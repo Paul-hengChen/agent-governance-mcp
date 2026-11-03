@@ -44,6 +44,10 @@ export const STAGE_PATHS = Object.freeze({
     + " dist/ .current/.config.json docs/backlog.md tasks.md .current/_primary/tasks.md CLAUDE.md AGENTS.md .antigravityrules").split(" ")),
 });
 
+const STAGE_MEMBERS = Object.freeze([...STAGE_PATHS.featureDirs, ...STAGE_PATHS.metadataPaths]);
+// `p` is the member itself, or lies under it when the member is a directory.
+const under = (p, member) => (member.endsWith("/") ? p.startsWith(member) : p === member);
+
 const SEMVER = /^\d+\.\d+\.\d+$/, TAG = /^v\d+\.\d+\.\d+$/, REL = /^release\/[A-Za-z0-9._-]+$/;
 const any = () => true;
 // exact(...want)(a): a = [verb, ...rest] and rest matches want slot by slot.
@@ -185,8 +189,7 @@ export function parseArgs(argv) {
 // A status path is expected when the release commit may stage it, or it
 // lies under .current/, or it is the root task ledger.
 export function checkScope(statusPaths) {
-  const ok = (p) => p === "tasks.md" || p.startsWith(".current/") || STAGE_PATHS.featureDirs.some((d) => p.startsWith(d))
-    || STAGE_PATHS.metadataPaths.some((m) => (m.endsWith("/") ? p.startsWith(m) : p === m));
+  const ok = (p) => p === "tasks.md" || p.startsWith(".current/") || STAGE_MEMBERS.some((m) => under(p, m));
   const bad = statusPaths.find((p) => !ok(p));
   return bad === undefined ? null : `Pre-existing uncommitted changes found in ${bad} — this path is unrelated to the active feature. Commit or stash it first.`;
 }
@@ -200,6 +203,7 @@ function readInput(root, file, label) {
   if (rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))) throw usage(`${label} ${file} is inside the repository — keep it outside the repository root`);
   try { return readFileSync(abs, "utf-8"); } catch (e) { throw usage(`${label} ${file} is unreadable: ${e.message}`); }
 }
+const releaseSubject = (version) => new RegExp(`^chore\\(release\\): v${version.replace(/\./g, "\\.")} — .+$`);
 const lastLine = (text) => String(text).trim().split("\n").filter(Boolean).pop() ?? "";
 const gitOut = (r, args, step) => { const res = r.read("git", args, { step }); return res.status === 0 ? res.stdout.trim() : null; };
 
@@ -211,8 +215,7 @@ function preInputs(ctx) {
   if (!pass) throw usage(`--state must be a (qa-engineer, PASS) snapshot with an active_feature (got ${state?.last_agent}, ${state?.status})`);
   if (!safeSegment(state.active_feature)) throw usage(`--state active_feature ${JSON.stringify(state.active_feature)} cannot name an archive directory`);
   const message = readInput(root, opts.messageFile, "--message-file");
-  const subject = new RegExp(`^chore\\(release\\): v${opts.version.replace(/\./g, "\\.")} — .+$`);
-  if (!subject.test(message.split("\n")[0])) throw usage(`--message-file first line must be "chore(release): v${opts.version} — <summary>"`);
+  if (!releaseSubject(opts.version).test(message.split("\n")[0])) throw usage(`--message-file first line must be "chore(release): v${opts.version} — <summary>"`);
   if (opts.tickets === undefined && existsSync(path.join(root, "docs/backlog.md"))) throw usage("--tickets is required while docs/backlog.md exists (pass none when the feature has no row)");
   Object.assign(ctx, { state, message });
 }
@@ -233,6 +236,15 @@ function viewPr(ctx, branch) {
   if (res.status !== 0) return null;
   try { return JSON.parse(res.stdout); } catch { throw new ReleaseStop("INTERNAL", `gh pr view ${branch} printed non-JSON output`); }
 }
+// Every path `git status` reports; entries are "XY path\0", and a rename
+// or copy adds "origin\0" after it.
+function readStatusPaths(r, step) {
+  const st = r.read("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { step });
+  if (st.status !== 0) throw new ReleaseStop("INTERNAL", `git status exited ${st.status}`);
+  const f = st.stdout.split("\0"), paths = [];
+  for (let i = 0; i < f.length; i++) if (f[i]) { paths.push(f[i].slice(3)); if (/^[RC]/.test(f[i]) && f[i + 1]) paths.push(f[++i]); }
+  return paths;
+}
 function prePrepare(ctx) {
   const { opts, root, runner: r } = ctx, v = opts.version, rel = `release/v${v}`;
   requireBranch(ctx, (b) => b === rel, rel);
@@ -248,11 +260,7 @@ function prePrepare(ctx) {
   if (ctx.prevTag && ctx.prevTag !== `v${v}` && readme.includes(`#${ctx.prevTag}`)) throw new ReleaseStop("VERSION_INCOHERENT", `README.md still pins #${ctx.prevTag}`);
   const cv = r.read("node", ["scripts/check-version.mjs"], { step: "pre-5" });
   if (cv.status !== 0) throw new ReleaseStop("VERSION_INCOHERENT", `check-version.mjs exited ${cv.status} — ${lastLine(cv.stderr)}`);
-  const st = r.read("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { step: "pre-6" });
-  if (st.status !== 0) throw new ReleaseStop("INTERNAL", `git status exited ${st.status}`);
-  // Entries are "XY path\0"; a rename or copy adds "origin\0" after it.
-  const f = st.stdout.split("\0"), paths = (ctx.statusPaths = []);
-  for (let i = 0; i < f.length; i++) if (f[i]) { paths.push(f[i].slice(3)); if (/^[RC]/.test(f[i]) && f[i + 1]) paths.push(f[++i]); }
+  ctx.statusPaths = readStatusPaths(r, "pre-6");
   const unrelated = checkScope(ctx.statusPaths);
   if (unrelated) throw new ReleaseStop("UNRELATED_CHANGES", unrelated);
 }
@@ -502,11 +510,130 @@ function step7d(ctx) {
   }
 }
 
+// ---- Step 8a, part 1: stage plan, staging completeness, CHANGELOG citations ----
+
+const nulList = (text) => String(text).split("\0").filter(Boolean);
+
+// The STAGE_PATHS members, in list order, that exist and cover a changed
+// path. A missing pathspec would make `git add` stage nothing at all.
+export function planStage({ changed, exists }) {
+  return STAGE_MEMBERS.filter((m) => exists(m) && changed.some((p) => under(p, m)));
+}
+
+// `changed`: status paths before staging; `staged`: the index after it (or,
+// under dry-run, the changed paths the plan covers); `unstaged` / `untracked`:
+// leftovers outside .current/, which never ships in the release commit.
+export function checkStagingCompleteness({ changed, staged, unstaged = [], untracked = [] }) {
+  const missing = STAGE_PATHS.featureDirs.filter((d) => changed.some((p) => p.startsWith(d)) && !staged.some((p) => p.startsWith(d)));
+  const problems = [];
+  if (missing.length > 0) problems.push(`feature dir(s) with changes absent from the index: ${missing.join(" ")}`);
+  if (unstaged.length > 0) problems.push(`tracked file(s) left unstaged: ${unstaged.join(" ")}`);
+  if (untracked.length > 0) problems.push(`untracked file(s) never staged: ${untracked.join(" ")}`);
+  return { pass: problems.length === 0, missing, problems };
+}
+
+function step8aStage(ctx) {
+  const { root, runner: r, opts } = ctx, step = "8a-1";
+  // A dry-run never ran the earlier writes and moves, so their paths stand in for the status.
+  const planned = r.dryRun ? r.actions.filter((a) => a.kind === "fs" && a.op !== "mkdir").flatMap((a) => (a.dest ? [a.path, a.dest] : [a.path])) : [];
+  const changed = [...new Set([...readStatusPaths(r, step), ...planned])];
+  const plan = planStage({ changed, exists: (m) => existsSync(path.join(root, m)) || planned.some((p) => under(p, m)) });
+  ctx.stagePlan = plan;
+  if (plan.length > 0) {
+    const add = r.mutate("git", ["add", "--", ...plan], { step });
+    if (add.status !== 0) throw new ReleaseStop("MUTATION_FAILED", `git add exited ${add.status} — ${lastLine(add.stderr)}`);
+  } else {
+    // Nothing to stage on top of the release commit means a re-run after it; the commit step is then skipped.
+    const head = gitOut(r, ["log", "-1", "--format=%s"], step);
+    if (head === null || !releaseSubject(opts.version).test(head)) {
+      throw new ReleaseStop("STAGING_INCOMPLETE", `nothing to commit — no STAGE_PATHS member has a change and HEAD is not the v${opts.version} release commit`);
+    }
+    ctx.commitMade = true;
+    ctx.out(`release: [${step}] nothing to stage — HEAD is already the v${opts.version} release commit\n`);
+  }
+  const covered = (p) => plan.some((m) => under(p, m));
+  const cached = r.deferred("git", ["diff", "--cached", "--name-only", "-z", "--no-renames"], { step });
+  if (cached && cached.status !== 0) throw new ReleaseStop("INTERNAL", `git diff --cached exited ${cached.status}`);
+  const staged = cached ? nulList(cached.stdout) : changed.filter(covered);
+  // Dry-run reads the untouched index, so what the plan would stage is not a leftover.
+  const leftovers = (args) => {
+    const res = r.read("git", args, { step });
+    if (res.status !== 0) throw new ReleaseStop("INTERNAL", `git ${args[0]} exited ${res.status}`);
+    return nulList(res.stdout).filter((p) => !r.dryRun || !covered(p));
+  };
+  const verdict = checkStagingCompleteness({
+    changed, staged,
+    unstaged: leftovers(["diff", "--name-only", "-z", "--", ".", ":!.current"]),
+    untracked: leftovers(["ls-files", "--others", "--exclude-standard", "-z", "--", ".", ":!.current"]),
+  });
+  if (!verdict.pass) throw new ReleaseStop("STAGING_INCOMPLETE", `${verdict.problems.join("; ")} — stage them and re-run`);
+  ctx.staged = staged;
+}
+
+// The `## [X.Y.Z] - ` section of CHANGELOG.md up to the next `## ` heading, or null.
+export function extractChangelogEntry(changelogText, version) {
+  const lines = String(changelogText ?? "").split("\n"), start = lines.findIndex((l) => l.startsWith(`## [${version}] - `));
+  if (start < 0) return null;
+  const end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
+  return lines.slice(start, end < 0 ? undefined : end).join("\n");
+}
+
+const CITATION_RE = /^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.*-]+)*\/?(:\d+)?$/;
+const CITED_EXT_RE = /\.(md|mjs|js|ts|json|yml|txt)$/;
+// File paths cited as code spans; `context` is true when `(context, not
+// changed)` follows the span. Spans with a `*` are patterns, not paths.
+export function extractCitations(entry) {
+  const out = [], seen = new Set();
+  for (const m of String(entry ?? "").matchAll(/`([^`\n]+)`(\s*\(context, not changed\))?/g)) {
+    const span = m[1].trim();
+    if (span.includes("*") || !CITATION_RE.test(span)) continue;
+    const cited = span.replace(/:\d+$/, ""), context = m[2] !== undefined, key = `${context}:${cited}`;
+    if ((cited.includes("/") || CITED_EXT_RE.test(cited)) && !seen.has(key)) { seen.add(key); out.push({ path: cited, context }); }
+  }
+  return out;
+}
+
+// One problem line per failing citation: a context citation must exist on
+// disk; any other must be changed in the union (a trailing `/` matches any
+// file under it).
+export function checkChangelogCitations({ citations, union, exists }) {
+  const files = [...union];
+  return citations.flatMap(({ path: cited, context }) => {
+    if (context) return exists(cited) ? [] : [`\`${cited}\` (context, not changed) does not exist on disk`];
+    const hit = cited.endsWith("/") ? files.some((f) => f.startsWith(cited)) : files.includes(cited);
+    return hit ? [] : [`\`${cited}\` is cited but not changed in PREV_TAG..HEAD or the stage plan`];
+  });
+}
+
+function step8aCitations(ctx) {
+  const { root, runner: r, opts, prevTag } = ctx, step = "8a-2", abs = path.join(root, "CHANGELOG.md");
+  const entry = extractChangelogEntry(existsSync(abs) ? readFileSync(abs, "utf-8") : "", opts.version);
+  if (entry === null) throw new ReleaseStop("CHANGELOG_CITATION", `CHANGELOG.md has no "## [${opts.version}] - " entry`);
+  let range = [];
+  if (prevTag) {
+    const res = r.read("git", ["diff", "--name-only", "-z", "--no-renames", `${prevTag}..HEAD`], { step });
+    if (res.status !== 0) throw new ReleaseStop("INTERNAL", `git diff ${prevTag}..HEAD exited ${res.status}`);
+    range = nulList(res.stdout);
+  }
+  const union = new Set([...range, ...ctx.staged]);
+  // Existence is checked inside the repository only.
+  const exists = (rel) => {
+    const a = path.resolve(root, rel), back = path.relative(root, a);
+    return !back.startsWith("..") && !path.isAbsolute(back) && existsSync(a);
+  };
+  const problems = checkChangelogCitations({ citations: extractCitations(entry), union, exists });
+  if (problems.length > 0) {
+    for (const p of problems) ctx.err(`release: [${step}] ${p}\n`);
+    throw new ReleaseStop("CHANGELOG_CITATION", `${problems.length} citation(s) in the v${opts.version} entry fail: ${problems.join("; ")}`);
+  }
+  Object.assign(ctx, { changelogEntry: entry, unionFiles: [...union].sort() });
+}
+
 // Steps after the preconditions are not built yet; each phase stops as
 // INTERNAL there, so no run reports success for work it did not do.
 const notYet = (what) => () => { throw new ReleaseStop("INTERNAL", `${what} not implemented yet`); };
 const PHASES = {
-  prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, notYet("prepare step 8a")],
+  prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, notYet("prepare steps 8a-3..8a-6")],
   publish: [preGh, prePublish, notYet("publish steps 8b-9a")],
   "close-out": [preGh, preCloseOut, notYet("close-out steps 13a-13b")],
 };
@@ -516,7 +643,7 @@ export async function main(argv, deps = {}) {
   try {
     const opts = parseArgs(argv);
     if (opts.phase === "help") { out(USAGE_TEXT); return 0; }
-    const root = deps.root ?? ROOT, ctx = { opts, root, deps, out };
+    const root = deps.root ?? ROOT, ctx = { opts, root, deps, out, err };
     ctx.runner = createRunner({ root, dryRun: opts.dryRun, spawn: deps.spawn, env: deps.env ?? process.env, out, err });
     for (const step of PHASES[opts.phase]) await step(ctx);
     const v = `v${opts.version}`;
