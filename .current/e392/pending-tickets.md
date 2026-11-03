@@ -17,5 +17,6 @@ body: |
   sentence is pinned by test/e96-dispatch-preference.test.mjs (t-fallback-genuine-unavailability),
   so the test changes with it; re-capture the compose goldens and re-measure the teamwork and
   lean budgets.
+```
 
 ## Applied
