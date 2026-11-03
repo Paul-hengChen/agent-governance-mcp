@@ -205,14 +205,24 @@ function readInput(root, file, label) {
 }
 const releaseSubject = (version) => new RegExp(`^chore\\(release\\): v${version.replace(/\./g, "\\.")} — .+$`);
 const lastLine = (text) => String(text).trim().split("\n").filter(Boolean).pop() ?? "";
+// `text` holds the install pin `#<tag>` as a whole token: `#v1.2.1` is not
+// found inside `#v1.2.10` (the same tail boundary as versionToken).
+const reEscape = (t) => t.replace(/[.*+?^$()|[\]{}\\]/g, "\\$&");
+const pinsTag = (text, tag) => new RegExp(`#${reEscape(tag)}(?!\\w|\\.\\d)`).test(text);
 const gitOut = (r, args, step) => { const res = r.read("git", args, { step }); return res.status === 0 ? res.stdout.trim() : null; };
 
+// A state read view that elided entries: it carries a `*_truncated` key or a
+// pending note beginning with the read-view marker.
+const READ_VIEW_MARKER = "⟦agc read-view⟧";
+const readViewTruncated = (state) => "pending_notes_truncated" in state || "completed_tasks_truncated" in state
+  || (Array.isArray(state.pending_notes) && state.pending_notes.some((n) => typeof n === "string" && n.startsWith(READ_VIEW_MARKER)));
 function preInputs(ctx) {
   const { opts, root } = ctx;
   let state;
   try { state = JSON.parse(readInput(root, opts.statePath, "--state")); } catch (e) { throw e instanceof ReleaseStop ? e : usage(`--state is not JSON: ${e.message}`); }
   const pass = state?.last_agent === "qa-engineer" && state.status === "PASS" && typeof state.active_feature === "string" && state.active_feature;
   if (!pass) throw usage(`--state must be a (qa-engineer, PASS) snapshot with an active_feature (got ${state?.last_agent}, ${state?.status})`);
+  if (readViewTruncated(state)) throw usage("--state is a truncated read view (notes or task ids were omitted, so a release-scope note may be hidden) — supply the untruncated state built from the on-disk handoff");
   if (!safeSegment(state.active_feature)) throw usage(`--state active_feature ${JSON.stringify(state.active_feature)} cannot name an archive directory`);
   const message = readInput(root, opts.messageFile, "--message-file");
   if (!releaseSubject(opts.version).test(message.split("\n")[0])) throw usage(`--message-file first line must be "chore(release): v${opts.version} — <summary>"`);
@@ -258,8 +268,8 @@ function prePrepare(ctx) {
   if (pkg.version !== v) throw new ReleaseStop("VERSION_INCOHERENT", `--version ${v} ≠ package.json version ${pkg.version}`);
   ctx.prevTag = gitOut(r, ["describe", "--tags", "--abbrev=0"], "pre-5") || null;
   const readme = existsSync(path.join(root, "README.md")) ? readFileSync(path.join(root, "README.md"), "utf-8") : "";
-  if (!readme.includes(`#v${v}`)) throw new ReleaseStop("VERSION_INCOHERENT", `README.md has no #v${v} install pin`);
-  if (ctx.prevTag && ctx.prevTag !== `v${v}` && readme.includes(`#${ctx.prevTag}`)) throw new ReleaseStop("VERSION_INCOHERENT", `README.md still pins #${ctx.prevTag}`);
+  if (!pinsTag(readme, `v${v}`)) throw new ReleaseStop("VERSION_INCOHERENT", `README.md has no #v${v} install pin`);
+  if (ctx.prevTag && ctx.prevTag !== `v${v}` && pinsTag(readme, ctx.prevTag)) throw new ReleaseStop("VERSION_INCOHERENT", `README.md still pins #${ctx.prevTag}`);
   const cv = r.read("node", ["scripts/check-version.mjs"], { step: "pre-5" });
   if (cv.status !== 0) throw new ReleaseStop("VERSION_INCOHERENT", `check-version.mjs exited ${cv.status} — ${lastLine(cv.stderr)}`);
   ctx.statusPaths = readStatusPaths(r, "pre-6");
@@ -292,7 +302,7 @@ const safeSegment = (s) => typeof s === "string" && s !== "" && s !== "." && s !
 // `name` matches the glob `<prefix>*<suffix>`.
 const globbed = (name, prefix, suffix) => name.length >= prefix.length + suffix.length && name.startsWith(prefix) && name.endsWith(suffix);
 
-// The ticket code in an evidence basename (`review_T-E37-01.md` → E37), or null.
+// The ticket code in an evidence basename (`review_T-ABC-01.md` → ABC), or null.
 export function codeFromBasename(basename) {
   const m = CODE_RE.exec(basename);
   return m ? m[1].toUpperCase() : null;
@@ -1058,4 +1068,11 @@ export async function main(argv, deps = {}) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(await main(process.argv.slice(2)));
+// Run as a CLI when this file is the entry point, however it was reached: real
+// paths are compared, so a symlinked directory in argv[1] still matches.
+const realOrNull = (p) => { try { return realpathSync(p); } catch { return null; } };
+const isEntry = () => {
+  const self = realOrNull(fileURLToPath(import.meta.url));
+  return Boolean(process.argv[1]) && self !== null && realOrNull(process.argv[1]) === self;
+};
+if (isEntry()) process.exit(await main(process.argv.slice(2)));
