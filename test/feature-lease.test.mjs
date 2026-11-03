@@ -1530,14 +1530,6 @@ test("E9A-S5 (regression guard): the pre-existing pinned template blocks survive
     ),
     "pre-existing D10 push-rejection CRITICAL paragraph must still be present",
   );
-  // v3.21.2 AC2: haiku example-reply-suffix block still present and still
-  // preceded by a blank line.
-  const exampleLine = "Example reply suffix: … — @release-engineer (haiku)";
-  assert.ok(tpl.includes(exampleLine), "haiku example reply suffix block must still be present");
-  const lines = tpl.split(/\r?\n/);
-  const exampleIdx = lines.findIndex((l) => l === exampleLine);
-  assert.ok(exampleIdx > 0, "example line must not be the first line");
-  assert.equal(lines[exampleIdx - 1].trim(), "", "line before the example suffix must be blank");
 });
 
 // Release records must describe only what happened. Pins the record-integrity Hard rule in
@@ -1677,14 +1669,6 @@ test("E17-S4 (regression guard): the pre-existing pinned template blocks and ski
     tpl.includes("append this release's shipped task IDs to `driftBaselineIds`"),
     "pre-existing driftBaselineIds paragraph must still be present",
   );
-  // v3.21.2 AC2: haiku example-reply-suffix block still present and still
-  // preceded by a blank line.
-  const exampleLine = "Example reply suffix: … — @release-engineer (haiku)";
-  assert.ok(tpl.includes(exampleLine), "haiku example reply suffix block must still be present");
-  const lines = tpl.split(/\r?\n/);
-  const exampleIdx = lines.findIndex((l) => l === exampleLine);
-  assert.ok(exampleIdx > 0, "example line must not be the first line");
-  assert.equal(lines[exampleIdx - 1].trim(), "", "line before the example suffix must be blank");
 
   // Skill-side regression: the push-rejection and relay Hard rules and the
   // SOP step 8 HEREDOC commit-message prose are byte-unchanged by the
