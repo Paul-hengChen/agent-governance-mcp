@@ -1,12 +1,12 @@
 ---
 schema_version: 15
-active_feature: "release-prompt-audit-w2"
+active_feature: "release-prompt-audit-w3"
 status: "In_Progress"
-last_updated: "2026-11-03T03:40:22.129Z"
+last_updated: "2026-11-03T11:26:42.016Z"
 last_agent: "release-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "Evidence-only release gate for v4.17.0, same shape as release-prompt-audit-w1 (v4.16.1). Covers prompt-audit wave 2 (PR #64, merge a4080f7, head 9f5163e; plan specs/fanout-e393-builder-judge-core.md; single lane e393, merge 29f5844, lane head e9f5de0) plus bookkeeping PRs #62 (v4.16.1 post-release, ebeb96d) and #63 (E393 fan-out plan, f664ec9). 23 commits, 60 paths (48 lane + 12 bookkeeping). Text only: 18 content/ files, CLAUDE.md:233 and templates/agent-adapters/claude.md:12, 12 compose-goldens, six test edits, one new test. No dist/, bin/, scripts/, tools/, gates/, prompts/, schema, error-code or dependency change; GATE_REGISTRY stays 35, pipeline 18. Five qa-engineer verification tasks (T-RELPA2-01..05, AC1-AC13), no code or test changes; adopter-visible changes executed old-vs-new through dist (AC10 composition probe, AC11 switchRole probe); context-budget floor 2080 -> 1999 recorded as human ruling with headroom measured (AC12). Version decided by the human: v4.17.0 MINOR; QA verifies against current 4.16.1. Release-engineer owns bump, CHANGELOG with upgrade note, stamps, release/v4.17.0 PR, tag, GitHub release, archiving and the follow-up bookkeeping PR."
+scope_decision_why: "Evidence-only release gate for v4.18.0, same shape as release-prompt-audit-w2 (v4.17.0). Covers prompt-audit wave 3 (PR #68, merge 463f81a, head e51bf3b; plan specs/fanout-e392-e394.md; lanes e392 (E392+E280, merge 657b3d5, head 62f9db7; fence fix merge 8519793) and e394 (E394 items 1-3, merge 9a120cd, head f0d1a23)) plus bookkeeping PRs #66 (v4.17.0 post-release, 2f0f358) and #67 (wave plan, 89e01c6). 64 commits, 82 paths (32 e392 + 36 e394 - 1 shared test/feature-lease.test.mjs + 15 bookkeeping). Code this time: tools/role.ts and tools/registry.ts (tw_switch_role gains coordinator), 8 dist/tools/{role,registry}.* files, new scripts/release.mjs; 3 content files, 3 templates, CLAUDE.md:233, 1 golden, 13 test re-pins, 3 new tests, 5 specs. No gates/, schema/, prompts/, bin/, transitions, error-code or dependency change; GATE_REGISTRY stays 35, pipeline 18. Six qa-engineer verification tasks (T-RELPA3-01..06, AC1-AC15), no code or test changes; adopter-visible changes executed old-vs-new through dist (AC10 coordinator probe, AC11 budget probe, AC12 release SOP + release.mjs dry-run refusals on main); AC15 records first-run preconditions of release.mjs (untracked draft staging hazard, spec check). Version decided by the human: v4.18.0 MINOR; QA verifies against current 4.17.0. Release-engineer owns bump, CHANGELOG with upgrade note, stamps, done-marks, release.mjs prepare/publish/close-out."
 cut_approved: true
 dispatch_pins:
   pm: "opus"
@@ -14,7 +14,7 @@ dispatch_pins:
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-11-03T03:40:22.129Z"
+dispatched_at: "2026-11-03T11:26:42.016Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -28,20 +28,22 @@ visual_rounds_total: 0
 # Handoff State
 
 ## Completed
-- [x] T-RELPA2-01
-- [x] T-RELPA2-02
-- [x] T-RELPA2-03
-- [x] T-RELPA2-04
-- [x] T-RELPA2-05
+- [x] T-RELPA3-01
+- [x] T-RELPA3-02
+- [x] T-RELPA3-03
+- [x] T-RELPA3-04
+- [x] T-RELPA3-05
+- [x] T-RELPA3-06
 
 ## Pending & Handoff Notes
-- Released v4.17.0
-- tag: 66314bcc95d29dfb1e8aa67044430904cc1d9d8c (annotated tag object) -> commit 5181e75ff41e34516af2159f8135763bdf8272fe (PR #65 merge of release commit 0569930)
-- GitHub release: https://github.com/Paul-hengChen/agent-governance-mcp/releases/tag/v4.17.0
-- checks: pre-flight CI (a4080f7) PASSED; npx tsc 0 errors; check-version OK 4.17.0; check:transitions-sync OK; npm test 3857/3859 (2 skipped, 0 fail); npm audit --audit-level=high exit 0 (1 low, 6 moderate); agc check OK 4.17.0; step 8b CI-CHECK --strict PASSED (0569930, Node 20+22); verify-release v4.17.0 ALL CHECKS PASSED (CI wait budget DEFAULT_WAIT_SECONDS=480, env unset)
-- step 7a: PREV_TAG=v4.16.1, CODES={E393 RELPA2}; 6 E393 + 5 RELPA2 qa reports -> qa_reports/archive/release-prompt-audit-w2/, review_T-E393-01 -> review_reports/archive/release-prompt-audit-w2/, expected-red_e393-builder-judge-core.txt -> qa_reports/archive/e393-builder-judge-core/
-- AC4: MULTI-FEATURE branch (R) — range-derived: specs/e393-builder-judge-core.md, specs/release-prompt-audit-w2.md present in v4.16.1..HEAD
-- record notes: docs/agc-ticket-draft-wc32.md left untracked and unstaged per coordinator brief (sole leftover in the E94 root-file completeness check); E393 marked shipped v4.17.0 in docs/backlog.md only — docs/v4.0.0-new-tickets.md queue row left unchanged (v4.16.1 precedent did not edit it; outside release-engineer allowlist); CLAUDE.md 222 -> 223 test files x2 per human ruling (a); driftBaselineIds += T-RELPA2-01..05
+- Released v4.18.0
+- tag: 3d9f354857672b0749f0ac103cb1cdcdb420af5a
+- release commit 67ec0cf via PR #69 (release/v4.18.0, merged --auto --merge); GitHub release https://github.com/Paul-hengChen/agent-governance-mcp/releases/tag/v4.18.0; first real run of scripts/release.mjs: prepare OK (one prepare dry-run CHANGELOG_CITATION exit 31 on a bare `release.mjs` span, fixed per row and re-run), publish OK, verify-release ALL CHECKS PASSED
+- checks: npx tsc 0 errors; check-version OK 4.18.0; check:transitions-sync OK; npm test (test lock, Node 22) 3956/3958 pass, 0 fail, 2 skipped; npm audit --audit-level=high exit 0 at steps 3 and 9 (1 low, 6 moderate, no HIGH/CRITICAL); pre-flight and strict CI-CHECK PASSED; check:bookkeeping OK; agc check OK at 4.18.0
+- Human exception to the SOP Artifact list (Ruling 1a): CLAUDE.md '223 test files' -> '226 test files' at lines 126 and 158 in the release commit, count fix only, alongside the agc-version stamp
+- Ruling 2A honoured: docs/agc-ticket-draft-wc32.md untracked, excluded, not staged or touched; .git/info/exclude untouched
+- done-marks: docs/backlog.md E280, E392, E394 now 'shipped v4.18.0' (no other row); driftBaselineIds gains T-RELPA3-01..06; evidence archived to qa_reports/archive/release-prompt-audit-w3/ and review_reports/archive/release-prompt-audit-w3/
+- Deferred per CHANGELOG: E404 (template slimming), E405 (release.mjs as CD). Next: pm backlog intake
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
