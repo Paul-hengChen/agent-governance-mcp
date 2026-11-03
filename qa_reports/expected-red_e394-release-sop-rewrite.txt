@@ -90,3 +90,5 @@ test/verify-release.test.mjs | VR-10 (AC10): skill-release-engineer.md requires 
 test/verify-release.test.mjs | VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after push/gh-release and before the closing write, plus a matching Escalation Routes row
 test/verify-release.test.mjs | VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries no hardcoded duration literal and sources it from DEFAULT_WAIT_SECONDS
 test/verify-release.test.mjs | VR-9c (N11): step 13a's non-empty-stage assertion is scoped to catching a fully-empty stage, not partial under-staging
+# test/e394-release-script.test.mjs — T-E394-11, red because scripts/release.mjs violates its AC (sr-engineer fixes before the re-pin dispatches)
+test/e394-release-script.test.mjs | AC-S2 VERSION_INCOHERENT stops a stale README pin, not a correct bump whose version extends the old one (R3)
