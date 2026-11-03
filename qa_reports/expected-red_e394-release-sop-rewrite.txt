@@ -1,0 +1,92 @@
+# e394-release-sop-rewrite expected reds — T-E394-10 rewrote content/skill-release-engineer.md whole (base step numbering, inline
+# fragments, Escalation rows and incident text are gone; narratives now live in specs/release-sop-history.md). Every test below
+# pins base SOP wording and sits in the spec Test Re-pin Map; qa-engineer owns the re-pins (Constitution §2). Suite on 2d4b9a4:
+# 3779 pass / 65 fail / 2 skipped of 3846 (base 3859: e164-e167-content aborts at load, so its 14 tests report as 1 file-level failure).
+
+# test/e130-lane-default.test.mjs — re-pin map row, T-E394-13 (3)
+test/e130-lane-default.test.mjs | AC11: step 8a's PATHS= existence pre-filter variable stages .current/_primary/tasks.md
+test/e130-lane-default.test.mjs | AC11: step 8a's explicit git-add list stages .current/_primary/tasks.md
+test/e130-lane-default.test.mjs | AC11: the Artifact allowlist bullet names .current/_primary/tasks.md and explains the post-E125a ownership
+
+# test/e164-e167-content.test.mjs — re-pin map row, T-E394-14 (1)
+# module-level extractStep throws: step marker "8b. **CI gate**" not found; the file fails at load, reported under its own path.
+test/e164-e167-content.test.mjs | test/e164-e167-content.test.mjs
+
+# test/e166-template-defers-staging.test.mjs — re-pin map row, T-E394-14 (1)
+test/e166-template-defers-staging.test.mjs | T-E166-01c: the named anchors exist in content/skill-release-engineer.md, inside step 8a
+
+# test/e18-write-provenance.test.mjs — re-pin map row, T-E394-13 (1)
+test/e18-write-provenance.test.mjs | CONTENT-3: skill-release-engineer.md carries the COORDINATOR-RELAYED hard line (E18) naming the v3.85.0 incident and the new server-side gate
+
+# test/e297-main-protected-sop.test.mjs — re-pin map row, T-E394-13 (2)
+test/e297-main-protected-sop.test.mjs | AC3: release-engineer 8a-8c opens, merges and syncs through a release/vX.Y.Z pull request
+test/e297-main-protected-sop.test.mjs | AC4: the 8b budget advice survives and the pre-gate tag cleanup is gone
+
+# test/e336-portable-pull.test.mjs — re-pin map row, T-E394-13 (1)
+test/e336-portable-pull.test.mjs | AC-E336-1: skill-release-engineer.md has 0 plain and 6 portable pull command sites
+
+# test/feature-lease.test.mjs — re-pin map row, T-E394-13 (13)
+test/feature-lease.test.mjs | E13-AC6: content/skill-release-engineer.md carries the E13 terminal-marker resilience note near steps 12-13 (spec AC6)
+test/feature-lease.test.mjs | E17-S1: content/skill-release-engineer.md carries the CRITICAL record-integrity Hard rule bullet
+test/feature-lease.test.mjs | E17-S2: the record-integrity Hard rule's incident-reason tail names the v3.83.0 fabrication and its a484a4d correction (source file; fencing is a recorded decision — N10)
+test/feature-lease.test.mjs | E17-S4 (regression guard): the pre-existing pinned template blocks and skill Hard rules survive alongside the new E17 paragraph
+test/feature-lease.test.mjs | E9A-S1: content/skill-release-engineer.md carries the CRITICAL no-MCP-path relay Hard rule, never hand-edit
+test/feature-lease.test.mjs | E9A-S2: the CRITICAL relay Hard rule requires the exact literal tw_update_state call, verbatim values, RELAY REQUIRED: prefix
+test/feature-lease.test.mjs | E9A-S3: the amended Output rule gates 'Done. Released <tag>.' on a confirmed write, never speculative from an unverified relay
+test/feature-lease.test.mjs | S1: content/skill-release-engineer.md carries the 'Re-baseline off HEAD' SOP step (T-E1-02)
+test/feature-lease.test.mjs | S2: skill-release-engineer.md re-baseline step names FEATURE_LEASE_HELD as the in-checkout serializer
+test/feature-lease.test.mjs | S3: skill-release-engineer.md's re-baseline step is also the documented D10 Blocked-recovery FIRST step
+test/feature-lease.test.mjs | S7: content/skill-release-engineer.md SOP step 12 pins agent_id="release-engineer" on the closing write and no longer instructs agent_id="pm" there (AC-E1A-7)
+test/feature-lease.test.mjs | S8: content/skill-release-engineer.md carries step 11b — the success-metrics emit note is automatic/best-effort and names .current/<lane>/metrics.jsonl (E174a)
+test/feature-lease.test.mjs | S8b: step 11b sits between step 11 and step 12 (ordering) and the E1A step-12 contract text remains byte-intact alongside it (regression guard vs S7)
+
+# test/release-staging.test.mjs — re-pin map row, T-E394-12 (35)
+# includes E59 site enumeration: the map lists E59 as unedited, but its three skill anchors require the base label "6a. **Dependency-audit disposition**";
+# the rewrite keeps the two outcome bullets (Already recorded / Not recorded ...) and drops the 6a label — map/architecture conflict, flagged for qa + reviewer.
+test/release-staging.test.mjs | AC1: skill-release-engineer.md's git-add line enumerates every required staging directory and metadata path IN ITS CAPTURE GROUP (rescoped, E64/T-E645-03 point 2)
+test/release-staging.test.mjs | AC2 (E94): Root-file completeness check — the two EXTRACTED commands, EXECUTED, discriminate the v3.104.2 escape from a correct release across four workspace shapes (adopter repo with no .current/, source outside FEATURE_DIRS, .current/ dirty, and the escape/PASS pair code-reviewer verified empirically)
+test/release-staging.test.mjs | AC2: skill-release-engineer.md includes pre-commit 'git diff --cached --stat' verify step
+test/release-staging.test.mjs | AC3: failure-mode wording is inverted — source dirs are EXPECTED, not blocked
+test/release-staging.test.mjs | AC4 (E44/E142(b)): skill-release-engineer.md's post-commit check is conditional on dispatch shape — REQUIRE/MULTI-FEATURE/SKIP/UNCLASSIFIABLE, four named branches, range-corrected
+test/release-staging.test.mjs | C13-AC5: skill-release-engineer.md contains the verbatim CRITICAL STOP-on-⛔ rule
+test/release-staging.test.mjs | D10-AC1/AC2: skill-release-engineer.md Hard rule includes the worked pending_notes example and the incident-reason clause
+test/release-staging.test.mjs | D10-AC1: skill-release-engineer.md Hard rule STOPs on non-fast-forward push / collision and forbids destructive git recovery
+test/release-staging.test.mjs | D10-AC2: skill-release-engineer.md Hard rule routes to status=Blocked with the local release-commit SHA, handing back for coordinator recovery
+test/release-staging.test.mjs | D10-AC3: skill-release-engineer.md Escalation Routes table has a matching non-fast-forward/collision row (Blocked, SHA pending-note, human)
+test/release-staging.test.mjs | E49 step 7a: skill text pins the ACTUALLY SHIPPED derivation literally, both lines, plus PREV_TAG's resolution
+test/release-staging.test.mjs | E49/E44 step-order pin: step 7a precedes step 8a (the commit) in the file, and 7a's derivation does not depend on the release commit's own content (guards F2's class from returning)
+test/release-staging.test.mjs | E50 step 7a (N14 CLOSED — pin repointed at the EXECUTABLE CODES= fence): does not resurrect the round-2 committed-history-only rule (a substring pin on the round-2 command must fail)
+test/release-staging.test.mjs | E50 step 7a (N14 follow-up): the illustrative fence and the executable CODES= fence carry an identical find/grep -vxFf predicate pair per tree
+test/release-staging.test.mjs | E50 step 7a: the guard block precedes the CODES= derivation, mkdir, and move bullets, and performs no writes itself
+test/release-staging.test.mjs | E53/E163: the Escalation Routes table now carries 10 data rows — E163's two new rows placed FIRST, the E53 empty-baseline-hazard row still LAST
+test/release-staging.test.mjs | E53: Escalation Routes rows :152-154 and :156 (not already byte-pinned by D10-AC3 or the release-self-check test) are unchanged
+test/release-staging.test.mjs | E53: pending-note escaping caveat — the :84 guard clause and the new table row are semantically verbatim but NOT byte-equal, and normalise identically
+test/release-staging.test.mjs | E53: step 7a's empty-baseline STOP is now a genuine Escalation Routes table row, not an in-SOP-only halt
+test/release-staging.test.mjs | E55: the terminal handback step names the post-release PM/backlog-intake dispatch as an explicit terminal step of the release handback, not a bare routing formality
+test/release-staging.test.mjs | E59: all 4 live §6 dependency-audit normative sites carry the disposition-channel replacement text (structural, per-site enumeration, re-baselined 2026-08-17 per review_T-E48-02.md round 1/2 C2)
+test/release-staging.test.mjs | E65: step 7b (driftBaselineIds), 7c (backlog done-marking), and 7d (adapter-stamp bump) are ALL ordered before step 8a's commit, in that relative order — order is the whole defect
+test/release-staging.test.mjs | E65: the adapter-stamp step exists, names all three deployed adapter files, and requires agc check to exit 0
+test/release-staging.test.mjs | E65: the five newly-staged metadata paths appear in step 8's git-add line
+test/release-staging.test.mjs | E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references the new general §6 sanctioned-git-ops whitelist by name/section, pointer-only (spec AC2)
+test/release-staging.test.mjs | E71(a): the existence pre-filter, EXTRACTED verbatim from the SOP and EXECUTED, stages exactly the existing paths under both bash and zsh, and the wrapper is proven necessary by a negative control
+test/release-staging.test.mjs | E71(a): the git-add line stages exactly 34 paths (19 directories + 15 metadata), set-equal to FEATURE_DIRS/METADATA_PATHS/E65_METADATA_PATHS/E94_METADATA_PATHS/E198B_METADATA_PATHS
+test/release-staging.test.mjs | E71(b): the covers: sweep's double-quoted glob, EXTRACTED verbatim and EXECUTED under zsh inside the mandated bash -c wrapper, is NOMATCH-safe; the historical single-quoted form is proven broken by a negative control
+test/release-staging.test.mjs | E71(c): the Expected-vs-unrelated scope rule names .current/** (minus .config.json) and tasks.md as explicit non-STOP exclusions
+test/release-staging.test.mjs | E71(d): step 7c names the DONE-but-unreleased pre-marked-row shape and states the version stamp is still owed
+test/release-staging.test.mjs | Expected vs unrelated scope rule (E64, T-E645-03 point 3): the scope-rule paragraph's OWN enumeration — not the whole document — names every FEATURE_DIR including gates/
+test/release-staging.test.mjs | T-E76-02 (class assertion, closes F1): every variable REFERENCED anywhere in the assembled step-7a script is ASSIGNED somewhere within it -- no fragment reaches for an outer-shell variable
+test/release-staging.test.mjs | T-E76-02 (class assertion, pins fragment 3's identity): exactly ONE fence in step 7a opens with the executable `CODES=$(` binding
+test/release-staging.test.mjs | T-E76-02 (single-invocation property, F2 regression guard): step 7a assembles into exactly one quoted-heredoc-fed bash invocation -- no `bash -c` reintroduced, delimiter quoted, exactly one closing STEP7A line
+test/release-staging.test.mjs | residual (review round 2, Minor 2; retargeted E76 round 2): review_reports move example is EXCLUDE_RR-guarded via an enclosing if; qa_reports move example is NOT YET EXCLUDE_QA-guarded (known asymmetry, non-blocking, PASSed by qa-engineer -- see qa_reports/review_T-E76-02.md)
+
+# test/render-structure.test.mjs — re-pin map row, T-E394-14 (4)
+test/render-structure.test.mjs | T-E69-02 AC: content/skill-release-engineer.md renders glue-free via buildPromptForRole (MCP prompt path)
+test/render-structure.test.mjs | T-E69-02 AC: content/skill-release-engineer.md renders glue-free via tw_switch_role (tools/role.ts)
+test/render-structure.test.mjs | T-E8795-02 AC: skill-release-engineer.md CHANGELOG citation check (E95) renders at fullDetail=false, rationale stripped, zero raw markers
+test/render-structure.test.mjs | T-E8795-02 AC: skill-release-engineer.md CHANGELOG citation check (E95) renders at fullDetail=true, with rationale retained
+
+# test/verify-release.test.mjs — re-pin map row, T-E394-13 (4)
+test/verify-release.test.mjs | VR-10 (AC10): skill-release-engineer.md requires a tw_get_state read-back immediately after the closing write, before the final reply
+test/verify-release.test.mjs | VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after push/gh-release and before the closing write, plus a matching Escalation Routes row
+test/verify-release.test.mjs | VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries no hardcoded duration literal and sources it from DEFAULT_WAIT_SECONDS
+test/verify-release.test.mjs | VR-9c (N11): step 13a's non-empty-stage assertion is scoped to catching a fully-empty stage, not partial under-staging
