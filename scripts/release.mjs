@@ -231,8 +231,8 @@ function requireBranch(ctx, allowed, want) {
   if (!allowed(branch, head)) throw new ReleaseStop("WRONG_BRANCH", `on ${branch} at ${head}, expected ${want}`);
   return { branch, head };
 }
-function viewPr(ctx, branch) {
-  const res = ctx.runner.read("gh", ["pr", "view", branch, "--json", "number,state,mergeable,mergeStateStatus,statusCheckRollup,mergeCommit,headRefOid"], { step: "pre-3" });
+function viewPr(ctx, branch, step = "pre-3") {
+  const res = ctx.runner.read("gh", ["pr", "view", branch, "--json", "number,state,mergeable,mergeStateStatus,statusCheckRollup,mergeCommit,headRefOid"], { step });
   if (res.status !== 0) return null;
   try { return JSON.parse(res.stdout); } catch { throw new ReleaseStop("INTERNAL", `gh pr view ${branch} printed non-JSON output`); }
 }
@@ -629,11 +629,115 @@ function step8aCitations(ctx) {
   Object.assign(ctx, { changelogEntry: entry, unionFiles: [...union].sort() });
 }
 
+// ---- Step 8a, part 2: spec classes, then commit, push and pull request ----
+
+// scope_decision_why records a backlog-row-as-spec mini-chain (PM/architect skipped).
+export const recordsMiniChain = (why) => typeof why === "string"
+  && /mini-chain/i.test(why) && /pm(\s*\/\s*|\s+)?arch(itect)?\s*(skip|skipped)/i.test(why);
+
+// Top-level feature specs in a file list (array, or one path per line);
+// wave manifests and architecture companions are left out.
+export function deriveRangeSpecs(files) {
+  const list = typeof files === "string" ? files.split("\n") : [...files];
+  return list.map((l) => l.trim()).filter((l) => /^specs\/[^/]+\.md$/.test(l) && !/^specs\/(fanout-.*|.*-architecture)\.md$/.test(l));
+}
+
+const SPEC_UNCLASSIFIABLE_TEXT = "AC4 unclassifiable: no specs/<active_feature>.md in the tree, pending_notes does not record a multi-feature release, and scope_decision_why does not record a backlog-row-as-spec mini-chain — record the dispatch shape in scope_decision_why (or author specs/<active_feature>.md) and re-run.";
+// No commit exists yet when this check stops, so the remedy is to stage, never to amend.
+const specRequireText = (spec) => `Release commit incomplete: ${spec} is absent from the release range <prev-tag>..HEAD. Stage the missing files and re-run.`;
+
+// M = a pending note "Multi-feature release: a, b (…)"; R = the range holds a
+// feature spec other than the active one. M or R → MULTI-FEATURE (R alone keeps
+// the active feature's single-feature outcome); else spec in tree → REQUIRE;
+// else mini-chain → SKIP; else UNCLASSIFIABLE. `unionFiles` is PREV_TAG..HEAD
+// plus the stage plan: the set the release commit's range will equal.
+export function classifySpecCheck({ feature, unionFiles, specExists, scopeWhy = "", pendingNotes = [], prevTag = "<prev-tag>" }) {
+  const files = new Set(typeof unionFiles === "string" ? unionFiles.split("\n") : unionFiles);
+  const own = `specs/${feature}.md`, rangeDerived = deriveRangeSpecs([...files]), logs = [], range = `${prevTag}..HEAD`;
+  const R = rangeDerived.some((p) => p !== own);
+  const m = [pendingNotes].flat().join("\n").match(/^Multi-feature release:\s*(.+?)\.?\s*$/m);
+  const done = (branch, classId = null, errorMsg = null) => ({ pass: classId === null, branch, classId, errorMsg, rangeDerived, logs });
+  const skipLog = `AC4: SKIP branch — no ${own} in tree; scope_decision_why records backlog-row-as-spec mini-chain`;
+  if (m || R) {
+    logs.push(`AC4: MULTI-FEATURE branch — range-derived: ${rangeDerived.join(", ") || "none"} present in ${range}`);
+    if (!m) {
+      if (specExists(feature)) { if (!files.has(own)) return done("MULTI-FEATURE", "SPEC_REQUIRE", specRequireText(own)); }
+      else if (recordsMiniChain(scopeWhy)) logs.push(skipLog);
+      else return done("MULTI-FEATURE", "SPEC_UNCLASSIFIABLE", SPEC_UNCLASSIFIABLE_TEXT);
+      return done("MULTI-FEATURE");
+    }
+    for (const n of m[1].split(",").map((s) => s.replace(/\s*\([^)]*\)\s*$/, "").trim()).filter(Boolean)) {
+      const spec = `specs/${n}.md`;
+      if (!specExists(n)) { logs.push(`AC4: MULTI-FEATURE branch — ${n} has no ${spec}; logged and skipped by design (mini-chain convention)`); continue; }
+      if (!files.has(spec)) return done("MULTI-FEATURE", "SPEC_REQUIRE", specRequireText(spec));
+      logs.push(`AC4: MULTI-FEATURE branch — ${spec} present in ${range}`);
+    }
+    return done("MULTI-FEATURE");
+  }
+  if (specExists(feature)) {
+    if (!files.has(own)) return done("REQUIRE", "SPEC_REQUIRE", specRequireText(own));
+    logs.push(`AC4: REQUIRE branch — ${own} present in ${range}`);
+    return done("REQUIRE");
+  }
+  if (recordsMiniChain(scopeWhy)) { logs.push(skipLog); return done("SKIP"); }
+  return done("UNCLASSIFIABLE", "SPEC_UNCLASSIFIABLE", SPEC_UNCLASSIFIABLE_TEXT);
+}
+
+// Runs before the commit, so a stop leaves no commit behind.
+function step8aSpecs(ctx) {
+  const { root, state } = ctx, step = "8a-3";
+  const verdict = classifySpecCheck({
+    feature: state.active_feature, unionFiles: ctx.unionFiles, prevTag: ctx.prevTag ?? "<prev-tag>",
+    scopeWhy: typeof state.scope_decision_why === "string" ? state.scope_decision_why : "",
+    pendingNotes: Array.isArray(state.pending_notes) ? state.pending_notes.filter((n) => typeof n === "string") : [],
+    specExists: (n) => safeSegment(n) && existsSync(path.join(root, "specs", `${n}.md`)),
+  });
+  for (const l of verdict.logs) ctx.out(`release: [${step}] ${l}\n`);
+  if (!verdict.pass) throw new ReleaseStop(verdict.classId, verdict.errorMsg);
+}
+
+// The branch and local sha a Blocked note names, with the call's last stderr line.
+function failedAt(ctx, what, res, step) {
+  const head = gitOut(ctx.runner, ["rev-parse", "HEAD"], step) ?? "<unknown>";
+  return `${what} exited ${res.status} on ${ctx.runner.branch} at ${head} — ${lastLine(res.stderr) || "no output"}`;
+}
+
+// Commit, push and pull request; each one is skipped when a re-run finds it already done.
+function step8aCommitPushPr(ctx) {
+  const { runner: r, opts } = ctx, v = opts.version, rel = `release/v${v}`;
+  if (ctx.commitMade) ctx.out(`release: [8a-4] commit skipped — HEAD is already the v${v} release commit\n`);
+  else {
+    // The message file goes to git as an argument; it is never read by a shell.
+    const res = r.mutate("git", ["commit", "-F", path.resolve(opts.messageFile)], { step: "8a-4" });
+    if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git commit", res, "8a-4"));
+  }
+  // A commit made by this run cannot be upstream yet; only a resumed one is compared.
+  const head = ctx.commitMade ? gitOut(r, ["rev-parse", "HEAD"], "8a-5") : null;
+  const upstream = head && gitOut(r, ["rev-parse", "--verify", "--quiet", "@{u}"], "8a-5");
+  if (head && head === upstream) ctx.out(`release: [8a-5] push skipped — the upstream of ${rel} is already at ${head}\n`);
+  else {
+    const res = r.mutate("git", ["push", "-u", "origin", rel], { step: "8a-5" });
+    if (res.status !== 0) throw new ReleaseStop("PUSH_REJECTED", failedAt(ctx, `git push -u origin ${rel}`, res, "8a-5"));
+  }
+  const pr = viewPr(ctx, rel, "8a-6");
+  if (pr?.state === "OPEN") {
+    ctx.out(`release: [8a-6] pull request #${pr.number} for ${rel} is already open\n`);
+    ctx.okSuffix = ` — pull request #${pr.number}`;
+    return;
+  }
+  const title = ctx.message.split("\n")[0];
+  const res = r.mutate("gh", ["pr", "create", "--base", "main", "--head", rel, "--title", title, "--body", ctx.changelogEntry], { step: "8a-6" });
+  if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "gh pr create", res, "8a-6"));
+  if (r.dryRun) return;
+  const number = /\/pull\/(\d+)\s*$/.exec(res.stdout.trim())?.[1] ?? viewPr(ctx, rel, "8a-6")?.number;
+  ctx.okSuffix = ` — pull request #${number ?? "?"}`;
+}
+
 // Steps after the preconditions are not built yet; each phase stops as
 // INTERNAL there, so no run reports success for work it did not do.
 const notYet = (what) => () => { throw new ReleaseStop("INTERNAL", `${what} not implemented yet`); };
 const PHASES = {
-  prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, notYet("prepare steps 8a-3..8a-6")],
+  prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, step8aSpecs, step8aCommitPushPr],
   publish: [preGh, prePublish, notYet("publish steps 8b-9a")],
   "close-out": [preGh, preCloseOut, notYet("close-out steps 13a-13b")],
 };
