@@ -4,10 +4,11 @@
 // <CLASS_ID>: <detail>`; `--dry-run` runs every read and only records mutations.
 // Contract: specs/e394-release-sop-rewrite-architecture.md.
 
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, renameSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as path from "node:path";
+import * as os from "node:os";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PHASE_OF = { p: "prepare", u: "publish", c: "close-out" };
@@ -216,13 +217,38 @@ const gitOut = (r, args, step) => { const res = r.read("git", args, { step }); r
 const READ_VIEW_MARKER = "⟦agc read-view⟧";
 const readViewTruncated = (state) => "pending_notes_truncated" in state || "completed_tasks_truncated" in state
   || (Array.isArray(state.pending_notes) && state.pending_notes.some((n) => typeof n === "string" && n.startsWith(READ_VIEW_MARKER)));
-function preInputs(ctx) {
+// A handoff.md copy is parsed by the compiled canonical parser inside a
+// throwaway workspace under the OS temp directory (never the repository); the
+// parser may write migration results there, and the directory is removed.
+async function parseHandoffCopy(ctx, text) {
+  const { root, deps } = ctx, load = deps.importHandoffParse ?? (() => import(pathToFileURL(path.join(root, "dist/tools/handoff-parse.js")).href));
+  let parseHandoff;
+  try { ({ parseHandoff } = await load()); } catch (e) { throw usage(`--state is a handoff copy, but dist/tools/handoff-parse.js cannot be loaded (run npm run build) — ${e?.message ?? e}`); }
+  const tmp = mkdtempSync(path.join(os.tmpdir(), "release-state-"));
+  try {
+    mkdirSync(path.join(tmp, ".current"));
+    writeFileSync(path.join(tmp, ".current", "handoff.md"), text);
+    let state;
+    try { state = parseHandoff(tmp); } catch (e) { throw usage(`--state handoff copy cannot be parsed: ${e?.message ?? e}`); }
+    if (state === null || typeof state !== "object") throw usage("--state handoff copy cannot be parsed: the parser returned no state");
+    return state;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+// --state is either a verbatim handoff.md copy (it opens with the `---`
+// frontmatter fence) or a state JSON object.
+async function readState(ctx) {
+  const text = readInput(ctx.root, ctx.opts.statePath, "--state");
+  if (text.replace(/^\uFEFF/, "").startsWith("---")) return parseHandoffCopy(ctx, text);
+  try { return JSON.parse(text); } catch (e) { throw usage(`--state is neither a handoff copy nor JSON: ${e.message}`); }
+}
+async function preInputs(ctx) {
   const { opts, root } = ctx;
-  let state;
-  try { state = JSON.parse(readInput(root, opts.statePath, "--state")); } catch (e) { throw e instanceof ReleaseStop ? e : usage(`--state is not JSON: ${e.message}`); }
+  const state = await readState(ctx);
   const pass = state?.last_agent === "qa-engineer" && state.status === "PASS" && typeof state.active_feature === "string" && state.active_feature;
   if (!pass) throw usage(`--state must be a (qa-engineer, PASS) snapshot with an active_feature (got ${state?.last_agent}, ${state?.status})`);
-  if (readViewTruncated(state)) throw usage("--state is a truncated read view (notes or task ids were omitted, so a release-scope note may be hidden) — supply the untruncated state built from the on-disk handoff");
+  if (readViewTruncated(state)) throw usage("--state is a truncated read view (notes or task ids were omitted, so a release-scope note may be hidden) — pass a copy of the lane's handoff.md taken before the opening write");
   if (!safeSegment(state.active_feature)) throw usage(`--state active_feature ${JSON.stringify(state.active_feature)} cannot name an archive directory`);
   const message = readInput(root, opts.messageFile, "--message-file");
   if (!releaseSubject(opts.version).test(message.split("\n")[0])) throw usage(`--message-file first line must be "chore(release): v${opts.version} — <summary>"`);
