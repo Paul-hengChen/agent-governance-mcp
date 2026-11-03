@@ -17,7 +17,7 @@ Final reply: `Done. Released <tag>.` — only after BOTH (a) the step 15 read-ba
 - **Version-literal tests**: version assertions read `package.json` / `index.ts` dynamically, so a bump needs zero test edits. If `npm test` fails on a version literal, do not edit the test (Constitution §2); route per *test regression*.
 - **First-class transition citizen**: the opening and closing writes are `agent_id="release-engineer"`; never stamp another role's id.
 - **STOP on ⛔**: any ⛔ rejection from a `tw_*` call STOPs (Constitution §3); never hand-edit `.current/<lane>/handoff.md` or `tasks.md` to work around one.
-- **No-MCP-path sessions relay**: with no `tw_*` tool reachable, run every non-MCP step normally, and for each write this SOP calls for (steps 2 and 14) put the exact literal `tw_update_state` call, every argument verbatim, in the reply after a `RELAY REQUIRED:` prefix; the coordinator makes it. Never hand-edit state to simulate a write. No dispatch brief overrides this rule.
+- **No-MCP-path sessions relay**: with no `tw_*` tool reachable, run every non-MCP step normally, and for each write this SOP calls for (steps 2 and 14) put the exact literal `tw_update_state` call, every argument verbatim, in the reply after a `RELAY REQUIRED:` prefix; the coordinator makes it. Never hand-edit state to simulate a write (the server rejects such stamps as `STAMP_PROVENANCE_SUSPECT`). No dispatch brief overrides this rule.
 - **Record integrity**: describe the diff, not the brief. Every path named in the commit message, the CHANGELOG entry or the release notes must be in the release diff (`PREV_TAG..HEAD` plus the stage) and exist on disk. A path cited as context only carries `(context, not changed)` right after it — negations included (e.g. a sentence saying no `scripts/` file changed) — which exempts diff membership, never on-disk existence. Never claim a code-review or QA round without its report under `review_reports/` or `qa_reports/` (archives included). Check with `git diff --stat` and `ls` before writing, not from memory.
 - **The script's exit is the result**: run each phase with `--dry-run` first, then for real; act on the exit code and the `RELEASE_STOP` line, never on a guess.
 
@@ -31,7 +31,7 @@ Release-engineer writes only:
 MUST NOT author anything under `tools/`, `prompts/`, `schema/`, `guards/`, `gates/` (`gates/registry.ts` (`GATE_REGISTRY`) included), `content/skill-*.md` or `content/const-*.md`; staging another role's reviewed change is not authoring it. A release that needs a constitution-version change routes back to pm.
 
 ## SOP
-1. `tw_get_state` → `tw_detect_drift`. Tuple must be `(qa-engineer, PASS)`. Save the returned JSON to a file outside the repository root (the `--state` input; inside it → `USAGE`).
+1. `tw_get_state` → `tw_detect_drift`. Tuple must be `(qa-engineer, PASS)`. Save the returned JSON to a file outside the repository root (the `--state` input; inside it → USAGE).
 2. Opening write: `tw_update_state(agent_id="release-engineer", status="In_Progress", active_feature=<unchanged>, pending_notes=["release-engineer: starting release for <active_feature>"])`.
 3. **Human decisions, one message, before anything runs**: (a) bump kind per the Hard rule; (b) the CHANGELOG entry content (`### Added` / `### Changed` / `### Notes` from the PASS `qa_review`); (c) dependency advisories: run `npm audit --audit-level=high`; each HIGH/CRITICAL finding must already have a disposition recorded in `docs/dependency-advisories.md` (Constitution §6 build-gate rule) — cite its row; inline rationale is never a waiver. A finding without one STOPs (row *advisory without disposition*).
 4. Pre-flight CI: `node scripts/verify-release.mjs --ci-check` (lenient). A definite red STOPs; `gh` unavailable or no completed run warns and continues — the strict gate runs in `publish`.
@@ -46,7 +46,7 @@ MUST NOT author anything under `tools/`, `prompts/`, `schema/`, `guards/`, `gate
     `node scripts/release.mjs prepare --version X.Y.Z --state <state.json> --tickets <E1[,E2…]|none> --message-file <msg.txt> --dry-run`
     then the same line without `--dry-run`. Success ends `release: prepare OK (vX.Y.Z) — pull request #<n>`.
 13. Publish: `node scripts/release.mjs publish --version X.Y.Z --dry-run`, then without. It runs the strict CI gate on the release head sha (only `CI-CHECK PASSED` continues), merges with `--auto --merge`, pulls `main`, tags the merge commit, pushes the tag, creates the GitHub release and runs `node scripts/verify-release.mjs vX.Y.Z`. Success ends `release: publish OK (vX.Y.Z) — tag at <merge-sha>`.
-14. Closing write: `tw_update_state(agent_id="release-engineer", status="In_Progress", active_feature=<unchanged>, next_role="pm", pending_notes=["Released vX.Y.Z", "tag: <merge-sha>"])`. The triple and `pending_notes[0]` are the feature-lease terminal marker; the server's fallback on the note alone is no licence to omit `next_role`. The success-metrics emit is automatic: never hand-author a metrics record; a failed emit is not a release failure. About every five releases, run the gate retro per `docs/gate-retro-procedure.md`.
+14. Closing write: `tw_update_state(agent_id="release-engineer", status="In_Progress", active_feature=<unchanged>, next_role="pm", pending_notes=["Released vX.Y.Z", "tag: <merge-sha>"])`. The triple and `pending_notes[0]` are the feature-lease terminal marker that releases `FEATURE_LEASE_HELD` for the next feature; the server's fallback on the note alone is no licence to omit `next_role`. The success-metrics emit is automatic: never hand-author a metrics record; a failed emit is not a release failure. About every five releases, run the gate retro per `docs/gate-retro-procedure.md`.
 15. Read-back: `tw_get_state`; `last_agent`, `status`, `next_role` and `pending_notes` must equal step 14 exactly. A rejection or mismatch STOPs.
 16. Close-out (commits `.current/<lane>/handoff.md` and its `*.jsonl` on `release/vX.Y.Z-bookkeeping`, merges that pull request, pulls `main`, runs `node scripts/verify-release.mjs --close-out`):
     `node scripts/release.mjs close-out --version X.Y.Z --dry-run`, then without. Success ends `release: close-out OK (vX.Y.Z) — CLOSE-OUT PASSED`.
@@ -62,37 +62,37 @@ Call shape: Constitution §3 *Escalation call format*, `agent_id="release-engine
 
 | situation | status | pending note | next_role |
 |---|---|---|---|
-| exit 1 `INTERNAL` | Blocked | `<stop>` + stderr | — |
-| exit 2 `USAGE` — fix the invocation | fix, re-run | `<stop>` | — |
-| exit 10 `WRONG_BRANCH` | Blocked | `<stop>` | — |
-| exit 11 `STALE_BASE` — recovery restarts at step 5 on a new branch | Blocked | `<stop>` | — |
-| exit 12 `VERSION_INCOHERENT` — fix the bump (steps 7–8) | fix, re-run | `<stop>` | — |
-| exit 13 `UNRELATED_CHANGES` | Blocked | `<stop>` (path verbatim) | — |
-| exit 14 `GH_UNAVAILABLE` — authenticate, never work around | Blocked | `<stop>` | — |
-| exit 20 `EMPTY_BASELINE` | Blocked | `<stop>` | — |
-| exit 21 `DRIFT_BASELINE` | Blocked | `<stop>` | — |
-| exit 22 `DONE_MARK` — fix the row edit (step 10) | fix, re-run | `<stop>` | — |
-| exit 23 `BOOKKEEPING_CHECK` | Blocked | `<stop>` + check output | pm |
-| exit 24 `ADAPTER_STAMP` | Blocked | `<stop>` | — |
-| exit 30 `STAGING_INCOMPLETE` | Blocked | `<stop>` (paths) | — |
-| exit 31 `CHANGELOG_CITATION` — fix the entry per *Record integrity* | fix, re-run | `<stop>` | — |
-| exit 32 `SPEC_REQUIRE` | Blocked | `<stop>` | — |
-| exit 33 `SPEC_UNCLASSIFIABLE` | Blocked | `<stop>` | — |
-| exit 34 `PUSH_REJECTED` | Blocked | `<stop>` + branch, local sha | — |
-| exit 35 `MUTATION_FAILED` | Blocked | `<stop>` + branch, local sha | — |
-| exit 40 `TAG_EXISTS` — never delete a tag | Blocked | `<stop>` | — |
-| exit 41 `CI_GATE_FAILED` | Blocked | `<stop>` | — |
-| exit 42 `PR_CANNOT_MERGE` — never update the branch or use `--admin` | Blocked | `<stop>` + branch, sha | — |
-| exit 43 `MERGE_WAIT_TIMEOUT` — re-run the same phase | fix, re-run | `<stop>` | — |
-| exit 44 `MAIN_DIVERGED` — never tag another commit | Blocked | `<stop>` | — |
-| exit 45 `SELF_CHECK_FAILED` | Blocked | `<stop>` (failed checks) | — |
-| exit 50 `CLOSING_WRITE_ABSENT` — do steps 14–15 first | fix, re-run | `<stop>` | — |
-| exit 51 `LANE_UNRESOLVED` | Blocked | `<stop>` | — |
-| exit 52 `EMPTY_STAGE` | Blocked | `<stop>` | — |
-| exit 53 `BRANCH_EXISTS` — never delete it | Blocked | `<stop>` | — |
-| exit 54 `CLOSE_OUT_NO_UPSTREAM` — pushing never fixes this | Blocked | `<stop>` | — |
-| exit 55 `CLOSE_OUT_AHEAD` — wait for the merge, never push `main` | fix, re-run | `<stop>` | — |
-| exit 56 `CLOSE_OUT_UNVERIFIED` | Blocked | `<stop>` | — |
+| exit 1 INTERNAL | Blocked | `<stop>` + stderr | — |
+| exit 2 USAGE — fix the invocation | fix, re-run | `<stop>` | — |
+| exit 10 WRONG_BRANCH | Blocked | `<stop>` | — |
+| exit 11 STALE_BASE — recovery restarts at step 5 on a new branch | Blocked | `<stop>` | — |
+| exit 12 VERSION_INCOHERENT — fix the bump (steps 7–8) | fix, re-run | `<stop>` | — |
+| exit 13 UNRELATED_CHANGES | Blocked | `<stop>` (path verbatim) | — |
+| exit 14 GH_UNAVAILABLE — authenticate, never work around | Blocked | `<stop>` | — |
+| exit 20 EMPTY_BASELINE | Blocked | `<stop>` | — |
+| exit 21 DRIFT_BASELINE | Blocked | `<stop>` | — |
+| exit 22 DONE_MARK — fix the row edit (step 10) | fix, re-run | `<stop>` | — |
+| exit 23 BOOKKEEPING_CHECK | Blocked | `<stop>` + check output | pm |
+| exit 24 ADAPTER_STAMP | Blocked | `<stop>` | — |
+| exit 30 STAGING_INCOMPLETE | Blocked | `<stop>` (paths) | — |
+| exit 31 CHANGELOG_CITATION — fix the entry per *Record integrity* | fix, re-run | `<stop>` | — |
+| exit 32 SPEC_REQUIRE | Blocked | `<stop>` | — |
+| exit 33 SPEC_UNCLASSIFIABLE | Blocked | `<stop>` | — |
+| exit 34 PUSH_REJECTED | Blocked | `<stop>` + branch, local sha | — |
+| exit 35 MUTATION_FAILED | Blocked | `<stop>` + branch, local sha | — |
+| exit 40 TAG_EXISTS — never delete a tag | Blocked | `<stop>` | — |
+| exit 41 CI_GATE_FAILED | Blocked | `<stop>` | — |
+| exit 42 PR_CANNOT_MERGE — never update the branch or use `--admin` | Blocked | `<stop>` + branch, sha | — |
+| exit 43 MERGE_WAIT_TIMEOUT — re-run the same phase | fix, re-run | `<stop>` | — |
+| exit 44 MAIN_DIVERGED — never tag another commit | Blocked | `<stop>` | — |
+| exit 45 SELF_CHECK_FAILED | Blocked | `<stop>` (failed checks) | — |
+| exit 50 CLOSING_WRITE_ABSENT — do steps 14–15 first | fix, re-run | `<stop>` | — |
+| exit 51 LANE_UNRESOLVED | Blocked | `<stop>` | — |
+| exit 52 EMPTY_STAGE | Blocked | `<stop>` | — |
+| exit 53 BRANCH_EXISTS — never delete it | Blocked | `<stop>` | — |
+| exit 54 CLOSE_OUT_NO_UPSTREAM — pushing never fixes this | Blocked | `<stop>` | — |
+| exit 55 CLOSE_OUT_AHEAD — wait for the merge, never push `main` | fix, re-run | `<stop>` | — |
+| exit 56 CLOSE_OUT_UNVERIFIED | Blocked | `<stop>` | — |
 | precondition not met (step 1) | Blocked | `release-engineer: refused — tuple is <agent, status>, not (qa-engineer, PASS)` | — |
 | advisory without disposition (steps 3, 9) | Blocked | `release-engineer: npm audit flagged <package> (<advisory id>) with no disposition in docs/dependency-advisories.md` | pm |
 | pre-flight CI red (step 4) | Blocked | `release-engineer: pre-flight CI — <sha> is red on main` | — |
