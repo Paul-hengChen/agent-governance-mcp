@@ -369,11 +369,144 @@ function step7a(ctx) {
   Object.assign(ctx, { codes, archived: plan });
 }
 
+// ---- Step 7b: drift-baseline acknowledgment (.current/.config.json) ----
+
+const CONFIG_REL = ".current/.config.json";
+// Appends the ids not yet present to `driftBaselineIds` (created if absent),
+// keeping the existing order; `added` empty means nothing needs writing.
+export function appendDriftBaseline(configText, ids) {
+  let obj = {};
+  if (configText !== null) {
+    try { obj = JSON.parse(configText); } catch (e) { throw new ReleaseStop("DRIFT_BASELINE", `${CONFIG_REL} is not JSON: ${e.message}`); }
+  }
+  if (obj === null || typeof obj !== "object" || Array.isArray(obj)) throw new ReleaseStop("DRIFT_BASELINE", `${CONFIG_REL} is not a JSON object`);
+  const have = obj.driftBaselineIds ?? [];
+  if (!Array.isArray(have)) throw new ReleaseStop("DRIFT_BASELINE", `${CONFIG_REL} driftBaselineIds is not an array`);
+  const seen = new Set(have), added = [];
+  for (const id of ids) if (!seen.has(id)) { seen.add(id); added.push(id); }
+  obj.driftBaselineIds = [...have, ...added];
+  return { text: `${JSON.stringify(obj, null, 2)}\n`, added };
+}
+
+function step7b(ctx) {
+  const { root, runner: r } = ctx, ids = ctx.state.completed_tasks ?? [];
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string" && id !== "")) throw usage("--state completed_tasks must be an array of task ids");
+  const abs = path.join(root, CONFIG_REL);
+  const { text, added } = appendDriftBaseline(existsSync(abs) ? readFileSync(abs, "utf-8") : null, ids);
+  if (added.length === 0) { ctx.out(`release: [7b] driftBaselineIds already holds all ${ids.length} completed task id(s)\n`); return; }
+  if (!existsSync(path.dirname(abs))) r.mkdir(path.posix.dirname(CONFIG_REL), { step: "7b" });
+  r.writeFile(CONFIG_REL, text, { step: "7b" });
+  ctx.out(`release: [7b] driftBaselineIds gains ${added.join(",")}\n`);
+}
+
+// ---- Step 7c: backlog done-mark verification, then check-bookkeeping.mjs ----
+
+const BACKLOG_REL = "docs/backlog.md";
+// The cells of a markdown table row; an escaped `\|` stays inside its cell.
+const rowCells = (line) => {
+  const cells = line.split(/(?<!\\)\|/).map((c) => c.trim());
+  return cells.slice(1, cells.at(-1) === "" ? -1 : undefined);
+};
+// `vX.Y.Z` as a whole token: not part of a longer version or word.
+const versionToken = (version) => new RegExp(`(?<![\\w.])v${version.replace(/\./g, "\\.")}(?!\\w|\\.\\d)`);
+
+// The agent writes the done-mark text; this checks it. `tickets` is the id
+// list (or "none": no row, so any backlog edit is a stray one); `diffLines`
+// are the +/- content lines of the backlog's diff against HEAD.
+export function checkDoneMarks({ backlogText, diffLines, tickets, version }) {
+  const ids = Array.isArray(tickets) ? tickets : [], problems = [], lines = String(backlogText ?? "").split("\n");
+  const token = versionToken(version);
+  for (const id of ids) {
+    const rows = lines.filter((l) => l.startsWith(`| ${id} |`));
+    if (rows.length !== 1) { problems.push(`${id} has ${rows.length} ticket rows in ${BACKLOG_REL}, expected exactly one`); continue; }
+    const desc = rowCells(rows[0])[1] ?? "";
+    if (!desc.startsWith("**DONE")) problems.push(`${id} row desc does not start with **DONE`);
+    if (!token.test(desc)) problems.push(`${id} row does not name v${version}`);
+    if (/not yet released/i.test(desc)) problems.push(`${id} row still says "not yet released" — amend that phrase in place`);
+  }
+  for (const d of diffLines) {
+    const body = d.slice(1), cells = body.startsWith("|") ? rowCells(body) : [];
+    if (!cells.slice(0, 2).some((c) => ids.includes(c))) problems.push(`${BACKLOG_REL} changes a line that is not a done-marked ticket row: ${d.slice(0, 80)}`);
+  }
+  return problems;
+}
+
+// Content lines (+/-) of a unified diff; header lines before each hunk are dropped.
+function diffContentLines(diffText) {
+  const out = [];
+  let inHunk = false;
+  for (const l of diffText.split("\n")) {
+    if (l.startsWith("diff --git ")) inHunk = false;
+    else if (l.startsWith("@@")) inHunk = true;
+    else if (inHunk && (l.startsWith("+") || l.startsWith("-"))) out.push(l);
+  }
+  return out;
+}
+
+function step7c(ctx) {
+  const { root, runner: r, opts } = ctx, abs = path.join(root, BACKLOG_REL);
+  if (opts.tickets !== undefined) {
+    const diff = r.read("git", ["diff", "-U0", "HEAD", "--", BACKLOG_REL], { step: "7c" });
+    if (diff.status !== 0) throw new ReleaseStop("INTERNAL", `git diff HEAD -- ${BACKLOG_REL} exited ${diff.status}`);
+    const problems = checkDoneMarks({
+      backlogText: existsSync(abs) ? readFileSync(abs, "utf-8") : "", diffLines: diffContentLines(diff.stdout),
+      tickets: opts.tickets, version: opts.version,
+    });
+    if (problems.length > 0) throw new ReleaseStop("DONE_MARK", problems.join("; "));
+  }
+  const res = r.read("node", ["scripts/check-bookkeeping.mjs"], { step: "7c" });
+  if (res.status !== 0) {
+    const why = (res.stderr.trim() || lastLine(res.stdout)).slice(0, 1000);
+    throw new ReleaseStop("BOOKKEEPING_CHECK", `check-bookkeeping.mjs exited ${res.status} — ${why}`);
+  }
+}
+
+// ---- Step 7d: adapter agc-version stamps, then agc check ----
+
+export const ADAPTER_STAMPS = Object.freeze([
+  { path: "CLAUDE.md", line: /^<!--\s*agc-version:\s*\S+\s*-->\s*$/, render: (v) => `<!-- agc-version: ${v} -->` },
+  { path: "AGENTS.md", line: /^#\s*agc-version:\s*\S+\s*$/, render: (v) => `# agc-version: ${v}` },
+  { path: ".antigravityrules", line: /^#\s*agc-version:\s*\S+\s*$/, render: (v) => `# agc-version: ${v}` },
+].map((s) => Object.freeze(s)));
+
+// The adapter text with its one stamp line set to `version`; any other
+// count of stamp lines stops. Line endings (LF or CRLF) are kept.
+export function bumpAdapterStamp(file, text, version) {
+  const spec = ADAPTER_STAMPS.find((s) => s.path === file);
+  if (!spec) throw new ReleaseStop("INTERNAL", `${file} is not an adapter with an agc-version stamp`);
+  const lines = String(text).split("\n"), at = [];
+  lines.forEach((l, i) => { if (spec.line.test(l.replace(/\r$/, ""))) at.push(i); });
+  if (at.length !== 1) throw new ReleaseStop("ADAPTER_STAMP", `${file} has ${at.length} agc-version stamp lines, expected exactly one`);
+  const [i] = at;
+  lines[i] = spec.render(version) + (lines[i].endsWith("\r") ? "\r" : "");
+  return lines.join("\n");
+}
+
+function step7d(ctx) {
+  const { root, runner: r, opts } = ctx;
+  // All three are checked before the first write, so a bad adapter leaves none half-bumped.
+  const writes = ADAPTER_STAMPS.flatMap(({ path: rel }) => {
+    const abs = path.join(root, rel);
+    if (!existsSync(abs)) throw new ReleaseStop("ADAPTER_STAMP", `${rel} does not exist`);
+    const text = readFileSync(abs, "utf-8"), next = bumpAdapterStamp(rel, text, opts.version);
+    return next === text ? [] : [[rel, next]];
+  });
+  for (const [rel, next] of writes) r.writeFile(rel, next, { step: "7d" });
+  const wrote = writes.length > 0;
+  // agc check reads the stamps 7d may just have written, so a dry-run that
+  // planned a write records the check instead of running it.
+  const args = ["bin/agc-init.mjs", "check"];
+  const res = wrote ? r.deferred("node", args, { step: "7d" }) : r.read("node", args, { step: "7d" });
+  if (res && res.status !== 0) {
+    throw new ReleaseStop("ADAPTER_STAMP", `agc-init.mjs check exited ${res.status} — ${lastLine(res.stderr) || lastLine(res.stdout)}`);
+  }
+}
+
 // Steps after the preconditions are not built yet; each phase stops as
 // INTERNAL there, so no run reports success for work it did not do.
 const notYet = (what) => () => { throw new ReleaseStop("INTERNAL", `${what} not implemented yet`); };
 const PHASES = {
-  prepare: [preInputs, preGh, prePrepare, step7a, notYet("prepare steps 7b-8a")],
+  prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, notYet("prepare step 8a")],
   publish: [preGh, prePublish, notYet("publish steps 8b-9a")],
   "close-out": [preGh, preCloseOut, notYet("close-out steps 13a-13b")],
 };
