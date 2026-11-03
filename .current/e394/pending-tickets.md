@@ -1,5 +1,7 @@
 # Pending tickets — lane e394
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E394-NEW-1
 title: release.mjs — a BOM-prefixed handoff copy given as --state stops USAGE with a misleading detail
@@ -48,5 +50,3 @@ body: |
   temporary workspace and calling the workspace-level parser. A parse-from-text export would
   remove the temp directory and the migration write-back inside it.
 ```
-
-## Applied
