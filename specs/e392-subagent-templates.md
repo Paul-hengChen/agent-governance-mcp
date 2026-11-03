@@ -116,12 +116,15 @@ Site → AC → task mapping is in *Site map* below. All `node --test` proofs ru
   and doc-writer; non-haiku reverse assertion for the other 10 templates, release-engineer
   included).
   proof: `node --test test/subagent-templates.test.mjs`.
-- **AC11 (b: second pin — PENDING RULING R1)** — Given `test/feature-lease.test.mjs` lines
-  1533–1540 and 1680–1687, which assert the `Example reply suffix: … — @release-engineer (haiku)`
-  line is still present, then after AC8 they no longer assert it (each block is removed or
-  inverted to assert absence). This file is OUTSIDE the e392 owned set (it belongs to e394); see
-  *Dependencies / Prerequisites* R1. AC8 cannot land green until R1 is ruled.
-  proof: `node --test test/feature-lease.test.mjs` green on the lane HEAD.
+- **AC11 (b: second pin — R1 ruled: integrator, 2026-11-03, option A)** — Given
+  `test/feature-lease.test.mjs` base lines 1533–1540 (in `E9A-S5 (regression guard)`) and
+  1680–1687 (in `E17-S4 (regression guard)`), which assert the
+  `Example reply suffix: … — @release-engineer (haiku)` line is still present, then both blocks
+  are DELETED (no inversion — the non-haiku reverse assertion in
+  `test/subagent-templates.test.mjs` already covers absence), and every other line of the file
+  is byte-unchanged (the rest of the file stays e394-owned; e392 touches only these two blocks).
+  proof: `node --test test/feature-lease.test.mjs` green on the lane HEAD, and
+  `git diff 89e01c6 -- test/feature-lease.test.mjs` shows only those two deletions (reviewer).
 - **AC12 (c: coord-02 alias)** — Given `content/coord-02-host-dispatch.md`, then line 1 contains
   string `coord02.alias` exactly once, inserted directly after
   `**Subagent Dispatch (Claude Code)** — preferred when available. ` with the rest of line 1
@@ -168,7 +171,7 @@ Site → AC → task mapping is in *Site map* below. All `node --test` proofs ru
 | `templates/claude-code-agents/release-engineer.md:24–25` | AC8 | T-E392-03 |
 | `content/coord-04-host-watermark.md:5` | AC9 | T-E392-03 |
 | `test/subagent-templates.test.mjs` `HAIKU_ROLES` (line 397) | AC10 | T-E392-05 |
-| `test/feature-lease.test.mjs:1533–1540`, `:1680–1687` (outside owned set) | AC11 | proposed T-E392-08, pending R1 |
+| `test/feature-lease.test.mjs:1533–1540`, `:1680–1687` (reassigned to e392 by R1, these two blocks only) | AC11 | T-E392-08 |
 | `content/coord-02-host-dispatch.md:1` (alias); `:3`, `:9`, `:11`, `:22` stay | AC12 | T-E392-04 |
 | `templates/agent-adapters/claude.md:12` + `CLAUDE.md:233` (same text, same commit) | AC13 | T-E392-04 |
 | AC tests for AC1–AC5, AC7–AC9, AC12 | — | T-E392-06 |
@@ -213,11 +216,12 @@ Site → AC → task mapping is in *Site map* below. All `node --test` proofs ru
 
 ## Dependencies / Prerequisites
 
-None blocking except R1. (Visual Structural Assertions omitted: no `design/<feature>.md`, mode
+None blocking (R1 ruled below). (Visual Structural Assertions omitted: no `design/<feature>.md`, mode
 = no-design.) Lane base `89e01c6`; `.current/.config.json` has `host: "claude-code"`, so
 `agc init` workspaces get the AC1 profile.
 
-**Option choices made in this cut (integrator pre-review, human approval):**
+**Option choices made in this cut (accepted by integrator pre-review 2026-11-03; human approval
+pending):**
 - O1 — switch-role key: `coordinator` (integrator's suggestion). Maps to the logical key
   `skill-coordinator.md`, already in `SKILL_SEGMENTS`; verified `switchRole`'s `isSplit` branch
   skips the on-disk existence check and composes it via `composeSkill` +
@@ -235,7 +239,11 @@ None blocking except R1. (Visual Structural Assertions omitted: no `design/<feat
   parentheses, so `test/agc-adapters.test.mjs` E101 (`MUST.{0,20}Task`) and
   `test/e393-builder-judge-core.test.mjs` AC-B11 pass unchanged.
 
-**needs human ruling — R1 (`test/feature-lease.test.mjs` is outside the e392 owned set).**
+**R1 — RULED (integrator, 2026-11-03, option A; cross-lane file reassignment).**
+`test/feature-lease.test.mjs` is reassigned to e392 ONLY for the two Example-suffix assertion
+blocks at base lines 1533–1540 (E9A-S5) and 1680–1687 (E17-S4); qa DELETES them (no inversion);
+the rest of the file stays e394-owned and e392 must not touch it; e394 has been told not to
+touch those two blocks. Task T-E392-08. The original finding, kept for the record:
 Lines 1533–1540 (inside test `E9A-S5 (regression guard)`, line 1513) and 1680–1687 (inside
 test `E17-S4 (regression guard)`, line 1648) assert
 `Example reply suffix: … — @release-engineer (haiku)` is still present and preceded by a blank
@@ -246,8 +254,11 @@ absence; e394 must not touch those lines; integration merges disjoint hunks of o
 recommended, keeps the human's "three sites together" ruling in this wave;
 (B) e394's qa edits the two blocks — e392's lane suite is red on 2 tests until integration;
 (C) defer the template line + `HAIKU_ROLES` to post-integration NEW-1 (same file, same test),
-landing only coord-04 line 5 here. Until R1 is ruled, T-E392-03's template half and
-T-E392-05's `HAIKU_ROLES` half wait; the rest of the cut is unaffected.
+landing only coord-04 line 5 here. (Option A chosen; the holds on T-E392-03 and T-E392-05 are
+lifted.)
+
+**New finding filed:** `.current/e392/pending-tickets.md` `E392-NEW-1` — coord-03 still says
+`Task` on the no-host / lean path, where coord-02's alias definition does not load.
 
 **Test files, file by file (owned-set check against the e392 row):**
 
@@ -257,7 +268,7 @@ T-E392-05's `HAIKU_ROLES` half wait; the rest of the cut is unaffected.
 | `test/e392-subagent-templates.test.mjs` | new (T-E392-06) | AC1–AC5, AC7–AC9, AC12 | yes (`test/e392-*.test.mjs`) |
 | `test/skill-manifest.test.mjs` | yes, comments only (T-E392-06) | line 36 "The 9 keys of ROLE_SKILL_MAP" and lines 320–322 "No switchRole-reachable role maps to a split skill yet" become false; its loops iterate a hard-coded 9-role list, so behaviour is unaffected (do NOT append `coordinator` to that list: the witness test reads `skill-${role}.md` from disk and would throw) | yes |
 | `test/fixtures/compose-golden/skill-coordinator-monolith.txt` | yes (T-E392-07) | recapture | yes (`test/fixtures/compose-golden/**`) |
-| `test/feature-lease.test.mjs` | needed (AC11) | pins the `(haiku)` example line | **NO — R1** |
+| `test/feature-lease.test.mjs` | yes, two blocks only (T-E392-08) | pins the `(haiku)` example line at base 1533–1540 and 1680–1687; both deleted | reassigned by R1 (integrator, 2026-11-03), those two blocks only — manifest row not yet updated |
 | `test/context-budget.test.mjs` | no | 21515 ≤ 21715 | yes (not needed) |
 | `test/e393-builder-judge-core.test.mjs` | no | AC-B11 holds (identical lines, anchor kept) | yes, conditional (not triggered) |
 | `test/e96-dispatch-preference.test.mjs` | no | lines 32–77 patterns untouched by the line-1 insertion | yes, conditional (not triggered) |
@@ -272,14 +283,21 @@ T-E392-05's `HAIKU_ROLES` half wait; the rest of the cut is unaffected.
 ~tok (+36: coord-02 alias +~41, coord-04 list −~5); cap 21715, headroom 236 → 200. No cap
 change. The constitution-only figures do not move (no `const-*` edit).
 
+**check --cut note (T-E392-08):** the R1 reassignment of `test/feature-lease.test.mjs` is
+recorded in the integrator's primary copy of the manifest, not in this lane branch's copy, so a
+lane-local `node scripts/fanout.mjs check --cut specs/fanout-e392-e394.md e392 specs/e392-subagent-templates.md`
+reports that path as 1 out of bounds (exit 1). Expected; the integrator's primary run is
+authoritative.
+
 ## Cut
 
 | id | desc | depends_on | est. files | touches | design-link |
 |---|---|---|---|---|---|
 | T-E392-01 | sr-engineer: add `"coordinator": "skill-coordinator.md"` to `ROLE_SKILL_MAP` (one entry, optional one-line comment: composed coordinator, logical key, not a chain role); add `"coordinator"` to the `tw_switch_role` zod enum and inputSchema enum; `npm run build`; commit the two sources and only `dist/tools/role.*` + `dist/tools/registry.*` (AC1–AC6) | none | 2 source + up to 8 generated | `tools/role.ts` `tools/registry.ts` `dist/tools/role.*` `dist/tools/registry.*` | — |
 | T-E392-02 | sr-engineer: rewrite teamwork template line 9 to string `teamwork.load` (AC7) | T-E392-01 | 1 | `templates/claude-code-agents/teamwork.md` | — |
-| T-E392-03 | sr-engineer: delete release-engineer template lines 24–25 (O2; waits on R1) and set coord-04 line 5 to string `coord04.haiku` (AC8, AC9) | none | 2 | `templates/claude-code-agents/release-engineer.md` `content/coord-04-host-watermark.md` | — |
+| T-E392-03 | sr-engineer: delete release-engineer template lines 24–25 (O2) and set coord-04 line 5 to string `coord04.haiku` (AC8, AC9) | none | 2 | `templates/claude-code-agents/release-engineer.md` `content/coord-04-host-watermark.md` | — |
 | T-E392-04 | sr-engineer: insert string `coord02.alias` in coord-02 line 1; set adapter template line 12 and `CLAUDE.md` line 233 to string `adapter.dispatch`, same commit (AC12, AC13) | none | 3 | `content/coord-02-host-dispatch.md` `templates/agent-adapters/claude.md` `CLAUDE.md` | — |
-| T-E392-05 | qa-engineer: E280 — tighten `FILE_PATH_DELEGATES.teamwork` to the new sentence and refresh its stale comment; drop release-engineer from `HAIKU_ROLES` (waits on R1) (AC7, AC10) | T-E392-02, T-E392-03 | 1 | `test/subagent-templates.test.mjs` | — |
+| T-E392-05 | qa-engineer: E280 — tighten `FILE_PATH_DELEGATES.teamwork` to the new sentence and refresh its stale comment; drop release-engineer from `HAIKU_ROLES` (AC7, AC10) | T-E392-02, T-E392-03 | 1 | `test/subagent-templates.test.mjs` | — |
 | T-E392-06 | qa-engineer: new AC test file for AC1–AC5, AC7–AC9, AC12; refresh the two stale comments in skill-manifest test | T-E392-01, T-E392-02, T-E392-03, T-E392-04 | 2 | `test/e392-subagent-templates.test.mjs` `test/skill-manifest.test.mjs` | — |
-| T-E392-07 | qa-engineer: recapture the 12 compose goldens (only the coordinator monolith may differ, each hunk explained); record budget before/after; final `node scripts/test-lock.mjs -- npm test` on the last HEAD (AC14–AC16) | T-E392-05, T-E392-06 | 1 | `test/fixtures/compose-golden/skill-coordinator-monolith.txt` | — |
+| T-E392-07 | qa-engineer: recapture the 12 compose goldens (only the coordinator monolith may differ, each hunk explained); record budget before/after; final `node scripts/test-lock.mjs -- npm test` on the last HEAD (AC14–AC16) | T-E392-05, T-E392-06, T-E392-08 | 1 | `test/fixtures/compose-golden/skill-coordinator-monolith.txt` | — |
+| T-E392-08 | qa-engineer: R1 option A — delete the two release-engineer `(haiku)` Example-suffix assertion blocks in feature-lease test (base lines 1533–1540 in E9A-S5, 1680–1687 in E17-S4) only; no other line of that file (AC11) | T-E392-03 | 1 | `test/feature-lease.test.mjs` | — |
