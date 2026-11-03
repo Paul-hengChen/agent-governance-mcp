@@ -1,0 +1,26 @@
+# QA review — T-RELPA2-05
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-11-03T03:22:50.540Z — PASS — by qa-engineer
+
+suite-result: 3857/3859 passed (server-recorded from qa_suite_result; command: node scripts/test-lock.mjs -- npm test (Node v22.22.3, HEAD a4080f7, 2 skipped, 0 fail))
+
+## AC Execution Log
+covers: T-RELPA2-01, T-RELPA2-02, T-RELPA2-03, T-RELPA2-04, T-RELPA2-05. All run by QA myself on Node v22.22.3, HEAD a4080f73, 4.16.1; no source/test file written; docs/agc-ticket-draft-wc32.md untracked/unstaged (tracked=1); git status unchanged by fanout reads.
+
+AC1 PASS: 23 commits; 60 files 1239+/180-; merges a4080f7/f664ec9/ebeb96d; lane merge 53 paths (48 non-.current + 5 .current/e393); PR #62 3 _primary files, #63 fanout spec; wave close 9 paths; untouched-set diff empty; content 18, test 19, templates only agent-adapters/claude.md.
+AC2 PASS: lane handoff e393-builder-judge-core/PASS/qa-engineer/hop 4; ledger x=6 void=0 open=0; six reviews pass=1 fail=0, T-E393-06 covers 01..06 + suite-result 3857/3859 line; review_reports covers 01..05, Verdict APPROVED; expected-red file exists; backlog E393 DONE merge 29f5844; E392,E394-E398 exist not DONE/VOID; queue #207 DONE, #208-#213 open (#212 E397, #213 E398); ancestry and second parents exactly as specified.
+AC3 PASS: node scripts/test-lock.mjs -- npm test exit 0: tests 3859, pass 3857, fail 0, skipped 2 (Node v22.22.3).
+AC4 PASS: build clean, git status --porcelain dist/ empty; check-version OK (4.16.1) exit 0; check:bookkeeping OK (442/230/361); check:md-tables OK (689 files, 0 malformed).
+AC5 PASS: package.json/lock/dependency-advisories diff empty; npm audit --audit-level=high exit 0 (7: 1 low, 6 moderate); zod@4.6.7, body-parser@2.4.0, no invalid/UNMET/extraneous.
+AC6 PASS: agc check OK (4.16.1) exit 0; numstat 1/1 for CLAUDE.md and adapter template; only hunk @@ -233 +233; agc-version diff lines 0; check-transitions-sync OK.
+AC7 PASS: all six gh runs success with test (20)=success and test (22)=success; shas a4080f7, 9f5163e x2, e9f5de0, ebeb96d, f664ec9 as specified. Node 20 verdict rests on CI.
+AC8 PASS: (a) fanout/scripts diff 0, 32 manifests, only wave5.1 and wave6 exit 2 with {DECISIONS_SECTION_ABSENT, PINS_SECTION_ABSENT}; e393 validates (1 lane, 0 provisional, 13 decisions). (b) owners exit 1, 60 paths/48 hits, 48 (e393:, 0 multi-lane, 12 non-HIT = the 12 bookkeeping paths. (c) closing exit 0 with 接手步驟 + 4 sub-items; exception (1) sr and code-reviewer both opus. (d) check: 5 facts, 2 differ, 2 moved, exit 1; DIFF lines only git status and lane-status, explained by this feature's own uncommitted bookkeeping, the untracked draft and the new active_feature. (e) usage 5 lines, exit 2; git status unchanged. (f) 24 fanout test files: 251/251.
+AC9 PASS: 35 18 13 12 {"handoff":15,"tasks":2,"sqlite":2,"config":2}; HOP_CAP=14 (transitions.ts:326); tools/gates/schema/prompts/bin/scripts/dist diff empty; agc --help identical to v4.16.1 (help-same); contract tests 270/270.
+AC10 PASS: composition probe old-vs-new through dist printed exactly the 8 expected lines (old: rule=0 x3, chain/design rule=1 rule-in-s3=0, visual_split=0, v3.40.0; new: rule=1 rule-in-s3=1 visual_split-row=1 v3.41.0 in all four). Shipped bullet grep 1; const-11 Builder count 0, 2 bullets; header lines as specified. Tests in AC10-12 group 341/341 (incl. e393 6 cases, compose-equivalence, skill-manifest).
+AC11 PASS: old-form grep over content/templates/CLAUDE.md exit=1 (none), v4.16.1 had 8 files with hits; 13 citation lines; Scope line reads §1, §3, §3.1, §3.2, §5, §6, §7; adapter-same; 1 old / 1+1 new; SOP probe exactly 6 expected lines (sr 0/1/2 -> 1/0/0; qa round3 3 -> 0, cap-route 0 -> 2; d10 4 -> 0, a10 4 -> 0); numeric-round greps 0; rationale D10 sentence 1 under ## §6.
+AC12 PASS: content numstat matches all 18 rows (sum 40/40); 12 goldens match (14/17, 11/9, 6/4, 5/3, 4/4); test numstat 6/6, 2/1, 4/2, 145/0, 2/2, 1/1, 1/1 and nothing else; only literal change 2080 -> 1999 (6 lines as expected); size-ceiling sets identical old vs new; floor ruling recorded in review_T-E393-06 Saving-floor re-baseline (:58,:62) and manifest exception (3). Measured via dist: design-arm 10475 (ceiling 10598, +123), non-design 8476 (8501, +25), design-only saving 1999 vs floor 1999 (headroom 0); lean bundle 5711 (5723, +12, measure-context-cost). skill-sr (2852) and teamwork (21715) ceilings pass in test/context-budget.test.mjs; not separately measured to the token. Budget group tests pass.
+AC13 PASS: v4.16.1 -> f3767e5, ancestor exit 0; CHANGELOG ## [4.16.1] at :19; schema diff empty; 25 named test files 468 pass/0 fail/2 skip. CLAUDE.md baseline: 35 entries/35 gate definitions, thirteen tw_* tools, 18-step, 12 registered role prompts/Twelve prompts, 15 ordered fragments, 7 fragments, other 11 role SOPs, 12 model-pinned, ~300 lines (index.ts = 311); test files HEAD 223 vs v4.16.1 222; const 15, coord 7, skill 12, templates 12. EXPECTED (human ruling (a), not a FAIL): CLAUDE.md states 222 test files at lines 126 and 158, stale vs 223; release-engineer fixes.
+Phase 0.5 skipped (no new expected-red for this feature); Phase 1.5 skipped (no Visual Baselines); Phase 3 not applicable (evidence-only, no test file placement per brief).
+

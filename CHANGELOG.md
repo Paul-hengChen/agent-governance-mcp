@@ -16,6 +16,83 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-11-03
+
+MINOR release. It ships prompt-audit wave 2 since v4.16.1, landed on `main` by one wave pull
+request: lane `e393` (E393, builder ≠ judge promoted to a core rule). Plan
+`specs/fanout-e393-builder-judge-core.md`, release gate `specs/release-prompt-audit-w2.md`, lane
+spec `specs/e393-builder-judge-core.md`. Semver: MINOR (decided by the human), because one rule's
+scope widens for adopters: builder ≠ judge now binds every dispatch mode, not only design-armed
+chains. This is a text-only release: it changes named lines in 18 `content/` files, one line in
+`CLAUDE.md` and in `templates/agent-adapters/claude.md`, and the tests that pin them. No compiled
+code changed (`dist/` changes only by the version literal), no `bin/` or `scripts/` file changed,
+no MCP tool was added or removed, no gate or routing rule changed, no schema version changed
+(handoff 15, tasks 2, sqlite 2, config 2), no error code was added, no dependency changed, and the
+gate registry stays at 35 entries with an 18-step write pipeline. Read *Upgrade notes*.
+
+### Upgrade notes
+
+- **Builder ≠ judge is now a core rule (`content/const-05-core-standards.md`,
+  `content/const-11-design-chain-32.md`).** The role-collapse guard moves out of the
+  design-chain-only §3.2 (Visual Verdict Authority) to the end of core §3 (State
+  Synchronisation). It now reads: the actor that built or edited a change MUST NOT author its
+  code-review verdict, its qa verdict (visual verdict included), or its PASS; with no independent
+  judge context available, the work stops at `status=Blocked` ("awaiting independent QA"), never
+  a builder-signed verdict. In v4.16.1 it covered only the visual verdict and visual PASS, and
+  only in design-armed compositions; from v4.17.0 it applies to every code-review verdict, qa
+  verdict and PASS in every dispatch mode, lite included. §3.2 keeps its other rules (no
+  global-frame metric, visual verdict is qa-visual-owned).
+- **13 reference sites now point at Constitution §3 builder ≠ judge.** Every citation of the
+  guard (most read "§3.2 builder ≠ judge") now cites §3: `content/const-04-design-surgical.md`,
+  `content/coord-02-host-dispatch.md`, `content/coord-03-core-fallback.md`,
+  `content/coord-05-core-visual-drift.md`, `content/coord-07-core-sop.md`,
+  `content/skill-integrator.md` (two sites), `content/skill-qa-visual.md`,
+  `content/skill-sr-engineer.md`, `content/constitution-rationale.md` (two sites), and the
+  Execution Profile line of the Claude Code adapter (`templates/agent-adapters/claude.md`, and
+  this repo's own `CLAUDE.md`). An adapter generated from the v4.16.1 template still cites §3.2;
+  the rule itself reaches agents through the composed constitution either way.
+- **New `visual_split` row in the Constitution Limits table (`content/const-01-core-head.md`).**
+  `visual_split` threshold = 3: the `visual_round` from which sr-engineer MAY request a split. The
+  value is unchanged (v4.16.1 said "Round 3" in prose); the split-escalation bullet in
+  `content/const-09-design-chain-vround.md` and `content/skill-sr-engineer.md` now cite the named
+  threshold. The constitution header moves to `Constitution v3.41.0`.
+
+### Changed
+
+- **E393: named round caps replace bare round numbers (`content/const-06-chain-31-head.md`,
+  `content/const-08-chain-31-mid.md`, `content/const-09-design-chain-vround.md`,
+  `content/const-12-chain-r10-s4.md`, `content/skill-qa-engineer.md`,
+  `content/skill-qa-visual.md`, `content/skill-sr-engineer.md`,
+  `content/constitution-rationale.md`).** Phrases such as "Round 4 of `qa_round`", "Round 6
+  attempts", "for up to 3 rounds" and "after Round 3" now name the `qa_round`, `review_round`,
+  `visual_round` caps or the `visual_split` threshold from the Limits table. No cap value changed.
+- **E393: context-budget trims ruled by the human (`content/const-01-core-head.md`,
+  `content/const-05-core-standards.md`, `content/const-15-core-tail.md`,
+  `content/constitution-rationale.md`).** The const-01 header comment is shortened; the
+  `(precedent: A10 …)` clause leaves the const-05 Test ownership bullet; the const-15
+  `Reason (D10, generalized)` sentence moves to the rationale's §6 note; the rationale Scope line
+  adds §3 and its §3.2 builder ≠ judge passage now points at §3.
+- **Tests.** 12 compose-golden fixtures under `test/fixtures/compose-golden/` are re-captured;
+  six tests are re-pinned (`test/context-budget.test.mjs`, `test/e178a-integrator-role.test.mjs`,
+  `test/e391-prompt-audit-stale-facts.test.mjs`, `test/e5-intake-tiering.test.mjs`,
+  `test/e96-dispatch-preference.test.mjs`, `test/phase-0-5-sop.test.mjs`). In
+  `test/context-budget.test.mjs` no size ceiling moved; the design-only strip saving floor changes
+  from `>= 2080` to `>= 1999` by human ruling, since the moved rule now lands on both arms. New
+  test: `test/e393-builder-judge-core.test.mjs`.
+
+### Notes
+
+- `dist/` is rebuilt; only `dist/index.js` changes, by the version literal. `CLAUDE.md` count
+  correction: test files 222 → 223 (two places).
+- Wave evidence moves to `qa_reports/archive/release-prompt-audit-w2/` and
+  `review_reports/archive/release-prompt-audit-w2/`, and the E393 expected-red list to
+  `qa_reports/archive/e393-builder-judge-core/`; the lane ledger is archived under
+  `.current/history/2026-11/`.
+- `npm audit --audit-level=high` exits 0 at this release (one low and six moderate findings
+  remain, below that threshold).
+- Follow-up tickets E397 and E398 are filed in `docs/backlog.md`, not shipped; E392 and
+  E394–E396 stay open.
+
 ## [4.16.1] - 2026-11-02
 
 PATCH release. It ships prompt-audit wave 1 since v4.16.0, landed on `main` by one wave pull
