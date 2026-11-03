@@ -1,12 +1,8 @@
 // Coded by @qa-engineer
 // Acceptance tests for specs/e392-subagent-templates.md (AC1-AC5, AC7-AC9, AC12).
-// WHY these exist: three Claude Code subagent-facing texts contradicted the code
-// (a Task-dispatched @teamwork could not load its SOP; release-engineer was
-// labelled haiku although pinned opus; `Task(...)` was never defined). The tests
-// pin the contract the fix establishes: `coordinator` is a context-loading
-// switchRole destination ONLY (never a chain role), and the three texts agree
-// with the code. They assert stable structure of real files and never diff
-// against a fixed base sha (resident-test hygiene).
+// WHY: `coordinator` is a context-loading switchRole destination ONLY (never a
+// chain role), and the teamwork template, release-engineer tier and Task alias
+// must agree with the code. Asserts stable structure; never diffs a base sha.
 // Requires a built tree (`npm run build`).
 
 import { test } from "node:test";
