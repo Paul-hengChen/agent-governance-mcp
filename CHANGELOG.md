@@ -16,6 +16,74 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-11-03
+
+MINOR release. It ships prompt-audit wave 3 since v4.17.0, landed on `main` by one wave pull
+request: lanes `e392` (E392 + E280, subagent templates) and `e394` (E394 items 1–3, release SOP
+rewrite). Plan `specs/fanout-e392-e394.md`, release gate `specs/release-prompt-audit-w3.md`, lane
+specs `specs/e392-subagent-templates.md` and `specs/e394-release-sop-rewrite.md`. Semver: MINOR
+(decided by the human), because `tw_switch_role` gains a new accepted value. This is the first
+release produced by `scripts/release.mjs`. Read *Notes* before re-copying the `teamwork`
+subagent template.
+
+### Added
+
+- **`tw_switch_role` accepts `coordinator` (E392, human option (i); `tools/role.ts`,
+  `tools/registry.ts`, and the compiled `dist/tools/{role,registry}.*`).** It returns the
+  coordinator SOP composed from the `content/coord-01..07-*.md` fragments for the workspace's
+  `host` setting. `coordinator` is a loading target only, not an `agent_id`; routing is
+  unchanged.
+- **`scripts/release.mjs`.** The release-engineer's mechanical steps as three phases —
+  `prepare`, `publish`, `close-out` — each with `--dry-run`; a stop exits with one of 31 exit
+  classes and prints a final `RELEASE_STOP <CLASS_ID>: <detail>` line.
+- **`specs/release-sop-history.md`.** The release SOP's incident narratives, backtests and
+  rationale, moved verbatim out of the SOP.
+- **Three new tests:** `test/e392-subagent-templates.test.mjs`,
+  `test/e394-release-script.test.mjs`, `test/e394-release-sop.test.mjs`.
+
+### Changed
+
+- **Release-engineer SOP rewritten (E394 items 1–3; `content/skill-release-engineer.md`).** It
+  shrinks from 98,836 to 14,434 bytes; each of the 31 `scripts/release.mjs` exit classes has
+  exactly one Escalation Routes row. `scripts/verify-release.mjs` (context, not changed),
+  `scripts/check-version.mjs` (context, not changed) and `scripts/check-bookkeeping.mjs`
+  (context, not changed) keep their CLIs.
+- **The `teamwork` subagent template loads its SOP via `tw_switch_role("coordinator")`
+  (`templates/claude-code-agents/teamwork.md`; E280, folded into E392)** instead of reading a
+  file that does not exist.
+- **`Task(...)` is defined once (`content/coord-02-host-dispatch.md`)** as agc's shorthand for
+  Claude Code's `Agent` subagent tool; the Claude Code adapter's Subagent-dispatch line says the
+  same (`templates/agent-adapters/claude.md:12`, and this repo's `CLAUDE.md:233`).
+- **release-engineer is no longer listed as a haiku-tier subagent.** The watermark note in
+  `content/coord-04-host-watermark.md` and the `(haiku)` example suffix in
+  `templates/claude-code-agents/release-engineer.md` are removed; the template stays
+  `model: opus`.
+- **Tests.** One compose-golden fixture is re-captured
+  (`test/fixtures/compose-golden/skill-coordinator-monolith.txt`) and 13 test files are
+  re-pinned (`test/e130-lane-default.test.mjs`, `test/e164-e167-content.test.mjs`,
+  `test/e166-template-defers-staging.test.mjs`, `test/e18-write-provenance.test.mjs`,
+  `test/e297-main-protected-sop.test.mjs`, `test/e336-portable-pull.test.mjs`,
+  `test/feature-lease.test.mjs`, `test/qa-flow.test.mjs`, `test/release-staging.test.mjs`,
+  `test/render-structure.test.mjs`, `test/skill-manifest.test.mjs`,
+  `test/subagent-templates.test.mjs`, `test/verify-release.test.mjs`); 226 top-level test files.
+  The teamwork bundle grows from 21479 to 21515 ~tok, under the unchanged ceiling.
+- **`CLAUDE.md` test-file count** corrected from 223 to 226 in the layout and testing sections
+  (human ruling).
+- Unchanged: `GATE_REGISTRY` stays at 35 entries with an 18-step write pipeline; no gate,
+  schema, error-code, routing or dependency change; no `prompts/` (context, not changed) or
+  `bin/` (context, not changed) change; `dist/` changes only in `dist/tools/{role,registry}.*`
+  and the version literal.
+
+### Notes
+
+- **Upgrade note — update the agc server before re-copying
+  `templates/claude-code-agents/teamwork.md` into `~/.claude/agents/`.** A v4.17.0 or older
+  server rejects `tw_switch_role("coordinator")` at the tool boundary, so a new template on an
+  old server cannot load its SOP.
+- Adopters who regenerate the adapter block with `agc init` get the new Subagent-dispatch line.
+- v4.18.0 is the first release produced by `scripts/release.mjs`. Deferred: E404
+  (release-engineer template slimming, E394 item 4) and E405 (`scripts/release.mjs` as CD).
+
 ## [4.17.0] - 2026-11-03
 
 MINOR release. It ships prompt-audit wave 2 since v4.16.1, landed on `main` by one wave pull
