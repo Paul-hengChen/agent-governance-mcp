@@ -1,12 +1,12 @@
 ---
 schema_version: 15
-active_feature: "release-prompt-audit-w1"
+active_feature: "release-prompt-audit-w2"
 status: "In_Progress"
-last_updated: "2026-11-02T07:24:30.353Z"
+last_updated: "2026-11-03T03:40:22.129Z"
 last_agent: "release-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "Evidence-only release gate, same shape as release-post-v4-w13 (v4.16.0), 12th use (v4.5.0-v4.16.0). Covers prompt-audit wave 1 (PR #60, merge 8a79731, head e6007b1; plan specs/fanout-e391-prompt-audit.md; single lane e391, merge 34bd318, lane head 5b27a16) plus bookkeeping PRs #57 (v4.16.0 post-release, 673bab9), #58 (prompt-audit ticket filing + docs/prompt-audit-2026-11-02.md, d519a45) and #59 (E391 fan-out plan, 664e147). 24 commits, 47 paths (34 lane + 13 bookkeeping). Text only: named lines in nine content/ files, four CLAUDE.md body passages, 11 compose-golden re-captures (three strings), qa-visual-skill-split regex re-pin, one comment line in compose-equivalence, new test e391-prompt-audit-stale-facts. No dist/, bin/, scripts/, tools/, gates/, schema, error-code or dependency change; GATE_REGISTRY stays 35. Five qa-engineer verification tasks (T-RELPA1-01..05, AC1-AC13), no code or test changes; three adopter-visible changes executed old-vs-new (AC10 via dist switchRole probe, AC11 CLAUDE.md). Version decided by the human: v4.16.1 PATCH; QA verifies against current 4.16.0. Release-engineer owns bump, CHANGELOG with upgrade note, stamps, release/v4.16.1 PR, tag on merge commit, GitHub release, archiving and the follow-up bookkeeping PR."
+scope_decision_why: "Evidence-only release gate for v4.17.0, same shape as release-prompt-audit-w1 (v4.16.1). Covers prompt-audit wave 2 (PR #64, merge a4080f7, head 9f5163e; plan specs/fanout-e393-builder-judge-core.md; single lane e393, merge 29f5844, lane head e9f5de0) plus bookkeeping PRs #62 (v4.16.1 post-release, ebeb96d) and #63 (E393 fan-out plan, f664ec9). 23 commits, 60 paths (48 lane + 12 bookkeeping). Text only: 18 content/ files, CLAUDE.md:233 and templates/agent-adapters/claude.md:12, 12 compose-goldens, six test edits, one new test. No dist/, bin/, scripts/, tools/, gates/, prompts/, schema, error-code or dependency change; GATE_REGISTRY stays 35, pipeline 18. Five qa-engineer verification tasks (T-RELPA2-01..05, AC1-AC13), no code or test changes; adopter-visible changes executed old-vs-new through dist (AC10 composition probe, AC11 switchRole probe); context-budget floor 2080 -> 1999 recorded as human ruling with headroom measured (AC12). Version decided by the human: v4.17.0 MINOR; QA verifies against current 4.16.1. Release-engineer owns bump, CHANGELOG with upgrade note, stamps, release/v4.17.0 PR, tag, GitHub release, archiving and the follow-up bookkeeping PR."
 cut_approved: true
 dispatch_pins:
   pm: "opus"
@@ -14,7 +14,7 @@ dispatch_pins:
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-11-02T07:24:30.353Z"
+dispatched_at: "2026-11-03T03:40:22.129Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -28,21 +28,20 @@ visual_rounds_total: 0
 # Handoff State
 
 ## Completed
-- [x] T-RELPA1-01
-- [x] T-RELPA1-02
-- [x] T-RELPA1-03
-- [x] T-RELPA1-04
-- [x] T-RELPA1-05
+- [x] T-RELPA2-01
+- [x] T-RELPA2-02
+- [x] T-RELPA2-03
+- [x] T-RELPA2-04
+- [x] T-RELPA2-05
 
 ## Pending & Handoff Notes
-- Released v4.16.1
-- tag: v4.16.1 (tag object 68ce446) on merge commit f3767e5 (PR #61, release/v4.16.1 head 4bc8b0d)
-- Checks: CI pre-flight lenient PASSED on 8a79731; npx tsc + check-version OK (4.16.1) + check:transitions-sync OK; npm test 3851/3853 pass, 0 fail, 2 skipped; npm audit --audit-level=high exit 0 (1 low, 6 moderate); agc check OK (4.16.1); CI gate --strict CI-CHECK PASSED on 4bc8b0d; verify-release v4.16.1 ALL CHECKS PASSED (CI wait budget DEFAULT_WAIT_SECONDS=480); GitHub release v4.16.1 published
-- Step 7a: PREV_TAG=v4.16.0, CODES={E391,RELPA1}; archived to qa_reports/archive/release-prompt-audit-w1/ (12), review_reports/archive/release-prompt-audit-w1/ (1), qa_reports/archive/e391-prompt-audit-stale-facts/ (expected-red)
-- AC4: MULTI-FEATURE branch — range-derived specs/e391-prompt-audit-stale-facts.md, specs/release-prompt-audit-w1.md present in v4.16.0..HEAD
-- Human ruling (a) applied: CLAUDE.md test-file count 221 -> 222 (two places); drift baseline += T-RELPA1-01..05; backlog E391 stamped shipped v4.16.1
-- docs/agc-ticket-draft-wc32.md left untracked (open human question), excluded from staging
-- Record note: release commit message cites wave content/ paths from the v4.16.0..release range, not that commit's own stat (same shape as the v4.16.0 commit); not amended, since §6 forbids amend
+- Released v4.17.0
+- tag: 66314bcc95d29dfb1e8aa67044430904cc1d9d8c (annotated tag object) -> commit 5181e75ff41e34516af2159f8135763bdf8272fe (PR #65 merge of release commit 0569930)
+- GitHub release: https://github.com/Paul-hengChen/agent-governance-mcp/releases/tag/v4.17.0
+- checks: pre-flight CI (a4080f7) PASSED; npx tsc 0 errors; check-version OK 4.17.0; check:transitions-sync OK; npm test 3857/3859 (2 skipped, 0 fail); npm audit --audit-level=high exit 0 (1 low, 6 moderate); agc check OK 4.17.0; step 8b CI-CHECK --strict PASSED (0569930, Node 20+22); verify-release v4.17.0 ALL CHECKS PASSED (CI wait budget DEFAULT_WAIT_SECONDS=480, env unset)
+- step 7a: PREV_TAG=v4.16.1, CODES={E393 RELPA2}; 6 E393 + 5 RELPA2 qa reports -> qa_reports/archive/release-prompt-audit-w2/, review_T-E393-01 -> review_reports/archive/release-prompt-audit-w2/, expected-red_e393-builder-judge-core.txt -> qa_reports/archive/e393-builder-judge-core/
+- AC4: MULTI-FEATURE branch (R) — range-derived: specs/e393-builder-judge-core.md, specs/release-prompt-audit-w2.md present in v4.16.1..HEAD
+- record notes: docs/agc-ticket-draft-wc32.md left untracked and unstaged per coordinator brief (sole leftover in the E94 root-file completeness check); E393 marked shipped v4.17.0 in docs/backlog.md only — docs/v4.0.0-new-tickets.md queue row left unchanged (v4.16.1 precedent did not edit it; outside release-engineer allowlist); CLAUDE.md 222 -> 223 test files x2 per human ruling (a); driftBaselineIds += T-RELPA2-01..05
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
