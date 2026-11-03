@@ -24,14 +24,6 @@ const HISTORY = rd("specs", "release-sop-history.md");
 const rel = await import(pathToFileURL(path.join(REPO, "scripts", "release.mjs")).href);
 
 const NEXT_ROLE_ENUM = ["pm", "researcher", "design-auditor", "architect", "sr-engineer", "code-reviewer", "qa-engineer", "release-engineer"];
-const BASE = "89e01c6";
-const baseSop = () => {
-  const ok = spawnSync("git", ["rev-parse", "--verify", `${BASE}^{commit}`], { cwd: REPO, encoding: "utf-8" });
-  if (ok.status !== 0) return null;
-  const r = spawnSync("git", ["show", `${BASE}:content/skill-release-engineer.md`], { cwd: REPO, encoding: "utf-8", maxBuffer: 1 << 26 });
-  return r.status === 0 ? r.stdout : null;
-};
-
 const section = (name) => {
   const start = SOP.indexOf(`\n## ${name}\n`);
   assert.ok(start >= 0, `## ${name} exists`);
@@ -305,15 +297,12 @@ test("AC-P10 history anchors", (t) => {
   // Units appear in base order.
   const pos = UNITS.map(([, , , , first]) => lines.findIndex((l) => l.trimStart().startsWith(first)));
   assert.deepEqual(pos, [...pos].sort((a, b) => a - b), "units in base order");
-  // Byte identity against the base text, while the base commit exists (closed historical range).
-  const base = baseSop();
-  if (base === null) { t.skip(`base commit ${BASE} not in this clone — byte-identity of the 16 units NOT verified (lane-protocol §3)`); return; }
-  const bl = base.split("\n");
+  // Byte identity of each unit, anchored on the sha256 prefixes recorded in the architecture's History Move table
+  // (no repository history is read): unit i = (b - a + 1) lines starting at its first-line anchor.
   for (const [id, a, b, prefix, first] of UNITS) {
-    const unit = bl.slice(a - 1, b).join("\n");
-    assert.ok(unit.trimStart().startsWith(first), `${id}: base lines ${a}..${b} start as the architecture says`);
-    assert.equal(createHash("sha256").update(unit).digest("hex").slice(0, prefix.length), prefix, `${id}: sha256 prefix`);
-    assert.ok(HISTORY.includes(unit), `${id}: byte-identical in the history file`);
+    const start = lines.findIndex((l) => l.trimStart().startsWith(first));
+    const unit = lines.slice(start, start + (b - a + 1)).join("\n");
+    assert.equal(createHash("sha256").update(unit).digest("hex").slice(0, prefix.length), prefix, `${id}: sha256 prefix of the ${b - a + 1}-line unit`);
   }
 });
 
@@ -351,9 +340,8 @@ test("AC-L1 every cited ticket has an assertion", () => {
   assert.equal(carries(["L:E71 L:E71a x"], "E71a"), true);
 });
 
-test("AC-L1 the 69 ids are the ids the base SOP cited", (t) => {
-  const base = baseSop();
-  if (base === null) { t.skip(`base commit ${BASE} not in this clone — the literal list was NOT compared with the base SOP (lane-protocol §3)`); return; }
-  const cited = [...new Set(base.match(/\bE[0-9]+[a-z]?\b/g))].sort();
+test("AC-L1 the 69 ids are the ids the history file cites", () => {
+  // The base SOP's ids live in the 16 verbatim units; the header and group headings add none.
+  const cited = [...new Set(HISTORY.match(/\bE[0-9]+[a-z]?\b/g))].sort();
   assert.deepEqual([...ALL_IDS].sort(), cited);
 });
