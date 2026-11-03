@@ -10,9 +10,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execSync, spawnSync } from "node:child_process";
+import { execFileSync, execSync, spawnSync } from "node:child_process";
 import * as os from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { getTsConfigSourceDirs } from "../dist/lib/tsconfig-source-dirs.js";
 import { composeConstitution } from "../dist/prompts/build.js";
 
@@ -29,6 +29,24 @@ const CONST15 = fs.readFileSync(
   path.join(ROOT, "content", "const-15-core-tail.md"),
   "utf-8",
 );
+
+// E394 (T-E394-12): the release mechanics moved out of the SOP into scripts/release.mjs, the narratives
+// into specs/release-sop-history.md. Mechanism lessons are asserted on the script's exports and source, rule
+// lessons on the rewritten SOP, incident text on the history file (byte-identity of that text is pinned by
+// test/e394-release-sop.test.mjs AC-P10).
+const REL = await import(pathToFileURL(path.join(ROOT, "scripts", "release.mjs")).href);
+const RELEASE_SRC = fs.readFileSync(path.join(ROOT, "scripts", "release.mjs"), "utf-8");
+const HISTORY = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+// Source text of `function <name>(` up to its closing brace at column 0.
+const fnSrc = (name) => {
+  const i = RELEASE_SRC.search(new RegExp(`^(export )?(async )?function ${name}\\(`, "m"));
+  assert.ok(i >= 0, `scripts/release.mjs defines function ${name}`);
+  return RELEASE_SRC.slice(i, RELEASE_SRC.indexOf("\n}\n", i) + 3);
+};
+// SOP table rows as trimmed cell arrays (the SOP carries no escaped pipe: see the E53 caveat test).
+const SOP_ROWS = SKILL.split("\n").filter((l) => l.startsWith("| ")).map((l) => l.slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim()));
+const exitRow = (code, id) => SOP_ROWS.find((c) => c[0].startsWith(`exit ${code} ${id}`));
+const sopRow = (re) => SOP_ROWS.find((c) => re.test(c[0]));
 
 // ---------------------------------------------------------------------------
 // Content-assertion helpers (mirror the SOP logic in pure JS so fixtures
@@ -127,37 +145,18 @@ const FULL_CHAIN_SCOPE_WHY =
 // STOP strings below are updated to match content/skill-release-engineer.md's
 // current text verbatim (not weakened — same shape, new range wording).
 const AC4_REQUIRE_STOP =
-  "Release commit incomplete: specs/<active_feature>.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.";
+  "Release commit incomplete: specs/<active_feature>.md is absent from the release range <prev-tag>..HEAD. Stage the missing files and re-run.";
 
 const AC4_UNCLASSIFIABLE_STOP =
   "AC4 unclassifiable: no specs/<active_feature>.md in the tree, pending_notes does not record a multi-feature release, and scope_decision_why does not record a backlog-row-as-spec mini-chain — record the dispatch shape in scope_decision_why (or author specs/<active_feature>.md) and re-run.";
 
 /**
- * Derive the release's feature-spec set from the range, mirroring the SOP's
- * command (E152): `git diff "$PREV_TAG"..HEAD --name-only -- specs/ | grep -E
- * '^specs/[^/]+\.md$' | grep -vE '^specs/(fanout-.*|.*-architecture)\.md$'`.
- * Top-level feature specs only; wave manifests and architecture companions out.
+ * The AC4 spec-class check as scripts/release.mjs evaluates it (before the release commit): delegates to the
+ * script's classifySpecCheck so the fixtures below run the shipped decision, not a hand copy. Inputs keep
+ * the old fixture shape: S = spec exists in tree, M = pending_notes records "Multi-feature release: ...",
+ * R = the range holds a feature spec other than the active one (E152), W = mini-chain.
  */
-function deriveRangeSpecs(gitDiffRange) {
-  return gitDiffRange
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => /^specs\/[^/]+\.md$/.test(l))
-    .filter((l) => !/^specs\/(fanout-.*|.*-architecture)\.md$/.test(l));
-}
-
-/**
- * Simulate the AC4 post-commit spec-file check (content/skill-release-engineer.md
- * step 8a). Returns { pass, branch, errorMsg, rangeDerived }. Inputs: S = spec
- * exists in tree, M = pending_notes records "Multi-feature release: ...",
- * R = the range-derived feature-spec set holds a path other than
- * specs/<active_feature>.md (E152), W = mini-chain. Branches:
- * M or R -> MULTI-FEATURE; else S -> REQUIRE; else W -> SKIP; else UNCLASSIFIABLE.
- * Under MULTI-FEATURE a line-named feature with no spec in the tree is skipped;
- * one whose spec exists but is not in the range STOPs. When only R fires (not M)
- * the active feature is still classified by the single-feature rules, so the
- * REQUIRE / UNCLASSIFIABLE strings stay byte-identical (non-weakening).
- */
+const deriveRangeSpecs = (gitDiffRange) => REL.deriveRangeSpecs(gitDiffRange);
 function simulatePostCommitCheck(
   gitDiffRange,
   activeFeature,
@@ -166,406 +165,182 @@ function simulatePostCommitCheck(
   pendingNotes = "",
   multiFeatureSpecsInTree = {},
 ) {
-  const specFile = `specs/${activeFeature}.md`;
-  const rangeDerived = deriveRangeSpecs(gitDiffRange);
-  const R = rangeDerived.some((p) => p !== specFile);
-
-  const multiFeatureMatch = pendingNotes.match(/Multi-feature release:\s*(.+?)\.?\s*$/m);
-  const M = Boolean(multiFeatureMatch);
-
-  if (M || R) {
-    if (!M) {
-      // R-only: the active feature keeps its single-feature classification.
-      if (specExistsInTree) {
-        if (!gitDiffRange.includes(specFile)) {
-          return {
-            pass: false,
-            branch: "MULTI-FEATURE",
-            rangeDerived,
-            errorMsg: `Release commit incomplete: specs/${activeFeature}.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.`,
-          };
-        }
-      } else if (!scopeDecisionWhyRecordsMiniChain(scopeDecisionWhy)) {
-        return { pass: false, branch: "MULTI-FEATURE", rangeDerived, errorMsg: AC4_UNCLASSIFIABLE_STOP };
-      }
-      // Range-derived siblings are in the range by construction: logged, pass.
-      return { pass: true, branch: "MULTI-FEATURE", rangeDerived, errorMsg: null };
-    }
-    const names = multiFeatureMatch[1]
-      .split(",")
-      .map((s) => s.replace(/\s*\([^)]*\)\s*$/, "").trim())
-      .filter(Boolean);
-    for (const name of names) {
-      if (!multiFeatureSpecsInTree[name]) {
-        continue; // logged-and-skipped by design (E142(b) Decision)
-      }
-      const nameSpecFile = `specs/${name}.md`;
-      if (!gitDiffRange.includes(nameSpecFile)) {
-        return {
-          pass: false,
-          branch: "MULTI-FEATURE",
-          rangeDerived,
-          errorMsg: `Release commit incomplete: ${nameSpecFile} is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.`,
-        };
-      }
-    }
-    return { pass: true, branch: "MULTI-FEATURE", rangeDerived, errorMsg: null };
-  }
-
-  if (specExistsInTree) {
-    if (gitDiffRange.includes(specFile)) {
-      return { pass: true, branch: "REQUIRE", rangeDerived, errorMsg: null };
-    }
-    return {
-      pass: false,
-      branch: "REQUIRE",
-      rangeDerived,
-      errorMsg: `Release commit incomplete: specs/${activeFeature}.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.`,
-    };
-  }
-
-  if (scopeDecisionWhyRecordsMiniChain(scopeDecisionWhy)) {
-    return { pass: true, branch: "SKIP", rangeDerived, errorMsg: null };
-  }
-
-  return {
-    pass: false,
-    branch: "UNCLASSIFIABLE",
-    rangeDerived,
-    errorMsg: AC4_UNCLASSIFIABLE_STOP,
-  };
+  const r = REL.classifySpecCheck({
+    feature: activeFeature,
+    unionFiles: gitDiffRange,
+    specExists: (n) => (n in multiFeatureSpecsInTree ? Boolean(multiFeatureSpecsInTree[n]) : n === activeFeature && specExistsInTree),
+    scopeWhy: scopeDecisionWhy ?? "",
+    pendingNotes,
+  });
+  return { pass: r.pass, branch: r.branch, rangeDerived: r.rangeDerived, errorMsg: r.errorMsg };
 }
 
 // ---------------------------------------------------------------------------
 // Phase 1 — Content assertion tests (AC1–AC5)
 // ---------------------------------------------------------------------------
 
-test("AC1: skill-release-engineer.md's git-add line enumerates every required staging directory and metadata path IN ITS CAPTURE GROUP (rescoped, E64/T-E645-03 point 2)", () => {
-  // The git-add line must name each required directory by path. The test
-  // asserts against that line's capture group only: a whole-document search was
-  // vacuous, since prose elsewhere names every dir and deleting the line stayed green.
-  const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
-  assert.ok(gitAddMatch, "must find the git-add line in the staging instruction (AC1)");
-  const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean);
-
-  for (const dir of FEATURE_DIRS) {
-    assert.ok(
-      stagedTokens.includes(dir),
-      `the git-add line's capture group must include '${dir}' (AC1, rescoped)`,
-    );
-  }
-  // The metadata files must also be present in the git-add line's capture group.
-  for (const meta of [...METADATA_PATHS, ...E65_METADATA_PATHS, ...E94_METADATA_PATHS, ...E198B_METADATA_PATHS]) {
-    assert.ok(
-      stagedTokens.includes(meta),
-      `the git-add line's capture group must include '${meta}' (AC1, rescoped)`,
-    );
-  }
-  // Must NOT use the old abstract phrasing
-  assert.ok(
-    !SKILL.includes("git add <touched files"),
-    "skill-release-engineer.md must NOT contain the old 'git add <touched files' abstract phrasing (AC1)",
-  );
-});
-
-test("AC2: skill-release-engineer.md includes pre-commit 'git diff --cached --stat' verify step", () => {
-  // Contract: the SOP must instruct the agent to run git diff --cached --stat
-  // and cross-reference against git status --short before committing.
-  assert.match(
-    SKILL,
-    /git diff --cached --stat/,
-    "SOP must reference 'git diff --cached --stat' as the pre-commit verify command (AC2)",
-  );
-  assert.match(
-    SKILL,
-    /git status --short/,
-    "SOP must reference 'git status --short' for cross-reference (AC2)",
-  );
-  // Metadata-only staging with source dirs having changes must be a FAIL signal
-  assert.match(
-    SKILL,
-    /Metadata-only staging[\s\S]*?FAIL signal/,
-    "SOP must declare metadata-only staging as a FAIL signal when source dirs have pending edits (AC2)",
-  );
-
-  // Directory-set pin (T-E66-02, review_T-E66-01.md round-1 Architecture
-  // finding): the three assertions above only check that framing STRINGS are
-  // present — none of them inspect the `{...}` cross-reference set itself, so
-  // that set could be emptied entirely (or drift from FEATURE_DIRS/AC1's set)
-  // with this test still green. Extract it and pin it exactly.
-  const ac2SetMatch = SKILL.match(/every directory in `\{([^}]*)\}`/);
-  assert.ok(
-    ac2SetMatch,
-    "must find AC2's pre-commit cross-reference set ('every directory in `{...}`') in the SOP",
-  );
-  const ac2Dirs = ac2SetMatch[1]
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+test("AC1: the staging list lives in scripts/release.mjs STAGE_PATHS — every required directory and metadata path, set-equal to this file's lists; the SOP carries no hand git-add line (rescoped, E64/T-E645-03 point 2; AC-S6)", () => {
+  const sp = REL.STAGE_PATHS;
+  assert.deepEqual([...sp.featureDirs].sort(), [...FEATURE_DIRS].sort(), "STAGE_PATHS.featureDirs must equal FEATURE_DIRS");
   assert.deepEqual(
-    [...ac2Dirs].sort(),
-    [...FEATURE_DIRS].sort(),
-    `AC2's cross-reference set must be exactly FEATURE_DIRS (got ${JSON.stringify(ac2Dirs)})`,
+    [...sp.metadataPaths].sort(),
+    [...METADATA_PATHS, ...E65_METADATA_PATHS, ...E94_METADATA_PATHS, ...E198B_METADATA_PATHS].sort(),
+    "STAGE_PATHS.metadataPaths must equal the four metadata arrays",
   );
+  // Every member is actually stageable: a change under it yields it in the plan.
+  const everyChange = [...sp.featureDirs.map((d) => `${d}x.txt`), ...sp.metadataPaths];
+  assert.deepEqual([...REL.planStage({ changed: everyChange, exists: () => true })].sort(), [...sp.featureDirs, ...sp.metadataPaths].sort());
+  // The SOP delegates: no hand-run `git add`, no abstract phrasing, and prepare owns the staging checks.
+  assert.ok(!/^\s+git add /m.test(SKILL), "the SOP must not carry an executable git-add line — staging is the script's (AC-S6)");
+  assert.ok(!SKILL.includes("git add <touched files"), "the old abstract 'git add <touched files' phrasing must not return (AC1)");
+  assert.match(SKILL, /staging and citation checks/, "SOP step 12 must name the staging checks as part of prepare");
+  assert.ok(HISTORY.includes("34 paths"), "the old '34 paths' staging narrative lives in the history file (AC-P10)");
 });
 
-test("AC2 (E94): Root-file completeness check — the two EXTRACTED commands, EXECUTED, discriminate the v3.104.2 escape from a correct release across four workspace shapes (adopter repo with no .current/, source outside FEATURE_DIRS, .current/ dirty, and the escape/PASS pair code-reviewer verified empirically)", () => {
-  // The directory cross-reference sees only FEATURE_DIRS, so a root file left
-  // unstaged passed silently (how v3.104.2 shipped without CONTRIBUTING.md).
-  // The SOP's two commands, run after `git add`, print nothing on PASS. This
-  // test extracts them from the SOP text and runs them in scratch git repos
-  // across four workspace shapes. Why `git status --short` was rejected:
-  // specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
-  const labelIdx = SKILL.indexOf("**Root-file completeness (E94)**");
-  assert.ok(labelIdx > -1, "must find the Root-file completeness (E94) label");
-  const sentenceEnd = SKILL.indexOf("If either command's output is non-empty", labelIdx);
-  assert.ok(sentenceEnd > -1, "must find the Root-file completeness paragraph's STOP sentence");
-  const section = SKILL.slice(labelIdx, sentenceEnd);
-
-  // Regression guard (review finding C1): the paragraph is allowed to NAME `git status --short`
-  // as the anti-pattern it replaces (round-2 APPROVED text does exactly that,
-  // "so a future editor doesn't reintroduce the same non-discriminating
-  // form") -- what it must never do is key the actual STOP condition on it.
-  // Distinguish the two by requiring the explicit "Do NOT use" disclaimer to
-  // be the ONLY way `git status --short` appears in the paragraph.
-  const statusShortMentions = section.match(/git status --short/g) ?? [];
-  assert.ok(
-    statusShortMentions.length <= 1,
-    `the Root-file completeness paragraph must mention 'git status --short' at most once (as the documented anti-pattern), found ${statusShortMentions.length}`,
-  );
-  if (statusShortMentions.length === 1) {
-    assert.match(
-      section,
-      /Do NOT use `git status --short`/,
-      "the paragraph's one 'git status --short' mention must be inside an explicit 'Do NOT use' disclaimer, not the operative check (C1 regression guard)",
-    );
+test("AC2: the pre-commit staging verify is the script's checkStagingCompleteness — metadata-only staging FAILs for every FEATURE_DIR with pending edits (AC-S6)", () => {
+  for (const dir of FEATURE_DIRS) {
+    const bad = REL.checkStagingCompleteness({ changed: [`${dir}a.txt`, "package.json"], staged: ["package.json"] });
+    assert.equal(bad.pass, false, `metadata-only staging with a pending ${dir} edit must FAIL`);
+    assert.deepEqual(bad.missing, [dir], `the missing directory must be named: ${dir}`);
+    const ok = REL.checkStagingCompleteness({ changed: [`${dir}a.txt`, "package.json"], staged: [`${dir}a.txt`, "package.json"] });
+    assert.equal(ok.pass, true, `complete staging must pass for ${dir}`);
   }
+  // The stop is its own exit class and an Escalation row; the script says "stage them and re-run".
+  assert.ok(exitRow(30, "STAGING_INCOMPLETE"), "SOP Escalation Routes must carry the STAGING_INCOMPLETE row");
+  assert.match(RELEASE_SRC, /\$\{verdict\.problems\.join\("; "\)\} — stage them and re-run/);
+  assert.ok(HISTORY.includes("git diff --cached --stat"), "the old hand verify step lives in the history file (AC-P10)");
+});
 
-  const diffMatch = section.match(/`(git diff --name-only[^`]*)`/);
-  const lsFilesMatch = section.match(/`(git ls-files --others[^`]*)`/);
-  assert.ok(diffMatch, "must find the tracked-unstaged command (git diff --name-only ...) in the paragraph");
-  assert.ok(lsFilesMatch, "must find the untracked-never-staged command (git ls-files --others ...) in the paragraph");
-  const diffCmd = diffMatch[1];
-  const lsFilesCmd = lsFilesMatch[1];
-  assert.match(diffCmd, /:!\.current/, "the diff command must exclude .current/ via the documented pathspec");
-  assert.match(lsFilesCmd, /:!\.current/, "the ls-files command must exclude .current/ via the documented pathspec");
-  assert.match(lsFilesCmd, /--exclude-standard/, "the ls-files command must pass --exclude-standard (else every gitignored path, e.g. node_modules/, would be listed)");
+test("AC2 (E94): root-file completeness — the script's two leftover commands, EXECUTED, discriminate the v3.104.2 escape from a correct release across four workspace shapes (adopter repo with no .current/, source outside FEATURE_DIRS, .current/ dirty, escape/PASS pair) (AC-S6)", () => {
+  // The two argv arrays are lifted from step8aStage's `leftovers([...])` calls, so the commands run here are
+  // the shipped ones.
+  const calls = [...fnSrc("step8aStage").matchAll(/leftovers\(\[([^\]]*)\]\)/g)].map((m) => JSON.parse(`[${m[1]}]`));
+  assert.equal(calls.length, 2, "step8aStage runs exactly two leftover commands (tracked-unstaged, untracked-never-staged)");
+  const [diffArgs, lsArgs] = calls;
+  assert.deepEqual(diffArgs.slice(0, 2), ["diff", "--name-only"]);
+  assert.deepEqual(lsArgs.slice(0, 3), ["ls-files", "--others", "--exclude-standard"], "ls-files must pass --exclude-standard (else node_modules/ would be listed)");
+  assert.ok(diffArgs.includes(":!.current") && lsArgs.includes(":!.current"), "both commands exclude .current/ via the documented pathspec");
 
+  const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf-8" });
   const runBoth = (cwd) => ({
-    diff: execSync(diffCmd, { cwd, encoding: "utf-8", shell: "/bin/bash" }).trim(),
-    lsFiles: execSync(lsFilesCmd, { cwd, encoding: "utf-8", shell: "/bin/bash" }).trim(),
+    diff: git(cwd, diffArgs).split("\0").filter(Boolean),
+    lsFiles: git(cwd, lsArgs).split("\0").filter(Boolean),
   });
-
   const initRepo = (dir) => {
-    execSync("git init -q", { cwd: dir });
-    execSync("git config user.email a@b.c && git config user.name t", { cwd: dir });
+    git(dir, ["init", "-q"]);
+    git(dir, ["config", "user.email", "a@b.c"]);
+    git(dir, ["config", "user.name", "t"]);
+    git(dir, ["config", "commit.gpgsign", "false"]);
   };
+  const verdictOf = (r) => REL.checkStagingCompleteness({ changed: [], staged: [], unstaged: r.diff, untracked: r.lsFiles });
 
-  // Shape 1 (adopter repo, NO .current/ at all, source in a dir outside the
-  // 19 FEATURE_DIRS): the exclude pathspec must not error when .current/ is
-  // absent (unlike `git add`, `git diff`/`git ls-files` never treat an
-  // unmatched pathspec as fatal), AND the check must surface a source dir
-  // the FEATURE_DIRS enumeration structurally cannot see -- the
-  // "enumeration-free" property T-E94-01's WHY note claims.
+  // Shape 1: adopter repo, NO .current/, source in a dir outside FEATURE_DIRS.
   {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e94-adopter-"));
     initRepo(tmp);
     fs.mkdirSync(path.join(tmp, "src"));
     fs.writeFileSync(path.join(tmp, "src", "app.ts"), "x");
     fs.writeFileSync(path.join(tmp, "CONTRIBUTING.md"), "x");
-    execSync("git add -- src CONTRIBUTING.md", { cwd: tmp });
-    execSync('git commit -q -m init', { cwd: tmp });
-    fs.writeFileSync(path.join(tmp, "src", "app.ts"), "x2"); // modify, leave BOTH unstaged
+    git(tmp, ["add", "--", "src", "CONTRIBUTING.md"]);
+    git(tmp, ["commit", "-q", "-m", "init"]);
+    fs.writeFileSync(path.join(tmp, "src", "app.ts"), "x2");
     fs.writeFileSync(path.join(tmp, "CONTRIBUTING.md"), "x2");
-    // Deliberately no `git add` here -- both the source-dir edit and the
-    // root-file edit stay unstaged, simulating an under-staged release.
-    assert.doesNotThrow(() => runBoth(tmp), "the pathspec must not error in a repo with no .current/ directory at all");
-    const { diff } = runBoth(tmp);
-    assert.match(diff, /CONTRIBUTING\.md/, "must surface the left-unstaged root file even with no .current/ present");
-    assert.match(diff, /src\/app\.ts/, "must surface a source dir OUTSIDE FEATURE_DIRS (adopter layout) -- the enumeration-free property");
+    const r = runBoth(tmp);
+    assert.deepEqual([...r.diff].sort(), ["CONTRIBUTING.md", "src/app.ts"], "surfaces the root file and a source dir outside FEATURE_DIRS (enumeration-free)");
+    const v = verdictOf(r);
+    assert.equal(v.pass, false);
+    assert.ok(v.problems.some((x) => x.includes("CONTRIBUTING.md") && x.includes("src/app.ts")), "the stop names both paths");
   }
-
-  // Shape 2 (.current/ dirty): a modified .current/handoff.md must be
-  // excluded -- the one legitimate exclusion, since step 12's closing write
-  // happens after this commit by construction.
+  // Shape 2: .current/ dirty is excluded; an untracked stray root file is surfaced.
   {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e94-current-"));
     initRepo(tmp);
     fs.mkdirSync(path.join(tmp, ".current"));
     fs.writeFileSync(path.join(tmp, ".current", "handoff.md"), "x");
-    fs.writeFileSync(path.join(tmp, "NOTES-local.txt"), "x"); // untracked stray root file
-    execSync("git add -- .current", { cwd: tmp });
-    execSync('git commit -q -m init', { cwd: tmp });
-    fs.writeFileSync(path.join(tmp, ".current", "handoff.md"), "x2"); // dirty, never excluded from add
-    const { diff, lsFiles } = runBoth(tmp);
-    assert.ok(!diff.includes(".current"), ".current/ must be excluded from the tracked-unstaged output even while dirty");
-    assert.match(lsFiles, /NOTES-local\.txt/, "an untracked stray root file must be surfaced by the ls-files half");
+    fs.writeFileSync(path.join(tmp, "NOTES-local.txt"), "x");
+    git(tmp, ["add", "--", ".current"]);
+    git(tmp, ["commit", "-q", "-m", "init"]);
+    fs.writeFileSync(path.join(tmp, ".current", "handoff.md"), "x2");
+    const r = runBoth(tmp);
+    assert.deepEqual(r.diff, [], ".current/ is excluded from the tracked-unstaged output even while dirty");
+    assert.deepEqual(r.lsFiles, ["NOTES-local.txt"], "an untracked stray root file is surfaced");
+    assert.equal(verdictOf(r).pass, false);
   }
-
-  // Shape 3 (ESCAPE vs PASS pair, the v3.104.2 shape itself): a tracked root
-  // file left unstaged after `git add` must STOP; the same tree with
-  // everything staged must be silent.
+  // Shape 3: the v3.104.2 escape (a root file left unstaged) STOPs; the fully staged tree is silent.
   {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e94-escape-"));
     initRepo(tmp);
     fs.mkdirSync(path.join(tmp, "tools"));
     fs.writeFileSync(path.join(tmp, "tools", "a.ts"), "x");
     fs.writeFileSync(path.join(tmp, "CONTRIBUTING.md"), "x");
-    execSync("git add -- tools CONTRIBUTING.md", { cwd: tmp });
-    execSync('git commit -q -m init', { cwd: tmp });
+    git(tmp, ["add", "--", "tools", "CONTRIBUTING.md"]);
+    git(tmp, ["commit", "-q", "-m", "init"]);
     fs.writeFileSync(path.join(tmp, "tools", "a.ts"), "x2");
-    fs.writeFileSync(path.join(tmp, "CONTRIBUTING.md"), "x2"); // the v3.104.2 escape: CHANGELOG claims it, tree doesn't have it
-
-    execSync("git add -- tools", { cwd: tmp }); // ESCAPE: CONTRIBUTING.md deliberately left unstaged
+    fs.writeFileSync(path.join(tmp, "CONTRIBUTING.md"), "x2");
+    git(tmp, ["add", "--", "tools"]);
     const escape = runBoth(tmp);
-    assert.notEqual(escape.diff + escape.lsFiles, "", "ESCAPE case (CONTRIBUTING.md left unstaged) must produce non-empty output -- correctly STOPs");
-
-    execSync("git add -- CONTRIBUTING.md", { cwd: tmp }); // now fully staged
+    assert.deepEqual(escape.diff, ["CONTRIBUTING.md"]);
+    assert.equal(verdictOf(escape).pass, false, "ESCAPE case must STOP");
+    git(tmp, ["add", "--", "CONTRIBUTING.md"]);
     const pass = runBoth(tmp);
-    assert.equal(pass.diff, "", "PASS case: tracked-unstaged output must be empty once everything is staged");
-    assert.equal(pass.lsFiles, "", "PASS case: untracked-never-staged output must be empty once everything is staged");
+    assert.deepEqual([pass.diff, pass.lsFiles], [[], []], "PASS case must be silent once everything is staged");
+    assert.equal(verdictOf(pass).pass, true);
   }
 });
 
-test("AC3: failure-mode wording is inverted — source dirs are EXPECTED, not blocked", () => {
-  // Contract (v3.22.1 fix): the old 'release-artifact whitelist' stop condition
-  // must be replaced with inverted framing: feature source files are EXPECTED;
-  // only UNRELATED uncommitted changes trigger STOP.
-  assert.ok(
-    !SKILL.includes("release-artifact whitelist"),
-    "skill-release-engineer.md must NOT contain 'release-artifact whitelist' (old framing replaced by AC3)",
+test("AC3: failure-mode wording is inverted — source dirs are EXPECTED, only UNRELATED paths STOP, with the verbatim message (AC-S6, UNRELATED_CHANGES)", () => {
+  assert.ok(!SKILL.includes("release-artifact whitelist"), "the old 'release-artifact whitelist' framing must not return");
+  for (const dir of FEATURE_DIRS) assert.equal(REL.checkScope([`${dir}some-file`]), null, `a change under ${dir} is EXPECTED, never a STOP`);
+  assert.equal(
+    REL.checkScope(["stray/file.txt"]),
+    "Pre-existing uncommitted changes found in stray/file.txt — this path is unrelated to the active feature. Commit or stash it first.",
+    "the verbatim AC3 stop-condition string, with the path filled in",
   );
-  assert.match(
-    SKILL,
-    /EXPECTED in a release commit/,
-    "failure-mode section must declare feature source files as EXPECTED (AC3)",
-  );
-  assert.match(
-    SKILL,
-    /UNRELATED uncommitted changes/i,
-    "failure-mode section must limit STOP condition to UNRELATED paths (AC3)",
-  );
-  assert.match(
-    SKILL,
-    /Pre-existing uncommitted changes found in <path> — this path is unrelated to the active feature\. Commit or stash it first\./,
-    "failure-mode must include the verbatim AC3 stop-condition string (AC3)",
-  );
-
-  // Directory-set pin (T-E66-02, review_T-E66-01.md round-1 Architecture
-  // finding): the assertions above only check framing STRINGS — none inspect
-  // the "Expected vs unrelated scope rule" paragraph's own directory list, so
-  // that list could be emptied entirely (or drift from FEATURE_DIRS/AC1's
-  // set) with this test still green. Extract it and pin it exactly.
-  const ac3Match = SKILL.match(
-    /feature source files in ([\s\S]*?) are EXPECTED in a release commit/,
-  );
-  assert.ok(
-    ac3Match,
-    "must find the 'Expected vs unrelated scope rule' paragraph's directory list in the SOP",
-  );
-  const ac3Dirs = [...ac3Match[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
-  assert.deepEqual(
-    [...ac3Dirs].sort(),
-    [...FEATURE_DIRS].sort(),
-    `AC3's Expected-scope directory list must be exactly FEATURE_DIRS (got ${JSON.stringify(ac3Dirs)})`,
-  );
+  const row = exitRow(13, "UNRELATED_CHANGES");
+  assert.ok(row, "SOP Escalation Routes carries the UNRELATED_CHANGES row");
+  assert.deepEqual(row.slice(1), ["Blocked", "`<stop>` (path verbatim)", "—"]);
+  assert.ok(HISTORY.includes("EXPECTED in a release commit"), "the old 'EXPECTED in a release commit' scope-rule wording lives in the history file (AC-P10)");
 });
 
-test("AC4 (E44/E142(b)): skill-release-engineer.md's post-commit check is conditional on dispatch shape — REQUIRE/MULTI-FEATURE/SKIP/UNCLASSIFIABLE, four named branches, range-corrected", () => {
-  // Contract (E44, docs/backlog.md:161; re-baselined E142(b)/AC4-AC5): the
-  // post-commit check is no longer a single unconditional STOP, and it is no
-  // longer just three branches — exactly one of FOUR named branches fires,
-  // depending on whether pending_notes records a multi-feature release,
-  // whether specs/<active_feature>.md exists anywhere in the tree, and
-  // whether scope_decision_why records a backlog-row-as-spec mini-chain.
-  assert.match(SKILL, /\*\*REQUIRE branch\*\*/, "SOP must name the REQUIRE branch (E44)");
-  assert.match(SKILL, /\*\*MULTI-FEATURE branch\*\*/, "SOP must name the MULTI-FEATURE branch (E142(b)/AC5)");
-  assert.match(SKILL, /\*\*SKIP branch\*\*/, "SOP must name the SKIP branch (E44)");
-  assert.match(SKILL, /\*\*UNCLASSIFIABLE branch\*\*/, "SOP must name the UNCLASSIFIABLE branch (E44)");
-
-  // Range-corrected (E142(b)/AC4): the check now measures the release's true
-  // range, never a single-commit proxy.
-  assert.match(
-    SKILL,
-    /git diff <prev-tag>\.\.HEAD --name-only/,
-    "REQUIRE/MULTI-FEATURE branches must reference 'git diff <prev-tag>..HEAD --name-only' as the post-commit check command (AC4)",
-  );
-  assert.doesNotMatch(
-    SKILL,
-    /git diff HEAD~1 --name-only/,
-    "the post-commit check must no longer use the single-commit HEAD~1 proxy — that is exactly the defect AC4 fixes (a lane-worktree --no-ff merge's HEAD~1 is the merge commit, not the spec-carrying commit)",
-  );
-  assert.match(
-    SKILL,
-    /specs\/<active_feature>\.md/,
-    "post-commit check must reference 'specs/<active_feature>.md' (AC4)",
-  );
-
-  // REQUIRE branch: byte-identical current STOP string (F5 — non-weakening;
-  // range wording updated, shape unchanged).
-  assert.ok(
-    SKILL.includes(AC4_REQUIRE_STOP),
-    "SOP must contain the verbatim, byte-identical REQUIRE STOP string (AC4/F5)",
-  );
-
-  // UNCLASSIFIABLE branch: verbatim string, INCLUDING the F6 remedy clause
-  // (review round 2 amendment) AND the new pending_notes clause (E142(b)),
-  // and distinct from the REQUIRE STOP string.
-  assert.ok(
-    SKILL.includes(AC4_UNCLASSIFIABLE_STOP),
-    "SOP must contain the verbatim UNCLASSIFIABLE string including the F6 remedy clause and the E142(b) pending_notes clause, distinct from the REQUIRE STOP string (AC4/F6/E142(b))",
-  );
-  assert.notEqual(
-    AC4_REQUIRE_STOP,
-    AC4_UNCLASSIFIABLE_STOP,
-    "REQUIRE and UNCLASSIFIABLE STOP strings must be textually distinct (sanity check on the fixtures above)",
-  );
-
-  // SKIP branch: self-documenting log line naming which branch fired.
-  assert.match(
-    SKILL,
-    /AC4: SKIP branch/,
-    "SKIP branch must log a line naming itself as the fired branch, so the next reader sees a deliberate decision, not an omission (E44)",
-  );
-
-  // MULTI-FEATURE branch (E142(b) Decision): a named feature with no spec
-  // file at all is logged and skipped by design — self-documenting log line,
-  // and the ratified Decision language must be present, not just implied.
-  assert.match(
-    SKILL,
-    /AC4: MULTI-FEATURE branch/,
-    "MULTI-FEATURE branch must log a line naming itself as the fired branch (E142(b))",
-  );
-  assert.match(
-    SKILL,
-    /logged and skipped by design/,
-    "MULTI-FEATURE branch must record the E142(b) Decision — a named feature with no spec file is logged-and-skipped, not STOPped",
-  );
-
-  // Range-derived feature set (E152, AC-E152-1): the SOP derives the sibling
-  // spec set from the release range, so a missing pending_notes line can no
-  // longer reduce the check to the active feature's spec alone.
-  assert.ok(
-    SKILL.includes(
-      `git diff "$PREV_TAG"..HEAD --name-only -- specs/ | grep -E '^specs/[^/]+\\.md$' | grep -vE '^specs/(fanout-.*|.*-architecture)\\.md$'`,
-    ),
-    "SOP must give the range-derived feature-spec command with the fanout-*/*-architecture exclusion (E152)",
-  );
-  assert.match(
-    SKILL,
-    /MULTI-FEATURE branch\*\*[^\n]*WHEN M OR R holds \(M ∨ R\)/,
-    "MULTI-FEATURE branch must fire on the pending_notes line OR another feature spec in the range (M ∨ R) (E152)",
-  );
-  assert.match(
-    SKILL,
-    /That line is optional extra input, never required/,
-    "the Multi-feature release pending_notes line must be documented as optional (E152)",
-  );
-  assert.match(
-    SKILL,
-    /neither `pending_notes` records a multi-feature release nor the range carries another feature spec \(¬M ∧ ¬R/,
-    "REQUIRE/SKIP/UNCLASSIFIABLE triggers must be keyed on ¬M ∧ ¬R (E152)",
-  );
+test("AC4 (E44/E142(b)): the spec-class check is conditional on dispatch shape — REQUIRE/MULTI-FEATURE/SKIP/UNCLASSIFIABLE, evaluated by the script BEFORE the commit over PREV_TAG..HEAD plus the stage plan, with the REQUIRE remedy 'Stage the missing files and re-run.' (AC-S4, AC-S6)", () => {
+  // REQUIRE: byte-exact stop text; the remedy no longer says "amend" (no commit exists yet when this stops).
+  const req = REL.classifySpecCheck({ feature: "f", unionFiles: [], specExists: () => true, prevTag: "v1.0.0" });
+  assert.equal(req.branch, "REQUIRE");
+  assert.equal(req.classId, "SPEC_REQUIRE");
+  assert.equal(req.errorMsg, AC4_REQUIRE_STOP.replace("<active_feature>", "f"));
+  assert.ok(AC4_REQUIRE_STOP.endsWith("Stage the missing files and re-run."));
+  assert.ok(!/amend/i.test(req.errorMsg), "no commit exists at this check, so the remedy must not say amend");
+  // UNCLASSIFIABLE: base string, distinct from REQUIRE.
+  const unc = REL.classifySpecCheck({ feature: "f", unionFiles: [], specExists: () => false, scopeWhy: "", prevTag: "v1.0.0" });
+  assert.equal(unc.branch, "UNCLASSIFIABLE");
+  assert.equal(unc.classId, "SPEC_UNCLASSIFIABLE");
+  assert.equal(unc.errorMsg, AC4_UNCLASSIFIABLE_STOP);
+  assert.notEqual(AC4_REQUIRE_STOP, AC4_UNCLASSIFIABLE_STOP);
+  // SKIP names itself in the log.
+  const skip = REL.classifySpecCheck({ feature: "f", unionFiles: [], specExists: () => false, scopeWhy: MINI_CHAIN_SCOPE_WHY, prevTag: "v1.0.0" });
+  assert.equal(skip.branch, "SKIP");
+  assert.ok(skip.logs.some((l) => l.startsWith("AC4: SKIP branch")), "SKIP logs a line naming itself");
+  // MULTI-FEATURE: M alone fires it; a named feature with no spec file is logged and skipped by design.
+  const multi = REL.classifySpecCheck({ feature: "f", unionFiles: [], specExists: () => false, pendingNotes: ["Multi-feature release: a, b."], prevTag: "v1.0.0" });
+  assert.equal(multi.branch, "MULTI-FEATURE");
+  assert.ok(multi.pass);
+  assert.ok(multi.logs.some((l) => l.startsWith("AC4: MULTI-FEATURE branch") && l.includes("logged and skipped by design")));
+  // M or R: R alone (another feature spec in the range, no pending note) also fires MULTI-FEATURE; the note is optional.
+  const r = REL.classifySpecCheck({ feature: "f", unionFiles: ["specs/f.md", "specs/g.md"], specExists: () => true, prevTag: "v1.0.0" });
+  assert.equal(r.branch, "MULTI-FEATURE");
+  const none = REL.classifySpecCheck({ feature: "f", unionFiles: ["specs/f.md"], specExists: () => true, prevTag: "v1.0.0" });
+  assert.equal(none.branch, "REQUIRE", "neither M nor R: the single-feature branches decide");
+  // Range-corrected: the true release range, never the single-commit HEAD~1 proxy, and before the commit.
+  assert.ok(req.logs.concat(skip.logs, multi.logs).length > 0);
+  assert.ok(!RELEASE_SRC.includes("HEAD~1"), "the script never measures a single-commit proxy");
+  assert.match(RELEASE_SRC, /`\$\{prevTag\}\.\.HEAD`/, "the range is PREV_TAG..HEAD");
+  const stepOrder = RELEASE_SRC.match(/const PHASES = \{\s*prepare: \[([^\]]*)\]/)[1].split(",").map((x) => x.trim());
+  assert.ok(stepOrder.indexOf("step8aSpecs") > -1 && stepOrder.indexOf("step8aSpecs") < stepOrder.indexOf("step8aCommitPushPr"), "AC4 classes are evaluated before the commit");
+  // SOP: both stop classes are Escalation rows; the old four-branch prose and range command live in the history file.
+  assert.ok(exitRow(32, "SPEC_REQUIRE") && exitRow(33, "SPEC_UNCLASSIFIABLE"), "SOP Escalation Routes carries both spec-class rows");
+  for (const old of ["Stage missing files and amend or create a fix commit.", "WHEN M OR R holds", "That line is optional extra input, never required", "git diff \"$PREV_TAG\"..HEAD --name-only"]) {
+    assert.ok(HISTORY.includes(old), `history keeps the old AC4 text: ${old}`);
+  }
 });
 
 test("AC5: release-engineer.md shim contains a reinforcement hint (<=2 sentences)", () => {
@@ -716,7 +491,7 @@ test("Fixture C (AC4/REQUIRE, AC6): REQUIRE branch fires with verbatim AC4 error
   assert.equal(result.branch, "REQUIRE", "Fixture C: spec-in-tree must select the REQUIRE branch");
   assert.equal(
     result.errorMsg,
-    "Release commit incomplete: specs/release-engineer-complete-staging.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.",
+    "Release commit incomplete: specs/release-engineer-complete-staging.md is absent from the release range <prev-tag>..HEAD. Stage the missing files and re-run.",
     "Fixture C: error message must match verbatim AC4 error string",
   );
 });
@@ -800,7 +575,7 @@ test("Fixture H (AC4/REQUIRE non-weakening, F6): spec-in-tree wins over SKIP eve
   assert.equal(result.branch, "REQUIRE", "Fixture H: spec-in-tree must win over SKIP regardless of scope_decision_why");
   assert.equal(
     result.errorMsg,
-    "Release commit incomplete: specs/release-engineer-complete-staging.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.",
+    "Release commit incomplete: specs/release-engineer-complete-staging.md is absent from the release range <prev-tag>..HEAD. Stage the missing files and re-run.",
     "Fixture H: the STOP string must be byte-identical to the current AC4 wording — unweakened by the mini-chain signal",
   );
 });
@@ -844,7 +619,7 @@ test("Fixture J (AC4/MULTI-FEATURE, AC5): a named feature whose spec DOES exist 
   assert.equal(result.branch, "MULTI-FEATURE");
   assert.equal(
     result.errorMsg,
-    "Release commit incomplete: specs/e109-workspace-feature-anchoring.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.",
+    "Release commit incomplete: specs/e109-workspace-feature-anchoring.md is absent from the release range <prev-tag>..HEAD. Stage the missing files and re-run.",
     "Fixture J: STOP must name the offending named feature's spec path, same message shape as REQUIRE",
   );
 });
@@ -1069,21 +844,12 @@ test("Partition (E66, T-E66-02): every top-level repo directory is classified in
 // We pin load-bearing substrings, not paragraphs, so rewording passes but
 // removal fails.
 
-test("C13-AC5: skill-release-engineer.md contains the verbatim CRITICAL STOP-on-⛔ rule", () => {
-  // Contract: the Hard rules section must instruct STOP + hand-back on ANY
-  // tw_* ⛔ rejection, and must explicitly forbid hand-editing BOTH
-  // .current/handoff.md and tasks.md — the two files the incident's
-  // hand-edit workaround touched / could touch.
-  assert.match(
-    SKILL,
-    /On any ⛔ rejection from any tw_\* tool call \(including but not limited to TRANSITION_REJECTED\), STOP immediately and hand back to the coordinator\/human\./,
-    "skill-release-engineer.md must contain the verbatim CRITICAL STOP-on-⛔ rule opening (C13-AC5)",
-  );
-  assert.match(
-    SKILL,
-    /NEVER hand-edit \.current\/<lane>\/handoff\.md or tasks\.md directly to work around a rejection — this applies regardless of role and is a Constitution §3 violation\./,
-    "skill-release-engineer.md must contain the verbatim CRITICAL STOP-on-⛔ rule's hand-edit-ban clause (C13-AC5, E174a lane-scoped path)",
-  );
+test("C13-AC5: the SOP's STOP-on-⛔ rule survives (hand-edit ban included); the verbatim original lives in the history file (AC-P4, AC-P10)", () => {
+  assert.match(SKILL, /\*\*STOP on ⛔\*\*: any ⛔ rejection from a `tw_\*` call STOPs \(Constitution §3\)/, "the rule opens with the STOP");
+  assert.match(SKILL, /never hand-edit `\.current\/<lane>\/handoff\.md` or `tasks\.md` to work around one/, "the hand-edit ban names both files");
+  assert.ok(HISTORY.includes("On any ⛔ rejection from any tw_* tool call (including but not limited to TRANSITION_REJECTED), STOP immediately and hand back to the coordinator/human."));
+  assert.ok(HISTORY.includes("NEVER hand-edit .current/<lane>/handoff.md or tasks.md directly to work around a rejection"));
+  assert.ok(sopRow(/^⛔ rejection from any `tw_\*` call/), "SOP Escalation Routes carries the ⛔ row");
 });
 
 test("C13-AC5: skill-release-engineer.md no longer contains the old stamp-as-upstream-caller workaround language", () => {
@@ -1151,76 +917,41 @@ test("C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines a
 // routes to Blocked with the local release-commit SHA; the shim mirrors it.
 // Substrings are pinned, as above, so rewording passes but removal fails.
 
-test("D10-AC1: skill-release-engineer.md Hard rule STOPs on non-fast-forward push / collision and forbids destructive git recovery", () => {
-  // Contract: the Hard rule must instruct immediate STOP and explicitly
-  // forbid git reset / rebase / checkout --force / clean as workarounds —
-  // the exact anti-pattern the D10 incident exhibited.
-  assert.ok(
-    SKILL.includes(
-      "STOP immediately — NEVER run `git reset`, `git rebase`, `git checkout --force`, or `git clean` to work around it.",
-    ),
-    "skill-release-engineer.md must contain the verbatim D10 stop-clause forbidding destructive git recovery (D10-AC1)",
-  );
+test("D10-AC1: a push rejection or collision STOPs and the allow-list refuses destructive git recovery (reset, rebase, checkout --force, clean) (AC-P4, AC-S3)", () => {
+  assert.match(SKILL, /Never force-push; tags are immutable/);
+  assert.match(SKILL, /A push rejection, collision or any `RELEASE_STOP` is a Blocked write carrying the branch and local sha, never a recovery command\./);
+  for (const args of [["reset", "--hard", "HEAD~1"], ["rebase", "main"], ["checkout", "--force", "main"], ["clean", "-fd"]]) {
+    assert.equal(REL.isAllowed("git", args, { branch: "release/v1.0.0" }), false, `git ${args.join(" ")} must be refused by the script's allow-list`);
+  }
+  assert.ok(HISTORY.includes("STOP immediately — NEVER run `git reset`, `git rebase`, `git checkout --force`, or `git clean` to work around it."));
 });
 
-test("D10-AC2: skill-release-engineer.md Hard rule routes to status=Blocked with the local release-commit SHA, handing back for coordinator recovery", () => {
-  // Contract: instead of self-recovering, the rule must instruct writing
-  // status=Blocked with the local release-commit SHA in pending_notes and
-  // handing back — never attempting recovery itself. Pinned as two
-  // substrings (spec's own Copy/Strings table elides the middle with "..."),
-  // both of which must survive intact.
-  assert.ok(
-    SKILL.includes(
-      "write `status=Blocked` with the local release-commit SHA in `pending_notes`",
-    ),
-    "skill-release-engineer.md must instruct writing status=Blocked with the local release-commit SHA in pending_notes (D10-AC2)",
-  );
-  assert.ok(
-    SKILL.includes("and hand back for coordinator recovery."),
-    "skill-release-engineer.md must instruct handing back for coordinator recovery, not self-recovery (D10-AC2)",
-  );
+test("D10-AC2: a rejected push is a Blocked write with the branch and local sha, handing back (never self-recovery); the script names both in its stop (AC-P4, AC-P6)", () => {
+  const row = exitRow(34, "PUSH_REJECTED");
+  assert.ok(row, "SOP Escalation Routes carries the PUSH_REJECTED row");
+  assert.deepEqual(row.slice(1), ["Blocked", "`<stop>` + branch, local sha", "—"]);
+  assert.match(SKILL, /`—` in `next_role` = omit the field: the status hands back to the human/);
+  assert.match(fnSrc("failedAt"), /on \$\{ctx\.runner\.branch\} at \$\{head\}/, "the script's stop names the branch and the local head sha");
+  assert.ok(HISTORY.includes("write `status=Blocked` with the local release-commit SHA in `pending_notes`"));
+  assert.ok(HISTORY.includes("and hand back for coordinator recovery."));
 });
 
-test("D10-AC1/AC2: skill-release-engineer.md Hard rule includes the worked pending_notes example and the incident-reason clause", () => {
-  // Contract: the Hard rule gives a literal pending_notes=[...] example
-  // (this file's existing convention for other Blocked examples) plus the
-  // rationale from the git-stop incident (D10), so the rule reads as self-justifying under
-  // context pressure rather than a bare directive.
-  assert.ok(
-    SKILL.includes(
-      'pending_notes=["release-engineer: push rejected (non-fast-forward) — local release commit <sha> not on remote, needs coordinator recovery"]',
-    ),
-    "skill-release-engineer.md must contain the verbatim D10 worked pending_notes example (D10-AC1/AC2)",
-  );
-  assert.ok(
-    SKILL.includes(
-      "Reason (D10): a haiku-tier release-engineer hit exactly this collision, aborted a rebase, and ran `git reset HEAD~1`, discarding its own committed release — only the reflog made recovery possible.",
-    ),
-    "skill-release-engineer.md must contain the verbatim D10 incident-reason clause (D10-AC1/AC2)",
-  );
+test("D10-AC1/AC2: the worked pending_notes example and the incident-reason clause moved to the history file; the SOP keeps a compact pending-note per exit class (AC-P10)", () => {
+  assert.ok(HISTORY.includes('pending_notes=["release-engineer: push rejected (non-fast-forward) — local release commit <sha> not on remote, needs coordinator recovery"]'));
+  assert.ok(HISTORY.includes("Reason (D10): a haiku-tier release-engineer hit exactly this collision, aborted a rebase, and ran `git reset HEAD~1`, discarding its own committed release — only the reflog made recovery possible."));
+  assert.ok(!SKILL.includes("haiku-tier"), "the incident narrative is not inline in the SOP");
+  assert.match(SKILL, /`<stop>` = `release-engineer: <CLASS_ID> \(exit <code>\) — <detail>`/, "the SOP defines the pending-note shape once");
 });
 
-test("D10-AC3: skill-release-engineer.md Escalation Routes table has a matching non-fast-forward/collision row (Blocked, SHA pending-note, human)", () => {
-  // Contract: the Escalation Routes table row must name the trigger, carry
-  // status=Blocked, the canonical SHA pending-note (deliberately identical
-  // to the Hard rule's worked example per spec's paired-wording intent),
-  // and next_role=human.
-  assert.match(
-    SKILL,
-    /\| non-fast-forward push rejection \/ concurrent-release collision \(D10\) \| Blocked \|/,
-    "skill-release-engineer.md Escalation Routes table must have a D10 row with status=Blocked (D10-AC3)",
-  );
-  assert.ok(
-    SKILL.includes(
-      "`release-engineer: push rejected (non-fast-forward) — local release commit <sha> not on remote, needs coordinator recovery`",
-    ),
-    "skill-release-engineer.md Escalation Routes row must carry the verbatim backtick-wrapped D10 pending-note (D10-AC3)",
-  );
-  assert.match(
-    SKILL,
-    /non-fast-forward push rejection \/ concurrent-release collision \(D10\) \| Blocked \| `release-engineer: push rejected \(non-fast-forward\) — local release commit <sha> not on remote, needs coordinator recovery` \| human \|/,
-    "skill-release-engineer.md Escalation Routes D10 row must route to next_role=human (D10-AC3)",
-  );
+test("D10-AC3: the Escalation Routes table has the push-rejection / collision row (Blocked, branch + local sha note, hand back to the human) (AC-P6)", () => {
+  const push = exitRow(34, "PUSH_REJECTED");
+  assert.ok(push);
+  assert.equal(push[1], "Blocked");
+  assert.match(push[2], /branch, local sha/);
+  assert.equal(push[3], "—", "next_role omitted = the status hands back to the human");
+  const mut = exitRow(35, "MUTATION_FAILED");
+  assert.ok(mut && mut[1] === "Blocked" && /branch, local sha/.test(mut[2]), "a failed mutation carries the same note");
+  assert.ok(HISTORY.includes("non-fast-forward push rejection / concurrent-release collision (D10) | Blocked |"), "the old D10 row lives in the history file");
 });
 
 test("D10-AC4: release-engineer.md shim contains the verbatim D10 reinforcement hint (<=2 sentences)", () => {
@@ -1285,144 +1016,56 @@ test("E53: zero remaining claims that release-engineer:Blocked is unreachable", 
   );
 });
 
-test("E53: step 7a's empty-baseline STOP is now a genuine Escalation Routes table row, not an in-SOP-only halt", () => {
-  // Contract: the guard bullet at step 7a must instruct the actual
-  // tw_update_state(status="Blocked") write and point at the table row, and
-  // that row must exist with status=Blocked and next_role=human — the
-  // opposite of the deleted "in-SOP-only halt" / "never an Escalation-Routes-
-  // table row" framing.
-  assert.match(
-    SKILL,
-    /DO `tw_update_state\(agent_id="release-engineer", status="Blocked", pending_notes=\["<the message above>"\]\)` per \*Escalation Routes: empty-baseline hazard \(step 7a\)\*/,
-    "step 7a's guard must instruct the real tw_update_state Blocked write and cite the Escalation Routes row by name (E53)",
-  );
-  assert.match(
-    SKILL,
-    /This is now a real Escalation-Routes-table row and a genuine state transition \(E53 opened the `release-engineer:Blocked` edge in `tools\/transitions\.ts`\)/,
-    "step 7a's guard prose must state the halt is now a real table row / state transition, superseding the old in-SOP-only framing (E53)",
-  );
-  assert.match(
-    SKILL,
-    /\| empty-baseline hazard \(step 7a: no membership baseline for `qa_reports`\/`review_reports`, and that tree currently holds root-level evidence files it would sweep in full — `STOP_QA`\/`STOP_RR` set\) \| Blocked \| `step 7a has no membership baseline for <qa_reports\\\|review_reports> \(PREV_TAG='\$PREV_TAG'\)/,
-    "Escalation Routes table must carry the new empty-baseline-hazard row with status=Blocked (E53)",
-  );
-  assert.match(
-    SKILL,
-    /step 7a has no membership baseline for <qa_reports\\\|review_reports> \(PREV_TAG='\$PREV_TAG'\) — that tree has root-level evidence files and no baseline to diff them against; refusing to derive <CODES> for it rather than risk an unbounded sweep\.` \| human \|/,
-    "the new row must route to next_role=human, matching every other Blocked row in this table (E53)",
-  );
+test("E53: step 7a's empty-baseline STOP is a genuine Escalation Routes row (exit 20, Blocked) and the script stops before any write (AC-S6, L:E53)", () => {
+  const row = exitRow(20, "EMPTY_BASELINE");
+  assert.ok(row, "SOP Escalation Routes carries the EMPTY_BASELINE row");
+  assert.deepEqual(row.slice(1), ["Blocked", "`<stop>`", "—"]);
+  assert.equal(REL.EXIT_CLASSES.find((c) => c.id === "EMPTY_BASELINE").code, 20);
+  assert.equal(REL.classifyArchiveTree({ prevTag: "", treeExists: true, baselineHasFiles: true, rootHasFiles: true }), "STOP", "an unset PREV_TAG is a STOP for every tree");
+  assert.equal(REL.classifyArchiveTree({ prevTag: "v1", treeExists: true, baselineHasFiles: false, rootHasFiles: true }), "STOP", "no baseline and root files present: STOP");
+  assert.ok(RELEASE_SRC.includes("step 7a has no membership baseline for <qa_reports|review_reports> (PREV_TAG='${prevTag ?? \"\"}') — that tree has root-level evidence files and no baseline to diff them against; refusing to derive <CODES> for it rather than risk an unbounded sweep."), "the stop text is the base message");
+  const s7a = fnSrc("step7a");
+  assert.ok(s7a.indexOf("EMPTY_BASELINE") > -1 && s7a.indexOf("EMPTY_BASELINE") < s7a.indexOf("r.mkdir") && s7a.indexOf("EMPTY_BASELINE") < s7a.indexOf("r.move"), "the stop precedes every write");
+  assert.ok(HISTORY.includes("empty-baseline hazard (step 7a:"), "the old row text lives in the history file");
 });
 
-test("E53: pending-note escaping caveat — the :84 guard clause and the new table row are semantically verbatim but NOT byte-equal, and normalise identically", () => {
-  // A markdown table cell escapes `|` as `\|`, so the new row and the step 7a
-  // prose differ byte for byte. This asserts they are equal after normalising
-  // `\|` to `|`, and that the raw forms differ, so the normalising is needed.
-  const proseMatch = SKILL.match(
-    /WHEN either is set → \*\*STOP\*\*: `"(step 7a has no membership baseline for <qa_reports\|review_reports>[^"]*)"`/,
-  );
-  const rowMatch = SKILL.match(
-    /\| Blocked \| `(step 7a has no membership baseline for <qa_reports\\\|review_reports>[^`]*)` \| human \|/,
-  );
-  assert.ok(proseMatch, "must find the step 7a prose STOP message (:84 area)");
-  assert.ok(rowMatch, "must find the new Escalation Routes row's pending-note message");
-
-  const proseMsg = proseMatch[1];
-  const rowMsgRaw = rowMatch[1];
-  assert.notEqual(
-    proseMsg,
-    rowMsgRaw,
-    "the two occurrences must NOT be byte-equal as written — the row's pipe is escaped, the prose's is not (this is what makes normalisation load-bearing)",
-  );
-
-  const normalise = (s) => s.replace(/\\\|/g, "|");
-  assert.equal(
-    normalise(proseMsg),
-    normalise(rowMsgRaw),
-    "the step 7a prose message and the new table row's message must be semantically identical once `\\|` is normalised to `|`",
-  );
+test("E53: pending-note escaping caveat — no SOP table cell carries an unescaped pipe, and the history file keeps both the escaped and unescaped forms of the old message", () => {
+  // A markdown table cell must escape `|` as `\|`. The rewritten rows carry `<stop>` instead of the message, so
+  // no row needs an escape; the check below catches the next row that forgets one (a stray pipe adds a cell).
+  for (const cells of SOP_ROWS) assert.equal(cells.length, 4, `table row has exactly 4 cells: ${cells.join(" | ")}`);
+  assert.ok(!SKILL.includes("\\|"), "the SOP carries no escaped pipe: the messages moved out of the table");
+  assert.ok(HISTORY.includes("<qa_reports|review_reports>") && HISTORY.includes("<qa_reports\\|review_reports>"), "history keeps both forms, which differ byte for byte");
 });
 
-test("E53: Escalation Routes rows :152-154 and :156 (not already byte-pinned by D10-AC3 or the release-self-check test) are unchanged", () => {
-  // Contract: this cut's pinned scope is 4 files, none of which include the
-  // six pre-existing Escalation Routes rows — only a new seventh row was
-  // appended. D10-AC3 (:757 above) pins the non-fast-forward row (:155) and
-  // test/verify-release.test.mjs:701 pins the release-self-check row (:157).
-  // This test covers the remaining four rows those two do not.
-  assert.ok(
-    SKILL.includes(
-      "| unrelated uncommitted changes (scope rule below) | Blocked | `Pre-existing uncommitted changes found in <path> — this path is unrelated to the active feature. Commit or stash it first.` | human |",
-    ),
-    "the 'unrelated uncommitted changes' row (:152) must be unchanged (E53 scope)",
-  );
-  assert.ok(
-    SKILL.includes(
-      "| `npm test` regression | Blocked | `release-engineer: npm test regression — do not tag a red suite` | qa-engineer |",
-    ),
-    "the 'npm test regression' row (:153) must be unchanged (E53 scope)",
-  );
-  assert.ok(
-    SKILL.includes(
-      "| tag with the target name already exists locally OR on origin | Blocked | `release-engineer: tag <vX.Y.Z> already exists — choose a new bump or delete the old tag manually (never delete it yourself per Hard rules)` | human |",
-    ),
-    "the 'tag already exists' row (:154) must be unchanged (E53 scope)",
-  );
-  assert.ok(
-    SKILL.includes(
-      "| `gh` CLI missing or unauthenticated | Blocked | `release-engineer: gh CLI missing/unauthenticated — authenticate; do not work around` | human |",
-    ),
-    "the 'gh CLI missing' row (:156) must be unchanged (E53 scope)",
-  );
+test("E53: the unrelated-changes, test-regression, tag-exists and gh-unavailable rows are present with their routing (AC-P6)", () => {
+  assert.deepEqual(exitRow(13, "UNRELATED_CHANGES").slice(1), ["Blocked", "`<stop>` (path verbatim)", "—"]);
+  assert.deepEqual(sopRow(/^test regression or hardcoded version literal/).slice(1), ["Blocked", "`release-engineer: npm test regression — <test file>: <test name>`", "qa-engineer"]);
+  assert.equal(exitRow(40, "TAG_EXISTS")[0], "exit 40 TAG_EXISTS — never delete a tag");
+  assert.equal(exitRow(40, "TAG_EXISTS")[1], "Blocked");
+  assert.equal(exitRow(14, "GH_UNAVAILABLE")[0], "exit 14 GH_UNAVAILABLE — authenticate, never work around");
+  assert.equal(exitRow(14, "GH_UNAVAILABLE")[1], "Blocked");
+  assert.ok(HISTORY.includes("| unrelated uncommitted changes (scope rule below) | Blocked |"), "the old rows live in the history file");
 });
 
-test("E53/E163: the Escalation Routes table now carries 10 data rows — E163's two new rows placed FIRST, the E53 empty-baseline-hazard row still LAST", () => {
-  // E163 added two Escalation Routes rows, placed first because they fire
-  // earliest in the SOP. This pins 10 rows and their order, not a bare count:
-  // a duplicated, dropped or reordered row, or the hazard row losing last place, fails.
-  const tableStart = SKILL.indexOf("| situation | status | pending note | next_role |");
-  const scopeRuleStart = SKILL.indexOf("**Expected vs unrelated scope rule**");
-  assert.ok(tableStart > -1 && scopeRuleStart > -1, "must locate both the table header and the scope-rule paragraph");
-  const tableBlock = SKILL.slice(tableStart, scopeRuleStart);
-  const dataRows = tableBlock
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith("|") && !l.startsWith("|---") && !l.startsWith("| situation"));
-  assert.equal(
-    dataRows.length,
-    10,
-    "Escalation Routes table must have exactly 10 data rows (6 pre-E53 + E53's empty-baseline row + E163's two new rows + E297's pull-request-cannot-merge row)",
+test("E53/E163: the Escalation Routes table is one row per exit class, in exit-code order, then the situation rows (pre-flight CI step 4, CI gate exit 41, empty baseline exit 20) (AC-P6)", () => {
+  const exitRows = SOP_ROWS.filter((c) => /^exit \d+ /.test(c[0]));
+  assert.deepEqual(
+    exitRows.map((c) => c[0].match(/^exit (\d+) ([A-Z_]+)/).slice(1, 3).join(" ")),
+    REL.EXIT_CLASSES.map((c) => `${c.code} ${c.id}`),
+    "one row per exit class, ascending by code — a dropped, duplicated or reordered row fails",
   );
-  assert.ok(
-    dataRows[0].startsWith("| pre-flight CI gate red (step 2a:"),
-    "E163's pre-flight CI gate row must be FIRST in the table — it fires earliest in the SOP's step order (step 2a, before the version bump)",
-  );
-  assert.ok(
-    dataRows[1].startsWith("| CI gate failure (step 8b:"),
-    "E163's CI gate failure row must be SECOND, immediately after the pre-flight row and still ahead of the six pre-existing rows",
-  );
-  assert.ok(
-    dataRows[9].startsWith("| empty-baseline hazard (step 7a:"),
-    "the empty-baseline-hazard row (E53) must remain the LAST row — E163's two new rows are additive at the front, not a reorder of the pre-existing rows",
-  );
+  const firstSituation = SOP_ROWS.findIndex((c) => !/^exit \d+ /.test(c[0]) && c[0] !== "situation" && !/^-+$/.test(c[0]));
+  assert.ok(firstSituation > exitRows.length - 1, "situation rows follow the exit rows");
+  assert.ok(sopRow(/^pre-flight CI red \(step 4\)/), "E163's pre-flight CI row is present");
+  assert.ok(exitRow(41, "CI_GATE_FAILED"), "E163's CI gate row is present");
+  assert.ok(exitRow(42, "PR_CANNOT_MERGE"), "E297's pull-request-cannot-merge row is present");
 });
 
-test("Expected vs unrelated scope rule (E64, T-E645-03 point 3): the scope-rule paragraph's OWN enumeration — not the whole document — names every FEATURE_DIR including gates/", () => {
-  // Retargets the AC1 rescope's lesson to the second list this file carries.
-  // A whole-document `SKILL.includes(dir)` check is vacuous (round-1 F1 layer
-  // 3): every dir is satisfied by prose elsewhere, so a check like that
-  // cannot tell whether THIS paragraph's own list is complete. Bound the
-  // check to the paragraph's enumeration sentence only.
-  const scopeRuleStart = SKILL.indexOf("**Expected vs unrelated scope rule**");
-  assert.ok(scopeRuleStart > -1, "must find the scope-rule paragraph");
-  const enumSentenceEnd = SKILL.indexOf("MUST be staged per SOP step 8", scopeRuleStart);
-  assert.ok(enumSentenceEnd > -1, "must find the enumeration sentence's end anchor");
-  const enumeratedList = SKILL.slice(scopeRuleStart, enumSentenceEnd);
-
-  for (const dir of FEATURE_DIRS) {
-    assert.ok(
-      enumeratedList.includes(`\`${dir}\``),
-      `the scope-rule paragraph's own enumeration must name '${dir}' (E64) — checked within the paragraph only, not the whole document`,
-    );
-  }
+test("Expected vs unrelated scope rule (E64, T-E645-03 point 3): the script's checkScope accepts every FEATURE_DIR including gates/ and stops on a stray top-level path (AC-S6)", () => {
+  for (const dir of FEATURE_DIRS) assert.equal(REL.checkScope([`${dir}a/b.txt`]), null, `${dir} is in the scope rule's own enumeration (E64)`);
+  assert.equal(REL.checkScope(["gates/x.ts"]), null, "gates/ is named (E64)");
+  assert.notEqual(REL.checkScope(["src/app.ts"]), null, "a directory outside the enumeration is unrelated");
+  assert.notEqual(REL.checkScope(["notes.txt"]), null, "a stray root file is unrelated");
 });
 
 // ---------------------------------------------------------------------------
@@ -1496,21 +1139,11 @@ test("E7-AC1/AC3: the sanctioned-git-ops bullet reaches the COMPOSED (not raw) c
   );
 });
 
-test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references the new general §6 sanctioned-git-ops whitelist by name/section, pointer-only (spec AC2)", () => {
-  assert.ok(
-    /§6/.test(SKILL) || /general git-ops whitelist/i.test(SKILL),
-    "skill-release-engineer.md must reference the general §6 git-ops rule by section number or name (E7-AC2)",
-  );
-  assert.ok(
-    SKILL.includes(
-      "one source of truth is the general git-ops whitelist in Constitution §6 (Security & Privacy), binding ALL roles",
-    ),
-    "skill-release-engineer.md's D10 bullet must carry the verbatim §6 cross-reference sentence (E7-AC2)",
-  );
-  assert.ok(
-    SKILL.includes("this bullet retains only the release-engineer recovery mechanics"),
-    "the cross-reference must explicitly scope the D10 bullet down to recovery mechanics only, pointer not restatement (E7-AC2)",
-  );
+test("E7-AC2: the SOP's Git rule points at Constitution §6 Sanctioned git operations by name, pointer-only; the old cross-reference sentence lives in the history file (AC-P4)", () => {
+  assert.match(SKILL, /\*\*Git\*\*: Constitution §6 \*Sanctioned git operations\*/, "the Git rule cites the general §6 whitelist by section and name");
+  assert.ok(!/\bgit (reset|rebase|clean)\b/.test(SKILL.split("## Escalation Routes")[0].replace(/never run[^.]*\./gi, "")), "the SOP does not restate the whitelist's verbs");
+  assert.ok(HISTORY.includes("one source of truth is the general git-ops whitelist in Constitution §6 (Security & Privacy), binding ALL roles"));
+  assert.ok(HISTORY.includes("this bullet retains only the release-engineer recovery mechanics"));
 });
 
 // ---------------------------------------------------------------------------
@@ -1555,7 +1188,7 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
     },
     {
       body: SKILL,
-      anchor: /6a\. \*\*Dependency-audit disposition\*\*.*$/m,
+      anchor: /\*\*Dependency-audit disposition\*\*.*$/m,
       label: "content/skill-release-engineer.md:56 (§6a disposition heading)",
     },
     {
@@ -1566,13 +1199,13 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
       // would false-fail the presence assertion below), but the bullet is
       // meaningless detached from the "6a. Dependency-audit disposition"
       // heading that introduces it, so the excerpt legitimately includes it.
-      anchor: /6a\. \*\*Dependency-audit disposition\*\*[\s\S]*?- \*\*Already recorded\*\*.*$/m,
+      anchor: /\*\*Dependency-audit disposition\*\*[\s\S]*?- \*\*Already recorded\*\*.*$/m,
       label: "content/skill-release-engineer.md:57 (Already-recorded disposition bullet)",
     },
     {
       body: SKILL,
       // Same widening as :57, for the same reason.
-      anchor: /6a\. \*\*Dependency-audit disposition\*\*[\s\S]*?- \*\*Not recorded, or recorded but its re-review trigger has since fired\*\*.*$/m,
+      anchor: /\*\*Dependency-audit disposition\*\*[\s\S]*?- \*\*Not recorded, or recorded but its re-review trigger has since fired\*\*.*$/m,
       label: "content/skill-release-engineer.md:58 (Not-recorded disposition bullet)",
     },
   ];
@@ -1747,81 +1380,31 @@ function resolveMoves({ qaAdmitted = [], rrAdmitted = [], activeFeature }) {
   return moves;
 }
 
-test("E49 step 7a: skill text pins the ACTUALLY SHIPPED derivation literally, both lines, plus PREV_TAG's resolution", () => {
-  assert.match(
-    SKILL,
-    /PREV_TAG=\$\(git describe --tags --abbrev=0\)/,
-    "SOP must define PREV_TAG via `git describe --tags --abbrev=0` (E49)",
-  );
-  assert.ok(
-    SKILL.includes("find qa_reports -maxdepth 1 -type f | sort"),
-    "SOP must enumerate root-level qa_reports/ files via `find qa_reports -maxdepth 1 -type f | sort` — the WORKING-TREE enumeration line (E49, round 3 shipped text)",
-  );
-  assert.ok(
-    SKILL.includes('grep -vxFf <(git ls-tree -r --name-only "$PREV_TAG" -- qa_reports/)'),
-    "SOP must use `git ls-tree -r --name-only \"$PREV_TAG\" -- qa_reports/` as a MEMBERSHIP predicate via grep -vxFf — the round 3 shipped text (E49)",
-  );
+test("E49 step 7a: the script derives PREV_TAG via `git describe --tags --abbrev=0` and enumerates ONLY root-level files, with PREV_TAG's tree as the membership predicate (AC-S6, L:E49)", () => {
+  assert.ok(RELEASE_SRC.includes('["describe", "--tags", "--abbrev=0"]'), "PREV_TAG comes from `git describe --tags --abbrev=0`");
+  assert.ok(RELEASE_SRC.includes('["ls-tree", "-r", "-z", "--name-only", prevTag, "--", `${tree}/`]'), "membership is `git ls-tree -r --name-only <PREV_TAG> -- <tree>/`");
+  const root = fnSrc("step7a");
+  assert.ok(root.includes("rootFileNames(abs)"), "step 7a lists the tree's root files");
+  assert.match(RELEASE_SRC, /const rootFileNames = \(abs\) => readdirSync\(abs, \{ withFileTypes: true \}\)\.filter\(\(d\) => d\.isFile\(\)\)/, "direct children only (the old `-maxdepth 1 -type f`): archive/ is structurally invisible");
+  assert.ok(HISTORY.includes("find qa_reports -maxdepth 1 -type f | sort"), "the old shell derivation lives in the history file");
 });
 
-test("E50 step 7a (N14 CLOSED — pin repointed at the EXECUTABLE CODES= fence): does not resurrect the round-2 committed-history-only rule (a substring pin on the round-2 command must fail)", () => {
-  // The old pin matched the first "find qa_reports -maxdepth 1" fence, which is
-  // the illustrative one, so re-adding committed-history logic to the executed
-  // fence stayed green. It now anchors on the `CODES=$( {` fence the role runs.
-  const fenceMatch = SKILL.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
-  assert.ok(fenceMatch, "must find step 7a's EXECUTABLE CODES= fenced derivation code block");
-  const fence = fenceMatch[1];
-  assert.ok(fence.includes("CODES="), "sanity: the matched fence must actually contain the CODES= binding, not the illustrative fence");
-  assert.ok(
-    !/git log/.test(fence),
-    "the EXECUTABLE CODES= fence must not invoke `git log` — that is the round-2 committed-history rule (F7 regression class)",
-  );
-  assert.ok(
-    !/diff-filter/.test(fence),
-    "the EXECUTABLE CODES= fence must not contain --diff-filter=A — that is the round-2 rule that returned EMPTY on 2 of the last 6 releases (F7)",
-  );
-  assert.ok(
-    fence.includes('git ls-tree -r --name-only "$PREV_TAG" -- qa_reports/'),
-    "the CODES= fence must use git ls-tree as qa_reports/'s membership predicate",
-  );
-  assert.ok(
-    fence.includes('git ls-tree -r --name-only "$PREV_TAG" -- review_reports/'),
-    "the CODES= fence must use git ls-tree as review_reports/'s membership predicate too (E50)",
-  );
+test("E50 step 7a (N14 CLOSED): the derivation does not resurrect the round-2 committed-history-only rule — no `git log`, no --diff-filter — and uses ls-tree for BOTH trees (AC-S6, L:E50)", () => {
+  const s7a = fnSrc("step7a");
+  assert.ok(!/"log"/.test(s7a) && !/git log/.test(s7a), "step 7a must not read `git log` (F7 regression class)");
+  assert.ok(!/diff-filter/.test(RELEASE_SRC), "no --diff-filter=A anywhere: that rule returned EMPTY on 2 of the last 6 releases (F7)");
+  assert.ok(s7a.includes('"ls-tree"'), "step 7a uses git ls-tree as the membership predicate");
+  const trees = RELEASE_SRC.match(/const TREES = \[(.*)\];/)[1];
+  assert.ok(trees.includes('"qa_reports"') && trees.includes('"review_reports"'), "both trees run through the same predicate (E50)");
+  assert.ok(HISTORY.includes("diff-filter"), "the round-2 rule is recorded in the history file");
 });
 
-test("E50 step 7a (N14 follow-up): the illustrative fence and the executable CODES= fence carry an identical find/grep -vxFf predicate pair per tree", () => {
-  // The remedy for that stale-pin finding (N14) is sequenced: this ticket repoints the pin (test above); a
-  // follow-up ticket collapses the two fences into one, since every future
-  // edit to the membership predicate currently has to be made twice and only
-  // one copy is under test. Until that lands, pin that the duplicate cannot
-  // silently diverge.
-  const illustrativeMatch = SKILL.match(/```\n(\s*find qa_reports -maxdepth 1[\s\S]*?)```/);
-  const executableMatch = SKILL.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
-  assert.ok(illustrativeMatch && executableMatch, "both fences must be present in the shipped text");
-
-  const normalize = (s) =>
-    s
-      .replace(/\[ -z "\$EXCLUDE_(QA|RR)" \] && /g, "") // only the executable fence gates each pipeline on EXCLUDE_*
-      .replace(/\\\n/g, " ") // shell line-continuation, not a semantic difference
-      .replace(/\s+/g, " ")
-      .trim();
-
-  const illustrative = normalize(illustrativeMatch[1]);
-  const executable = normalize(executableMatch[1]);
-  for (const tree of ["qa_reports", "review_reports"]) {
-    const pairRe = new RegExp(
-      `find ${tree} -maxdepth 1 -type f \\| sort \\| grep -vxFf <\\(git ls-tree -r --name-only "\\$PREV_TAG" -- ${tree}/\\)`,
-    );
-    const fromIllustrative = illustrative.match(pairRe);
-    const fromExecutable = executable.match(pairRe);
-    assert.ok(fromIllustrative, `illustrative fence must contain the ${tree}/ find/grep -vxFf pair`);
-    assert.ok(fromExecutable, `executable fence must contain the ${tree}/ find/grep -vxFf pair`);
-    assert.equal(
-      fromIllustrative[0],
-      fromExecutable[0],
-      `${tree}/'s find/grep -vxFf pair must stay byte-identical (modulo the EXCLUDE_* guard clause and whitespace) between the two fences until they are collapsed into one`,
-    );
-  }
+test("E50 step 7a (N14 follow-up): the duplicate-fence hazard is gone — ONE membership predicate in the script serves both trees, and the SOP carries no fenced shell (AC-S6)", () => {
+  // The old SOP held two copies of the find/grep pair that could drift. The script has a single call site
+  // inside a loop over TREES, so there is no second copy to diverge.
+  assert.equal([...fnSrc("step7a").matchAll(/"ls-tree"/g)].length, 1, "exactly one ls-tree call in step 7a");
+  assert.match(fnSrc("step7a"), /for \(const \[key, tree\] of TREES\)/, "both trees go through that one call");
+  assert.ok(!/```[a-z]*\n[\s\S]*ls-tree/.test(SKILL), "the SOP has no fenced derivation");
 });
 
 test("E49 step 7a (F7 regression — the single most important assertion in this suite): v3.93.0 shape — evidence untracked at root, absent from PREV_TAG's tree, still yields a non-empty code", () => {
@@ -1943,33 +1526,14 @@ test("E50 step 7a (Item 0 — F9 CLOSED, N4 hazard closed): an empty PREV_TAG ba
   );
 });
 
-test("E49/E44 step-order pin: step 7a precedes step 8a (the commit) in the file, and 7a's derivation does not depend on the release commit's own content (guards F2's class from returning)", () => {
-  // Retargeted for E163: the former single step 8 ("8. **Commit + tag +
-  // push**") split into 8a (commit + push branch) / 8b (CI gate) / 8c (tag +
-  // push). This test's property is about the COMMIT specifically — 7a's
-  // moves must land in the release commit, and 7a's own text must not
-  // reference that commit's own diff/content before it exists — so it
-  // retargets to 8a, not 8c: nothing here concerns the tag push.
-  const idx7a = SKILL.indexOf("7a. **Archive shipped feature's qa_reports**");
-  const idx8a = SKILL.indexOf("8a. **Commit + push branch**");
-  assert.ok(idx7a > -1, "must find step 7a's header text");
-  assert.ok(idx8a > -1, "must find step 8a's header text (E163: step 8 split into 8a/8b/8c)");
-  assert.ok(idx7a < idx8a, "step 7a must precede step 8a in file order — 7a's moves must land IN the release commit step 8a creates");
-
-  // Guard against a future-state read (finding F2, blocking in round 1 and closed in round 2): the round-1 worked example silently
-  // read state from the future — slugs that exist only inside the release
-  // commit itself, which does not exist yet when 7a runs. Guard against that
-  // defect class returning: 7a's own section (through 7b/7c/7d, up to the
-  // commit at 8a) must not reference the release commit's own diff/content.
-  const section7a = SKILL.slice(idx7a, idx8a);
-  assert.ok(
-    !/git diff HEAD~1/.test(section7a),
-    "step 7a must not reference the release commit's own diff (HEAD~1) — that commit does not exist yet at 7a time (F2 regression class)",
-  );
-  assert.ok(
-    !/git show HEAD\b/.test(section7a),
-    "step 7a must not reference the release commit's own content via `git show HEAD` (F2 regression class)",
-  );
+test("E49/E44 step-order pin: in `prepare`, 7a precedes the commit and 7a's derivation does not read the release commit's own content (guards F2's class from returning) (AC-S6, L:E65)", () => {
+  const order = RELEASE_SRC.match(/const PHASES = \{\s*prepare: \[([^\]]*)\]/)[1].split(",").map((x) => x.trim());
+  assert.ok(order.indexOf("step7a") > -1 && order.indexOf("step8aCommitPushPr") > -1);
+  assert.ok(order.indexOf("step7a") < order.indexOf("step8aCommitPushPr"), "7a's moves must land IN the release commit");
+  const s7a = fnSrc("step7a");
+  assert.ok(!/HEAD~1/.test(s7a), "step 7a must not reference the release commit's own diff (HEAD~1) — F2 regression class");
+  assert.ok(!/"show"/.test(s7a), "step 7a must not read the release commit via `git show` (F2 regression class)");
+  assert.ok(!/HEAD/.test(s7a.replace(/\/\/.*$/gm, "")), "step 7a reads no HEAD content: only PREV_TAG's tree and the working tree");
 });
 
 // ---------------------------------------------------------------------------
@@ -2216,22 +1780,14 @@ test("E50 step 7a (Item 4 continued — directory absence on disk): review_repor
   assert.ok(!admitted.some((f) => f.startsWith("review_reports/")), "no review_reports/ path may enter the admitted set when EXCLUDE_RR is set");
 });
 
-test("E50 step 7a: the guard block precedes the CODES= derivation, mkdir, and move bullets, and performs no writes itself", () => {
-  const idx7a = SKILL.indexOf("7a. **Archive shipped feature's qa_reports**");
-  const guardIdx = SKILL.indexOf("STOP_QA= STOP_RR= EXCLUDE_QA= EXCLUDE_RR=");
-  const codesIdx = SKILL.indexOf("CODES=$( {");
-  const mkdirIdx = SKILL.indexOf("`mkdir -p` the archive dir for each tree that is NOT");
-  assert.ok(idx7a > -1 && guardIdx > -1 && codesIdx > -1 && mkdirIdx > -1, "must locate step 7a, the guard block, the CODES= derivation, and the mkdir bullet");
-  assert.ok(idx7a < guardIdx, "the guard must live inside step 7a");
-  assert.ok(guardIdx < codesIdx, "the guard must precede the CODES= derivation -- a guard evaluated after the sweep is worthless");
-  assert.ok(codesIdx < mkdirIdx, "the CODES= derivation must precede the mkdir bullet");
-
-  const guardFence = SKILL.match(/```\n(\s*STOP_QA= STOP_RR=[\s\S]*?)```/);
-  assert.ok(guardFence, "must find the guard's fenced code block");
-  const guard = guardFence[1];
-  assert.ok(!/\bmv\b/.test(guard), "the guard block must contain no `mv` -- it must not itself be capable of sweeping");
-  assert.ok(!/mkdir/.test(guard), "the guard block must contain no `mkdir`");
-  assert.ok(!/git add/.test(guard), "the guard block must contain no `git add`");
+test("E50 step 7a: the guard (classification of both trees) precedes every write, and the classifier itself performs none (AC-S6, L:E53)", () => {
+  const s7a = fnSrc("step7a");
+  const stop = s7a.indexOf("EMPTY_BASELINE"), mk = s7a.indexOf("r.mkdir"), mv = s7a.indexOf("r.move"), codes = s7a.indexOf("deriveCodes(");
+  assert.ok(stop > -1 && mk > -1 && mv > -1 && codes > -1, "locate the guard, the derivation and the writes");
+  assert.ok(stop < codes, "the guard precedes the derivation — a guard evaluated after the sweep is worthless");
+  assert.ok(codes < mk && mk < mv, "the derivation precedes mkdir, which precedes the moves");
+  const classifier = fnSrc("classifyArchiveTree");
+  assert.ok(!/mkdir|\.move\(|writeFile|mutate\(/.test(classifier), "the classifier is pure: it cannot itself sweep");
 });
 
 // ---------------------------------------------------------------------------
@@ -2240,66 +1796,35 @@ test("E50 step 7a: the guard block precedes the CODES= derivation, mkdir, and mo
 // whole defect and a review of the moved steps can miss it.
 // ---------------------------------------------------------------------------
 
-test("E65: the five newly-staged metadata paths appear in step 8's git-add line", () => {
-  const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
-  assert.ok(gitAddMatch, "must find the git-add line");
-  const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean);
-  for (const p of E65_METADATA_PATHS) {
-    assert.ok(stagedTokens.includes(p), `step 8's git-add line must stage '${p}' (E65)`);
-  }
+test("E65: the five newly-staged metadata paths are STAGE_PATHS members (AC-S6, L:E65)", () => {
+  for (const p of E65_METADATA_PATHS) assert.ok(REL.STAGE_PATHS.metadataPaths.includes(p), `STAGE_PATHS stages '${p}' (E65)`);
 });
 
-test("E65: the adapter-stamp step exists, names all three deployed adapter files, and requires agc check to exit 0", () => {
-  // Retargeted for E163 (step 8 -> 8a/8b/8c): this test's property is that
-  // the adapter-stamp bump (7d) lands IN the release commit, so it bounds
-  // against 8a (the commit sub-step), not 8c (the tag push) — the stamp has
-  // no relationship to tagging.
-  assert.match(SKILL, /\*\*Adapter-stamp bump\*\*/, "SOP must name the adapter-stamp bump step (E65)");
-  const idx7d = SKILL.indexOf("**Adapter-stamp bump**");
-  const idx8a = SKILL.indexOf("8a. **Commit + push branch**");
-  assert.ok(idx7d > -1 && idx8a > -1, "must locate the adapter-stamp step and step 8a (E163: step 8 split into 8a/8b/8c)");
-  const section7d = SKILL.slice(idx7d, idx8a);
-  for (const f of ["CLAUDE.md", "AGENTS.md", ".antigravityrules"]) {
-    assert.ok(section7d.includes(f), `adapter-stamp step must name ${f} (E65)`);
-  }
-  assert.match(section7d, /agc check/, "adapter-stamp step must invoke agc check (E65)");
-  assert.match(section7d, /exits 0/, "adapter-stamp step must require agc check to exit 0 (E65)");
+test("E65: the adapter-stamp step names all three deployed adapter files and requires `agc check` to exit 0 (AC-S5, L:E65)", () => {
+  assert.deepEqual(REL.ADAPTER_STAMPS.map((x) => x.path).sort(), [".antigravityrules", "AGENTS.md", "CLAUDE.md"]);
+  const s7d = fnSrc("step7d");
+  assert.ok(s7d.includes('["bin/agc-init.mjs", "check"]'), "step 7d runs `agc check`");
+  assert.match(s7d, /res\.status !== 0\) \{\s*throw new ReleaseStop\("ADAPTER_STAMP"/, "a non-zero agc check is an ADAPTER_STAMP stop");
+  assert.ok(exitRow(24, "ADAPTER_STAMP"), "SOP Escalation Routes carries the ADAPTER_STAMP row");
+  assert.match(SKILL, /adapter stamps and `agc check`/, "SOP step 12 names the stamps and agc check as part of prepare");
 });
 
-test("E65: step 7b (driftBaselineIds), 7c (backlog done-marking), and 7d (adapter-stamp bump) are ALL ordered before step 8a's commit, in that relative order — order is the whole defect", () => {
-  // Retargeted for E163 (step 8 -> 8a/8b/8c): all three of 7b/7c/7d exist so
-  // their writes land IN the release commit — that is 8a specifically (the
-  // commit + branch push), not 8c (the tag push, which is now gated by 8b's
-  // CI check in between). None of this test's property concerns tagging, so
-  // 8a is the correct retarget, not 8c.
-  const idx7b = SKILL.indexOf("7b. **Drift-baseline acknowledgment**");
-  const idx7c = SKILL.indexOf("7c. **Backlog done-marking**");
-  const idx7d = SKILL.indexOf("7d. **Adapter-stamp bump**");
-  const idx8a = SKILL.indexOf("8a. **Commit + push branch**");
-  assert.ok(
-    idx7b > -1 && idx7c > -1 && idx7d > -1 && idx8a > -1,
-    "must locate steps 7b, 7c, 7d, and 8a (E163: step 8 split into 8a/8b/8c)",
-  );
-  assert.ok(idx7b < idx8a, "step 7b (driftBaselineIds append) must precede step 8a's commit (E65)");
-  assert.ok(idx7c < idx8a, "step 7c (backlog done-marking) must precede step 8a's commit (E65)");
-  assert.ok(idx7d < idx8a, "step 7d (adapter-stamp bump) must precede step 8a's commit (E65)");
-  assert.ok(idx7b < idx7c && idx7c < idx7d, "7b, 7c, and 7d must appear in that relative order, matching their own numbering");
+test("E65: step 7b (driftBaselineIds), 7c (backlog done-marking) and 7d (adapter-stamp bump) all run before the release commit, in that relative order — order is the whole defect (AC-S5, L:E65)", () => {
+  const order = RELEASE_SRC.match(/const PHASES = \{\s*prepare: \[([^\]]*)\]/)[1].split(",").map((x) => x.trim());
+  const at = (n) => order.indexOf(n);
+  for (const n of ["step7a", "step7b", "step7c", "step7d", "step8aStage", "step8aCommitPushPr"]) assert.ok(at(n) > -1, `prepare runs ${n}`);
+  assert.ok(at("step7a") < at("step7b") && at("step7b") < at("step7c") && at("step7c") < at("step7d"), "7a, 7b, 7c, 7d in their numbering order");
+  assert.ok(at("step7d") < at("step8aStage") && at("step8aStage") < at("step8aCommitPushPr"), "all bookkeeping lands before the stage and the commit");
 });
 
-test("E55: the terminal handback step names the post-release PM/backlog-intake dispatch as an explicit terminal step of the release handback, not a bare routing formality", () => {
-  assert.match(
-    SKILL,
-    /\*\*Terminal handback: backlog intake\*\*/,
-    "SOP must name the terminal-handback step (E55)",
-  );
-  const idx12 = SKILL.indexOf("12. **Closing write**");
-  const idx14 = SKILL.indexOf("**Terminal handback: backlog intake**");
-  assert.ok(idx12 > -1 && idx14 > -1, "must find both step 12 (closing write) and the terminal-handback step");
-  assert.ok(idx12 < idx14, "the terminal-handback step must be described AFTER step 12's closing write, since it explains what the write's next_role hands off to");
-  assert.ok(
-    SKILL.includes("pm's normal intake"),
-    "the terminal-handback step must describe pm's post-release backlog intake as the expected next action, not an optional follow-up (E55)",
-  );
+test("E55: the terminal handback names pm's post-release backlog intake as the expected next action, described AFTER the closing write whose next_role hands off to it (AC-P4)", () => {
+  const closing = SKILL.indexOf("Closing write: `tw_update_state(");
+  const handback = SKILL.indexOf("The `next_role=\"pm\"` handback is pm's backlog intake");
+  assert.ok(closing > -1 && handback > -1, "locate the closing write and the handback sentence");
+  assert.ok(closing < handback, "the handback is described after the closing write");
+  assert.match(SKILL.slice(closing, SKILL.indexOf("\n", closing)), /next_role="pm"/, "the closing write names next_role=\"pm\"");
+  assert.match(SKILL.slice(handback), /the expected next action, not optional/, "intake is expected, not optional");
+  assert.ok(HISTORY.includes("Terminal handback: backlog intake") && HISTORY.includes("pm's normal intake"), "the old step 14 lives in the history file");
 });
 
 // ---------------------------------------------------------------------------
@@ -2317,141 +1842,61 @@ const which = (bin) => {
   }
 };
 
-test("E71(a): the git-add line stages exactly 34 paths (19 directories + 15 metadata), set-equal to FEATURE_DIRS/METADATA_PATHS/E65_METADATA_PATHS/E94_METADATA_PATHS/E198B_METADATA_PATHS", () => {
-  // The capture group starts with "--" (`git add --`), so the token count
-  // drops it. The count grew with CONTRIBUTING.md and tasks.md (E94) and with
-  // `.current/_primary/tasks.md` (E198(b)); see the *_METADATA_PATHS arrays above.
-  const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
-  assert.ok(gitAddMatch, "must find the git-add line");
-  const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean).filter((t) => t !== "--");
+test("E71(a): STAGE_PATHS holds exactly 34 paths (19 directories + 15 metadata), set-equal to FEATURE_DIRS/METADATA_PATHS/E65_METADATA_PATHS/E94_METADATA_PATHS/E198B_METADATA_PATHS (AC-S6)", () => {
+  const sp = REL.STAGE_PATHS;
   const expected = [...FEATURE_DIRS, ...METADATA_PATHS, ...E65_METADATA_PATHS, ...E94_METADATA_PATHS, ...E198B_METADATA_PATHS];
-  assert.equal(expected.length, 34, "sanity: FEATURE_DIRS + METADATA_PATHS + E65_METADATA_PATHS + E94_METADATA_PATHS + E198B_METADATA_PATHS must total 34");
-  assert.equal(stagedTokens.length, 34, "the git-add line must stage exactly 34 non-'--' tokens (E71a/E94/E198b: '34 entries, not 19')");
-  assert.deepEqual(
-    [...stagedTokens].sort(),
-    [...expected].sort(),
-    "the git-add line's 34 staged paths must be set-equal to FEATURE_DIRS + METADATA_PATHS + E65_METADATA_PATHS + E94_METADATA_PATHS + E198B_METADATA_PATHS",
-  );
-  assert.match(SKILL, /34 paths/, "SOP prose must state the '34 paths' figure (E198b amendment)");
-  assert.match(SKILL, /19 directories \+ 15 metadata paths/, "SOP prose must decompose the 34 as 19 directories + 15 metadata paths (E198b amendment)");
+  assert.equal(expected.length, 34, "sanity: the five lists total 34");
+  assert.equal(sp.featureDirs.length, 19, "19 directories");
+  assert.equal(sp.metadataPaths.length, 15, "15 metadata paths");
+  assert.deepEqual([...sp.featureDirs, ...sp.metadataPaths].sort(), [...expected].sort());
+  assert.ok(HISTORY.includes("19 directories + 15 metadata paths"), "the old prose decomposition lives in the history file (AC-P10)");
 });
 
-test("E71(a): the existence pre-filter, EXTRACTED verbatim from the SOP and EXECUTED, stages exactly the existing paths under both bash and zsh, and the wrapper is proven necessary by a negative control", (t) => {
-  const idxLabel = SKILL.indexOf("**Existence pre-filter, mandatory (E71a)**");
-  assert.ok(idxLabel > -1, "must find the E71a existence-pre-filter label");
-  const idxFenceOpen = SKILL.indexOf("```", idxLabel);
-  const idxFenceClose = SKILL.indexOf("```", idxFenceOpen + 3);
-  assert.ok(idxFenceOpen > -1 && idxFenceClose > idxFenceOpen, "must find the fenced code block containing the pre-filter");
-  const snippet = SKILL.slice(idxFenceOpen + 3, idxFenceClose).trim();
-  assert.match(snippet, /^bash -c '/, "the extracted snippet must be wrapped in explicit bash -c '...' (E71a)");
-  assert.match(snippet, /git add -- \$EXISTING/, "the extracted snippet must stage via 'git add -- $EXISTING'");
-
-  // A scratch git repo with a SUBSET of the 30 paths present -- the adopter-
-  // workspace shape E71a exists to survive (this repo happens to have all 30;
-  // an adopter workspace overwhelmingly will not, per the SOP's own prose).
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e71a-test-"));
-  execSync("git init -q", { cwd: tmp });
-  execSync('git config user.email a@b.c && git config user.name t', { cwd: tmp });
-  fs.mkdirSync(path.join(tmp, "lib"));
-  fs.writeFileSync(path.join(tmp, "lib", "a.ts"), "x");
-  fs.mkdirSync(path.join(tmp, "tools"));
-  fs.writeFileSync(path.join(tmp, "tools", "b.ts"), "x");
-  fs.mkdirSync(path.join(tmp, "docs"));
-  fs.writeFileSync(path.join(tmp, "docs", "c.md"), "x");
-  fs.writeFileSync(path.join(tmp, "package.json"), "{}");
-  fs.writeFileSync(path.join(tmp, "index.ts"), "x");
-  // 24 of the 30 paths (schema/, guards/, gates/, qa_reports/, review_reports/,
-  // research/, multi-agent-scripts/, .github/, etc.) are deliberately ABSENT.
-
-  const expectedStaged = ["docs/c.md", "index.ts", "lib/a.ts", "package.json", "tools/b.ts"];
-
-  for (const shell of ["/bin/bash", "/bin/zsh"]) {
-    if (!which(path.basename(shell)) && !fs.existsSync(shell)) {
-      continue; // shell genuinely unavailable on this CI image; skip only that shell
-    }
-    execSync("git reset -q", { cwd: tmp }); // clear staging between shells
-    const output = execSync(snippet, { cwd: tmp, shell, encoding: "utf-8" });
-    assert.equal(output.trim(), "", `${shell}: the wrapped snippet must produce no stderr/stdout noise on a normal run`);
-    const staged = execSync("git diff --cached --name-only", { cwd: tmp, encoding: "utf-8" })
-      .trim().split("\n").filter(Boolean).sort();
-    assert.deepEqual(staged, [...expectedStaged].sort(), `${shell}: must stage exactly the 5 existing paths, skipping the 25 missing ones, with no 'fatal: pathspec' abort`);
-  }
-
-  // Negative control (same fixture, same shells): remove the bash -c wrapper --
-  // reproduces round-1's silent no-op ('Nothing specified, nothing added.',
-  // exit 0, 0 staged) -- proves the wrapper is the operative fix, not
-  // incidental, per review_reports/review_T-E69-01.md round 2's own method.
-  const innerBody = snippet.replace(/^bash -c '\n/, "").replace(/\n\s*'$/, "");
-  let ranAnyNegativeControl = false;
-  for (const shell of ["/bin/zsh"]) {
-    if (!fs.existsSync(shell)) continue;
-    ranAnyNegativeControl = true;
-    execSync("git reset -q", { cwd: tmp });
-    // git's "Nothing specified, nothing added." advice goes to STDERR, not
-    // STDOUT (verified directly) -- execSync only returns stdout, so combine
-    // both streams via spawnSync to see it.
-    const result = spawnSync(shell, ["-c", innerBody], { cwd: tmp, encoding: "utf-8" });
-    const combined = `${result.stdout}${result.stderr}`;
-    assert.match(combined, /Nothing specified, nothing added\./, "zsh, wrapper removed: must reproduce the round-1 silent no-op message");
-    const staged = execSync("git diff --cached --name-only", { cwd: tmp, encoding: "utf-8" }).trim();
-    assert.equal(staged, "", "zsh, wrapper removed: must stage ZERO files -- confirming the wrapper is the fix, not incidental");
-  }
-  if (!ranAnyNegativeControl) t.skip("zsh not available on this machine -- positive (wrapped) checks above already ran under bash");
+test("E71(a): the existence pre-filter stages exactly the existing paths, and the script's `git add` is an argv array, so no shell can swallow a missing pathspec (AC-S3, AC-S6, L:E71a)", () => {
+  // The old SOP needed `bash -c` because zsh aborts on an unmatched pathspec. The script has no shell: planStage
+  // is the existence pre-filter and `git add -- <plan>` is one argv array.
+  const present = new Set(["lib/", "tools/", "docs/", "package.json", "index.ts"]);
+  const changed = ["lib/a.ts", "tools/b.ts", "docs/c.md", "package.json", "index.ts"];
+  assert.deepEqual(REL.planStage({ changed, exists: (m) => present.has(m) }), ["lib/", "tools/", "docs/", "index.ts", "package.json"].sort((x, y) => {
+    const order = [...REL.STAGE_PATHS.featureDirs, ...REL.STAGE_PATHS.metadataPaths];
+    return order.indexOf(x) - order.indexOf(y);
+  }), "exactly the 5 existing paths, in STAGE_PATHS order, none of the 29 missing ones");
+  // Negative control: without the existence filter a missing member would be planned and `git add` would abort.
+  assert.deepEqual(REL.planStage({ changed: ["schema/x.ts"], exists: () => false }), [], "a changed path whose member is absent is not planned");
+  assert.ok(RELEASE_SRC.includes('["add", "--", ...plan]'), "git add takes the plan as one argv array");
+  assert.ok(!/shell\s*:\s*true/.test(RELEASE_SRC) && !/["'](bash|zsh|sh)["']/.test(RELEASE_SRC.replace(/\/\/.*$/gm, "")), "the script never spawns a shell");
+  assert.ok(!REL.ALLOWED.some((r) => ["bash", "zsh", "sh"].includes(r.cmd)), "no shell is on the allow-list");
+  assert.ok(HISTORY.includes("Existence pre-filter, mandatory (E71a)"), "the old bash -c wrapper narrative lives in the history file");
 });
 
-test("E71(b): the covers: sweep's double-quoted glob, EXTRACTED verbatim and EXECUTED under zsh inside the mandated bash -c wrapper, is NOMATCH-safe; the historical single-quoted form is proven broken by a negative control", (t) => {
-  const zshPath = "/bin/zsh";
-  if (!fs.existsSync(zshPath)) {
-    t.skip("zsh not available on this machine -- E71(b) is specifically a zsh-NOMATCH defect and cannot be exercised under bash");
-    return;
-  }
-
-  // Extract the two find-with-double-quoted-glob fragments named by the
-  // covers: sweep bullet (E71b, v3.102.1 amendment's second site).
-  const findFragments = [...SKILL.matchAll(/find (qa_reports|review_reports) -maxdepth 1 -name "\*\.md"/g)].map((m) => m[0]);
-  assert.ok(findFragments.some((f) => f.startsWith("find qa_reports")), "must find the qa_reports covers: sweep fragment, double-quoted");
-  assert.ok(findFragments.some((f) => f.startsWith("find review_reports")), "must find the review_reports covers: sweep fragment, double-quoted");
-  assert.ok(!/-name '\*\.md'/.test(SKILL), "the historical single-quoted form ( -name '*.md' ) must NOT reappear anywhere in the SOP (regression guard)");
-
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e71b-test-"));
-  fs.mkdirSync(path.join(tmp, "qa_reports"));
-  fs.writeFileSync(path.join(tmp, "qa_reports", "review_T-X-01.md"), "covers: T-X-01");
-
-  const qaFragment = findFragments.find((f) => f.startsWith("find qa_reports"));
-  const fixedCmd = `zsh -c "bash -c '${qaFragment}'"`;
-  const fixedOut = execSync(fixedCmd, { cwd: tmp, encoding: "utf-8" });
-  assert.equal(fixedOut.trim(), "qa_reports/review_T-X-01.md", "the fixed (double-quoted) form must find the file under zsh inside the mandated bash -c wrapper");
-
-  // Negative control: the round-1 broken form (single-quoted glob nested
-  // inside the same bash -c '...' wrapper) must fail with the exact error
-  // string the v3.102.1 amendment names.
-  const brokenCmd = `zsh -c "bash -c 'find qa_reports -maxdepth 1 -name '*.md''"`;
-  assert.throws(
-    () => execSync(brokenCmd, { cwd: tmp, encoding: "utf-8" }),
-    /no matches found/,
-    "negative control: the historical single-quoted form must still fail with 'no matches found' under zsh, proving the fix was necessary",
-  );
+test("E71(b): the covers: sweep is NOMATCH-safe by construction — no shell, no glob: names with `*`, `[`, spaces and quotes are matched as data (AC-S3, AC-S6, L:E71b)", () => {
+  const odd = ["note [draft] *.md", "it's here.md", "review_T-X-01.md"];
+  const moves = REL.planArchiveMoves({
+    feature: "f", codes: ["X"], qaRoot: odd, rrRoot: [], participating: { qa: true, rr: false },
+    coversLine: (rel) => (rel === "qa_reports/note [draft] *.md" ? "covers: T-X-02" : null),
+  });
+  assert.deepEqual(moves.map((m) => m.from).sort(), ["qa_reports/note [draft] *.md", "qa_reports/review_T-X-01.md"], "the glob-looking name is swept by its covers: line, as plain data");
+  assert.ok(!/["'](bash|zsh|sh)["']/.test(RELEASE_SRC.replace(/\/\/.*$/gm, "")), "no shell child anywhere: zsh NOMATCH cannot occur");
+  assert.ok(!/-name '\*\.md'/.test(SKILL), "the historical single-quoted glob does not reappear in the SOP");
+  assert.ok(HISTORY.includes('-name "*.md"') || HISTORY.includes("no matches found"), "the old zsh narrative lives in the history file");
 });
 
-test("E71(c): the Expected-vs-unrelated scope rule names .current/** (minus .config.json) and tasks.md as explicit non-STOP exclusions", () => {
-  const idx = SKILL.indexOf("**Expected vs unrelated scope rule**");
-  assert.ok(idx > -1, "must find the Expected-vs-unrelated scope rule paragraph");
-  const section = SKILL.slice(idx, idx + 2500);
-  assert.match(section, /`\.current\/\*\*`.*non-STOP exclusions/, "must name .current/** as a non-STOP exclusion (E71c)");
-  assert.match(section, /tasks\.md.*are explicit non-STOP exclusions|non-STOP exclusions from this rule \(E71c\)/, "must name tasks.md alongside .current/** as a non-STOP exclusion (E71c)");
-  assert.match(section, /minus `\.config\.json`, which IS staged/, ".config.json must be carved out of the .current/** exclusion (it IS staged)");
-  assert.match(section, /beyond those two exclusions/, "the STOP-trigger sentence must be scoped to UNRELATED changes beyond the two named exclusions (E71c)");
+test("E71(c): the scope rule treats .current/** (incl. .config.json, which IS staged) and tasks.md as non-STOP exclusions (AC-S6, L:E71c)", () => {
+  assert.equal(REL.checkScope([".current/handoff.md", ".current/telemetry.jsonl", "tasks.md"]), null, ".current/** and tasks.md never STOP");
+  assert.equal(REL.checkScope([".current/.config.json"]), null);
+  assert.ok(REL.STAGE_PATHS.metadataPaths.includes(".current/.config.json"), ".config.json is carved out of the exclusion: it IS staged");
+  assert.notEqual(REL.checkScope([".currentish/x"]), null, "only the .current/ directory is excluded");
+  assert.ok(HISTORY.includes("minus `.config.json`, which IS staged"), "the old scope-rule wording lives in the history file");
 });
 
-test("E71(d): step 7c names the DONE-but-unreleased pre-marked-row shape and states the version stamp is still owed", () => {
-  const idx7c = SKILL.indexOf("7c. **Backlog done-marking**");
-  const idx7d = SKILL.indexOf("7d. **Adapter-stamp bump**");
-  assert.ok(idx7c > -1 && idx7d > -1, "must find step 7c and step 7d");
-  const section7c = SKILL.slice(idx7c, idx7d);
-  assert.match(section7c, /DONE-but-unreleased/, "step 7c must name the DONE-but-unreleased row shape (E71d)");
-  assert.match(section7c, /NOT already satisfied by that pre-mark/, "step 7c must state the pre-mark does NOT already satisfy the done-marking obligation (E71d)");
-  assert.match(section7c, /version stamp is still owed/, "step 7c must state the version stamp is still owed (E71d)");
-  assert.match(section7c, /do NOT append a duplicate row/, "step 7c must forbid appending a duplicate row for the same feature (E71d)");
+test("E71(d): a DONE-but-unreleased pre-marked row must be amended in place — the SOP says so and the script's done-mark check enforces it (AC-S5, AC-P4, L:E71d)", () => {
+  assert.match(SKILL, /amend a pre-mark in place/, "SOP step 10 tells the agent to amend a pre-mark");
+  assert.match(SKILL, /no longer says "not yet released"/);
+  assert.match(SKILL, /Touch no other row/, "no duplicate row for the same feature");
+  const row = "| E7 | **DONE (not yet released)** — thing | x |";
+  const probs = REL.checkDoneMarks({ backlogText: row, diffLines: [], tickets: ["E7"], version: "1.2.3" });
+  assert.ok(probs.some((p) => /not yet released/.test(p)), "a pre-marked row is a DONE_MARK problem until it names the version");
+  assert.ok(HISTORY.includes("DONE-but-unreleased") && HISTORY.includes("version stamp is still owed"), "the old step 7c wording lives in the history file");
 });
 
 // Known asymmetry, pinned as a ratchet: step 7a's review_reports move loop is
@@ -2460,33 +1905,14 @@ test("E71(d): step 7c names the DONE-but-unreleased pre-marked-row shape and sta
 // stderr line, so it was passed as cosmetic. The test fails if either guard's
 // presence changes or the RR guard reverts to an inline `&&`, so a fix must
 // update this pin. History: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
-test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports move example is EXCLUDE_RR-guarded via an enclosing if; qa_reports move example is NOT YET EXCLUDE_QA-guarded (known asymmetry, non-blocking, PASSed by qa-engineer -- see qa_reports/review_T-E76-02.md)", () => {
-  const lines = SKILL.split("\n");
-  const rrIdx = lines.findIndex((l) => l.includes("find review_reports -maxdepth 1 -name \"review_T-${c}-*.md\""));
-  const qaIdx = lines.findIndex((l) => l.includes("find qa_reports -maxdepth 1 -name \"review_T-${c}-*.md\""));
-  assert.ok(rrIdx > -1, "must find the review_reports move example line");
-  assert.ok(qaIdx > -1, "must find the qa_reports move example line");
-  const rrLine = lines[rrIdx];
-  const qaLine = lines[qaIdx];
-
-  // The review_reports move loop MUST be nested inside an enclosing
-  // `if [ -z "$EXCLUDE_RR" ]; then` guard -- scan a small window of lines
-  // immediately above it (the loop is not itself prefixed inline anymore).
-  const rrPrecedingWindow = lines.slice(Math.max(0, rrIdx - 3), rrIdx).join("\n");
-  assert.match(
-    rrPrecedingWindow,
-    /if \[ -z "\$EXCLUDE_RR" \]; then/,
-    "the review_reports move example MUST be nested inside an enclosing EXCLUDE_RR guard",
-  );
-  assert.ok(!/\[ -z "\$EXCLUDE_RR" \] &&/.test(rrLine), "the guard now lives on an enclosing if line, not an inline && prefix on the find line itself");
-
-  // The qa_reports move loop must NOT be similarly guarded -- neither
-  // inline nor via an enclosing if in the lines immediately above it.
-  const qaPrecedingWindow = lines.slice(Math.max(0, qaIdx - 3), qaIdx).join("\n");
-  assert.ok(
-    !/\[ -z "\$EXCLUDE_QA" \] &&/.test(qaLine) && !/if \[ -z "\$EXCLUDE_QA" \]; then/.test(qaPrecedingWindow),
-    "the qa_reports move example does NOT yet carry an EXCLUDE_QA guard, inline or enclosing (tracked residual, not a regression) -- if this now fails, someone added the guard: update this test to assert its presence instead, and this comment/test name is safe to delete",
-  );
+test("residual (review round 2, Minor 2; E76): the qa_reports/review_reports asymmetry is closed — each tree's moves are guarded by that tree's own participation flag (AC-S6, L:E50)", () => {
+  const base = { feature: "f", codes: ["X"], qaRoot: ["review_T-X-01.md", "expected-red_f.txt"], rrRoot: ["review_T-X-01.md"], newExpectedRed: ["expected-red_f.txt"], coversLine: () => null };
+  const none = REL.planArchiveMoves({ ...base, participating: { qa: false, rr: false } });
+  assert.deepEqual(none, [], "an excluded tree contributes no moves, in either tree");
+  const qaOnly = REL.planArchiveMoves({ ...base, participating: { qa: true, rr: false } });
+  assert.ok(qaOnly.length > 0 && qaOnly.every((m) => m.from.startsWith("qa_reports/")), "EXCLUDE_RR: review_reports/ untouched");
+  const rrOnly = REL.planArchiveMoves({ ...base, participating: { qa: false, rr: true } });
+  assert.ok(rrOnly.length > 0 && rrOnly.every((m) => m.from.startsWith("review_reports/")), "EXCLUDE_QA: qa_reports/ untouched — the old unguarded qa loop is gone");
 });
 
 // ---------------------------------------------------------------------------
@@ -2495,221 +1921,32 @@ test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports
 // assertions run against the shipped script text, not a hand copy of it.
 // ---------------------------------------------------------------------------
 
-/**
- * Strip 5-space markdown-fence indentation from every line of an extracted
- * fenced code block, without disturbing any DEEPER indentation used for
- * shell line-continuations inside the fence (e.g. the CODES= derivation's
- * wrapped `| sed -E ...` continuation lines, which sit at 8 spaces).
- */
-function dedentFence(fenceText) {
-  return fenceText
-    .split("\n")
-    .map((l) => l.replace(/^ {5}/, ""))
-    .join("\n");
-}
+// Class-assertion pins (E76). The five shell fragments the SOP once assembled are one JS function now, so the
+// "variable referenced but never assigned" and "two invocations" hazards cannot occur; the pins below assert
+// that class-level property of the script instead.
 
-/**
- * Mask the interior of quoted strings (quote types in `quotes`) with 'x',
- * keeping the quotes and all other structure. This tells a real shell `VAR=`
- * or `$VAR` apart from one inside string data, such as step 7a's STOP message
- * text `(PREV_TAG='$PREV_TAG')`, which would otherwise defeat the class check.
- */
-function maskQuoted(text, quotes) {
-  let out = "";
-  let inQuote = null;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuote) {
-      if (ch === inQuote) {
-        inQuote = null;
-        out += ch;
-      } else {
-        out += quotes.includes(inQuote) ? "x" : ch;
-      }
-    } else if (ch === "'" || ch === '"') {
-      inQuote = ch;
-      out += ch;
-    } else {
-      out += ch;
-    }
-  }
-  return out;
-}
-
-/**
- * Sets of shell variable names assigned and referenced (`$VAR`, `${VAR}`) in a
- * script. Assignments are scanned with both quote types masked (an assignment
- * name is never quoted) and include `for VAR in` headers. References are
- * scanned with only single quotes masked, since bash expands `$VAR` inside
- * double quotes but not inside single quotes.
- */
-function extractAssignedAndReferenced(script) {
-  const forAssignment = maskQuoted(script, ["'", '"']);
-  const assigned = new Set();
-  for (const m of forAssignment.matchAll(/(?<![\w-])([A-Za-z_][A-Za-z0-9_]*)=(?!=)/g)) assigned.add(m[1]);
-  for (const m of forAssignment.matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b/g)) assigned.add(m[1]);
-
-  const forReference = maskQuoted(script, ["'"]);
-  const referenced = new Set();
-  for (const m of forReference.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) referenced.add(m[1]);
-
-  return { assigned, referenced };
-}
-
-/**
- * Extract step 7a's five fragments straight out of the shipped SOP text and
- * assemble them in the SOP's own mandated order (PREV_TAG -> guard -> the
- * EXECUTABLE CODES= derivation, never the illustrative find/grep example ->
- * the <CODES> logging line -> the mkdir/move/expected-red/covers: fence).
- * Returns null for any fragment not found, so callers can assert presence
- * before assembling (a missing fragment must fail loudly, not assemble a
- * silently-incomplete script that could pass the invariant by accident).
- */
-function extractStep7aFragments(skillText) {
-  const frag1 = "PREV_TAG=$(git describe --tags --abbrev=0)";
-  if (!skillText.includes(frag1)) return null;
-
-  const guardMatch = skillText.match(/```\n(\s*STOP_QA= STOP_RR= EXCLUDE_QA= EXCLUDE_RR=[\s\S]*?\n\s*```)/);
-  if (!guardMatch) return null;
-  const frag2 = dedentFence(guardMatch[1].replace(/\n\s*```$/, ""));
-
-  // The EXECUTABLE derivation fence is the one that opens `CODES=$( {` --
-  // NOT the illustrative find/grep fence immediately above it in the SOP
-  // text, which exists only to explain the predicate (see the "exactly one
-  // fence opens CODES=$(" test below, which pins this distinction directly).
-  const codesMatch = skillText.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
-  if (!codesMatch) return null;
-  const frag3 = dedentFence(codesMatch[1].replace(/\n\s*$/, ""));
-
-  const frag4 = 'echo "step 7a: <CODES> = {${CODES:-∅}}"';
-  if (!skillText.includes(frag4)) return null;
-
-  const moveMatch = skillText.match(/```\n(\s*\[ -z "\$EXCLUDE_QA" \] && mkdir -p[\s\S]*?)```/);
-  if (!moveMatch) return null;
-  const frag5 = dedentFence(moveMatch[1].replace(/\n\s*$/, "")).replace(/\nSTEP7A\s*$/, "");
-
-  return { frag1, frag2, frag3, frag4, frag5 };
-}
-
-test("T-E76-02 (class assertion, closes F1): every variable REFERENCED anywhere in the assembled step-7a script is ASSIGNED somewhere within it -- no fragment reaches for an outer-shell variable", () => {
-  const frags = extractStep7aFragments(SKILL);
-  assert.ok(frags, "must be able to extract all five step-7a fragments from the shipped SOP text");
-  const assembled = [frags.frag1, frags.frag2, frags.frag3, frags.frag4, frags.frag5].join("\n");
-
-  const { assigned, referenced } = extractAssignedAndReferenced(assembled);
-  const referencedNotAssigned = [...referenced].filter((v) => !assigned.has(v));
-  const assignedNotReferenced = [...assigned].filter((v) => !referenced.has(v));
-
-  assert.deepEqual(
-    referencedNotAssigned,
-    [],
-    `every variable step 7a reads must be bound somewhere in the SAME assembled script -- found referenced-but-never-assigned: ${referencedNotAssigned.join(", ")} (this is exactly F1's shape: a variable left in the outer shell, unreachable from inside the single heredoc invocation)`,
-  );
-  // Not the load-bearing half of the invariant (an assigned-but-unused var is
-  // dead code, not a correctness hazard), but code-reviewer's round-2
-  // verification found the two sets EXACTLY equal on the real shipped text,
-  // and pinning that observation too catches an accidental unused-variable
-  // regression for free.
-  assert.deepEqual(
-    assignedNotReferenced,
-    [],
-    `sanity (non-load-bearing): assigned-but-never-referenced variables found: ${assignedNotReferenced.join(", ")} -- the shipped text has none; if this now fails, someone added a dead assignment (harmless, but update this pin's comment if intentional)`,
-  );
-
-  // Guard the guard: round 1's assembly list omitted fragment 1, the PREV_TAG
-  // binding. Rebuild that omission from the current fragments 2-5 and confirm
-  // the invariant above catches it: PREV_TAG is read but never bound.
-  const round1Reconstruction = [frags.frag2, frags.frag3, frags.frag4, frags.frag5].join("\n");
-  const round1 = extractAssignedAndReferenced(round1Reconstruction);
-  const round1ReferencedNotAssigned = [...round1.referenced].filter((v) => !round1.assigned.has(v));
-  assert.deepEqual(
-    round1ReferencedNotAssigned,
-    ["PREV_TAG"],
-    "guard-the-guard: reconstructing round 1's fragment omission (PREV_TAG assignment left out of the assembled script) MUST make this exact invariant fail on PREV_TAG -- if it does not, the class assertion above is not actually testing what it claims to",
-  );
+test("T-E76-02 (class assertion, closes F1): step 7a is ONE function in ONE process — no fragment can reach for an outer-shell variable, and no child shell exists (AC-S3, L:E76)", () => {
+  const s7a = fnSrc("step7a");
+  assert.ok(s7a.length > 200, "sanity: step 7a is a real function body");
+  assert.ok(!/\bprocess\.env\b/.test(s7a), "step 7a reads no ambient environment variable (the old F1 shape: a var left in the outer shell)");
+  assert.ok(!REL.ALLOWED.some((r) => ["bash", "zsh", "sh"].includes(r.cmd)), "no shell command is on the allow-list");
+  assert.ok(!/shell\s*:\s*true/.test(RELEASE_SRC), "spawn never uses a shell");
+  assert.ok(!SKILL.includes("STEP7A"), "the SOP no longer assembles a heredoc script");
+  assert.ok(HISTORY.includes("STEP7A"), "the F1/F2 heredoc narrative lives in the history file (AC-P10)");
 });
 
-test("T-E76-02 (class assertion, pins fragment 3's identity): exactly ONE fence in step 7a opens with the executable `CODES=$(` binding", () => {
-  // Tells the one executable derivation fence apart from the illustrative
-  // find/grep fence above it; assembling the illustrative one would bind
-  // nothing and reproduce the empty-derivation hazard. Scoped to step 7a, since
-  // step 8 has an unrelated `bash -c` fence.
-  const start = SKILL.indexOf("7a. **Archive shipped");
-  const end = SKILL.indexOf("7b. **Drift-baseline");
-  assert.ok(start > -1 && end > start, "must find step 7a's section boundaries");
-  const section = SKILL.slice(start, end);
-
-  const codesOpeningFences = [...section.matchAll(/```\n(\s*CODES=\$\()/g)];
-  assert.equal(
-    codesOpeningFences.length,
-    1,
-    `expected exactly one fence in step 7a opening with CODES=$( -- found ${codesOpeningFences.length}. Two or more means the illustrative example and the executable derivation have become ambiguous (or ambiguously duplicated), reopening the empty-derivation hazard`,
-  );
-
-  // GUARD-THE-GUARD: prove the count-based assertion actually discriminates,
-  // by mutating a copy of the section so the illustrative fence ALSO opens
-  // with CODES=$( (a synthetic stand-in for "someone pasted the derivation
-  // into the illustrative slot too") and confirming the count goes to 2.
-  const mutated = section.replace(
-    /```\n(\s*find qa_reports -maxdepth 1 -type f)/,
-    "```\n     CODES=$( fake_duplicate_of_the_derivation",
-  );
-  const mutatedCount = [...mutated.matchAll(/```\n(\s*CODES=\$\()/g)].length;
-  assert.equal(
-    mutatedCount,
-    2,
-    "guard-the-guard: injecting a second CODES=$( fence opener must be detected as count=2, proving this assertion is not vacuously true",
-  );
+test("T-E76-02 (class assertion, pins fragment 3's identity): the code set is derived in exactly ONE place in step 7a and logged even when empty (AC-S6, L:E76)", () => {
+  const s7a = fnSrc("step7a");
+  assert.equal([...s7a.matchAll(/deriveCodes\(/g)].length, 1, "exactly one derivation call — two would reopen the empty-derivation hazard");
+  assert.match(s7a, /step 7a: <CODES> = \{\$\{codes\.join\(","\) \|\| "∅"\}\}/, "<CODES> is logged also when empty, so a silent no-op is visible");
+  assert.deepEqual(REL.deriveCodes({ qaAdmitted: [], rrAdmitted: [] }), [], "an empty derivation is an explicit empty set");
 });
 
-test("T-E76-02 (single-invocation property, F2 regression guard): step 7a assembles into exactly one quoted-heredoc-fed bash invocation -- no `bash -c` reintroduced, delimiter quoted, exactly one closing STEP7A line", () => {
-  const start = SKILL.indexOf("7a. **Archive shipped");
-  const end = SKILL.indexOf("7b. **Drift-baseline");
-  const section = SKILL.slice(start, end);
-
-  // The literal heredoc opener must be present, and quoted (`'STEP7A'`, not
-  // a bare `STEP7A`) -- an unquoted delimiter would let the outer shell
-  // expand the body, defeating F2's fix.
-  assert.ok(section.includes("bash <<'STEP7A'"), "step 7a must open the single invocation with a QUOTED heredoc delimiter: bash <<'STEP7A'");
-
-  // No fenced (executable) code block within step 7a may contain `bash -c` --
-  // scoped to FENCES specifically, not the surrounding prose, which
-  // legitimately discusses the retired `bash -c` shape by name while
-  // explaining why it was replaced (a bare substring match over the whole
-  // section would false-positive on that prose).
-  const fences = [...section.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1]);
-  assert.ok(fences.length > 0, "sanity: step 7a must contain at least one fenced code block");
-  const fencesWithBashC = fences.filter((f) => /bash -c/.test(f));
-  assert.deepEqual(
-    fencesWithBashC,
-    [],
-    "no executable fence in step 7a may reintroduce `bash -c` -- that is exactly F2's hazard (a single-quoted bash -c '...' cannot hold the derivation's own literal single quotes)",
-  );
-
-  // Exactly one closing terminator line, reading exactly `STEP7A` alone --
-  // more than one would mean the heredoc body was split across multiple
-  // invocations (the exact hazard the single-invocation bullet exists to
-  // close), and zero would mean the heredoc never closes.
-  const terminatorLines = [...section.matchAll(/^\s*STEP7A\s*$/gm)];
-  assert.equal(terminatorLines.length, 1, `expected exactly one bare STEP7A terminator line in step 7a; found ${terminatorLines.length}`);
-
-  // GUARD-THE-GUARD: reconstruct round 1's shape (moves wrapped in their own
-  // bash -c, matching E71b's per-bullet wrapping that E76's bullet itself
-  // names as "no longer a separate wrapping step here" -- see :137) and
-  // confirm the no-bash-c-in-fence assertion would have caught it.
-  const round1MoveFenceReconstruction = `\`\`\`\nbash -c '\n  for c in $CODES; do\n    : archive moves here\n  done\n'\n\`\`\``;
-  const round1Fences = [...round1MoveFenceReconstruction.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1]);
-  const round1FencesWithBashC = round1Fences.filter((f) => /bash -c/.test(f));
-  assert.ok(
-    round1FencesWithBashC.length > 0,
-    "guard-the-guard: a reconstructed bash -c-wrapped move fence must be caught by the same predicate used above, proving it is not vacuously true",
-  );
-
-  // NOT covered by this pin, deliberately: the five-fragment assembly
-  // ergonomics residual (spreading the script across ~110 lines of prose)
-  // that code-reviewer named as a non-blocking follow-up in review round 2 --
-  // see qa_reports/review_T-E76-02.md Part 4 for the explicit accept/file/pin
-  // decision on that separate concern. This pin only guards the INVOCATION
-  // shape (single quoted-heredoc, no bash -c, one close), not the assembly
-  // burden itself.
+test("T-E76-02 (single-invocation property, F2 regression guard): every process call is an argv array through one runner — no `bash -c`, no heredoc, nothing a quote can break (AC-S3, L:E76)", () => {
+  const code = RELEASE_SRC.replace(/\/\/.*$/gm, "");
+  assert.ok(!/bash -c|<<'?[A-Z]+'?/.test(code), "no `bash -c` and no heredoc in the script");
+  assert.match(code, /spawn\(bin, argv, \{ cwd: root/, "the runner spawns with an argv array");
+  const r = REL.createRunner({ dryRun: true, out: () => {}, err: () => {} });
+  assert.throws(() => r.read("bash", ["-c", "echo hi"], { step: "t" }), /not on the allow-list/, "a shell call is refused by the runner");
+  assert.ok(HISTORY.includes("bash <<'STEP7A'"), "the retired heredoc shape is recorded in the history file");
 });

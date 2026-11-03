@@ -48,26 +48,53 @@ test("AC2: no sentence in the integrator SOP still says main is fast-forwarded o
   assert.equal(INTEGRATOR.split("6. Bookkeeping, main, teardown").length - 1, 1, "the stage-table row is renamed exactly once");
 });
 
-test("AC3: release-engineer 8a-8c opens, merges and syncs through a release/vX.Y.Z pull request", () => {
+const RELEASE_SCRIPT = read("scripts", "release.mjs");
+
+test("AC3 [E394 re-pin AC-S7/AC-P3]: release-engineer opens, merges and syncs through a release/vX.Y.Z pull request (SOP prose + scripts/release.mjs)", () => {
+  // SOP: the branch is cut by the agent, push/PR/merge/pull are phases of the script.
   for (const pattern of [
     "git switch -c release/vX.Y.Z",
-    "git push -u origin release/vX.Y.Z",
-    "gh pr merge <n> --auto --merge",
-    "gh pr view <n> --json state,mergeCommit",
+    "merges with `--auto --merge`",
+    "pulls `main`",
+    "pull request #<n>",
   ]) {
     assert.ok(RELEASE.includes(pattern), `release SOP must contain: ${pattern}`);
+  }
+  // Script: the release branch push, the auto-merge, and the PR state/merge-commit read.
+  for (const pattern of [
+    '["push", "-u", "origin", rel]',
+    '"pr merge", true, "pr merge <n> --auto --merge"',
+    '"--json", "number,state,mergeable,mergeStateStatus,statusCheckRollup,mergeCommit,headRefOid"',
+    'git", ["-c", "pull.rebase=false", "pull", "--ff-only"]',
+  ]) {
+    assert.ok(RELEASE_SCRIPT.includes(pattern), `scripts/release.mjs must contain: ${pattern}`);
   }
   assert.ok(!RELEASE.includes("any time after step 8a completes"), "the early-tag allowance is retired");
 });
 
-test("AC4: the 8b budget advice survives and the pre-gate tag cleanup is gone", () => {
+test("AC4 [E394 re-pin AC-S7/AC-P4]: the host-kill budget advice survives (first attempt normal, lower only after a kill) and no pre-gate tag exists: the script tags only after the CI gate and merge", () => {
   assert.ok(!RELEASE.includes("delete any local tag created ahead of this gate"));
-  assert.ok(RELEASE.includes("make the FIRST attempt with the normal budget"));
+  assert.ok(
+    RELEASE.includes("After the first kill, set `AGC_VERIFY_CI_WAIT_SECONDS`"),
+    "the first attempt runs with the normal budget; the lowered budget is advised only after the first host kill",
+  );
+  // Order inside stepPublish: CI gate -> merge -> pull main -> tag. No tag before the gate.
+  const publish = RELEASE_SCRIPT.slice(RELEASE_SCRIPT.indexOf("async function stepPublish("));
+  const at = (needle) => publish.indexOf(needle);
+  assert.ok(at('"--ci-check", "--strict"') > -1 && at('["tag", "-a", tag') > -1, "stepPublish must hold both the strict CI gate and the tag");
+  assert.ok(at('"--ci-check", "--strict"') < at("autoMerge(ctx, rel, pr"), "the strict CI gate must precede the merge");
+  assert.ok(at("autoMerge(ctx, rel, pr") < at('["tag", "-a", tag'), "the merge must precede the tag");
+  // The history keeps the verbatim budget sentence.
+  assert.ok(read("specs", "release-sop-history.md").includes("make the FIRST attempt with the normal budget"));
 });
 
-test("AC5: 13a-13b close-out lands bookkeeping by pull request (D10 row kept)", () => {
+test("AC5 [E394 re-pin AC-S8/AC-P4]: close-out lands bookkeeping by pull request on release/vX.Y.Z-bookkeeping and ends CLOSE-OUT PASSED (SOP + script)", () => {
   assert.ok(RELEASE.includes("release/vX.Y.Z-bookkeeping"));
   assert.ok(RELEASE.includes("CLOSE-OUT PASSED"));
+  assert.ok(RELEASE_SCRIPT.includes("`release/v${opts.version}-bookkeeping`"), "the script must name the bookkeeping branch");
+  assert.ok(RELEASE_SCRIPT.includes("CLOSE-OUT PASSED"), "the script must require/print CLOSE-OUT PASSED");
+  // D10 row kept: a push rejection / merge-blocked bookkeeping branch is a Blocked stop, not a recovery.
+  assert.match(RELEASE, /exit 34 PUSH_REJECTED \| Blocked \|/);
 });
 
 test("AC7: Constitution section 6 — grant names gh pr create/merge, namespaces, pinned sentence and FORBIDDEN list unchanged", () => {

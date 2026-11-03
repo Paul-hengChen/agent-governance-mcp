@@ -1037,59 +1037,55 @@ test("VR-16 (E14 degradation, bonus): unparseable gh output -> WARN on stdout, n
 // ---------------------------------------------------------------------------
 // The release-engineer SOP step and its Escalation Routes row (content/skill-release-engineer.md) (VR-9, AC9)
 // ---------------------------------------------------------------------------
-test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after push/gh-release and before the closing write, plus a matching Escalation Routes row", () => {
+test("VR-9 [E394 re-pin AC-P4/AC-P5]: skill-release-engineer.md has the publish step (which runs verify-release.mjs) before the closing write, and a matching SELF_CHECK_FAILED Escalation Routes row; the script forbids no-FAIL-skip by exit code", () => {
+  // The self-check is the tail of the `publish` phase (SOP step 13); the closing write is step 14.
+  const step13 = SKILL.match(/^13\. Publish:.*$/m);
+  assert.ok(step13, "SOP step 13 (publish) must be present");
   assert.match(
-    SKILL,
-    /9a\.\s*\*\*Release self-check\*\*[\s\S]*?node scripts\/verify-release\.mjs/,
-    "SOP step 9a must instruct running node scripts/verify-release.mjs",
+    step13[0],
+    /runs `node scripts\/verify-release\.mjs vX\.Y\.Z`/,
+    "SOP step 13 must say publish runs node scripts/verify-release.mjs vX.Y.Z",
   );
-  // Step 9a must sit after step 9 (push/gh-release) and before step 12 (closing write).
-  const idxStep9 = SKILL.indexOf("**GitHub release**");
-  const idxStep9a = SKILL.indexOf("9a. **Release self-check**");
-  const idxStep12 = SKILL.indexOf("**Closing write**");
-  assert.ok(idxStep9 > -1 && idxStep9a > -1 && idxStep12 > -1, "all three anchor steps must be present");
-  assert.ok(idxStep9 < idxStep9a, "step 9a must come after step 9 (push + gh release)");
-  assert.ok(idxStep9a < idxStep12, "step 9a must come before the closing write (step 12)");
+  assert.match(
+    step13[0],
+    /creates the GitHub release and runs `node scripts\/verify-release\.mjs vX\.Y\.Z`\. Success ends `release: publish OK/,
+    "the self-check must come after the GitHub release inside publish, and only publish OK ends the step",
+  );
+  const idxStep13 = SKILL.search(/^13\. Publish:/m);
+  const idxStep14 = SKILL.search(/^14\. Closing write:/m);
+  assert.ok(idxStep13 > -1 && idxStep14 > -1, "both anchor steps must be present");
+  assert.ok(idxStep13 < idxStep14, "the self-check (inside step 13) must come before the closing write (step 14)");
 
   assert.match(
     SKILL,
-    /\| release self-check reports any FAIL \(`node scripts\/verify-release\.mjs` exits non-zero, SOP step 9a\) \| Blocked \|/,
-    "Escalation Routes must have a matching row with status=Blocked",
+    /\| exit 45 SELF_CHECK_FAILED \| Blocked \| `<stop>` \(failed checks\) \| — \|/,
+    "Escalation Routes must have a matching SELF_CHECK_FAILED row with status=Blocked and the failed checks in the note",
+  );
+  assert.match(
+    SKILL,
+    /Success ends `release: publish OK \(vX\.Y\.Z\) — tag at <merge-sha>`/,
+    "only the publish OK line is success; a non-zero exit is a stop row, never a done-report",
+  );
+  assert.match(
+    SKILL,
+    /Never claim it speculatively/,
+    "the Output rule must forbid the done-report without the confirmations",
+  );
+  // The CI-poll budget is cited by knob name in the SOP (E80/E82), never by a restated duration.
+  assert.match(
+    SKILL,
+    /set `AGC_VERIFY_CI_WAIT_SECONDS` and `AGC_RELEASE_MERGE_WAIT_SECONDS` below the host timeout/,
+    "the SOP must name the CI-poll budget knob so a host kill is retried with a lower budget (E80/E82)",
+  );
+  // Narrative: the E80/E82 bounded-poll text moved verbatim to the history.
+  const hist = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+  assert.ok(
+    hist.includes("the script itself bounded-polls `gh run list` for it (E80/E82; default is `DEFAULT_WAIT_SECONDS` in `scripts/verify-release.mjs`, overridable via `AGC_VERIFY_CI_WAIT_SECONDS`, `0` to opt out) before giving up"),
+    "history must keep the E80 bounded-poll narrative citing DEFAULT_WAIT_SECONDS by name",
   );
   assert.ok(
-    SKILL.includes(
-      "`release-engineer: release self-check failed — <failed check name(s)> — see script output`",
-    ),
-    "Escalation Routes row must carry the verbatim pending-note text from the spec's Copy/Strings vr.escalation-note entry",
-  );
-  assert.match(
-    SKILL,
-    /release self-check reports any FAIL \(`node scripts\/verify-release\.mjs` exits non-zero, SOP step 9a\) \| Blocked \| `release-engineer: release self-check failed — <failed check name\(s\)> — see script output` \| human \|/,
-    "Escalation Routes row must route to next_role=human",
-  );
-  assert.match(
-    SKILL,
-    /do NOT proceed to the closing write and do NOT emit `Done\. Released <tag>\.` on a FAIL/,
-    "SOP step 9a must explicitly forbid the closing write and the done-report on FAIL",
-  );
-
-  // Step 9a must separate "the script is polling, let it run" from "WARN and
-  // continue only in a degraded environment" (E80), and cite the wait constant
-  // by name instead of a duration (E82); VR-9b pins that property.
-  assert.match(
-    SKILL,
-    /the script itself bounded-polls `gh run list` for it \(E80\/E82; default is `DEFAULT_WAIT_SECONDS` in `scripts\/verify-release\.mjs`, overridable via `AGC_VERIFY_CI_WAIT_SECONDS`, `0` to opt out\) before giving up/,
-    "step 9a must describe the E80 bounded poll and cite DEFAULT_WAIT_SECONDS in scripts/verify-release.mjs by name, not a restated duration figure (E82(ii))",
-  );
-  assert.match(
-    SKILL,
-    /just let this step run to completion, do not treat a poll-in-progress as a WARN to manually re-run around/,
-    "step 9a must instruct the operator not to treat an in-progress poll as a WARN needing manual intervention",
-  );
-  assert.match(
-    SKILL,
-    /WARN-and-continue \(the check stays green either way, never a release blocker\) is what you get in two cases: the poll's own budget runs out with this sha still not found, or the environment is genuinely degraded/,
-    "step 9a must scope WARN-and-continue to exactly two cases — poll-budget expiry or a genuinely degraded environment — not a single undifferentiated catch-all",
+    hist.includes("do NOT proceed to the closing write and do NOT emit `Done. Released <tag>.` on a FAIL"),
+    "history must keep the verbatim no-closing-write-on-FAIL narrative",
   );
 });
 
@@ -1099,41 +1095,39 @@ test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after pu
 // sentence has no duration literal, and the constant it names exists in
 // scripts/verify-release.mjs.
 // ---------------------------------------------------------------------------
-test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries no hardcoded duration literal and sources it from DEFAULT_WAIT_SECONDS", () => {
-  const idxStep9a = SKILL.indexOf("9a. **Release self-check**");
-  const idxRationaleStart = SKILL.indexOf("<!-- rationale:start -->", idxStep9a);
-  const idxStep10 = SKILL.indexOf("10. *(retired", idxStep9a);
-  assert.ok(idxStep9a > -1, "step 9a must be present");
-  assert.ok(idxRationaleStart > idxStep9a, "step 9a's rationale fence must be present");
-  assert.ok(idxStep10 > idxRationaleStart, "step 10's retirement pointer must follow step 9a's rationale fence");
-  // (a) covers the operational sentence only, up to the rationale fence:
-  // stripRationale removes that fence from every dispatch, and it may keep the
-  // old figures as a note to future editors.
-  const step9aOperational = SKILL.slice(idxStep9a, idxRationaleStart);
+test("VR-9b [E394 re-pin AC-P4/AC-P10] (E82(ii) behavioral pin): the SOP's CI-poll-budget text carries no hardcoded duration literal and sources it from the named knob/constant; DEFAULT_WAIT_SECONDS is still a real constant", () => {
+  const idxStep13 = SKILL.search(/^13\. Publish:/m);
+  const idxStep14 = SKILL.search(/^14\. Closing write:/m);
+  const idxHostKill = SKILL.indexOf("**Host kill**");
+  const idxEscalation = SKILL.indexOf("## Escalation Routes");
+  assert.ok(idxStep13 > -1 && idxStep14 > idxStep13, "publish step 13 must precede step 14");
+  assert.ok(idxHostKill > -1 && idxEscalation > idxHostKill, "the Host kill paragraph must sit before Escalation Routes");
+  // (a) The OPERATIONAL text that carries the poll budget: the publish step and the Host kill paragraph.
+  const operational = SKILL.slice(idxStep13, idxStep14) + "\n" + SKILL.slice(idxHostKill, idxEscalation);
 
-  // (a) No hardcoded duration literal for the CI poll budget in the
-  // OPERATIONAL text a release-engineer actually executes. This is the
-  // precise staleness class the CI-wait default change was filed against (E82).
+  // (a) No hardcoded duration literal for the CI poll budget — the staleness class E82 was filed against.
   assert.doesNotMatch(
-    step9aOperational,
+    operational,
     /~?\d+\s*(seconds?|secs?|minutes?|mins?)\b/i,
-    "step 9a's operational text must not carry a hardcoded duration literal for the CI poll budget — cite DEFAULT_WAIT_SECONDS by name instead (E82(ii))",
+    "the SOP's poll-budget text must not carry a hardcoded duration literal — name the knob instead (E82(ii))",
   );
 
-  // (b) Names the constant, by identifier, as the source of the default.
+  // (b) Names the budget knobs by identifier.
   assert.match(
-    step9aOperational,
-    /`DEFAULT_WAIT_SECONDS`\s+in\s+`scripts\/verify-release\.mjs`/,
-    "step 9a must cite DEFAULT_WAIT_SECONDS in scripts/verify-release.mjs by name as the source of the poll budget",
+    operational,
+    /`AGC_VERIFY_CI_WAIT_SECONDS`/,
+    "the SOP must cite AGC_VERIFY_CI_WAIT_SECONDS by name as the poll-budget knob",
   );
+  // The history keeps the by-name citation and the E82 maintenance note.
+  const hist = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+  assert.ok(hist.includes("`DEFAULT_WAIT_SECONDS` in `scripts/verify-release.mjs`"), "history must keep the by-name DEFAULT_WAIT_SECONDS citation");
+  assert.ok(hist.includes("Maintenance note, E82 (ii)"), "history must keep the E82(ii) maintenance note");
 
-  // (c) The named constant must be a real numeric constant in the script. The
-  // value 480 is deliberately not pinned here (VR-23 pins the live behaviour),
-  // or a value change would make this test stale.
+  // (c) The named constant must be a real numeric constant in the script (value deliberately not pinned; VR-23 pins behaviour).
   assert.match(
     REAL_VERIFY_SCRIPT,
     /const\s+DEFAULT_WAIT_SECONDS\s*=\s*\d+\s*;/,
-    "scripts/verify-release.mjs must still define DEFAULT_WAIT_SECONDS as a numeric constant — if this fails, step 9a's citation now points at nothing",
+    "scripts/verify-release.mjs must still define DEFAULT_WAIT_SECONDS as a numeric constant — if this fails, the history's citation now points at nothing",
   );
 });
 
@@ -1144,94 +1138,75 @@ test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries 
 // `.jsonl` sidecars are silently left out. `tasks.md` is staged by step 8, not
 // 13a (E143). Details: specs/e260h-comment-rationale.md (test/verify-release.test.mjs).
 // ---------------------------------------------------------------------------
-test("VR-9c (N11): step 13a's non-empty-stage assertion is scoped to catching a fully-empty stage, not partial under-staging", () => {
-  const idxStep13a = SKILL.indexOf("13a. **Bookkeeping commit + push**");
-  const idxStep13b = SKILL.indexOf("13b. **Bookkeeping close-out check**");
-  assert.ok(idxStep13a > -1 && idxStep13b > -1, "steps 13a and 13b must both be present");
-  assert.ok(idxStep13a < idxStep13b, "step 13a must precede step 13b");
-  const step13aBlock = SKILL.slice(idxStep13a, idxStep13b);
+test("VR-9c [E394 re-pin AC-S8] (N11): the close-out phase's non-empty-stage assertion (scripts/release.mjs) is scoped to catching a fully-empty stage, not partial under-staging", () => {
+  const RELEASE_SCRIPT = fs.readFileSync(path.join(ROOT, "scripts", "release.mjs"), "utf-8");
+  const start = RELEASE_SCRIPT.indexOf("async function openBookkeepingPr(");
+  assert.ok(start > -1, "the close-out bookkeeping-PR function must exist in scripts/release.mjs");
+  const end = RELEASE_SCRIPT.indexOf("\n}\n", start);
+  const block = RELEASE_SCRIPT.slice(start, end);
 
-  // The enumerate-then-stage pattern (N9 fix) — never a raw shell glob.
-  // The enumeration + stage targets the derived lane dir, not a flat
-  // .current/ glob (E174a).
-  assert.match(
-    step13aBlock,
-    /JSONL=\$\(find "\.current\/\$LANE" -maxdepth 1 -name "\*\.jsonl"\)/,
-    "13a must enumerate .jsonl sidecars via find under the derived lane dir, never a raw shell glob (E174a)",
-  );
-  assert.match(
-    step13aBlock,
-    /git add -- "\.current\/\$LANE\/handoff\.md" \$JSONL/,
-    "13a must stage the lane-scoped handoff.md explicitly alongside the enumerated jsonl files (E143: tasks.md is staged by step 8, never by 13a; E174a: lane-scoped path)",
-  );
-  assert.doesNotMatch(
-    step13aBlock,
-    /git add -- "\.current\/\$LANE\/handoff\.md" tasks\.md/,
-    "E143: 13a's git add must NOT name tasks.md — step 8 owns staging it",
-  );
-  // The lane is derived via the compiled resolver, never hardcoded to
-  // _primary and never re-parsed from the branch name in shell (E174a).
-  assert.match(
-    step13aBlock,
-    /LANE=\$\(node --input-type=module -e "import \{resolveCurrentLane\} from \\"\.\/dist\/tools\/lane-paths\.js\\"; console\.log\(resolveCurrentLane\(process\.cwd\(\)\)\)"\)/,
-    "13a must derive $LANE by importing the compiled resolveCurrentLane, never hardcode _primary (E174a cut decision i)",
-  );
-  assert.match(
-    step13aBlock,
-    /lane dir \.current\/\$LANE missing — STOP/,
-    "13a must STOP if the derived lane's .current/$LANE directory does not exist (E174a)",
-  );
+  // The enumerate-then-stage pattern (N9 fix) — sidecars are listed, never a raw shell glob — under the
+  // derived lane dir (E174a), staging the lane handoff explicitly alongside them.
+  assert.match(block, /readdirSync\(path\.join\(root, dir\)[\s\S]*?\.endsWith\("\.jsonl"\)/, "close-out must enumerate .jsonl sidecars under the derived lane dir, never a raw glob (E174a)");
+  assert.match(block, /\["add", "--", \.\.\.plan\]/, "close-out must stage the explicit plan (lane handoff + enumerated sidecars) with git add --");
+  assert.match(block, /const plan = \[handoff, \.\.\.sidecars\]/, "the plan must be the lane-scoped handoff plus the sidecars (E174a)");
+  assert.doesNotMatch(block, /tasks\.md/, "E143: close-out must NOT stage tasks.md — the release commit (prepare) owns staging it");
+  // The lane is derived via the compiled resolver, never hardcoded to _primary (E174a cut decision i).
+  const laneFn = RELEASE_SCRIPT.slice(RELEASE_SCRIPT.indexOf("resolveCurrentLane"), RELEASE_SCRIPT.indexOf("resolveCurrentLane") + 400);
+  assert.ok(RELEASE_SCRIPT.includes("dist/tools/lane-paths.js"), "the lane must come from the compiled dist/tools/lane-paths.js resolver");
+  assert.ok(laneFn.length > 0, "resolveCurrentLane must be used");
+  assert.match(RELEASE_SCRIPT, /LANE_UNRESOLVED[\s\S]{0,200}does not exist/, "close-out must STOP (LANE_UNRESOLVED) if the derived lane dir does not exist (E174a)");
 
-  // The guaranteed property: the stage is checked for non-emptiness — this
-  // catches a TOTAL staging failure (nothing staged at all). It does NOT
-  // verify that every one of the named paths individually landed (N11) —
-  // that stronger guarantee is not what this assertion buys, and this test
-  // must not be strengthened to claim it does without also changing the SOP
-  // text to actually check per-path membership.
+  // The guaranteed property: the stage is checked for emptiness — catches a TOTAL staging failure. It does NOT
+  // verify every named path individually landed (N11) — do not strengthen this test without changing the script.
   assert.match(
-    step13aBlock,
-    /if \[ -z "\$\(git diff --cached --name-only\)" \]; then/,
-    "13a must assert the cached diff is non-empty before allowing the commit — the total-staging-failure guard",
+    block,
+    /if \(staged\.length === 0\) throw new ReleaseStop\("EMPTY_STAGE"/,
+    "close-out must assert the cached diff is non-empty before the commit — the total-staging-failure guard",
   );
-  assert.match(
-    step13aBlock,
-    /nothing staged for bookkeeping commit — STOP/,
-    "the non-empty-stage assertion's STOP message must be present",
+  assert.match(block, /nothing staged after git add/, "the empty-stage STOP message must be present");
+  // The throw precedes the commit, so a failure never reaches git commit (closes the vacuous-13b-PASS class).
+  assert.ok(
+    block.indexOf('"EMPTY_STAGE", `nothing staged after git add') < block.indexOf('["commit", "-m", title]'),
+    "the empty-stage STOP must come before git commit",
   );
-
-  // Do not proceed to commit on failure — this is the half that actually
-  // closes the vacuous-13b-PASS class (code-reviewer round 3, Q2).
-  assert.match(
-    step13aBlock,
-    /If that script exits non-zero, STOP here — do not proceed to `git commit`/,
-    "13a must forbid proceeding to git commit when the staging script exits non-zero",
-  );
+  // SOP side: the EMPTY_STAGE class is an Escalation row.
+  assert.match(SKILL, /\| exit 52 EMPTY_STAGE \| Blocked \|/, "the SOP must carry the EMPTY_STAGE Escalation row");
 });
 
 // ---------------------------------------------------------------------------
 // A tw_get_state read-back follows the closing write (VR-10, AC10)
 // ---------------------------------------------------------------------------
-test("VR-10 (AC10): skill-release-engineer.md requires a tw_get_state read-back immediately after the closing write, before the final reply", () => {
-  const idxStep12 = SKILL.indexOf("**Closing write**");
-  const idxStep13 = SKILL.indexOf("**Closing-write read-back**");
-  assert.ok(idxStep12 > -1 && idxStep13 > -1, "both the closing write and read-back steps must be present");
-  assert.ok(idxStep12 < idxStep13, "the read-back step must come after the closing write step");
+test("VR-10 [E394 re-pin AC-P5] (AC10): skill-release-engineer.md requires a tw_get_state read-back immediately after the closing write, before the final reply", () => {
+  const idxClosing = SKILL.search(/^14\. Closing write:/m);
+  const idxReadBack = SKILL.search(/^15\. Read-back:/m);
+  const idxReply = SKILL.search(/^17\. Reply/m);
+  assert.ok(idxClosing > -1 && idxReadBack > -1 && idxReply > -1, "the closing write, read-back and reply steps must be present");
+  assert.ok(idxClosing < idxReadBack, "the read-back step must come after the closing write step");
+  assert.ok(idxReadBack < idxReply, "the read-back must come before the final reply");
 
-  assert.match(
-    SKILL,
-    /13\.\s*\*\*Closing-write read-back\*\*[\s\S]*?call `tw_get_state` again/,
-    "step 13 must instruct calling tw_get_state again after the closing write",
-  );
+  const step15 = SKILL.match(/^15\. Read-back:.*$/m)[0];
+  assert.match(step15, /`tw_get_state`/, "step 15 must instruct calling tw_get_state after the closing write");
   for (const field of ["last_agent", "status", "next_role", "pending_notes"]) {
     assert.ok(
-      SKILL.includes(field),
-      `step 13 must name the '${field}' field to confirm against the closing write`,
+      step15.includes(field),
+      `step 15 must name the '${field}' field to confirm against the closing write`,
     );
   }
   assert.match(
-    SKILL,
-    /do NOT claim "Released"; STOP and surface the mismatch verbatim instead/,
+    step15,
+    /A rejection or mismatch STOPs\./,
     "a read-back mismatch must STOP the agent rather than let it claim success",
+  );
+  assert.match(
+    SKILL,
+    /\| closing write rejected or read-back mismatch \(steps 14–15\) \| Blocked \| `release-engineer: closing write unconfirmed — <field>: wrote <a>, read <b>` \|/,
+    "a read-back mismatch must have its Escalation Routes row naming the field and both values",
+  );
+  assert.match(
+    SKILL,
+    /only after BOTH \(a\) the step 15 read-back matched the closing write/,
+    "the Output rule must gate the done-report on the read-back",
   );
 });
 

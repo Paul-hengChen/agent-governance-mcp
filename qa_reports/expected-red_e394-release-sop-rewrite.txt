@@ -1,0 +1,3 @@
+# e394-release-sop-rewrite expected reds — window CLOSED at 40a3cac (T-E394-13 / T-E394-14 re-pinned every entry that was listed here).
+# No entries remain: every test that pinned base release-SOP wording now pins the rewritten content/skill-release-engineer.md,
+# scripts/release.mjs or specs/release-sop-history.md. Any red in the suite from here on is a regression, not an expected red.

@@ -2318,9 +2318,10 @@ test("T-E53-03(b): release-engineer:Blocked → release-engineer:In_Progress acc
 test("T-E53-03(c): release-engineer:Blocked → pm:In_Progress accepted (recovery escape)", () => {
   // WHY: mirrors the pm-escape shape all six other <role>:Blocked rows carry
   // (researcher/design-auditor/pm/architect/sr-engineer/code-reviewer). Most of
-  // the Escalation Routes rows in content/skill-release-engineer.md route to
-  // next_role=human, which resolves through this edge (coordinator recovery)
-  // or the self-resume edge above.
+  // the Escalation Routes rows in content/skill-release-engineer.md hand back to
+  // the human (no next_role field since E394, where the enum has no "human"),
+  // which resolves through this edge (coordinator recovery) or the
+  // self-resume edge above. Rows that do route set next_role=pm.
   assert.equal(
     validateTransition({
       prev: { agent: "release-engineer", status: "Blocked" },
@@ -2333,9 +2334,10 @@ test("T-E53-03(c): release-engineer:Blocked → pm:In_Progress accepted (recover
 });
 
 test("T-E53-03(d): release-engineer:Blocked → qa-engineer:In_Progress accepted (npm-test-regression row)", () => {
-  // WHY: the one Escalation Routes row (content/skill-release-engineer.md:153,
-  // "`npm test` regression") that names next_role=qa-engineer rather than
-  // human — pm alone would have been the wrong destination set for this key.
+  // WHY: the one Escalation Routes row (content/skill-release-engineer.md, the
+  // "test regression or hardcoded version literal" row) that names
+  // next_role=qa-engineer rather than a human handback — pm alone would have
+  // been the wrong destination set for this key.
   // Precedent: qa-engineer:Blocked -> sr-engineer:In_Progress (route to the
   // role that must fix, not just to pm).
   assert.equal(

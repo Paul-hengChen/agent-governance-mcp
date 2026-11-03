@@ -382,30 +382,55 @@ function readContentFile(f) {
   return fs.readFileSync(path.join(ROOT, "content", f), "utf-8");
 }
 
-test("S1: content/skill-release-engineer.md carries the 'Re-baseline off HEAD' SOP step (T-E1-02)", () => {
+// E394 re-pin helpers: the release SOP was rewritten (mechanics moved into scripts/release.mjs,
+// incident narratives moved verbatim into specs/release-sop-history.md). Rules stay pinned in the
+// SOP; narratives are pinned in the history file.
+function readReleaseHistory() {
+  return fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+}
+function releaseSopStep(skill, n) {
+  const m = skill.match(new RegExp(`^${n}\\. .*$`, "m"));
+  assert.ok(m, `must locate numbered SOP step ${n}`);
+  return m[0];
+}
+
+test("S1 [E394 re-pin AC-P3/AC-P6]: the release SOP re-baselines off a freshly fetched main (fetch, portable ff-only pull, version derived at HEAD + bump) and the history keeps the E1 rule text (T-E1-02)", () => {
   const skill = readContentFile("skill-release-engineer.md");
-  assert.match(skill, /\*\*Re-baseline off HEAD\*\*/, "must carry the named SOP step heading");
-  assert.ok(skill.includes("git fetch origin"), "must instruct git fetch origin before any version bump");
-  assert.ok(skill.includes("origin/<branch>"), "must reference re-deriving the version from origin/<branch> HEAD");
+  const step5 = releaseSopStep(skill, 5);
+  assert.ok(step5.includes("git fetch origin"), "step 5 must instruct git fetch origin before any version bump");
   assert.ok(
-    skill.includes("NOT from the baseline this session read at PASS time"),
-    "must explicitly reject the stale-baseline-from-PASS-time source",
+    step5.includes("git -c pull.rebase=false pull --ff-only"),
+    "step 5 must move local main only by the portable fast-forward pull",
+  );
+  assert.ok(
+    /derive `X\.Y\.Z` from the version at HEAD/.test(step5),
+    "step 5 must derive the target version from the version at HEAD (not the PASS-time baseline)",
+  );
+  assert.ok(skill.indexOf("\n5. ") < skill.indexOf("\n7. "), "re-baseline (5) must precede the bumps (7)");
+  const hist = readReleaseHistory();
+  assert.ok(hist.includes("Re-baseline off HEAD"), "history must keep the named E1 step");
+  assert.ok(
+    hist.includes("NOT from the baseline this session read at PASS time"),
+    "history must keep the explicit rejection of the stale PASS-time baseline",
   );
 });
 
-test("S2: skill-release-engineer.md re-baseline step names FEATURE_LEASE_HELD as the in-checkout serializer", () => {
-  const skill = readContentFile("skill-release-engineer.md");
+test("S2 [E394 re-pin AC-P10]: the history keeps the note that FEATURE_LEASE_HELD already serializes in-checkout features (re-baseline cause)", () => {
   assert.ok(
-    skill.includes("`FEATURE_LEASE_HELD` gate already serializes features"),
-    "must cite the FEATURE_LEASE_HELD gate as already serializing in-checkout releases",
+    readReleaseHistory().includes("`FEATURE_LEASE_HELD` gate already serializes features"),
+    "history must cite the FEATURE_LEASE_HELD gate as already serializing in-checkout releases",
   );
 });
 
-test("S3: skill-release-engineer.md's re-baseline step is also the documented D10 Blocked-recovery FIRST step", () => {
+test("S3 [E394 re-pin AC-P4/AC-P10]: the re-baseline step is still the Blocked-recovery FIRST step (STALE_BASE row restarts at step 5; history keeps the D10 text)", () => {
   const skill = readContentFile("skill-release-engineer.md");
   assert.ok(
-    skill.includes("documented FIRST recovery step when a prior release attempt sits `Blocked` on a non-fast-forward push"),
-    "the re-baseline step must double as the D10 Blocked-recovery entry point",
+    /exit 11 STALE_BASE — recovery restarts at step 5 on a new branch/.test(skill),
+    "the STALE_BASE escalation row must restart recovery at the re-baseline step (5)",
+  );
+  assert.ok(
+    readReleaseHistory().includes("documented FIRST recovery step when a prior release attempt sits `Blocked` on a non-fast-forward push"),
+    "history must keep the D10 Blocked-recovery entry-point sentence",
   );
 });
 
@@ -607,20 +632,19 @@ test("E1A-6: a SQLite-shaped prevState (no next_role field at all) can NEVER sat
   assert.equal(isFeatureLeaseHeld(staleSqliteShaped, "feat-y", Date.now(), LEASE_TTL_MIN), false);
 });
 
-test("S7: content/skill-release-engineer.md SOP step 12 pins agent_id=\"release-engineer\" on the closing write and no longer instructs agent_id=\"pm\" there (AC-E1A-7)", () => {
+test("S7 [E394 re-pin AC-P5]: the closing write (SOP step 14) pins agent_id=\"release-engineer\" and never instructs agent_id=\"pm\" there (AC-E1A-7)", () => {
   const skill = readContentFile("skill-release-engineer.md");
-  const step12Match = skill.match(/^12\.\s+\*\*Closing write\*\*.*$/m);
-  assert.ok(step12Match, "must locate the numbered step-12 Closing write line");
-  const step12Line = step12Match[0];
+  const step12Line = releaseSopStep(skill, 14);
+  assert.ok(step12Line.startsWith("14. Closing write:"), "step 14 must be the closing write");
 
   // The corrected closing-write call must open with agent_id="release-engineer".
   assert.ok(
     step12Line.includes('tw_update_state(agent_id="release-engineer"'),
-    "step 12's tw_update_state call must open with agent_id=\"release-engineer\" (self-loop)",
+    "the closing tw_update_state call must open with agent_id=\"release-engineer\" (self-loop)",
   );
   assert.ok(
     step12Line.includes('next_role="pm"'),
-    "step 12's tw_update_state call must still carry next_role=\"pm\" as the routing/terminal signal",
+    "the closing tw_update_state call must still carry next_role=\"pm\" as the routing/terminal signal",
   );
 
   // The OLD, incorrect instruction (agent_id="pm" as part of the actual call)
@@ -634,8 +658,13 @@ test("S7: content/skill-release-engineer.md SOP step 12 pins agent_id=\"release-
 
   // Explicit "NEVER agent_id=\"pm\"" guard language should accompany the fix.
   assert.ok(
-    /NEVER\s+`?"pm"`?/.test(step12Line) || step12Line.includes('— NEVER `"pm"`'),
-    "step 12 must explicitly call out that agent_id must NEVER be \"pm\" on the closing write",
+    !/tw_update_state\([^)]*agent_id="pm"/.test(skill),
+    "no tw_update_state call in the SOP may stamp agent_id=\"pm\"",
+  );
+  // The never-stamp-another-role's-id guard lives in the Hard rules (first-class citizen).
+  assert.ok(
+    /opening and closing writes are `agent_id="release-engineer"`; never stamp another role's id/.test(skill),
+    "the Hard rules must state both writes are agent_id=\"release-engineer\", never another role's id",
   );
 });
 
@@ -646,32 +675,29 @@ test("S7: content/skill-release-engineer.md SOP step 12 pins agent_id=\"release-
 // (e8-success-telemetry, T-E8-05/T-E8-07)
 // ============================================================================
 
-test("S8: content/skill-release-engineer.md carries step 11b — the success-metrics emit note is automatic/best-effort and names .current/<lane>/metrics.jsonl (E174a)", () => {
+test("S8 [E394 re-pin AC-P5/AC-P10]: the SOP closing-write step says the success-metrics emit is automatic, never hand-authored, never a release failure; the history keeps the E174a sidecar path and the best-effort/never-blocks text", () => {
   const skill = readContentFile("skill-release-engineer.md");
-  const step11bMatch = skill.match(/^11b\.\s+\*\*Success-metrics emit is automatic\*\*.*$/m);
-  assert.ok(step11bMatch, "must locate the numbered step-11b success-metrics line");
-  const step11bLine = step11bMatch[0];
+  const step14Line = releaseSopStep(skill, 14);
 
   assert.ok(
-    /automatic/i.test(step11bLine),
-    "step 11b must describe the emit as automatic (no manual action required)",
+    /success-metrics emit is automatic/i.test(step14Line),
+    "step 14 must describe the success-metrics emit as automatic (no manual action required)",
   );
   assert.ok(
-    /best-effort/i.test(step11bLine),
-    "step 11b must describe the emit as best-effort (never a release blocker)",
+    /never hand-author a metrics record/i.test(step14Line),
+    "step 14 must instruct release-engineer NEVER to hand-author metrics records",
   );
   assert.ok(
-    step11bLine.includes(".current/<lane>/metrics.jsonl"),
-    "step 11b must name the exact lane-scoped sidecar path .current/<lane>/metrics.jsonl (E174a)",
+    /failed emit is not a release failure/i.test(step14Line),
+    "step 14 must state a failed emit is not a release failure (never a blocker)",
   );
-  assert.ok(
-    /do not.*(hand-author|edit)/i.test(step11bLine),
-    "step 11b must instruct release-engineer NOT to hand-author or edit metrics records",
-  );
-  assert.ok(
-    /never.*(block|alter)/i.test(step11bLine) || /does not.*(block|alter)/i.test(step11bLine),
-    "step 11b must state the emit never blocks or alters the closing write's result",
-  );
+  // The narrative (sidecar path, best-effort, never blocks/alters the closing write) lives in the history.
+  const hist = readReleaseHistory();
+  const m = hist.match(/^11b\. \*\*Success-metrics emit is automatic\*\*.*$/m);
+  assert.ok(m, "history must keep the verbatim step 11b line");
+  assert.ok(m[0].includes(".current/<lane>/metrics.jsonl"), "history must name the lane-scoped sidecar path (E174a)");
+  assert.ok(/best-effort/i.test(m[0]), "history must keep the best-effort wording");
+  assert.ok(/never blocks or alters the closing write's result/i.test(m[0]), "history must keep the never-blocks/alters wording");
 });
 
 // E13: the release-closing marker must survive a later heal-write that drops next_role, so a
@@ -801,16 +827,28 @@ test("E13-AC5: Blocked status WITH closing-signature pending_notes still HOLDS �
   );
 });
 
-test("E13-AC6: content/skill-release-engineer.md carries the E13 terminal-marker resilience note near steps 12-13 (spec AC6)", () => {
+test("E13-AC6 [E394 re-pin AC-P5/AC-P10]: the SOP closing/read-back steps keep the E13 exact-triple contract and 'no licence to omit next_role'; the history keeps the full terminal-marker resilience note (spec AC6)", () => {
   const skill = readContentFile("skill-release-engineer.md");
-  const noteMatch = skill.match(/^\*\*Terminal-marker resilience note \(E13.*$/m);
-  assert.ok(noteMatch, "must locate the E13 terminal-marker resilience note heading");
-  // Find the note's paragraph (from the heading line to the next blank line
-  // or next H2, whichever comes first) so assertions aren't order-sensitive
-  // to unrelated surrounding prose.
-  const noteStart = skill.indexOf(noteMatch[0]);
-  const noteEnd = skill.indexOf("\n\n", noteStart);
-  const noteBlock = noteEnd === -1 ? skill.slice(noteStart) : skill.slice(noteStart, noteEnd);
+  const step14 = releaseSopStep(skill, 14);
+  const step15 = releaseSopStep(skill, 15);
+  assert.ok(
+    step14.includes('tw_update_state(agent_id="release-engineer", status="In_Progress"') && step14.includes('next_role="pm"'),
+    "step 14 must write the exact closing triple in full",
+  );
+  assert.ok(
+    /`last_agent`, `status`, `next_role` and `pending_notes` must equal step 14 exactly/.test(step15),
+    "step 15's read-back must verify the exact closing write verbatim, next_role included",
+  );
+  assert.ok(
+    /feature-lease terminal marker/.test(step14) && /no licence to omit `next_role`/.test(step14),
+    "step 14 must name the terminal marker and state the server fallback is no licence to omit next_role",
+  );
+
+  // The full narrative lives in the history file; the original assertions run against it.
+  const hist = readReleaseHistory();
+  const noteMatch = hist.match(/^\*\*Terminal-marker resilience note \(E13.*$/m);
+  assert.ok(noteMatch, "history must keep the E13 terminal-marker resilience note heading");
+  const noteBlock = noteMatch[0];
 
   // (a) the exact triple remains PRIMARY, still verified by step 13's read-back.
   assert.ok(
@@ -935,20 +973,19 @@ sqliteDescribe("SQLite mode: E13 closing-signature pending_notes are inert (AC4)
   });
 });
 
-test("S8b: step 11b sits between step 11 and step 12 (ordering) and the E1A step-12 contract text remains byte-intact alongside it (regression guard vs S7)", () => {
+test("S8b [E394 re-pin AC-P5]: the metrics note rides inside the closing-write step (14), before the read-back (15), and the closing call shape stays byte-intact alongside it (regression guard vs S7)", () => {
   const skill = readContentFile("skill-release-engineer.md");
-  const step11bIdx = skill.search(/^11b\.\s+\*\*Success-metrics emit is automatic\*\*/m);
-  const step12Idx = skill.search(/^12\.\s+\*\*Closing write\*\*/m);
-  assert.ok(step11bIdx >= 0, "step 11b must be present");
-  assert.ok(step12Idx >= 0, "step 12 must still be present");
-  assert.ok(step11bIdx < step12Idx, "step 11b must be ordered before step 12 (numbered-list convention: 11, 11a, 11b, 12)");
+  const step14Idx = skill.search(/^14\. Closing write:/m);
+  const step15Idx = skill.search(/^15\. Read-back:/m);
+  assert.ok(step14Idx >= 0, "step 14 (closing write) must be present");
+  assert.ok(step15Idx >= 0, "step 15 (read-back) must be present");
+  assert.ok(step14Idx < step15Idx, "the closing write (14) must precede the read-back (15)");
 
-  // The exact S7-pinned step-12 substrings must still be present verbatim —
-  // step 11b's insertion must not have perturbed step 12's text at all.
-  const step12Match = skill.match(/^12\.\s+\*\*Closing write\*\*.*$/m);
-  assert.ok(step12Match, "step 12 line must still be locatable");
-  assert.ok(step12Match[0].includes('tw_update_state(agent_id="release-engineer"'), "step 12's corrected call shape must remain byte-intact");
-  assert.ok(step12Match[0].includes('next_role="pm"'), "step 12's next_role=\"pm\" routing signal must remain byte-intact");
+  const step14Line = releaseSopStep(skill, 14);
+  assert.ok(/success-metrics emit is automatic/i.test(step14Line), "the metrics note must sit in step 14 itself, next to the closing call");
+  // The exact S7-pinned closing-call substrings must still be present verbatim.
+  assert.ok(step14Line.includes('tw_update_state(agent_id="release-engineer"'), "step 14's corrected call shape must remain byte-intact");
+  assert.ok(step14Line.includes('next_role="pm"'), "step 14's next_role=\"pm\" routing signal must remain byte-intact");
 });
 
 // E10: two independent additions on the lease predicate: `lease_override` (human-attested bypass
@@ -1410,76 +1447,90 @@ test("E10-AC8b: content/const-08-chain-31-mid.md carries the Bookkeeping-Write b
 // state write. Pins the Hard rule and the amended Output rule by grep on the load-bearing phrases
 // (never hand-edit, RELAY REQUIRED: prefix, exact-literal payload), like S1-S7 above. (E9A)
 
-test("E9A-S1: content/skill-release-engineer.md carries the CRITICAL no-MCP-path relay Hard rule, never hand-edit", () => {
+// E394 re-pin: the relay rule is one condensed Hard-rule bullet in the rewritten SOP (relay for steps 2 and 14,
+// never hand-edit, no brief override); its forensics narrative lives in specs/release-sop-history.md.
+function relayHardRule() {
   const skill = readContentFile("skill-release-engineer.md");
-  const ruleMatch = skill.match(/^-\s+\*\*CRITICAL — No-MCP-path sessions MUST relay, never hand-edit\*\*.*$/m);
-  assert.ok(ruleMatch, "must locate the CRITICAL no-MCP-path relay Hard rule bullet, byte-identifiable heading");
-  const ruleLine = ruleMatch[0];
+  const m = skill.match(/^-\s+\*\*No-MCP-path sessions relay\*\*.*$/m);
+  assert.ok(m, "must locate the No-MCP-path relay Hard rule bullet");
+  return m[0];
+}
 
+test("E9A-S1 [E394 re-pin AC-P6]: the SOP carries the no-MCP-path relay Hard rule, never hand-edit state to simulate a write", () => {
+  const ruleLine = relayHardRule();
   assert.ok(
-    ruleLine.includes("no MCP tool-invocation path at all"),
-    "must state the triggering condition: no MCP tool-invocation path at all",
+    ruleLine.includes("with no `tw_*` tool reachable"),
+    "must state the triggering condition: no tw_* tool reachable",
   );
   assert.ok(
-    /NEVER hand-edit/.test(ruleLine),
-    "must state the load-bearing NEVER hand-edit prohibition",
+    /Never hand-edit state to simulate a write/.test(ruleLine),
+    "must state the load-bearing never-hand-edit prohibition",
   );
   assert.ok(
-    ruleLine.includes(".current/<lane>/handoff.md") && ruleLine.includes("tasks.md"),
-    "must name both files the rule forbids hand-editing (E174a: lane-scoped handoff path)",
+    ruleLine.includes("STAMP_PROVENANCE_SUSPECT"),
+    "must name the server-side rejection that backs the prohibition",
   );
+  // The named files forbidden to hand-edit are pinned by the STOP-on-⛔ Hard rule.
+  const skill = readContentFile("skill-release-engineer.md");
+  assert.ok(
+    skill.includes("never hand-edit `.current/<lane>/handoff.md` or `tasks.md` to work around one"),
+    "the STOP-on-⛔ rule must name both files forbidden to hand-edit (E174a: lane-scoped handoff path)",
+  );
+  // The incident narrative moved to the history file verbatim.
+  const hist = readReleaseHistory();
+  assert.ok(hist.includes("no MCP tool-invocation path at all"), "history must keep the E9A triggering-condition narrative");
+  assert.ok(hist.includes("NEVER hand-edit `.current/<lane>/handoff.md` or `tasks.md`"), "history must keep the E9A never-hand-edit narrative");
 });
 
-test("E9A-S2: the CRITICAL relay Hard rule requires the exact literal tw_update_state call, verbatim values, RELAY REQUIRED: prefix", () => {
-  const skill = readContentFile("skill-release-engineer.md");
-  const ruleMatch = skill.match(/^-\s+\*\*CRITICAL — No-MCP-path sessions MUST relay, never hand-edit\*\*.*$/m);
-  assert.ok(ruleMatch, "must locate the CRITICAL no-MCP-path relay Hard rule bullet");
-  const ruleLine = ruleMatch[0];
-
+test("E9A-S2 [E394 re-pin AC-P6]: the relay Hard rule requires the exact literal tw_update_state call, verbatim values, RELAY REQUIRED: prefix, for both writes", () => {
+  const ruleLine = relayHardRule();
   assert.ok(
-    ruleLine.includes("**exact literal `tw_update_state` call**"),
-    "must require the exact literal tw_update_state call (bold, load-bearing exact-literal-payload requirement)",
+    ruleLine.includes("the exact literal `tw_update_state` call"),
+    "must require the exact literal tw_update_state call",
   );
   assert.ok(
-    ruleLine.includes("every argument, verbatim values"),
-    "must require every argument / verbatim values — not a paraphrase",
+    ruleLine.includes("every argument verbatim"),
+    "must require every argument verbatim — not a paraphrase",
   );
   assert.ok(
-    ruleLine.includes("`RELAY REQUIRED:` prefix"),
+    ruleLine.includes("after a `RELAY REQUIRED:` prefix"),
     "must mark the payload with the exact RELAY REQUIRED: prefix",
   );
   assert.ok(
-    ruleLine.includes("step 2's opening write") && ruleLine.includes("step 12's closing write"),
-    "must name both writes (opening/closing) a no-MCP-path session cannot make directly",
+    ruleLine.includes("(steps 2 and 14)"),
+    "must name both writes (opening step 2 / closing step 14) a no-MCP-path session cannot make directly",
+  );
+  assert.ok(
+    ruleLine.includes("No dispatch brief overrides this rule"),
+    "the relay rule must outrank any dispatch brief (E18)",
   );
 });
 
-test("E9A-S3: the amended Output rule gates 'Done. Released <tag>.' on a confirmed write, never speculative from an unverified relay", () => {
+test("E9A-S3 [E394 re-pin AC-P5/AC-P6]: the Output rule gates 'Done. Released <tag>.' on a confirmed write, never speculative from an unverified relay", () => {
   const skill = readContentFile("skill-release-engineer.md");
   const outputSection = skill.match(/^## Output rule\n(.+)$/m);
   assert.ok(outputSection, "must locate the ## Output rule section");
   const outputLine = outputSection[1];
 
   assert.ok(
-    outputLine.includes("emitted ONLY after a confirmed state write"),
-    "must gate the Done. Released <tag>. line on a confirmed state write",
+    outputLine.includes("`Done. Released <tag>.` — only after BOTH"),
+    "must gate the Done. Released <tag>. line on both confirmations",
   );
   assert.ok(
-    outputLine.includes("own SOP step-13 read-back confirms the closing write it made directly") ||
-      /step-13 read-back confirms/.test(outputLine),
+    outputLine.includes("the step 15 read-back matched the closing write"),
     "must name the own-read-back confirmation path (a)",
   );
   assert.ok(
-    /coordinator confirms back that a relayed .RELAY REQUIRED:. closing write landed/.test(outputLine),
-    "must name the coordinator-relay-confirmation path (b), tied to the RELAY REQUIRED: payload",
+    /in a no-MCP-path session, the coordinator confirmed the relayed write landed/.test(outputLine),
+    "must name the coordinator-relay-confirmation path (b)",
   );
   assert.ok(
-    /NEVER assert `Done\. Released <tag>\.` speculatively/.test(outputLine),
-    "must explicitly forbid speculative assertion from a session that could not verify the write",
+    /Never claim it speculatively/.test(outputLine),
+    "must explicitly forbid speculative assertion",
   );
   assert.ok(
-    outputLine.includes("does NOT claim Released"),
-    "must state that a no-MCP-path session ending on a RELAY REQUIRED: payload does not claim Released",
+    /ends its reply with that payload and claims nothing/.test(outputLine) && outputLine.includes("`RELAY REQUIRED:`"),
+    "a no-MCP-path session ending on a RELAY REQUIRED: payload must claim nothing",
   );
 });
 
@@ -1537,77 +1588,61 @@ test("E9A-S5 (regression guard): the pre-existing pinned template blocks survive
 // from git diff --stat, cited files exist, never written from memory of the brief, no invented
 // review or QA rounds. (E17, e17-release-record-integrity)
 
-test("E17-S1: content/skill-release-engineer.md carries the CRITICAL record-integrity Hard rule bullet", () => {
+test("E17-S1 [E394 re-pin AC-P6]: the SOP carries the Record-integrity Hard rule (diff-membership, on-disk existence, never from the brief, no fabricated review/QA round)", () => {
   const skill = readContentFile("skill-release-engineer.md");
-  const ruleMatch = skill.match(
-    /^-\s+\*\*CRITICAL — Record integrity: describe the diff, not the brief\*\*.*$/m,
-  );
-  assert.ok(ruleMatch, "must locate the CRITICAL record-integrity Hard rule bullet, byte-identifiable heading");
+  const ruleMatch = skill.match(/^-\s+\*\*Record integrity\*\*: describe the diff, not the brief\..*$/m);
+  assert.ok(ruleMatch, "must locate the Record integrity Hard rule bullet, byte-identifiable heading");
   const ruleLine = ruleMatch[0];
 
   assert.ok(
-    ruleLine.includes("MUST appear in the `git diff --stat` of the commit being described"),
-    "(i) must pin the git-diff-stat-derived file lists requirement",
+    ruleLine.includes("must be in the release diff (`PREV_TAG..HEAD` plus the stage)"),
+    "(i) must pin the diff-derived file lists requirement",
   );
   assert.ok(
-    ruleLine.includes("every referenced report/spec path MUST exist on disk at write time"),
-    "(ii) must pin the exists-on-disk-at-write-time requirement",
+    ruleLine.includes("exist on disk"),
+    "(ii) must pin the exists-on-disk requirement",
   );
   assert.ok(
-    ruleLine.includes("NEVER from memory of the dispatch brief"),
-    "(iii) must pin the never-from-memory-of-the-dispatch-brief prohibition",
+    ruleLine.includes("not from memory"),
+    "(iii) must pin the never-from-memory prohibition",
   );
   assert.ok(
-    ruleLine.includes("NEVER claim a code-review or QA round that has no on-disk report"),
+    ruleLine.includes("Never claim a code-review or QA round without its report under `review_reports/` or `qa_reports/`"),
     "(iv) must pin the no-fabricated-review/QA-rounds prohibition",
   );
   assert.ok(
-    ruleLine.includes("(E17)"),
-    "rule must carry the (E17) tag matching the surrounding Hard-rules block convention",
+    ruleLine.includes("`(context, not changed)`") && /exempts diff membership, never on-disk existence/.test(ruleLine),
+    "the context-citation exemption (E83) must stay scoped to diff membership only",
   );
 });
 
-test("E17-S2: the record-integrity Hard rule's incident-reason tail names the v3.83.0 fabrication and its a484a4d correction (source file; fencing is a recorded decision — N10)", () => {
+test("E17-S2 [E394 re-pin AC-P10]: the history keeps the record-integrity incident-reason tail naming the v3.83.0 fabrication and its a484a4d correction", () => {
   const skill = readContentFile("skill-release-engineer.md");
-  const ruleMatch = skill.match(
+  assert.ok(
+    skill.includes("`specs/release-sop-history.md`"),
+    "the SOP must point at the history file where the incident narrative now lives",
+  );
+  const hist = readReleaseHistory();
+  const ruleMatch = hist.match(
     /^-\s+\*\*CRITICAL — Record integrity: describe the diff, not the brief\*\*.*$/m,
   );
-  assert.ok(ruleMatch, "must locate the CRITICAL record-integrity Hard rule bullet, byte-identifiable heading");
-  const ruleLine = ruleMatch[0];
-  const ruleIdx = skill.indexOf(ruleLine);
-
-  // This rule's reason tail sits in a `<!-- rationale:start/end -->` fence, unlike its three
-  // sibling CRITICAL Hard rules, which keep theirs inline. build.ts strips rationale fences from
-  // dispatched prompts, so this checks the SOURCE FILE only and asserts the fence exists. That
-  // pins the asymmetry: updating this test means the asymmetry is being re-litigated on purpose.
-  const afterRule = skill.slice(ruleIdx + ruleLine.length);
+  assert.ok(ruleMatch, "history must keep the verbatim CRITICAL record-integrity bullet");
+  const afterRule = hist.slice(hist.indexOf(ruleMatch[0]) + ruleMatch[0].length);
   const fenceMatch = afterRule.match(/^\r?\n<!-- rationale:start -->([\s\S]*?)<!-- rationale:end -->/);
-  assert.ok(
-    fenceMatch,
-    "the E17 forensics tail must sit inside a rationale:start/end fence immediately after the rule bullet — if this fails because the tail is back inline, update this test deliberately (N10 asymmetry resolved), don't just re-point the match",
-  );
+  assert.ok(fenceMatch, "the E17 forensics tail must stay inside its rationale fence right after the bullet (N10 asymmetry, verbatim move)");
   const fenceBody = fenceMatch[1];
 
-  assert.ok(
-    fenceBody.includes("Reason (E17 forensics)"),
-    "must carry a Reason tail tagged E17 forensics, matching the D10/E9A precedent structure",
-  );
+  assert.ok(fenceBody.includes("Reason (E17 forensics)"), "must carry a Reason tail tagged E17 forensics");
   assert.ok(
     /v3\.83\.0 release commit message, CHANGELOG entry, and release notes all described a `tools\/handoff-orchestrator\.ts` change that does not exist/.test(fenceBody),
     "reason tail must name the v3.83.0 fabricated file-path incident",
   );
-  assert.ok(
-    fenceBody.includes("cited nonexistent spec/report paths"),
-    "reason tail must name the nonexistent-path incident",
-  );
+  assert.ok(fenceBody.includes("cited nonexistent spec/report paths"), "reason tail must name the nonexistent-path incident");
   assert.ok(
     fenceBody.includes("claimed a fabricated code-review round for E15"),
     "reason tail must name the fabricated-round incident",
   );
-  assert.ok(
-    fenceBody.includes("corrected post-release in commit a484a4d"),
-    "reason tail must name the a484a4d correction commit",
-  );
+  assert.ok(fenceBody.includes("corrected post-release in commit a484a4d"), "reason tail must name the a484a4d correction commit");
 });
 
 test("E17-S3: templates/claude-code-agents/release-engineer.md carries the matching record-integrity CRITICAL paragraph", () => {
@@ -1637,7 +1672,7 @@ test("E17-S3: templates/claude-code-agents/release-engineer.md carries the match
   );
 });
 
-test("E17-S4 (regression guard): the pre-existing pinned template blocks and skill Hard rules survive alongside the new E17 paragraph", () => {
+test("E17-S4 (regression guard) [E394 re-pin AC-P6]: the pre-existing pinned template blocks and skill Hard rules survive alongside the new E17 paragraph", () => {
   const tpl = fs.readFileSync(
     path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
     "utf-8",
@@ -1670,24 +1705,32 @@ test("E17-S4 (regression guard): the pre-existing pinned template blocks and ski
     "pre-existing driftBaselineIds paragraph must still be present",
   );
 
-  // Skill-side regression: the push-rejection and relay Hard rules and the
-  // SOP step 8 HEREDOC commit-message prose are byte-unchanged by the
-  // record-integrity bullet. (D10, E9A, E17)
+  // Skill-side regression [E394 re-pin AC-P6]: the push-rejection, relay and commit-message rules survive the
+  // rewrite alongside the record-integrity bullet. (D10, E9A, E17)
   const skill = readContentFile("skill-release-engineer.md");
   assert.ok(
-    skill.includes(
-      "**CRITICAL — STOP on push rejection / concurrent-release collision** (D10)",
-    ),
-    "pre-existing D10 Hard rule bullet must still be present, unmodified",
+    /Never force-push; tags are immutable/.test(skill) &&
+      /A push rejection, collision or any `RELEASE_STOP` is a Blocked write carrying the branch and local sha, never a recovery command/.test(skill),
+    "the D10 push-rejection rule (Blocked with branch + sha, never a recovery command) must still be present",
   );
   assert.ok(
-    skill.includes(
-      "**CRITICAL — No-MCP-path sessions MUST relay, never hand-edit** (E9A)",
-    ),
-    "pre-existing E9A Hard rule bullet must still be present, unmodified",
+    skill.includes("**No-MCP-path sessions relay**"),
+    "the E9A relay Hard rule must still be present",
   );
   assert.ok(
-    skill.includes('ALWAYS pass commit messages via `git commit -m "$(cat <<\'EOF\' ... EOF)"`'),
-    "pre-existing HEREDOC commit-message Hard rule must still be present, unmodified",
+    /exit 34 PUSH_REJECTED \| Blocked \| `<stop>` \+ branch, local sha/.test(skill),
+    "the PUSH_REJECTED escalation row (Blocked, branch + local sha) must still be present",
+  );
+  assert.ok(
+    /^11\. Commit message file, outside the repository root:/m.test(skill),
+    "the commit-message-by-file step (replaces the HEREDOC rule; no shell-quoted multi-line message) must still be present",
+  );
+  // The verbatim D10 / E9A / HEREDOC rule texts are preserved in the history.
+  const hist = readReleaseHistory();
+  assert.ok(hist.includes("**CRITICAL — STOP on push rejection / concurrent-release collision** (D10)"), "history must keep the D10 bullet verbatim");
+  assert.ok(hist.includes("**CRITICAL — No-MCP-path sessions MUST relay, never hand-edit** (E9A)"), "history must keep the E9A bullet verbatim");
+  assert.ok(
+    hist.includes('ALWAYS pass commit messages via `git commit -m "$(cat <<\'EOF\' ... EOF)"`'),
+    "history must keep the HEREDOC commit-message rule verbatim",
   );
 });
