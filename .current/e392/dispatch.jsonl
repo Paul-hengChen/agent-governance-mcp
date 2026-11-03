@@ -1,2 +1,4 @@
 {"ts":"2026-11-03T04:22:36.011Z","feature":"e392-subagent-templates","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-03T04:27:34.371Z","feature":"e392-subagent-templates","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-03T05:38:13.403Z","feature":"e392-subagent-templates","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-03T05:41:11.888Z","feature":"e392-subagent-templates","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
