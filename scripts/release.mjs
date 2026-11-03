@@ -74,8 +74,8 @@ export const ALLOWED = Object.freeze([
   rule("gh", "pr merge", true, "pr merge <n> --auto --merge", exact(/^\d+$/, "--auto", "--merge")),
   rule("gh", "release create", true, "release create vX.Y.Z", (a) => TAG.test(a[1] ?? "")),
   ...["scripts/check-version.mjs", "scripts/check-bookkeeping.mjs"].map((s) => rule("node", s, false, "no arguments", exact())),
-  rule("node", "scripts/verify-release.mjs", false, "--ci-check --strict | vX.Y.Z | --close-out",
-    either(exact("--ci-check", "--strict"), exact(TAG), exact("--close-out"))),
+  rule("node", "scripts/verify-release.mjs", false, "--ci-check --strict --sha <sha> | vX.Y.Z | --close-out",
+    either(exact("--ci-check", "--strict", "--sha", /^[0-9a-f]{40}([0-9a-f]{24})?$/), exact(TAG), exact("--close-out"))),
   rule("node", "bin/agc-init.mjs", false, "check", exact("check")),
 ]);
 
@@ -231,9 +231,11 @@ function requireBranch(ctx, allowed, want) {
   if (!allowed(branch, head)) throw new ReleaseStop("WRONG_BRANCH", `on ${branch} at ${head}, expected ${want}`);
   return { branch, head };
 }
-function viewPr(ctx, branch, step = "pre-3") {
-  const res = ctx.runner.read("gh", ["pr", "view", branch, "--json", "number,state,mergeable,mergeStateStatus,statusCheckRollup,mergeCommit,headRefOid"], { step });
-  if (res.status !== 0) return null;
+// `how` is "deferred" when the view observes this phase's own merge; null
+// then also means a dry-run, which never ran the view.
+function viewPr(ctx, branch, step = "pre-3", how = "read") {
+  const res = ctx.runner[how]("gh", ["pr", "view", branch, "--json", "number,state,mergeable,mergeStateStatus,statusCheckRollup,mergeCommit,headRefOid"], { step });
+  if (res === null || res.status !== 0) return null;
   try { return JSON.parse(res.stdout); } catch { throw new ReleaseStop("INTERNAL", `gh pr view ${branch} printed non-JSON output`); }
 }
 // Every path `git status` reports; entries are "XY path\0", and a rename
@@ -733,12 +735,161 @@ function step8aCommitPushPr(ctx) {
   ctx.okSuffix = ` — pull request #${number ?? "?"}`;
 }
 
-// Steps after the preconditions are not built yet; each phase stops as
-// INTERNAL there, so no run reports success for work it did not do.
+// ---- Publish (8b-9a): CI gate, merge, tag, GitHub release, self-check ----
+
+const FAILED_CONCLUSIONS = new Set(["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"]);
+// Why the pull request cannot merge as it stands, or null.
+function cannotMergeReason(pr) {
+  if (pr.state === "CLOSED") return `#${pr.number} is CLOSED`;
+  if (pr.mergeable === "CONFLICTING") return `#${pr.number} has merge conflicts`;
+  if (pr.mergeStateStatus === "BEHIND" || pr.mergeStateStatus === "DIRTY") return `#${pr.number} merge state is ${pr.mergeStateStatus}`;
+  const bad = [...new Set((pr.statusCheckRollup ?? []).map((c) => c?.conclusion).filter((c) => FAILED_CONCLUSIONS.has(c)))];
+  return bad.length > 0 ? `#${pr.number} has checks concluded ${bad.join(", ")}` : null;
+}
+export function classifyPr(pr) {
+  if (pr?.state === "MERGED") return "MERGED";
+  return !pr || cannotMergeReason(pr) !== null ? "CANNOT_MERGE" : "OPEN";
+}
+
+// The CHANGELOG entry body, then an Install section holding README's
+// first line that pins `#vX.Y.Z`.
+export function buildReleaseNotes({ changelogEntry, readmeText, version }) {
+  const body = String(changelogEntry ?? "").split("\n").slice(1).join("\n").trim();
+  const pinRe = new RegExp(`#${versionToken(version).source}`);
+  const pin = String(readmeText ?? "").split("\n").find((l) => pinRe.test(l));
+  if (!body) throw new ReleaseStop("INTERNAL", `CHANGELOG.md has no "## [${version}] - " entry body for the release notes`);
+  if (!pin) throw new ReleaseStop("INTERNAL", `README.md has no line pinning #v${version} for the release notes`);
+  return `${body}\n\n## Install\n\n\`\`\`\n${pin.trim()}\n\`\`\``;
+}
+
+// Same rule as verify-release.mjs's CI budget: unset, empty, or not a
+// number >= 0 falls back to the default.
+function envSeconds(env, name, fallback) {
+  const raw = env?.[name], n = raw === undefined || raw === "" ? NaN : Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+// Lines verify-release.mjs prints for a failed check, else its last line.
+function failLines(res) {
+  const fails = `${res.stderr}\n${res.stdout}`.split("\n").filter((l) => l.startsWith("FAIL:"));
+  return (fails.join("; ") || lastLine(res.stderr) || lastLine(res.stdout) || "no output").slice(0, 1000);
+}
+
+// The commit `tag` points at, locally and on origin; null where absent.
+function tagCommits(ctx, tag) {
+  const r = ctx.runner, step = "8b-1", ref = `refs/tags/${tag}`;
+  const local = gitOut(r, ["rev-parse", "-q", "--verify", `${ref}^{commit}`], step) || null;
+  const res = r.read("git", ["ls-remote", "--tags", "origin", ref, `${ref}^{}`], { step });
+  if (res.status !== 0) throw new ReleaseStop("INTERNAL", `git ls-remote --tags origin exited ${res.status} — cannot tell whether origin has ${tag}`);
+  const oids = new Map(res.stdout.split("\n").filter(Boolean).map((l) => l.split("\t").reverse()));
+  // An annotated tag lists its object and, under `^{}`, the commit it points at.
+  return { local, origin: oids.get(`${ref}^{}`) ?? oids.get(ref) ?? null };
+}
+
+// Tag and release title from the release commit subject; notes from the
+// checked-out CHANGELOG.md and README.md (the release commit's content).
+function releaseText(ctx, commit, step) {
+  if (ctx.release) return ctx.release;
+  const { root, opts } = ctx, v = opts.version, prefix = `chore(release): v${v} — `;
+  const subject = gitOut(ctx.runner, ["log", "-1", "--format=%s", commit], step);
+  if (!subject?.startsWith(prefix)) throw new ReleaseStop("INTERNAL", `${commit} is not the v${v} release commit (subject: ${subject ?? "unreadable"})`);
+  const read = (rel) => (existsSync(path.join(root, rel)) ? readFileSync(path.join(root, rel), "utf-8") : "");
+  const notes = buildReleaseNotes({ changelogEntry: extractChangelogEntry(read("CHANGELOG.md"), v), readmeText: read("README.md"), version: v });
+  return (ctx.release = { title: `v${v} — ${subject.slice(prefix.length)}`, notes });
+}
+
+// Polls until the pull request is MERGED; a dry-run records one poll and
+// carries a placeholder merge commit forward.
+async function waitMerged(ctx, rel, pr) {
+  const env = ctx.deps.env ?? process.env, sleep = ctx.deps.sleep ?? ((ms) => new Promise((done) => setTimeout(done, ms)));
+  const budget = envSeconds(env, "AGC_RELEASE_MERGE_WAIT_SECONDS", 900), poll = Math.max(1, envSeconds(env, "AGC_RELEASE_POLL_SECONDS", 15));
+  const deadline = Date.now() + budget * 1000;
+  for (;;) {
+    const seen = viewPr(ctx, rel, "8c-2", "deferred");
+    if (ctx.runner.dryRun) return { ...pr, state: "MERGED", mergeCommit: { oid: "<merge-commit>" } };
+    if (seen && classifyPr(seen) === "MERGED") return seen;
+    const why = seen && cannotMergeReason(seen);
+    if (why) throw new ReleaseStop("PR_CANNOT_MERGE", `${why} while waiting for the merge — never update the branch or merge with --admin`);
+    const left = deadline - Date.now();
+    if (left <= 0) throw new ReleaseStop("MERGE_WAIT_TIMEOUT", `#${pr.number} not merged within ${budget}s (AGC_RELEASE_MERGE_WAIT_SECONDS)${seen ? "" : "; the last gh pr view failed"} — re-run publish to keep waiting`);
+    ctx.out(`release: [8c-2] #${pr.number} not merged yet; polling again in ${Math.round(Math.min(poll * 1000, left) / 1000)}s\n`);
+    await sleep(Math.min(poll * 1000, left));
+  }
+}
+
+// Each mutation is skipped when a re-run finds it done: the merge (PR MERGED),
+// the tag (at the merge commit, locally or on origin), the release (gh release view).
+async function stepPublish(ctx) {
+  const { runner: r, opts } = ctx, tag = `v${opts.version}`, rel = `release/${tag}`;
+  let pr = ctx.pr;
+  const tags = tagCommits(ctx, tag);
+  const stray = [["locally", tags.local], ["on origin", tags.origin]]
+    .filter(([, oid]) => oid !== null && !(pr.state === "MERGED" && oid === pr.mergeCommit?.oid));
+  if (stray.length > 0) {
+    const want = pr.state === "MERGED" ? `merge commit ${pr.mergeCommit?.oid} of #${pr.number}` : `a merge commit (#${pr.number} is not merged)`;
+    throw new ReleaseStop("TAG_EXISTS", `${tag} exists ${stray.map(([where, oid]) => `${where} at ${oid}`).join(" and ")}, not at ${want} — never delete or move a tag`);
+  }
+  if (pr.state === "OPEN") {
+    // Title and notes are checked before anything irreversible happens.
+    releaseText(ctx, pr.headRefOid, "8b-2");
+    const ci = r.read("node", ["scripts/verify-release.mjs", "--ci-check", "--strict", "--sha", pr.headRefOid], { step: "8b-2" });
+    if (ci.status !== 0 || !ci.stdout.includes("CI-CHECK PASSED")) {
+      throw new ReleaseStop("CI_GATE_FAILED", `verify-release.mjs --ci-check --strict exited ${ci.status} for ${pr.headRefOid} — ${failLines(ci)}`);
+    }
+    const why = cannotMergeReason(pr);
+    if (why) throw new ReleaseStop("PR_CANNOT_MERGE", `${why} — never update the branch or merge with --admin`);
+    const merge = r.mutate("gh", ["pr", "merge", String(pr.number), "--auto", "--merge"], { step: "8c-1" });
+    if (merge.status !== 0) throw new ReleaseStop("PR_CANNOT_MERGE", failedAt(ctx, `gh pr merge ${pr.number} --auto --merge`, merge, "8c-1"));
+    pr = await waitMerged(ctx, rel, pr);
+  }
+  const oid = pr.mergeCommit?.oid;
+  if (!oid) throw new ReleaseStop("INTERNAL", `#${pr.number} is MERGED but gh reports no merge commit`);
+  const [onLocal, onOrigin] = [tags.local === oid, tags.origin === oid];
+
+  if (r.branch !== "main") {
+    const sw = r.mutate("git", ["switch", "main"], { step: "8c-3" });
+    if (sw.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git switch main", sw, "8c-3"));
+  }
+  const pull = r.mutate("git", ["-c", "pull.rebase=false", "pull", "--ff-only"], { step: "8c-3" });
+  if (pull.status !== 0) throw new ReleaseStop("MAIN_DIVERGED", failedAt(ctx, "git pull --ff-only", pull, "8c-3"));
+  // A tag already at the merge commit is never re-created, so main may have moved past it.
+  const head = onLocal || onOrigin ? null : r.deferred("git", ["rev-parse", "HEAD"], { step: "8c-3" });
+  if (head && head.stdout.trim() !== oid) {
+    throw new ReleaseStop("MAIN_DIVERGED", `main is at ${head.stdout.trim() || "<unknown>"} after pull --ff-only, not at merge commit ${oid} — never tag another commit`);
+  }
+  const { title, notes } = releaseText(ctx, pr.headRefOid, "8c-4");
+
+  if (onLocal || onOrigin) ctx.out(`release: [8c-4] tag skipped — ${tag} is already at ${oid}${onLocal ? "" : " on origin"}\n`);
+  else {
+    const res = r.mutate("git", ["tag", "-a", tag, "-m", title], { step: "8c-4" });
+    if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `git tag -a ${tag}`, res, "8c-4"));
+  }
+  if (onOrigin) ctx.out(`release: [8c-5] push skipped — origin already has ${tag} at ${oid}\n`);
+  else {
+    const res = r.mutate("git", ["push", "origin", tag], { step: "8c-5" });
+    if (res.status !== 0) throw new ReleaseStop("PUSH_REJECTED", failedAt(ctx, `git push origin ${tag}`, res, "8c-5"));
+  }
+  if (gitOut(r, ["rev-parse", "-q", "--verify", `refs/heads/${rel}`], "8c-6") !== null) {
+    const res = r.mutate("git", ["branch", "-d", rel], { step: "8c-6" });
+    if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `git branch -d ${rel}`, res, "8c-6"));
+  }
+
+  if (r.read("gh", ["release", "view", tag, "--json", "tagName"], { step: "9" }).status === 0) ctx.out(`release: [9] release skipped — ${tag} already has a GitHub release\n`);
+  else {
+    // --verify-tag: gh must never create the tag itself, at whatever commit it picks.
+    const res = r.mutate("gh", ["release", "create", tag, "--verify-tag", "--title", title, "--notes", notes], { step: "9" });
+    if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `gh release create ${tag}`, res, "9"));
+  }
+  const check = r.deferred("node", ["scripts/verify-release.mjs", tag], { step: "9a" });
+  if (check && check.status !== 0) throw new ReleaseStop("SELF_CHECK_FAILED", `verify-release.mjs ${tag} exited ${check.status} — ${failLines(check)}`);
+  ctx.okSuffix = ` — tag at ${oid}`;
+}
+
+// Close-out is not built yet; it stops as INTERNAL there, so no run
+// reports success for work it did not do.
 const notYet = (what) => () => { throw new ReleaseStop("INTERNAL", `${what} not implemented yet`); };
 const PHASES = {
   prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, step8aSpecs, step8aCommitPushPr],
-  publish: [preGh, prePublish, notYet("publish steps 8b-9a")],
+  publish: [preGh, prePublish, stepPublish],
   "close-out": [preGh, preCloseOut, notYet("close-out steps 13a-13b")],
 };
 
