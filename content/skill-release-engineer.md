@@ -33,7 +33,9 @@ MUST NOT author anything under `tools/`, `prompts/`, `schema/`, `guards/`, `gate
 ## SOP
 1. `tw_get_state` → `tw_detect_drift`. Tuple must be `(qa-engineer, PASS)`. Save the returned JSON to a file outside the repository root (the `--state` input; inside it → USAGE).
 2. Opening write: `tw_update_state(agent_id="release-engineer", status="In_Progress", active_feature=<unchanged>, pending_notes=["release-engineer: starting release for <active_feature>"])`.
-3. **Human decisions, one message, before anything runs**: (a) bump kind per the Hard rule; (b) the CHANGELOG entry content (`### Added` / `### Changed` / `### Notes` from the PASS `qa_review`); (c) dependency advisories: run `npm audit --audit-level=high`; each HIGH/CRITICAL finding must already have a disposition recorded in `docs/dependency-advisories.md` (Constitution §6 build-gate rule) — cite its row; inline rationale is never a waiver. A finding without one STOPs (row *advisory without disposition*).
+3. **Human decisions, one message, before anything runs**: (a) bump kind per the Hard rule; (b) the CHANGELOG entry content (`### Added` / `### Changed` / `### Notes` from the PASS `qa_review`); (c) **Dependency-audit disposition** (Constitution §6 build-gate rule): run `npm audit --audit-level=high` and look up each HIGH/CRITICAL finding in `docs/dependency-advisories.md`:
+   - **Already recorded** with a decision and no re-review trigger fired → cite that row in the release notes; inline rationale is never a waiver.
+   - **Not recorded, or recorded but its re-review trigger has since fired** → STOP (row *advisory without disposition*); the record is updated through pm, never by this role.
 4. Pre-flight CI: `node scripts/verify-release.mjs --ci-check` (lenient). A definite red STOPs; `gh` unavailable or no completed run warns and continues — the strict gate runs in `publish`.
 5. On `main`: `git fetch origin`, `git -c pull.rebase=false pull --ff-only`, then derive `X.Y.Z` from the version at HEAD plus the step 3 bump kind.
 6. `git switch -c release/vX.Y.Z`. A branch of that name existing locally or on origin STOPs; never reuse or delete it.
