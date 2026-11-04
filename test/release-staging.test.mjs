@@ -1051,8 +1051,8 @@ test("E53/E163: the Escalation Routes table is one row per exit class, in exit-c
   const exitRows = SOP_ROWS.filter((c) => /^exit \d+ /.test(c[0]));
   assert.deepEqual(
     exitRows.map((c) => c[0].match(/^exit (\d+) ([A-Z_]+)/).slice(1, 3).join(" ")),
-    REL.EXIT_CLASSES.map((c) => `${c.code} ${c.id}`),
-    "one row per exit class, ascending by code — a dropped, duplicated or reordered row fails",
+    REL.EXIT_CLASSES.filter((c) => c.phases.some((p) => ["prepare", "publish", "close-out"].includes(p))).map((c) => `${c.code} ${c.id}`),
+    "one row per manual-phase exit class (runner-only classes live in docs/release-cd.md, AC-R10 / AC-D3), ascending by code — a dropped, duplicated or reordered row fails",
   );
   const firstSituation = SOP_ROWS.findIndex((c) => !/^exit \d+ /.test(c[0]) && c[0] !== "situation" && !/^-+$/.test(c[0]));
   assert.ok(firstSituation > exitRows.length - 1, "situation rows follow the exit rows");
