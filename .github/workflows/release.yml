@@ -1,0 +1,170 @@
+# Release: runs scripts/release.mjs end to end on GitHub Actions, so a
+# release needs no agent session. A human dispatches it on main with the
+# bump kind, the ticket ids and the dry-run switch; the human decisions
+# (the qa PASS write, the CHANGELOG entry, the advisory rows, the backlog
+# pre-marks) are committed to main before the run.
+#
+# One job, one checkout: the opening write, the closing write and close-out
+# all touch the same .current/_primary/ files, so the bookkeeping pull
+# request carries the run's state writes.
+#
+# Tokens: every push, pull request, tag and merge authenticates as the
+# RELEASE_TOKEN secret (the checkout's persisted credential for git, GH_TOKEN
+# for gh), because pushes and pull requests made with the job token start no
+# required checks. The job token only files the failure issue.
+#
+# dry_run (default true) runs `start --dry-run` alone; every later release
+# step is skipped and no issue is filed. A failed real run files an issue
+# titled "Release failed: <CLASS_ID>" carrying the script's RELEASE_STOP line.
+#
+# Operator guide (trigger, inputs, secret, pre-trigger checklist, failure
+# handling, manual fallback): docs/release-cd.md.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump kind (major only by deliberate choice)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+        required: true
+      tickets:
+        description: "Backlog ids to done-mark, comma-separated without spaces (E1,E2), or none"
+        type: string
+        required: true
+      dry_run:
+        description: "Dry run: run start --dry-run only; nothing is written, pushed or filed"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      AGC_VERIFY_CI_WAIT_SECONDS: "900"
+      AGC_RELEASE_MERGE_WAIT_SECONDS: "900"
+      AGC_RELEASE_POLL_SECONDS: "15"
+      GIT_AUTHOR_NAME: "github-actions[bot]"
+      GIT_AUTHOR_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+      GIT_COMMITTER_NAME: "github-actions[bot]"
+      GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+
+    steps:
+      - name: Require main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "Release runs only from refs/heads/main; this run is on $REF." >&2
+            exit 1
+          fi
+
+      - name: Work directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          echo "RELEASE_DIR=$RUNNER_TEMP/release" >> "$GITHUB_ENV"
+          echo "AGC_RELEASE_STOP_FILE=$RUNNER_TEMP/release/stop-line.txt" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Start (dry run)
+        id: start-dry-run
+        if: ${{ inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          BUMP: ${{ inputs.bump }}
+          TICKETS: ${{ inputs.tickets }}
+        run: node scripts/release.mjs start --bump "$BUMP" --tickets "$TICKETS" --work-dir "$RELEASE_DIR" --dry-run
+
+      - name: Start
+        id: start
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          BUMP: ${{ inputs.bump }}
+          TICKETS: ${{ inputs.tickets }}
+        run: |
+          node scripts/release.mjs start --bump "$BUMP" --tickets "$TICKETS" --work-dir "$RELEASE_DIR"
+          echo "version=$(cat "$RELEASE_DIR/version")" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare
+        id: prepare
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TICKETS: ${{ inputs.tickets }}
+          VERSION: ${{ steps.start.outputs.version }}
+        run: node scripts/release.mjs prepare --version "$VERSION" --state "$RELEASE_DIR/state.md" --tickets "$TICKETS" --message-file "$RELEASE_DIR/message.txt"
+
+      - name: Publish
+        id: publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          VERSION: ${{ steps.start.outputs.version }}
+        run: node scripts/release.mjs publish --version "$VERSION"
+
+      - name: Record
+        id: record
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          VERSION: ${{ steps.start.outputs.version }}
+        run: node scripts/release.mjs record --version "$VERSION"
+
+      - name: Close out
+        id: close-out
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          VERSION: ${{ steps.start.outputs.version }}
+        run: node scripts/release.mjs close-out --version "$VERSION"
+
+      - name: File failure issue
+        if: ${{ failure() && !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BUMP: ${{ inputs.bump }}
+          TICKETS: ${{ inputs.tickets }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          PHASE: ${{ steps.start.outcome == 'failure' && 'start' || steps.prepare.outcome == 'failure' && 'prepare' || steps.publish.outcome == 'failure' && 'publish' || steps.record.outcome == 'failure' && 'record' || steps['close-out'].outcome == 'failure' && 'close-out' || 'setup' }}
+        run: |
+          stop="No RELEASE_STOP line was printed; read the run log."
+          class=NO_STOP_LINE
+          if [ -n "${AGC_RELEASE_STOP_FILE:-}" ] && [ -s "$AGC_RELEASE_STOP_FILE" ]; then
+            line="$(tail -n 1 "$AGC_RELEASE_STOP_FILE")"
+            case "$line" in
+              "RELEASE_STOP "*) id="${line#RELEASE_STOP }"; id="${id%%:*}"
+                case "$id" in ""|*[!A-Z_]*) ;; *) stop="$line"; class="$id" ;; esac ;;
+            esac
+          fi
+          printf '%s\nRun: %s\nInputs: bump=%s tickets=%s dry_run=%s\nPhase: %s\n' "$stop" "$RUN_URL" "$BUMP" "$TICKETS" "$DRY_RUN" "$PHASE" > "$RUNNER_TEMP/release-issue.md"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Release failed: $class" --body-file "$RUNNER_TEMP/release-issue.md"

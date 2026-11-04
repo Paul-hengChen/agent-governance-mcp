@@ -22,6 +22,7 @@ npm test        # 1633/1633 at v3.94.0
 - `dist/` is committed. `scripts/check-version.mjs` verifies `package.json` matches the `Server()` literal in `index.ts`.
 - `agc check` must exit 0 — it compares the `agc-version` stamps in `CLAUDE.md`, `AGENTS.md`, and `.antigravityrules` against the installed version. Bump the stamps in the same commit as a release.
 - `npm audit --audit-level=high` at the build gate — binds every role that runs a build, not only the release step (Constitution §6, generalized by E59). A HIGH/CRITICAL advisory blocks the build unless `docs/dependency-advisories.md` already carries a disposition for it — the only sanctioned way past a finding, never an inline PR-description waiver.
+- Releases run from GitHub Actions: see `docs/release-cd.md` (the release-engineer SOP is the manual fallback).
 - **Line-number citations**: cite by symbol/anchor (function name, heading, gate id) rather than by line number wherever prose merely points at a concept — line numbers drift as files change and a stale one misleads more than it helps. A line-number citation stays acceptable only where it is load-bearing for a reviewer verifying a specific claim (e.g. a forensics note pinning the exact line a bug lived on); re-verify it at the next review of that paragraph rather than trusting it indefinitely.
 
 ---

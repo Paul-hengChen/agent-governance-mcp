@@ -1,32 +1,42 @@
 #!/usr/bin/env node
-// Release mechanics in three phases (prepare, publish, close-out); `--help`.
+// Release mechanics in five phases: the manual prepare, publish and close-out,
+// and the runner-only start and record that a workflow adds around them; `--help`.
 // Each failure class has its own exit code and a last stderr line `RELEASE_STOP
 // <CLASS_ID>: <detail>`; `--dry-run` runs every read and only records mutations.
-// Contract: specs/e394-release-sop-rewrite-architecture.md.
+// Contracts: specs/e394-release-sop-rewrite-architecture.md, specs/e405-release-cd-architecture.md.
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, renameSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as path from "node:path";
 import * as os from "node:os";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PHASE_OF = { p: "prepare", u: "publish", c: "close-out" };
+const PHASE_OF = { s: "start", p: "prepare", u: "publish", r: "record", c: "close-out" };
 
 // Codes group by decade: 1-9 any phase, 10s preconditions, 20s prepare
-// bookkeeping, 30s prepare commit/push, 40s publish, 50s close-out.
+// bookkeeping, 30s prepare commit/push, 40s publish, 50s close-out, 60s runner
+// state and gates, 70s runner bump, build and checks. Phase letters are in run
+// order: s start, p prepare, u publish, r record, c close-out.
 export const EXIT_CLASSES = Object.freeze([
-  [1, "INTERNAL", "puc"], [2, "USAGE", "puc"], [10, "WRONG_BRANCH", "puc"], [11, "STALE_BASE", "p"],
-  [12, "VERSION_INCOHERENT", "p"], [13, "UNRELATED_CHANGES", "pc"], [14, "GH_UNAVAILABLE", "puc"],
-  [20, "EMPTY_BASELINE", "p"], [21, "DRIFT_BASELINE", "p"], [22, "DONE_MARK", "p"],
+  [1, "INTERNAL", "spurc"], [2, "USAGE", "spurc"], [10, "WRONG_BRANCH", "spurc"], [11, "STALE_BASE", "p"],
+  [12, "VERSION_INCOHERENT", "sp"], [13, "UNRELATED_CHANGES", "pc"], [14, "GH_UNAVAILABLE", "spuc"],
+  [20, "EMPTY_BASELINE", "p"], [21, "DRIFT_BASELINE", "p"], [22, "DONE_MARK", "sp"],
   [23, "BOOKKEEPING_CHECK", "p"], [24, "ADAPTER_STAMP", "p"], [30, "STAGING_INCOMPLETE", "p"],
   [31, "CHANGELOG_CITATION", "p"], [32, "SPEC_REQUIRE", "p"], [33, "SPEC_UNCLASSIFIABLE", "p"],
-  [34, "PUSH_REJECTED", "puc"], [35, "MUTATION_FAILED", "puc"], [40, "TAG_EXISTS", "u"],
+  [34, "PUSH_REJECTED", "puc"], [35, "MUTATION_FAILED", "spuc"], [40, "TAG_EXISTS", "u"],
   [41, "CI_GATE_FAILED", "u"], [42, "PR_CANNOT_MERGE", "uc"], [43, "MERGE_WAIT_TIMEOUT", "uc"],
-  [44, "MAIN_DIVERGED", "uc"], [45, "SELF_CHECK_FAILED", "u"], [50, "CLOSING_WRITE_ABSENT", "c"],
-  [51, "LANE_UNRESOLVED", "c"], [52, "EMPTY_STAGE", "c"], [53, "BRANCH_EXISTS", "c"],
+  [44, "MAIN_DIVERGED", "suc"], [45, "SELF_CHECK_FAILED", "u"], [50, "CLOSING_WRITE_ABSENT", "c"],
+  [51, "LANE_UNRESOLVED", "sc"], [52, "EMPTY_STAGE", "c"], [53, "BRANCH_EXISTS", "c"],
   [54, "CLOSE_OUT_NO_UPSTREAM", "c"], [55, "CLOSE_OUT_AHEAD", "c"], [56, "CLOSE_OUT_UNVERIFIED", "c"],
+  [60, "PRECONDITION_NOT_PASS", "s"], [61, "STATE_WRITE_REJECTED", "sr"], [62, "READBACK_MISMATCH", "r"],
+  [63, "PREFLIGHT_CI_RED", "s"], [64, "RELEASE_BRANCH_EXISTS", "s"], [70, "CHANGELOG_ENTRY_MISSING", "s"],
+  [71, "LOCKFILE_DRIFT", "s"], [72, "BUILD_FAILED", "s"], [73, "TEST_FAILED", "s"], [74, "AUDIT_FAILED", "s"],
+  [75, "ADVISORY_UNDISPOSED", "s"],
 ].map(([code, id, ph]) => Object.freeze({ code, id, phases: Object.freeze([...ph].map((k) => PHASE_OF[k])) })));
+// Phases only the workflow runs; a class whose phases all lie here has no SOP row.
+export const RUNNER_PHASES = Object.freeze(["start", "record"]);
 
 export class ReleaseStop extends Error {
   constructor(classId, detail) {
@@ -75,9 +85,15 @@ export const ALLOWED = Object.freeze([
   rule("gh", "pr merge", true, "pr merge <n> --auto --merge", exact(/^\d+$/, "--auto", "--merge")),
   rule("gh", "release create", true, "release create vX.Y.Z", (a) => TAG.test(a[1] ?? "")),
   ...["scripts/check-version.mjs", "scripts/check-bookkeeping.mjs"].map((s) => rule("node", s, false, "no arguments", exact())),
-  rule("node", "scripts/verify-release.mjs", false, "--ci-check --strict --sha <sha> | vX.Y.Z | --close-out",
-    either(exact("--ci-check", "--strict", "--sha", /^[0-9a-f]{40}([0-9a-f]{24})?$/), exact(TAG), exact("--close-out"))),
+  rule("node", "scripts/check-transitions-sync.mjs", false, "no arguments", exact()),
+  rule("node", "scripts/verify-release.mjs", false, "--ci-check [--strict --sha <sha>] | vX.Y.Z | --close-out",
+    either(exact("--ci-check"), exact("--ci-check", "--strict", "--sha", /^[0-9a-f]{40}([0-9a-f]{24})?$/), exact(TAG), exact("--close-out"))),
   rule("node", "bin/agc-init.mjs", false, "check", exact("check")),
+  rule("npm", "install", true, "install --package-lock-only", exact("--package-lock-only")),
+  // npm test and npx tsc write only dist/ and are always called deferred, so a dry-run never builds or tests.
+  rule("npm", "test", false, "test, no arguments; always deferred", exact()),
+  rule("npm", "audit", false, "audit --audit-level=high --json", exact("--audit-level=high", "--json")),
+  rule("npx", "tsc", false, "tsc, no arguments; always deferred", exact()),
 ]);
 
 const REFUSED_VERBS = new Set(["reset", "rebase", "clean", "checkout", "stash", "update-ref", "merge"]);
@@ -108,6 +124,18 @@ function assertAllowed(cmd, args, kind, branch) {
 const show = (args) => args.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(" ");
 const writer = (stream) => (s) => stream.write(s);
 
+// The env a child sees: the runner's env with the per-call overlay on top.
+// npm and npx children also lose the tokens and every AGC_* key, so a test
+// suite run here sees CI's env and cannot reach the workflow's stop-line file.
+const SCRUBBED = (k) => k === "GH_TOKEN" || k === "GITHUB_TOKEN" || k.startsWith("AGC_");
+function childEnv(base, overlay, cmd) {
+  const scrub = cmd === "npm" || cmd === "npx";
+  if (!overlay && !scrub) return base;
+  const env = { ...base, ...overlay };
+  if (scrub) for (const k of Object.keys(env)) if (SCRUBBED(k)) delete env[k];
+  return env;
+}
+
 // Every process call and file write goes through here: argv arrays only,
 // never a shell. Under dry-run mutations are recorded in `actions`, not run.
 export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, env = process.env, out, err } = {}) {
@@ -117,11 +145,11 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
     if (path.isAbsolute(rel) || r === "" || r.startsWith("..")) throw new ReleaseStop("INTERNAL", `runner refused a path outside the repository: ${rel}`);
     return abs;
   };
-  const exec = (cmd, args, step, kind) => {
+  const exec = (cmd, args, step, kind, overlay) => {
     runner.actions.push({ step, kind, cmd, args: [...args], executed: true });
     say(`release: [${step}] $ ${cmd} ${show(args)}\n`);
     const [bin, argv] = cmd === "node" ? [process.execPath, [path.join(root, args[0]), ...args.slice(1)]] : [cmd, args];
-    const res = spawn(bin, argv, { cwd: root, env, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 << 20 });
+    const res = spawn(bin, argv, { cwd: root, env: childEnv(env, overlay, cmd), encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 << 20 });
     const result = { status: res.status ?? -1, stdout: res.stdout ?? "", stderr: res.error ? String(res.error.message) : res.stderr ?? "" };
     if (result.stdout) say(result.stdout.replace(/\0/g, "\n").replace(/\n?$/, "\n"));
     if (result.stderr) warn(result.stderr.replace(/\n?$/, "\n"));
@@ -131,7 +159,8 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
   const fsAct = (op, step, rel, dest, run) => (record({ step, kind: "fs", op, path: rel, ...(dest ? { dest } : {}) }, op === "move" ? `mv ${rel} ${dest}` : `${op} ${rel}`), dryRun || run());
   const runner = {
     actions: [], branch: null, dryRun, root,
-    read(cmd, args, { step }) { assertAllowed(cmd, args, "read", runner.branch); return exec(cmd, args, step, "read"); },
+    // `env` is a per-call overlay on the runner's env (read and deferred only).
+    read(cmd, args, { step, env: overlay }) { assertAllowed(cmd, args, "read", runner.branch); return exec(cmd, args, step, "read", overlay); },
     mutate(cmd, args, { step }) {
       assertAllowed(cmd, args, "mutate", runner.branch);
       if (dryRun) record({ step, kind: "mutate", cmd, args: [...args] }, `${cmd} ${show(args)}`);
@@ -141,9 +170,16 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
     },
     // A read that observes an earlier mutation of the same phase: dry-run
     // records it and returns null, a real run returns the read's result.
-    deferred(cmd, args, { step }) {
+    deferred(cmd, args, { step, env: overlay }) {
       assertAllowed(cmd, args, "read", runner.branch);
-      return dryRun ? (record({ step, kind: "deferred", cmd, args: [...args] }, `${cmd} ${show(args)}`), null) : exec(cmd, args, step, "deferred");
+      return dryRun ? (record({ step, kind: "deferred", cmd, args: [...args] }, `${cmd} ${show(args)}`), null) : exec(cmd, args, step, "deferred", overlay);
+    },
+    // A governance state call (op "get" or "update"): dry-run records it and
+    // returns null without calling `fn`, so nothing is loaded or written.
+    async state(op, label, fn, { step }) {
+      runner.actions.push({ step, kind: "state", op, executed: !dryRun });
+      say(dryRun ? `release: DRY-RUN [${step}] ${label}\n` : `release: [${step}] $ ${label}\n`);
+      return dryRun ? null : fn();
     },
     writeFile(rel, content, { step }) { const abs = inside(rel); fsAct("write", step, rel, null, () => writeFileSync(abs, content)); },
     mkdir(rel, { step }) { const abs = inside(rel); fsAct("mkdir", step, rel, null, () => mkdirSync(abs, { recursive: true })); },
@@ -157,17 +193,29 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
 }
 
 const USAGE_TEXT = `Usage:
+  node scripts/release.mjs start     --bump <patch|minor|major> --tickets <E1[,E2…]|none> --work-dir <dir> [--dry-run]
   node scripts/release.mjs prepare   --version X.Y.Z --state <file> --tickets <E1[,E2…]|none> --message-file <file> [--dry-run]
   node scripts/release.mjs publish   --version X.Y.Z [--dry-run]
+  node scripts/release.mjs record    --version X.Y.Z [--dry-run]
   node scripts/release.mjs close-out --version X.Y.Z [--dry-run]
   node scripts/release.mjs --help
 `;
-const FLAGS = { prepare: ["--version", "--state", "--tickets", "--message-file"], publish: ["--version"], "close-out": ["--version"] };
+const FLAGS = {
+  start: ["--bump", "--tickets", "--work-dir"], prepare: ["--version", "--state", "--tickets", "--message-file"],
+  publish: ["--version"], record: ["--version"], "close-out": ["--version"],
+};
+const BUMPS = ["patch", "minor", "major"];
 const usage = (detail) => new ReleaseStop("USAGE", detail);
+// Backlog ids joined by commas, or none; undefined stays undefined.
+function parseTickets(raw) {
+  const tickets = raw === undefined || raw === "none" ? raw : raw.split(",");
+  if (Array.isArray(tickets) && !tickets.every((t) => /^[A-Z]+\d+[A-Za-z0-9]*$/.test(t))) throw usage(`--tickets must be backlog ids or none (got ${raw})`);
+  return tickets;
+}
 export function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) return { phase: "help" };
   const [phase, ...rest] = argv;
-  if (!Object.hasOwn(FLAGS, phase ?? "")) throw usage(`unknown or missing phase ${JSON.stringify(phase ?? null)} — expected prepare, publish or close-out`);
+  if (!Object.hasOwn(FLAGS, phase ?? "")) throw usage(`unknown or missing phase ${JSON.stringify(phase ?? null)} — expected start, prepare, publish, record or close-out`);
   const seen = {};
   let dryRun = false;
   for (let i = 0; i < rest.length; i++) {
@@ -178,13 +226,17 @@ export function parseArgs(argv) {
     if (value === undefined || value.startsWith("--")) throw usage(`${flag} requires a value`);
     seen[flag] = value;
   }
-  const missing = FLAGS[phase].find((f) => f !== "--tickets" && !Object.hasOwn(seen, f));
+  // `start` needs all three flags; `prepare` may omit --tickets.
+  const missing = FLAGS[phase].find((f) => (phase === "start" || f !== "--tickets") && !Object.hasOwn(seen, f));
   if (missing) throw usage(`${phase} requires ${missing}`);
+  if (phase === "start") {
+    if (!BUMPS.includes(seen["--bump"])) throw usage(`--bump must be patch, minor or major (got ${seen["--bump"]})`);
+    // The work directory is created and checked by the phase (pre-1), which knows the repository root.
+    return { phase, bump: seen["--bump"], tickets: parseTickets(seen["--tickets"]), workDir: seen["--work-dir"], dryRun };
+  }
   if (!SEMVER.test(seen["--version"])) throw usage(`--version must be X.Y.Z without a leading v (got ${seen["--version"]})`);
   if (phase !== "prepare") return { phase, version: seen["--version"], dryRun };
-  const raw = seen["--tickets"], tickets = raw === undefined || raw === "none" ? raw : raw.split(",");
-  if (Array.isArray(tickets) && !tickets.every((t) => /^[A-Z]+\d+[A-Za-z0-9]*$/.test(t))) throw usage(`--tickets must be backlog ids or none (got ${raw})`);
-  return { phase, version: seen["--version"], dryRun, statePath: seen["--state"], tickets, messageFile: seen["--message-file"] };
+  return { phase, version: seen["--version"], dryRun, statePath: seen["--state"], tickets: parseTickets(seen["--tickets"]), messageFile: seen["--message-file"] };
 }
 
 // A status path is expected when the release commit may stage it, or it
@@ -809,6 +861,16 @@ function failLines(res) {
   const fails = `${res.stderr}\n${res.stdout}`.split("\n").filter((l) => l.startsWith("FAIL:"));
   return (fails.join("; ") || lastLine(res.stderr) || lastLine(res.stdout) || "no output").slice(0, 1000);
 }
+// The verdict of one verify-release.mjs --ci-check call, from its exit and its
+// printed lines: a completed red run and a run not completed yet have their own
+// FAIL phrasing; any other failure (gh unanswered, unreadable output) is unverified.
+export function classifyCiState({ status, stdout, stderr } = {}) {
+  const fails = `${stderr ?? ""}\n${stdout ?? ""}`.split("\n").filter((l) => l.startsWith("FAIL:"));
+  if (status === 0 && String(stdout ?? "").includes("CI-CHECK PASSED")) return "passed";
+  if (fails.some((l) => l.includes(' concluded "'))) return "red";
+  if (fails.some((l) => l.includes("no completed CI run for "))) return "pending";
+  return "unverified";
+}
 
 // The commit `tag` points at, locally and on origin; null where absent.
 function tagCommits(ctx, tag) {
@@ -898,8 +960,14 @@ async function stepPublish(ctx) {
   if (pr.state === "OPEN") {
     // Title and notes are checked before anything irreversible happens.
     releaseText(ctx, pr.headRefOid, "8b-2");
-    const ci = r.read("node", ["scripts/verify-release.mjs", "--ci-check", "--strict", "--sha", pr.headRefOid], { step: "8b-2" });
-    if (ci.status !== 0 || !ci.stdout.includes("CI-CHECK PASSED")) {
+    // A dry-run polls once with no wait budget and reports the state; only a completed red run stops it.
+    const ci = r.read("node", ["scripts/verify-release.mjs", "--ci-check", "--strict", "--sha", pr.headRefOid],
+      { step: "8b-2", env: r.dryRun ? { AGC_VERIFY_CI_WAIT_SECONDS: "0" } : undefined });
+    const seen = r.dryRun ? classifyCiState(ci) : null;
+    if (seen !== null && seen !== "red") {
+      const text = seen === "passed" ? "passed" : seen === "pending" ? "not completed yet" : `unverified — ${failLines(ci)}`;
+      ctx.out(`release: DRY-RUN [8b-2] CI state of ${pr.headRefOid}: ${text} — not waited for under --dry-run\n`);
+    } else if (ci.status !== 0 || !ci.stdout.includes("CI-CHECK PASSED")) {
       throw new ReleaseStop("CI_GATE_FAILED", `verify-release.mjs --ci-check --strict exited ${ci.status} for ${pr.headRefOid} — ${failLines(ci)}`);
     }
     pr = await autoMerge(ctx, rel, pr, "8c-1", "8c-2");
@@ -974,8 +1042,8 @@ const CLOSE_OUT_REMEDY = {
   CLOSE_OUT_UNVERIFIED: "",
 };
 
-// The lane directory, as the compiled lane resolver names it.
-async function laneDir(ctx) {
+// The lane directory, as the compiled lane resolver names it; `step` labels the log line.
+async function laneDir(ctx, step = "13a-1") {
   const { root, deps } = ctx, load = deps.importLanePaths ?? (() => import(pathToFileURL(path.join(root, "dist/tools/lane-paths.js")).href));
   let lane;
   try { lane = (await load()).resolveCurrentLane(root); } catch (e) {
@@ -983,7 +1051,7 @@ async function laneDir(ctx) {
   }
   const dir = `.current/${lane}`, abs = path.join(root, dir);
   if (!safeSegment(lane) || !existsSync(abs) || !statSync(abs).isDirectory()) throw new ReleaseStop("LANE_UNRESOLVED", `lane ${JSON.stringify(lane)}: ${dir}/ does not exist`);
-  ctx.out(`release: [13a-1] lane ${lane}\n`);
+  ctx.out(`release: [${step}] lane ${lane}\n`);
   return dir;
 }
 
@@ -1069,10 +1137,394 @@ async function stepCloseOut(ctx) {
   ctx.okSuffix = " — CLOSE-OUT PASSED";
 }
 
+// ---- Start (pre-1..s2): work directory, branch, precondition, opening write ----
+
+// pre-1: the work directory holds the hand-offs to prepare and the workflow.
+// Like readInput it must lie outside the repository (realpath compare); the
+// nearest existing ancestor is checked first, so a refused path is never created.
+function preWorkDir(ctx) {
+  const { opts, root } = ctx, abs = path.resolve(opts.workDir), realRoot = realpathSync(root);
+  const outside = (real) => { const rel = path.relative(realRoot, real); return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel); };
+  let probe = abs;
+  while (!existsSync(probe)) probe = path.dirname(probe);
+  if (!outside(path.join(realpathSync(probe), path.relative(probe, abs)))) throw usage(`--work-dir ${opts.workDir} is inside the repository — keep it outside the repository root`);
+  try { mkdirSync(abs, { recursive: true }); } catch (e) { throw usage(`--work-dir ${opts.workDir} cannot be created: ${e.message}`); }
+  if (!statSync(abs).isDirectory() || !outside(realpathSync(abs))) throw usage(`--work-dir ${opts.workDir} is not a directory outside the repository root`);
+  ctx.workDir = abs;
+}
+// Work-directory files are plain fs writes, since the runner refuses paths
+// outside the root; they are made under --dry-run too, as nothing in the repository changes.
+function writeWorkFile(ctx, step, name, content) {
+  writeFileSync(path.join(ctx.workDir, name), content);
+  ctx.out(`release: [${step}] wrote ${path.join(ctx.opts.workDir, name)}\n`);
+}
+// pre-3: on main, tracking origin/main.
+function preStart(ctx) {
+  requireBranch(ctx, (b) => b === "main", "main");
+  const up = gitOut(ctx.runner, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], "pre-3");
+  if (up !== "origin/main") throw new ReleaseStop("WRONG_BRANCH", `main tracks ${up || "no upstream"}, expected origin/main`);
+}
+// s1: the release gate is the checkout's own lane handoff at (qa-engineer, PASS).
+// Nothing is written before that holds; then the handoff is copied byte for
+// byte to <work-dir>/state.md, which prepare reads as --state.
+async function stepPrecondition(ctx) {
+  const handoff = `${await laneDir(ctx, "s1")}/handoff.md`, abs = path.join(ctx.root, handoff);
+  const notPass = (why) => new ReleaseStop("PRECONDITION_NOT_PASS", `${handoff} ${why} — commit the release gate's (qa-engineer, PASS) write to main first`);
+  if (!existsSync(abs)) throw notPass("does not exist");
+  const bytes = readFileSync(abs);
+  let state;
+  try { state = await parseHandoffCopy(ctx, bytes.toString("utf-8")); } catch (e) {
+    if (e instanceof ReleaseStop) throw notPass(`cannot be parsed (${e.detail})`);
+    throw e;
+  }
+  if (state.last_agent !== "qa-engineer" || state.status !== "PASS") throw notPass(`is (${state.last_agent ?? "absent"}, ${state.status ?? "absent"}), expected (qa-engineer, PASS)`);
+  if (!safeSegment(state.active_feature)) throw notPass(`active_feature ${JSON.stringify(state.active_feature ?? null)} cannot name an archive directory`);
+  writeWorkFile(ctx, "s1", "state.md", bytes);
+  ctx.state = state;
+}
+
+// The compiled server, loaded once per process and never under --dry-run (a
+// real get may lazily migrate an old handoff and write it).
+async function loadOrchestrator(ctx) {
+  if (ctx.orchestrator) return ctx.orchestrator;
+  const { root, deps } = ctx, load = deps.importOrchestrator ?? (() => import(pathToFileURL(path.join(root, "dist/tools/handoff-orchestrator.js")).href));
+  const fail = (why) => new ReleaseStop("STATE_WRITE_REJECTED", `cannot load dist/tools/handoff-orchestrator.js (run npm run build) — ${why}`);
+  let mod;
+  try { mod = await load(); } catch (e) { throw fail(e?.message ?? e); }
+  if (typeof mod?.handleGetState !== "function" || typeof mod?.handleUpdateState !== "function") throw fail("handleGetState or handleUpdateState is not exported");
+  return (ctx.orchestrator = mod);
+}
+const stateLabel = (op, a) => (op === "get" ? "tw_get_state"
+  : `tw_update_state agent_id=${a.agent_id} status=${a.status} active_feature=${a.active_feature}${a.next_role ? ` next_role=${a.next_role}` : ""} pending_notes=${JSON.stringify(a.pending_notes)}`);
+// One state call through the runner. A throw or an isError result stops with
+// the server's first text line, which carries the gate code; a get returns the
+// parsed state, an update its text, a dry-run null.
+async function stateCall(ctx, op, args, step) {
+  const label = stateLabel(op, args), tool = label.split(" ")[0];
+  return ctx.runner.state(op, label, async () => {
+    const orch = await loadOrchestrator(ctx);
+    let res;
+    try { res = await (op === "get" ? orch.handleGetState(args) : orch.handleUpdateState(args)); } catch (e) {
+      throw new ReleaseStop("STATE_WRITE_REJECTED", `${tool} threw — ${e?.message ?? e}`);
+    }
+    const text = typeof res?.content?.[0]?.text === "string" ? res.content[0].text : "";
+    if (!res || res.isError) throw new ReleaseStop("STATE_WRITE_REJECTED", text.split("\n").map((l) => l.trim()).find(Boolean) ?? `${tool} failed with no message`);
+    if (op === "update") return text;
+    try { return JSON.parse(text); } catch { throw new ReleaseStop("STATE_WRITE_REJECTED", `${tool} returned non-JSON text`); }
+  }, { step });
+}
+// s2: the opening write (SOP step 2), before the first repository mutation; get
+// comes first in this process for the pre-flight guard and the freshness snapshot.
+async function stepOpeningWrite(ctx) {
+  const { root, state } = ctx, feature = state.active_feature;
+  await stateCall(ctx, "get", { workspace_path: root }, "s2");
+  await stateCall(ctx, "update", {
+    workspace_path: root, agent_id: "release-engineer", status: "In_Progress", active_feature: feature,
+    completed_tasks: [], pending_notes: [`release-engineer: starting release for ${feature}`],
+  }, "s2");
+}
+
+// ---- Start (s3-s7): CHANGELOG entry, pre-flight CI, version, release branch, bumps ----
+
+// patch → x.y.(z+1), minor → x.(y+1).0, major → (x+1).0.0.
+export function deriveVersion(current, bump) {
+  if (!SEMVER.test(String(current))) throw new ReleaseStop("VERSION_INCOHERENT", `package.json version ${JSON.stringify(current)} is not x.y.z`);
+  const [x, y, z] = current.split(".").map(Number);
+  if (bump === "patch") return `${x}.${y}.${z + 1}`;
+  if (bump === "minor") return `${x}.${y + 1}.0`;
+  if (bump === "major") return `${x + 1}.0.0`;
+  throw usage(`--bump must be patch, minor or major (got ${bump})`);
+}
+
+const incoherent = (detail) => new ReleaseStop("VERSION_INCOHERENT", detail);
+const jsonObject = (text) => { try { const o = JSON.parse(text); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch { return null; } };
+// The three version targets, each found exactly where it must be: the
+// package.json top-level version (nothing else in the object changes), the one
+// index.ts Server literal (the check-version.mjs pattern), and every README
+// `#v<old>` install pin as a whole token.
+export function bumpVersionFiles({ packageText, indexText, readmeText, oldVersion, newVersion }) {
+  const pkg = jsonObject(packageText), old = reEscape(oldVersion);
+  if (!pkg || typeof pkg.name !== "string") throw incoherent("package.json is not a JSON object with a name");
+  const nextPackage = String(packageText).replace(new RegExp(`("version"\\s*:\\s*")${old}"`), `$1${newVersion}"`);
+  if (!isDeepStrictEqual(jsonObject(nextPackage), { ...pkg, version: newVersion })) throw incoherent(`package.json: the first "version": "${oldVersion}" is not its top-level version`);
+  const literal = new RegExp(`(name:\\s*"${reEscape(pkg.name)}",\\s*version:\\s*")${old}"`, "g");
+  const hits = (String(indexText).match(literal) ?? []).length;
+  if (hits !== 1) throw incoherent(`index.ts has ${hits} Server literal(s) with name "${pkg.name}" and version "${oldVersion}", expected exactly one`);
+  const pin = new RegExp(`#v${old}(?!\\w|\\.\\d)`, "g");
+  if ((String(readmeText).match(pin) ?? []).length === 0) throw incoherent(`README.md has no #v${oldVersion} install pin`);
+  return {
+    packageText: nextPackage, indexText: String(indexText).replace(literal, `$1${newVersion}"`),
+    readmeText: String(readmeText).replace(pin, `#v${newVersion}`),
+  };
+}
+
+const UNRELEASED = "## [Unreleased]";
+// The lines under the exact `## [Unreleased]` line up to the next `## `
+// heading, with blank lines trimmed at both ends; null without the heading.
+function unreleasedSection(text) {
+  const lines = String(text ?? "").split("\n"), at = lines.indexOf(UNRELEASED);
+  if (at < 0) return null;
+  const next = lines.findIndex((l, i) => i > at && l.startsWith("## ")), end = next < 0 ? lines.length : next;
+  const blank = (l) => l.trim() === "";
+  let [a, b] = [at + 1, end];
+  while (a < b && blank(lines[a])) a++;
+  while (b > a && blank(lines[b - 1])) b--;
+  return { lines, at, end, body: lines.slice(a, b) };
+}
+export function unreleasedEntry(changelogText) {
+  const s = unreleasedSection(changelogText);
+  return s && s.body.length > 0 ? s.body.join("\n") : null;
+}
+const entryMissing = () => new ReleaseStop("CHANGELOG_ENTRY_MISSING", `CHANGELOG.md has no entry under "${UNRELEASED}" — commit the release's entry there first`);
+// The [Unreleased] entry becomes `## [X.Y.Z] - <date>` directly below an
+// emptied `## [Unreleased]`; the rest of the file is unchanged.
+export function moveUnreleased(changelogText, version, date) {
+  const s = unreleasedSection(changelogText);
+  if (!s || s.body.length === 0) throw entryMissing();
+  if (s.lines.some((l) => l.startsWith(`## [${version}] - `))) throw incoherent(`CHANGELOG.md already has a "## [${version}] - " heading`);
+  return [...s.lines.slice(0, s.at + 1), "", `## [${version}] - ${date}`, "", ...s.body, "", ...s.lines.slice(s.end)].join("\n");
+}
+
+// The HEAD lockfile with its root version and packages[""].version set to the
+// new version must equal the file npm wrote; else the first differing
+// top-level key. No lockfile at HEAD (`before` null) skips the check.
+export function checkLockfileParity({ before, after, oldVersion, newVersion }) {
+  if (before === null || before === undefined) return null;
+  const head = jsonObject(before), disk = jsonObject(after);
+  if (!head) return "package-lock.json at HEAD is not a JSON object";
+  if (!disk) return "package-lock.json is not a JSON object after npm install --package-lock-only";
+  const want = structuredClone(head);
+  want.version = newVersion;
+  if (want.packages?.[""] && typeof want.packages[""] === "object") want.packages[""].version = newVersion;
+  const key = [...new Set([...Object.keys(want), ...Object.keys(disk)])].find((k) => !isDeepStrictEqual(want[k], disk[k]));
+  return key === undefined ? null
+    : `npm install --package-lock-only (v${oldVersion} → v${newVersion}) changed package-lock.json "${key}" beyond the root version and packages[""].version`;
+}
+
+const readRepo = (ctx, rel) => { const abs = path.join(ctx.root, rel); return existsSync(abs) ? readFileSync(abs, "utf-8") : ""; };
+
+const PRE_MARK = "not yet released";
+const isTicketRow = (line, id) => line.startsWith(`| ${id} |`);
+// s3(b): each named row exists once, its desc cell starts **DONE and carries
+// the integrator's `not yet released` pre-mark, which s10 amends. At most one problem per id.
+export function checkPreMarks({ backlogText, tickets }) {
+  const lines = String(backlogText ?? "").split("\n");
+  return (Array.isArray(tickets) ? tickets : []).flatMap((id) => {
+    const rows = lines.filter((l) => isTicketRow(l, id));
+    if (rows.length !== 1) return [`${id} has ${rows.length} ticket rows in ${BACKLOG_REL}, expected exactly one`];
+    const desc = rowCells(rows[0])[1] ?? "";
+    if (!desc.startsWith("**DONE")) return [`${id} row desc does not start with **DONE`];
+    return desc.includes(PRE_MARK) ? [] : [`${id} row has no "${PRE_MARK}" pre-mark to amend`];
+  });
+}
+// s10: in each named row only, every `not yet released` becomes `shipped
+// vX.Y.Z`; the result must pass prepare's done-mark check over exactly those rows.
+export function applyDoneMarks({ backlogText, tickets, version }) {
+  const ids = Array.isArray(tickets) ? tickets : [], diffLines = [];
+  const text = String(backlogText ?? "").split("\n").map((l) => {
+    if (!ids.some((id) => isTicketRow(l, id))) return l;
+    const amended = l.split(PRE_MARK).join(`shipped v${version}`);
+    if (amended !== l) diffLines.push(`-${l}`, `+${amended}`);
+    return amended;
+  }).join("\n");
+  const problems = checkDoneMarks({ backlogText: text, diffLines, tickets, version });
+  if (problems.length > 0) throw new ReleaseStop("DONE_MARK", problems.join("; "));
+  return text;
+}
+
+const ADVISORIES_REL = "docs/dependency-advisories.md";
+const GHSA_RE = /GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}/i;
+// The HIGH/CRITICAL findings of `npm audit --json`, one per (pkg, id). A string
+// `via` entry points at another package's finding and is skipped.
+export function auditFindings(stdout) {
+  const report = jsonObject(stdout), vulns = report?.vulnerabilities;
+  if (!report || "error" in report || !vulns || typeof vulns !== "object" || Array.isArray(vulns)) {
+    throw new ReleaseStop("AUDIT_FAILED", `npm audit printed no usable report: ${String(stdout ?? "").trim().slice(0, 300) || "no output"}`);
+  }
+  const found = new Map();
+  for (const [name, v] of Object.entries(vulns)) {
+    for (const via of Array.isArray(v?.via) ? v.via : []) {
+      if (!via || typeof via !== "object" || !["high", "critical"].includes(via.severity)) continue;
+      const pkg = via.name ?? name, id = GHSA_RE.exec(String(via.url ?? ""))?.[0] ?? `npm-advisory-${via.source}`;
+      if (!found.has(`${pkg}\0${id}`)) found.set(`${pkg}\0${id}`, { pkg, id, severity: via.severity });
+    }
+  }
+  return [...found.values()];
+}
+// A finding is recorded when its id occurs as a whole token in the advisory record.
+export function classifyAdvisories({ findings, recordText }) {
+  const text = String(recordText ?? ""), recorded = [], undisposed = [];
+  for (const f of findings) (new RegExp(`(?<![\\w-])${reEscape(f.id)}(?![\\w-])`).test(text) ? recorded : undisposed).push(f);
+  return { recorded, undisposed };
+}
+// s3(c), s9: npm exits non-zero when it finds anything, so only the report decides.
+function stepAudit(ctx, step) {
+  const res = ctx.runner.read("npm", ["audit", "--audit-level=high", "--json"], { step });
+  let findings;
+  try { findings = auditFindings(res.stdout); } catch (e) {
+    const why = lastLine(res.stderr).slice(0, 300);
+    throw new ReleaseStop("AUDIT_FAILED", `npm audit --audit-level=high --json exited ${res.status} — ${e?.detail ?? e?.message ?? e}${why ? ` (stderr: ${why})` : ""}`);
+  }
+  const { recorded, undisposed } = classifyAdvisories({ findings, recordText: readRepo(ctx, ADVISORIES_REL) });
+  for (const f of recorded) ctx.out(`release: [${step}] advisory ${f.pkg} (${f.id}) recorded in ${ADVISORIES_REL}\n`);
+  if (undisposed.length > 0) throw new ReleaseStop("ADVISORY_UNDISPOSED", undisposed.map((f) => `npm audit flagged ${f.pkg} (${f.id}) with no disposition in ${ADVISORIES_REL}`).join("; "));
+}
+
+// s3: the human-owned artifacts are checked before any branch, bump or build
+// work, so a missing decision stops in seconds: (a) the CHANGELOG entry, (b)
+// the backlog pre-marks, (c) a disposition for every HIGH/CRITICAL advisory.
+function stepHumanArtifacts(ctx) {
+  if (unreleasedEntry(readRepo(ctx, "CHANGELOG.md")) === null) throw entryMissing();
+  const problems = checkPreMarks({ backlogText: readRepo(ctx, BACKLOG_REL), tickets: ctx.opts.tickets });
+  if (problems.length > 0) throw new ReleaseStop("DONE_MARK", `${problems.join("; ")} — pre-mark each named row "**DONE … ${PRE_MARK}" on main first`);
+  stepAudit(ctx, "s3");
+}
+// s4: lenient pre-flight CI for the checked-out head. A non-zero exit is a
+// definite red; WARN lines (gh unavailable, no completed run) continue. A
+// dry-run's child polls once and never waits.
+function stepPreflightCi(ctx) {
+  const env = ctx.runner.dryRun ? { AGC_VERIFY_CI_WAIT_SECONDS: "0" } : undefined;
+  const ci = ctx.runner.read("node", ["scripts/verify-release.mjs", "--ci-check"], { step: "s4", env });
+  if (ci.status !== 0) throw new ReleaseStop("PREFLIGHT_CI_RED", `verify-release.mjs --ci-check exited ${ci.status} — ${failLines(ci)}`);
+}
+// s5: main is brought up to date (recorded, not run, under --dry-run), then
+// the release version is derived from package.json and --bump.
+function stepVersion(ctx) {
+  const { runner: r, opts } = ctx;
+  const fetched = r.mutate("git", ["fetch", "origin"], { step: "s5" });
+  if (fetched.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git fetch origin", fetched, "s5"));
+  pullMain(ctx, "s5");
+  const pkg = jsonObject(readRepo(ctx, "package.json"));
+  if (!pkg) throw incoherent("package.json is not a JSON object");
+  opts.version = deriveVersion(pkg.version, opts.bump);
+  ctx.oldVersion = pkg.version;
+  ctx.out(`release: [s5] ${opts.bump} bump: v${pkg.version} → v${opts.version}\n`);
+}
+// s6: a release branch of that name, local or on origin, is never reused or deleted.
+function stepReleaseBranch(ctx) {
+  const r = ctx.runner, rel = `release/v${ctx.opts.version}`, ref = `refs/heads/${rel}`;
+  const local = gitOut(r, ["rev-parse", "-q", "--verify", ref], "s6");
+  const remote = r.read("git", ["ls-remote", "--heads", "origin", ref], { step: "s6" });
+  if (remote.status !== 0) throw new ReleaseStop("INTERNAL", `git ls-remote --heads origin exited ${remote.status} — cannot tell whether origin has ${rel}`);
+  const where = [local && "locally", remote.stdout.trim() && "on origin"].filter(Boolean);
+  if (where.length > 0) throw new ReleaseStop("RELEASE_BRANCH_EXISTS", `${rel} exists ${where.join(" and ")} — never reuse or delete it`);
+  const sw = r.mutate("git", ["switch", "-c", rel], { step: "s6" });
+  if (sw.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `git switch -c ${rel}`, sw, "s6"));
+}
+// s7: every bump is computed before the first write, so a stop leaves no file
+// half-bumped; then the lockfile is refreshed and may change only its two
+// version fields. A dry-run records the writes and the install and skips parity.
+function stepBumps(ctx) {
+  const { runner: r, opts, oldVersion } = ctx, v = opts.version, step = "s7";
+  const files = bumpVersionFiles({ packageText: readRepo(ctx, "package.json"), indexText: readRepo(ctx, "index.ts"), readmeText: readRepo(ctx, "README.md"), oldVersion, newVersion: v });
+  const changelog = moveUnreleased(readRepo(ctx, "CHANGELOG.md"), v, ctx.now().toISOString().slice(0, 10));
+  for (const [rel, text] of [["package.json", files.packageText], ["index.ts", files.indexText], ["README.md", files.readmeText], ["CHANGELOG.md", changelog]]) r.writeFile(rel, text, { step });
+  const install = r.mutate("npm", ["install", "--package-lock-only"], { step });
+  if (install.status !== 0) throw new ReleaseStop("MUTATION_FAILED", `npm install --package-lock-only exited ${install.status} — ${lastLine(install.stderr) || "no output"}`);
+  const head = r.deferred("git", ["show", "HEAD:package-lock.json"], { step });
+  if (head === null || head.status !== 0) return;
+  const drift = checkLockfileParity({ before: head.stdout, after: readRepo(ctx, "package-lock.json"), oldVersion, newVersion: v });
+  if (drift) throw new ReleaseStop("LOCKFILE_DRIFT", drift);
+}
+
+// ---- Start (s8-s11): build, test, done-mark, commit message ----
+
+// The first output line matching `re`, else the last line of stderr or stdout.
+const firstMatch = (res, re) => (`${res.stdout}\n${res.stderr}`.split("\n").map((l) => l.trim()).find((l) => re.test(l))
+  ?? (lastLine(res.stderr) || lastLine(res.stdout) || "no output")).slice(0, 500);
+// s8: SOP step 8 without npm run build, whose prebuild check needs the dist it
+// makes. All three are deferred: they observe the bumps, which a dry-run never made.
+function stepBuild(ctx) {
+  for (const [cmd, args, id] of [["npx", ["tsc"], "BUILD_FAILED"], ["node", ["scripts/check-version.mjs"], "VERSION_INCOHERENT"],
+    ["node", ["scripts/check-transitions-sync.mjs"], "BUILD_FAILED"]]) {
+    const res = ctx.runner.deferred(cmd, args, { step: "s8" });
+    if (res && res.status !== 0) throw new ReleaseStop(id, `${cmd} ${show(args)} exited ${res.status} — ${firstMatch(res, /error TS\d+/)}`);
+  }
+}
+// s9: the suite (deferred, as it observes the bumps), then the audit again with s3's rule.
+function stepTest(ctx) {
+  const res = ctx.runner.deferred("npm", ["test"], { step: "s9" });
+  if (res && res.status !== 0) {
+    const lines = res.stdout.split("\n").map((l) => l.trim());
+    const why = [lines.find((l) => /^(#|ℹ) fail \d+$/.test(l)), lines.find((l) => l.startsWith("not ok "))].filter(Boolean).join("; ");
+    throw new ReleaseStop("TEST_FAILED", `npm test exited ${res.status} — ${why || lastLine(res.stderr) || lastLine(res.stdout) || "no output"}`);
+  }
+  stepAudit(ctx, "s9");
+}
+// s10: the done-mark amends only the named pre-marked rows; --tickets none writes nothing.
+function stepDoneMark(ctx) {
+  const { opts } = ctx;
+  if (!Array.isArray(opts.tickets)) return;
+  const text = applyDoneMarks({ backlogText: readRepo(ctx, BACKLOG_REL), tickets: opts.tickets, version: opts.version });
+  ctx.runner.writeFile(BACKLOG_REL, text, { step: "s10" });
+}
+// <summary> is the active feature, followed by the ticket ids when there are
+// any; the same text later titles the tag and the GitHub release. No trailer.
+export function commitMessage({ version, oldVersion, bump, activeFeature, tickets }) {
+  const ids = Array.isArray(tickets) && tickets.length > 0 ? tickets.join(", ") : null;
+  return [`chore(release): v${version} — ${activeFeature}${ids ? ` (${ids})` : ""}`, "",
+    `Release gate: ${activeFeature} (qa-engineer PASS committed to main).`, `Tickets: ${ids ?? "none"}.`, `Bump: ${bump} from v${oldVersion}.`, ""].join("\n");
+}
+// s11: the message file prepare reads, then the version file, start's last write.
+function stepMessage(ctx) {
+  const { opts } = ctx, v = opts.version;
+  writeWorkFile(ctx, "s11", "message.txt", commitMessage({ version: v, oldVersion: ctx.oldVersion, bump: opts.bump, activeFeature: ctx.state.active_feature, tickets: opts.tickets }));
+  writeWorkFile(ctx, "s11", "version", `${v}\n`);
+  ctx.okSuffix = ` — release/v${v} bumped, built and tested`;
+}
+
+// ---- Record (pre-3, r14-1..r15): closing write and its read-back ----
+
+// The closing write's fields, compared with a tw_get_state read view field by
+// field; null when all four match, else one `<field>: wrote <a>, read <b>` per difference.
+export function readBackMismatch({ wrote, read }) {
+  const want = { last_agent: wrote?.agent_id, status: wrote?.status, next_role: wrote?.next_role, pending_notes: wrote?.pending_notes };
+  const diffs = Object.entries(want).filter(([k, v]) => !isDeepStrictEqual(v ?? null, read?.[k] ?? null))
+    .map(([k, v]) => `${k}: wrote ${JSON.stringify(v ?? null)}, read ${JSON.stringify(read?.[k] ?? null)}`);
+  return diffs.length > 0 ? diffs.join("; ") : null;
+}
+// pre-3: on main, where publish left the checkout.
+function preRecord(ctx) {
+  requireBranch(ctx, (b) => b === "main", "main");
+}
+// r14-1: the merge sha is the commit publish tagged, so record needs no hand-off.
+// A dry-run before publish has no tag yet and carries a placeholder.
+function stepMergeSha(ctx) {
+  const { runner: r, opts } = ctx, tag = `v${opts.version}`;
+  const sha = gitOut(r, ["rev-parse", "-q", "--verify", `refs/tags/${tag}^{commit}`], "r14-1") || null;
+  if (sha === null && !r.dryRun) throw usage(`record runs after publish: ${tag} has no tag`);
+  ctx.mergeSha = sha ?? "<merge-commit>";
+  ctx.out(`release: [r14-1] ${tag} is at ${ctx.mergeSha}\n`);
+}
+// r14: the closing write (SOP step 14), the feature-lease terminal marker; get
+// comes first in this process, and active_feature is carried over from it.
+async function stepClosingWrite(ctx) {
+  const { root, opts } = ctx, seen = await stateCall(ctx, "get", { workspace_path: root }, "r14");
+  const feature = seen === null ? "<unchanged>" : seen.active_feature;
+  if (typeof feature !== "string" || feature === "") throw new ReleaseStop("STATE_WRITE_REJECTED", "tw_get_state returned no active_feature to carry into the closing write");
+  ctx.closing = {
+    workspace_path: root, agent_id: "release-engineer", status: "In_Progress", active_feature: feature,
+    completed_tasks: [], next_role: "pm", pending_notes: [`Released v${opts.version}`, `tag: ${ctx.mergeSha}`],
+  };
+  await stateCall(ctx, "update", ctx.closing, "r14");
+}
+// r15: the read-back (SOP step 15); close-out runs only after a match.
+async function stepReadBack(ctx) {
+  const read = await stateCall(ctx, "get", { workspace_path: ctx.root }, "r15");
+  if (read === null) return;
+  const why = readBackMismatch({ wrote: ctx.closing, read });
+  if (why) throw new ReleaseStop("READBACK_MISMATCH", `${why} — the closing write did not land as written; do not run close-out`);
+  ctx.okSuffix = " — read-back matches the closing write";
+}
+
+// `prepare` stays the first key: tests read its step list from this literal's source.
 const PHASES = {
   prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, step8aSpecs, step8aCommitPushPr],
   publish: [preGh, prePublish, stepPublish],
   "close-out": [preGh, preCloseOut, stepCloseOut],
+  start: [preWorkDir, preGh, preStart, stepPrecondition, stepOpeningWrite, stepHumanArtifacts, stepPreflightCi, stepVersion, stepReleaseBranch,
+    stepBumps, stepBuild, stepTest, stepDoneMark, stepMessage],
+  record: [preRecord, stepMergeSha, stepClosingWrite, stepReadBack],
 };
 
 export async function main(argv, deps = {}) {
@@ -1080,7 +1532,7 @@ export async function main(argv, deps = {}) {
   try {
     const opts = parseArgs(argv);
     if (opts.phase === "help") { out(USAGE_TEXT); return 0; }
-    const root = deps.root ?? ROOT, ctx = { opts, root, deps, out, err };
+    const root = deps.root ?? ROOT, ctx = { opts, root, deps, out, err, now: deps.now ?? (() => new Date()) };
     ctx.runner = createRunner({ root, dryRun: opts.dryRun, spawn: deps.spawn, env: deps.env ?? process.env, out, err });
     for (const step of PHASES[opts.phase]) await step(ctx);
     const v = `v${opts.version}`;
@@ -1089,7 +1541,10 @@ export async function main(argv, deps = {}) {
   } catch (e) {
     const stop = e instanceof ReleaseStop ? e : new ReleaseStop("INTERNAL", e?.stack?.split("\n")[0] ?? String(e));
     if (stop.classId === "USAGE") err(USAGE_TEXT);
-    err(`RELEASE_STOP ${stop.classId}: ${stop.detail}\n`);
+    const line = `RELEASE_STOP ${stop.classId}: ${stop.detail}\n`, stopFile = (deps.env ?? process.env).AGC_RELEASE_STOP_FILE;
+    // The workflow reads the stop line from this file; a failed write never masks the stop.
+    if (stopFile) { try { writeFileSync(stopFile, line); } catch { /* the stderr line below still carries it */ } }
+    err(line);
     return stop.code;
   }
 }
