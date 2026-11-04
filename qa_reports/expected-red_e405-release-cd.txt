@@ -14,3 +14,8 @@ test/e394-release-script.test.mjs | AC-S2 one exit code per failure class
 # filter (phases include prepare, publish or close-out) in T-E405-11.
 test/release-staging.test.mjs | E53/E163: the Escalation Routes table is one row per exit class, in exit-code order, then the situation rows (pre-flight CI step 4, CI gate exit 41, empty baseline exit 20) (AC-P6)
 test/e394-release-sop.test.mjs | AC-P4 one row per exit code, valid next_role
+
+# AC-R11: ALLOWED gains the npm test shape (T-E405-04), so ["npm", ["test"]]
+# is no longer refused. qa moves it to the admitted list and adds the refused
+# npm ci / install x / publish / run build / npx eslint shapes in T-E405-10.
+test/e394-release-script.test.mjs | AC-S3 isAllowed admits the allow-list and refuses every absent verb

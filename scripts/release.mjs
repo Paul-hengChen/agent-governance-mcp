@@ -85,10 +85,15 @@ export const ALLOWED = Object.freeze([
   rule("gh", "pr merge", true, "pr merge <n> --auto --merge", exact(/^\d+$/, "--auto", "--merge")),
   rule("gh", "release create", true, "release create vX.Y.Z", (a) => TAG.test(a[1] ?? "")),
   ...["scripts/check-version.mjs", "scripts/check-bookkeeping.mjs"].map((s) => rule("node", s, false, "no arguments", exact())),
+  rule("node", "scripts/check-transitions-sync.mjs", false, "no arguments", exact()),
   rule("node", "scripts/verify-release.mjs", false, "--ci-check [--strict --sha <sha>] | vX.Y.Z | --close-out",
     either(exact("--ci-check"), exact("--ci-check", "--strict", "--sha", /^[0-9a-f]{40}([0-9a-f]{24})?$/), exact(TAG), exact("--close-out"))),
   rule("node", "bin/agc-init.mjs", false, "check", exact("check")),
   rule("npm", "install", true, "install --package-lock-only", exact("--package-lock-only")),
+  // npm test and npx tsc write only dist/ and are always called deferred, so a dry-run never builds or tests.
+  rule("npm", "test", false, "test, no arguments; always deferred", exact()),
+  rule("npm", "audit", false, "audit --audit-level=high --json", exact("--audit-level=high", "--json")),
+  rule("npx", "tsc", false, "tsc, no arguments; always deferred", exact()),
 ]);
 
 const REFUSED_VERBS = new Set(["reset", "rebase", "clean", "checkout", "stash", "update-ref", "merge"]);
@@ -1282,10 +1287,81 @@ export function checkLockfileParity({ before, after, oldVersion, newVersion }) {
 
 const readRepo = (ctx, rel) => { const abs = path.join(ctx.root, rel); return existsSync(abs) ? readFileSync(abs, "utf-8") : ""; };
 
+const PRE_MARK = "not yet released";
+const isTicketRow = (line, id) => line.startsWith(`| ${id} |`);
+// s3(b): each named row exists once, its desc cell starts **DONE and carries
+// the integrator's `not yet released` pre-mark, which s10 amends. At most one problem per id.
+export function checkPreMarks({ backlogText, tickets }) {
+  const lines = String(backlogText ?? "").split("\n");
+  return (Array.isArray(tickets) ? tickets : []).flatMap((id) => {
+    const rows = lines.filter((l) => isTicketRow(l, id));
+    if (rows.length !== 1) return [`${id} has ${rows.length} ticket rows in ${BACKLOG_REL}, expected exactly one`];
+    const desc = rowCells(rows[0])[1] ?? "";
+    if (!desc.startsWith("**DONE")) return [`${id} row desc does not start with **DONE`];
+    return desc.includes(PRE_MARK) ? [] : [`${id} row has no "${PRE_MARK}" pre-mark to amend`];
+  });
+}
+// s10: in each named row only, every `not yet released` becomes `shipped
+// vX.Y.Z`; the result must pass prepare's done-mark check over exactly those rows.
+export function applyDoneMarks({ backlogText, tickets, version }) {
+  const ids = Array.isArray(tickets) ? tickets : [], diffLines = [];
+  const text = String(backlogText ?? "").split("\n").map((l) => {
+    if (!ids.some((id) => isTicketRow(l, id))) return l;
+    const amended = l.split(PRE_MARK).join(`shipped v${version}`);
+    if (amended !== l) diffLines.push(`-${l}`, `+${amended}`);
+    return amended;
+  }).join("\n");
+  const problems = checkDoneMarks({ backlogText: text, diffLines, tickets, version });
+  if (problems.length > 0) throw new ReleaseStop("DONE_MARK", problems.join("; "));
+  return text;
+}
+
+const ADVISORIES_REL = "docs/dependency-advisories.md";
+const GHSA_RE = /GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}/i;
+// The HIGH/CRITICAL findings of `npm audit --json`, one per (pkg, id). A string
+// `via` entry points at another package's finding and is skipped.
+export function auditFindings(stdout) {
+  const report = jsonObject(stdout), vulns = report?.vulnerabilities;
+  if (!report || "error" in report || !vulns || typeof vulns !== "object" || Array.isArray(vulns)) {
+    throw new ReleaseStop("AUDIT_FAILED", `npm audit printed no usable report: ${String(stdout ?? "").trim().slice(0, 300) || "no output"}`);
+  }
+  const found = new Map();
+  for (const [name, v] of Object.entries(vulns)) {
+    for (const via of Array.isArray(v?.via) ? v.via : []) {
+      if (!via || typeof via !== "object" || !["high", "critical"].includes(via.severity)) continue;
+      const pkg = via.name ?? name, id = GHSA_RE.exec(String(via.url ?? ""))?.[0] ?? `npm-advisory-${via.source}`;
+      if (!found.has(`${pkg}\0${id}`)) found.set(`${pkg}\0${id}`, { pkg, id, severity: via.severity });
+    }
+  }
+  return [...found.values()];
+}
+// A finding is recorded when its id occurs as a whole token in the advisory record.
+export function classifyAdvisories({ findings, recordText }) {
+  const text = String(recordText ?? ""), recorded = [], undisposed = [];
+  for (const f of findings) (new RegExp(`(?<![\\w-])${reEscape(f.id)}(?![\\w-])`).test(text) ? recorded : undisposed).push(f);
+  return { recorded, undisposed };
+}
+// s3(c), s9: npm exits non-zero when it finds anything, so only the report decides.
+function stepAudit(ctx, step) {
+  const res = ctx.runner.read("npm", ["audit", "--audit-level=high", "--json"], { step });
+  let findings;
+  try { findings = auditFindings(res.stdout); } catch (e) {
+    const why = lastLine(res.stderr).slice(0, 300);
+    throw new ReleaseStop("AUDIT_FAILED", `npm audit --audit-level=high --json exited ${res.status} — ${e?.detail ?? e?.message ?? e}${why ? ` (stderr: ${why})` : ""}`);
+  }
+  const { recorded, undisposed } = classifyAdvisories({ findings, recordText: readRepo(ctx, ADVISORIES_REL) });
+  for (const f of recorded) ctx.out(`release: [${step}] advisory ${f.pkg} (${f.id}) recorded in ${ADVISORIES_REL}\n`);
+  if (undisposed.length > 0) throw new ReleaseStop("ADVISORY_UNDISPOSED", undisposed.map((f) => `npm audit flagged ${f.pkg} (${f.id}) with no disposition in ${ADVISORIES_REL}`).join("; "));
+}
+
 // s3: the human-owned artifacts are checked before any branch, bump or build
-// work, so a missing decision stops in seconds. (a) the CHANGELOG entry.
+// work, so a missing decision stops in seconds: (a) the CHANGELOG entry, (b)
+// the backlog pre-marks, (c) a disposition for every HIGH/CRITICAL advisory.
 function stepHumanArtifacts(ctx) {
   if (unreleasedEntry(readRepo(ctx, "CHANGELOG.md")) === null) throw entryMissing();
+  const problems = checkPreMarks({ backlogText: readRepo(ctx, BACKLOG_REL), tickets: ctx.opts.tickets });
+  if (problems.length > 0) throw new ReleaseStop("DONE_MARK", `${problems.join("; ")} — pre-mark each named row "**DONE … ${PRE_MARK}" on main first`);
+  stepAudit(ctx, "s3");
 }
 // s4: lenient pre-flight CI for the checked-out head. A non-zero exit is a
 // definite red; WARN lines (gh unavailable, no completed run) continue. A
@@ -1335,6 +1411,52 @@ function stepBumps(ctx) {
   if (drift) throw new ReleaseStop("LOCKFILE_DRIFT", drift);
 }
 
+// ---- Start (s8-s11): build, test, done-mark, commit message ----
+
+// The first output line matching `re`, else the last line of stderr or stdout.
+const firstMatch = (res, re) => (`${res.stdout}\n${res.stderr}`.split("\n").map((l) => l.trim()).find((l) => re.test(l))
+  ?? (lastLine(res.stderr) || lastLine(res.stdout) || "no output")).slice(0, 500);
+// s8: SOP step 8 without npm run build, whose prebuild check needs the dist it
+// makes. All three are deferred: they observe the bumps, which a dry-run never made.
+function stepBuild(ctx) {
+  for (const [cmd, args, id] of [["npx", ["tsc"], "BUILD_FAILED"], ["node", ["scripts/check-version.mjs"], "VERSION_INCOHERENT"],
+    ["node", ["scripts/check-transitions-sync.mjs"], "BUILD_FAILED"]]) {
+    const res = ctx.runner.deferred(cmd, args, { step: "s8" });
+    if (res && res.status !== 0) throw new ReleaseStop(id, `${cmd} ${show(args)} exited ${res.status} — ${firstMatch(res, /error TS\d+/)}`);
+  }
+}
+// s9: the suite (deferred, as it observes the bumps), then the audit again with s3's rule.
+function stepTest(ctx) {
+  const res = ctx.runner.deferred("npm", ["test"], { step: "s9" });
+  if (res && res.status !== 0) {
+    const lines = res.stdout.split("\n").map((l) => l.trim());
+    const why = [lines.find((l) => /^(#|ℹ) fail \d+$/.test(l)), lines.find((l) => l.startsWith("not ok "))].filter(Boolean).join("; ");
+    throw new ReleaseStop("TEST_FAILED", `npm test exited ${res.status} — ${why || lastLine(res.stderr) || lastLine(res.stdout) || "no output"}`);
+  }
+  stepAudit(ctx, "s9");
+}
+// s10: the done-mark amends only the named pre-marked rows; --tickets none writes nothing.
+function stepDoneMark(ctx) {
+  const { opts } = ctx;
+  if (!Array.isArray(opts.tickets)) return;
+  const text = applyDoneMarks({ backlogText: readRepo(ctx, BACKLOG_REL), tickets: opts.tickets, version: opts.version });
+  ctx.runner.writeFile(BACKLOG_REL, text, { step: "s10" });
+}
+// <summary> is the active feature, followed by the ticket ids when there are
+// any; the same text later titles the tag and the GitHub release. No trailer.
+export function commitMessage({ version, oldVersion, bump, activeFeature, tickets }) {
+  const ids = Array.isArray(tickets) && tickets.length > 0 ? tickets.join(", ") : null;
+  return [`chore(release): v${version} — ${activeFeature}${ids ? ` (${ids})` : ""}`, "",
+    `Release gate: ${activeFeature} (qa-engineer PASS committed to main).`, `Tickets: ${ids ?? "none"}.`, `Bump: ${bump} from v${oldVersion}.`, ""].join("\n");
+}
+// s11: the message file prepare reads, then the version file, start's last write.
+function stepMessage(ctx) {
+  const { opts } = ctx, v = opts.version;
+  writeWorkFile(ctx, "s11", "message.txt", commitMessage({ version: v, oldVersion: ctx.oldVersion, bump: opts.bump, activeFeature: ctx.state.active_feature, tickets: opts.tickets }));
+  writeWorkFile(ctx, "s11", "version", `${v}\n`);
+  ctx.okSuffix = ` — release/v${v} bumped, built and tested`;
+}
+
 // Steps not built yet stop INTERNAL; later tasks replace each one.
 const notImplemented = (step) => () => { throw new ReleaseStop("INTERNAL", `not implemented: ${step}`); };
 
@@ -1344,7 +1466,7 @@ const PHASES = {
   publish: [preGh, prePublish, stepPublish],
   "close-out": [preGh, preCloseOut, stepCloseOut],
   start: [preWorkDir, preGh, preStart, stepPrecondition, stepOpeningWrite, stepHumanArtifacts, stepPreflightCi, stepVersion, stepReleaseBranch,
-    stepBumps, ...["s8", "s9", "s10", "s11"].map(notImplemented)],
+    stepBumps, stepBuild, stepTest, stepDoneMark, stepMessage],
   record: ["pre-3", "r14-1", "r14", "r15"].map(notImplemented),
 };
 
