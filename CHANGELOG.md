@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.19.1] - 2026-11-04
+
 PATCH release. It ships wave prompt-audit-w4 since v4.19.0, landed on `main` by one wave pull
 request: lane `e403` (E403 + E407) and lane `e395` (E395 + E404). Plan
 `specs/fanout-prompt-audit-w4.md`, release gate `specs/release-cd-v4.19.1.md`, lane specs
