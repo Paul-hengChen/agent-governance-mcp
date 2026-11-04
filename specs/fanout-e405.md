@@ -2,7 +2,7 @@
 base: f0caa45    integration branch: integ/e405
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（Stage 2，2026-11-04），待派工。** 派工 base 為本清單 PR 的 merge sha（派工時記入 Decisions）。
+**狀態：已結案 2026-11-04。** lane e405 已合併（`integ/e405` ← e405 `fdc8e59` merge `75e5070`，零衝突）、finish、拆除；派工 base `18ffbc0`（本清單的 PR #72 merge）。
 
 範圍由人類指定（coordinator 提案「下一張票：E405」，人類回「開 E405」）：E405（P2，佇列 #214，人類 2026-11-03 裁決「release SOP 要做成 CD，排在 E394 之後」）。E394 已於 v4.18.0 出貨（`scripts/release.mjs` 第一次真實執行成功），前置條件清除。單 lane、full chain（pm → architect → sr-engineer → code-reviewer → qa-engineer）：workflow 與腳本之間的契約（input、secret、runner 內的狀態寫入、失敗→issue）需要 architect。本波不改任何 gate 程式、routing 表、schema、錯誤碼、`tools/**`、`prompts/**`、`dist/**`。
 
@@ -50,7 +50,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 ## Lanes
 | lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |
 |---|---|---|---|---|---|---|---|
-| e405 | E405＋E401 | feat/e405-release-cd | ../agent-governance-mcp-lanes/e405 | `.github/workflows/release.yml`（新）、`scripts/release.mjs`（runner 模式、步驟 2／5–11／14–15 的自動化、E401 dry-run 不等 CI、失敗→issue 所需的輸出）、`docs/release-cd.md`（新：觸發方式、input、secret 名與權限、觸發前檢查清單、失敗 issue、手動 fallback）、`content/skill-release-engineer.md`（只限：指向 `docs/release-cd.md` 的一行、E401 的 dry-run 句；不整檔重寫、≤ 15,000 B 不變）、`CONTRIBUTING.md`（只限 Dev workflow 一行指標，可不動）、`specs/e405-*.md`、`test/e405-*.test.mjs`（新，qa 定名）、`test/e394-release-script.test.mjs`、`test/e394-release-sop.test.mjs`、`.current/e405/**`、`qa_reports/`、`review_reports/` | 共同禁止全部，特別是 `.github/workflows/ci.yml`、`scripts/verify-release.mjs`／`check-version.mjs`／`check-bookkeeping.mjs`（E401 在 `release.mjs` 端解：dry-run 時不呼叫嚴格 gate 或把等待秒數設 0）、`tools/**`（E402 的內容層 parser export 不在本波）、`dist/**`（不改 `.ts` 就不該有差異） | 做：workflow 檔、腳本的 runner 模式與步驟自動化、文件、測試、SOP 點名行。不做：建 secret、跑真實 workflow、第一次真實發版（整合後、人類）、E402、E406、E404 | 無 |
+| e405 | E405＋E401 | feat/e405-release-cd | ../agent-governance-mcp-lanes/e405 | `.github/workflows/release.yml`（新）、`scripts/release.mjs`（runner 模式、步驟 2／5–11／14–15 的自動化、E401 dry-run 不等 CI、失敗→issue 所需的輸出）、`docs/release-cd.md`（新：觸發方式、input、secret 名與權限、觸發前檢查清單、失敗 issue、手動 fallback）、`content/skill-release-engineer.md`（只限：指向 `docs/release-cd.md` 的一行、E401 的 dry-run 句；不整檔重寫、≤ 15,000 B 不變）、`CONTRIBUTING.md`（只限 Dev workflow 一行指標，可不動）、`specs/e405-*.md`、`test/e405-*.test.mjs`（新，qa 定名）、`test/e394-release-script.test.mjs`、`test/e394-release-sop.test.mjs`、`test/release-staging.test.mjs`（只限 AC-P6「E53/E163: one row per exit class」一個斷言，重釘為 phases 含 prepare／publish／close-out 的列；架構預審重劃，整合者 2026-11-04）、`.current/e405/**`、`qa_reports/`、`review_reports/` | 共同禁止全部，特別是 `.github/workflows/ci.yml`、`scripts/verify-release.mjs`／`check-version.mjs`／`check-bookkeeping.mjs`（E401 在 `release.mjs` 端解：dry-run 時不呼叫嚴格 gate 或把等待秒數設 0）、`tools/**`（E402 的內容層 parser export 不在本波）、`dist/**`（不改 `.ts` 就不該有差異） | 做：workflow 檔、腳本的 runner 模式與步驟自動化、文件、測試、SOP 點名行。不做：建 secret、跑真實 workflow、第一次真實發版（整合後、人類）、E402、E406、E404 | 無 |
 
 ## 所有權重劃（相對於預設）
 - **`.github/**` 從共同禁止移出，劃給 e405，只限新檔 `release.yml`**：`ci.yml` 仍禁止（`test/e298-finish-remote-delete.test.mjs` 釘住它的 push 觸發；CD 不需要改 CI）。
@@ -58,6 +58,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 - **`content/skill-release-engineer.md` 劃給 e405，只限點名行與 dry-run 句**：它不在任何 golden、不在 budget 測試（e392-e394 波已查明），所以 addendum §2 的「`content/**` 共享生成物」對它不成立；整檔仍 ≤ 15,000 B（`test/e394-release-sop.test.mjs` 釘住）。
 - **`docs/` 新檔 `release-cd.md` 歸 e405**；其他 `docs/*` 禁止。
 - **`package.json` 不劃給 lane**：`release` npm script 別名若要，開整合後接線票。
+- **`test/release-staging.test.mjs` 一個斷言劃給 e405（架構預審重劃，整合者 2026-11-04）**：該檔約第 1050 行的 AC-P6 斷言把 SOP 的 exit 列釘成等於全部 `EXIT_CLASSES`；runner-only class 一加就紅，而 C2 規定 SOP 不加列。qa 在 T-E405-11 把它重釘成與 `test/e394-release-sop.test.mjs` AC-P4 相同的過濾（phases 含 prepare／publish／close-out 的列）；該檔其他斷言不碰。拒絕的備案（`RUNNER_EXIT_CLASSES` 第二張表）會讓 exit 表永久分裂，不採。本重劃在 primary 的清單上，隨 wave 記帳 commit 落地；lane 跑 `check --cut`／`check` 時以 primary 的清單為準。
 
 ## 完成定義 → 票
 | 完成定義條目 | 由哪張票讓它成立 | 同一波？ |
@@ -92,6 +93,13 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 4. 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge`。
 5. merged 之後 `git switch main`、`git -c pull.rebase=false pull --ff-only`，再 `git branch -d integ/e405`。
 
+## 結案
+- 日期 2026-11-04。`integ/e405` 自 `main` `18ffbc0` 開；← `--no-ff` e405 `fdc8e59`（merge `75e5070`，零衝突，無實質合併解決 → 無合併審查）；merge-invariants PASS（741 task id、0 lost [x]、132 sidecar）；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；`check:bookkeeping` OK；整合層 CI 見 Decisions。`finish e405 --shipped --base integ/e405` 一次成功（commit `ff07bf8`）：`.current/e405/` → `.current/history/2026-11/e405/`，worktree、信箱、本地與遠端 lane branch 都已移除；無 pending-ticket → 無配號。
+- 彙總（上限按 lane 計）：e405 12 task／hop 5/14／review 0 輪退回／qa 0 輪；證據與 `completed_tasks` 一致；lane 回報全套 4003/4005（2 skipped）。`lane-status.mjs --rollup` 在 finish 之後只讀活 lane，數字取自 lane 層驗證。
+- 完成定義：表中「同一波 ✓」的列全部成立；三項整合後／人類：建立 `RELEASE_TOKEN` secret、第一次真實執行 v4.19.0（裁定 6）、E405 與 E401 的發版 done-mark 由該次 release 改成 `shipped`。
+- 記帳：`docs/backlog.md` E405、E401 done-mark（not yet released）；佇列 #214、#217 DONE。接線票：無（code review 4 個 optional 為 log 雜訊與文件措辭，不開票）。
+- 給 v4.19.0 的 CHANGELOG 提示：新 workflow `Release`（`workflow_dispatch`：`bump`、`tickets`、`dry_run`）、`scripts/release.mjs` 新 phase `start`／`record` 與 42 列 exit 表、`docs/release-cd.md`；手動 SOP 仍可用；lane 回報 (c)：三個 commit 的 Co-Authored-By 模型名與實際執行模型不一致，§6 禁止 amend，留紀錄。
+
 ## Dispatch pins
 - e405：`pm=opus`、`architect=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
 
@@ -101,3 +109,10 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-03 | 人類 | release SOP 要做成 CD（雲端跑、不耗 agent token）；開接線票排在 E394 之後。人類：「好，現在記進清單，排在 E394 之後」→ E405（佇列 #214） | `specs/fanout-e392-e394.md` Decisions；`docs/backlog.md` E405 列 |
 | 2026-11-04 | 整合者 | 草案：單 lane e405、full chain（architect 替 workflow↔腳本契約）；E401 併入；`.github/**` 只開 `release.yml`、`scripts/**` 只開 `release.mjs`、`content/skill-release-engineer.md` 只開點名行與 dry-run 句；`ci.yml`、三個被吸收腳本、`tools/**`、`dist/**`、`package.json` 禁止；secret 由人類建、第一次真實執行在整合後。待人類裁定 1–8 見上 | 整合者 session |
 | 2026-11-04 | 人類 | 核准清單與待人類裁定 1–8 全部照整合者建議（「approve，1–8 都照建議」）：範圍含步驟 2／5–11／14–15 自動化；fine-grained PAT、secret 由人類建；PASS 狀態與 CHANGELOG 條目先 commit 到 `main`；advisory 不做 input；v4.19.0 為第一次真實執行；E401 併入；pins 如表 | 整合者 session |
+| 2026-11-04 | 整合者 | 清單 PR #72 merge `18ffbc0` = 派工 base（docs branch `docs/2026-11-04-fanout-e405` 已刪）；派工前核對在 `18ffbc0` 重做：擁有／禁止的 16 個已追蹤檔都在、`release.yml` 與 `docs/release-cd.md` 為新檔、SOP 14,434 B、`cutApprovalAutoTier` `{}`、`.current/_primary/handoff.md` tracked、遠端無 `feat/e405*`／`integ/e405`；信箱 `_mailbox/e405/` 重建為空、watch armed baseline 0；prompt 由 `fanout.mjs render --base 18ffbc0` 產生 | 整合者 session |
+| 2026-11-04 | 整合者 | e405 cut 預審 close（spec `d8d91b9`，to-integrator#1）：check --cut 12 task、14 token、0 越界；每個 AC 有實作 task。接受 lane 更正 F1：`STAGE_PATHS.featureDirs` **含** `.github/`（`scripts/release.mjs` 第 42–43 行），本清單「派工前核對」寫不含是錯的；乾淨 runner 上無影響，`STAGE_PATHS` 不改。接受 C1（CHANGELOG 條目預先 commit 在 `## [Unreleased]` 下，runner bump 時搬移）、C2（新 exit class 只給 runner 步驟，SOP 不加列）、C3（done-mark 只替換 `not yet released` 預標，v4.18.0 前的 wave merge `463f81a` 確為此慣例）、C4（lenient pre-flight CI 也在 runner 跑）、C5（commit summary 由架構定推導規則）、C6（狀態寫入與 close-out 同 job 或明確交接）；PM 自定 `RELEASE_TOKEN`、`dry_run` 預設 true、workflow 名 `Release`、issue 標題。給 architect 三點：runner git 身分、checkout 與 gh 同一 secret 的兩條路徑、RN 測試時間記錄 | 信箱 e405 to-lane#1 |
+| 2026-11-04 | 整合者 | 架構預審 close（`specs/e405-release-cd-architecture.md` `1b69d3b`，to-integrator#2）：單 job、每單元一 step；新 phase `start`（SOP 1–11）與 `record`（SOP 14–15）包住不變的三階段；11 個 runner-only exit class（60–64、70–75）；`ALLOWED` 加 6 個精確形狀；E401 以 `AGC_VERIFY_CI_WAIT_SECONDS=0` 跑一次（`verify-release.mjs` 接受 0 為不等）；等待各 900 s、timeout 120 min；SOP 14,690 B。Open Questions 三題整合者裁：OQ1 採提案——`test/release-staging.test.mjs` AC-P6 一個斷言劃給 e405（見所有權重劃）；OQ2 採提案——summary = `<active_feature>` 或 `<active_feature> (<E1>, <E2>)`，同字串作 tag message 與 release 標題；OQ3 採提案——`dry_run: true` 只跑 `start --dry-run`，其後 step 跳過，`docs/release-cd.md` 要寫明 dry run 只涵蓋 start、prepare／publish／close-out 的第一次 runner 執行是 v4.19.0（裁定 6）。spec 要補：T-E405-11 touches 加該測試檔、AC-D3 的「其他 SOP 測試不改」對該斷言例外；補法由 lane 定，與 OQ 結論一起呈人類核准 | 信箱 e405 to-lane#2 |
+| 2026-11-04 | 人類 | 在 e405 lane session 核准 cut（spec `d8d91b9`）與架構（`1b69d3b`）含 OQ1–3 結論；spec 補充 commit `634cd33`（T-E405-11 touches 加 `test/release-staging.test.mjs`、AC-D3 例外、Post-Review Amendments）；對 primary 清單 `check --cut` 0 越界。只影響 e405、已寫在核准的 spec 與架構檔裡 | e405 lane session；信箱 e405 to-integrator#3 |
+| 2026-11-04 | 整合者 | lane 進度（to-integrator#3，不需回覆）：sr T-E405-02..06 commit `946278c`、`b554c18`、`1e2f848`、`4f1ba5d`、`f712abf`（42 個 exit class、單 job 13 step workflow）；`dist/` 無差異；expected-red 5 筆（RS AC-S2 ×2、RS AC-S3、ST E53/E163、SP AC-P4）全由 qa 重釘；T-E405-07 進行中。sr 給 review 的備註：s7 `git show HEAD:package-lock.json` 與 `npm test`／`npm audit` stdout 全進 run log（log 噪音，非正確性） | 信箱 e405 to-integrator#3 |
+| 2026-11-04 | 整合者 | lane 進度（to-integrator#4，不需回覆）：T-E405-07 commit `4ecf583`（`docs/release-cd.md` 117 行、SOP 14,690 B、CONTRIBUTING 一行）；sr 收尾全套 3951/3958、5 紅皆預期項。code-reviewer round 1 APPROVED（`review_reports/review_T-E405-02.md` covers 02..07，commit `109e158`）：0 required、0 recommended、4 optional；42 列 exit 表與架構逐列相同、`dist/` 乾淨。**第一次真實執行（v4.19.0）watch item O2**：`start` pre-3 與 lenient `--ci-check` 假設 checkout 留下的 `main` 追蹤 `origin/main`，lane 驗不到——release-engineer／人類第一次跑時看 run log 這一段。qa（sonnet）已派 T-E405-08..12 | 信箱 e405 to-integrator#4 |
+| 2026-11-04 | 整合者 | e405 lane 層驗證 close（to-integrator#5）：HEAD `fdc8e59`，22 commits，hop 5/14，review 0 輪退回、qa 0 輪；fanout check 30 檔 0 越界；證據 `qa_reports/review_T-E405-01.md`（covers 01..12，PASS）＋ `review_T-E405-02..12.md`、`review_reports/review_T-E405-02.md`（APPROVED，covers 02..07）、`qa_reports/expected-red_e405-release-cd.txt`（5 筆，全部重釘）；重建後 porcelain 空；`dist/`、`ci.yml`、三個被吸收腳本無差異；SOP 14,690 B；lane 回報 4003/4005（2 skipped）；整合者 push 後 CI run 41795016362 在 `fdc8e59` 綠。新 export／CLI：`start`、`record` phase，`EXIT_CLASSES` 42 列。lane 疑慮 (c)：三個 sr／architect commit 的 Co-Authored-By trailer 模型名不一致，§6 禁止 amend，留紀錄不處理。code review 4 個 optional 未開票（log 雜訊、文件措辭） | 信箱 e405 to-lane#3 |
