@@ -861,6 +861,16 @@ function failLines(res) {
   const fails = `${res.stderr}\n${res.stdout}`.split("\n").filter((l) => l.startsWith("FAIL:"));
   return (fails.join("; ") || lastLine(res.stderr) || lastLine(res.stdout) || "no output").slice(0, 1000);
 }
+// The verdict of one verify-release.mjs --ci-check call, from its exit and its
+// printed lines: a completed red run and a run not completed yet have their own
+// FAIL phrasing; any other failure (gh unanswered, unreadable output) is unverified.
+export function classifyCiState({ status, stdout, stderr } = {}) {
+  const fails = `${stderr ?? ""}\n${stdout ?? ""}`.split("\n").filter((l) => l.startsWith("FAIL:"));
+  if (status === 0 && String(stdout ?? "").includes("CI-CHECK PASSED")) return "passed";
+  if (fails.some((l) => l.includes(' concluded "'))) return "red";
+  if (fails.some((l) => l.includes("no completed CI run for "))) return "pending";
+  return "unverified";
+}
 
 // The commit `tag` points at, locally and on origin; null where absent.
 function tagCommits(ctx, tag) {
@@ -950,8 +960,14 @@ async function stepPublish(ctx) {
   if (pr.state === "OPEN") {
     // Title and notes are checked before anything irreversible happens.
     releaseText(ctx, pr.headRefOid, "8b-2");
-    const ci = r.read("node", ["scripts/verify-release.mjs", "--ci-check", "--strict", "--sha", pr.headRefOid], { step: "8b-2" });
-    if (ci.status !== 0 || !ci.stdout.includes("CI-CHECK PASSED")) {
+    // A dry-run polls once with no wait budget and reports the state; only a completed red run stops it.
+    const ci = r.read("node", ["scripts/verify-release.mjs", "--ci-check", "--strict", "--sha", pr.headRefOid],
+      { step: "8b-2", env: r.dryRun ? { AGC_VERIFY_CI_WAIT_SECONDS: "0" } : undefined });
+    const seen = r.dryRun ? classifyCiState(ci) : null;
+    if (seen !== null && seen !== "red") {
+      const text = seen === "passed" ? "passed" : seen === "pending" ? "not completed yet" : `unverified — ${failLines(ci)}`;
+      ctx.out(`release: DRY-RUN [8b-2] CI state of ${pr.headRefOid}: ${text} — not waited for under --dry-run\n`);
+    } else if (ci.status !== 0 || !ci.stdout.includes("CI-CHECK PASSED")) {
       throw new ReleaseStop("CI_GATE_FAILED", `verify-release.mjs --ci-check --strict exited ${ci.status} for ${pr.headRefOid} — ${failLines(ci)}`);
     }
     pr = await autoMerge(ctx, rel, pr, "8c-1", "8c-2");
@@ -1457,8 +1473,49 @@ function stepMessage(ctx) {
   ctx.okSuffix = ` — release/v${v} bumped, built and tested`;
 }
 
-// Steps not built yet stop INTERNAL; later tasks replace each one.
-const notImplemented = (step) => () => { throw new ReleaseStop("INTERNAL", `not implemented: ${step}`); };
+// ---- Record (pre-3, r14-1..r15): closing write and its read-back ----
+
+// The closing write's fields, compared with a tw_get_state read view field by
+// field; null when all four match, else one `<field>: wrote <a>, read <b>` per difference.
+export function readBackMismatch({ wrote, read }) {
+  const want = { last_agent: wrote?.agent_id, status: wrote?.status, next_role: wrote?.next_role, pending_notes: wrote?.pending_notes };
+  const diffs = Object.entries(want).filter(([k, v]) => !isDeepStrictEqual(v ?? null, read?.[k] ?? null))
+    .map(([k, v]) => `${k}: wrote ${JSON.stringify(v ?? null)}, read ${JSON.stringify(read?.[k] ?? null)}`);
+  return diffs.length > 0 ? diffs.join("; ") : null;
+}
+// pre-3: on main, where publish left the checkout.
+function preRecord(ctx) {
+  requireBranch(ctx, (b) => b === "main", "main");
+}
+// r14-1: the merge sha is the commit publish tagged, so record needs no hand-off.
+// A dry-run before publish has no tag yet and carries a placeholder.
+function stepMergeSha(ctx) {
+  const { runner: r, opts } = ctx, tag = `v${opts.version}`;
+  const sha = gitOut(r, ["rev-parse", "-q", "--verify", `refs/tags/${tag}^{commit}`], "r14-1") || null;
+  if (sha === null && !r.dryRun) throw usage(`record runs after publish: ${tag} has no tag`);
+  ctx.mergeSha = sha ?? "<merge-commit>";
+  ctx.out(`release: [r14-1] ${tag} is at ${ctx.mergeSha}\n`);
+}
+// r14: the closing write (SOP step 14), the feature-lease terminal marker; get
+// comes first in this process, and active_feature is carried over from it.
+async function stepClosingWrite(ctx) {
+  const { root, opts } = ctx, seen = await stateCall(ctx, "get", { workspace_path: root }, "r14");
+  const feature = seen === null ? "<unchanged>" : seen.active_feature;
+  if (typeof feature !== "string" || feature === "") throw new ReleaseStop("STATE_WRITE_REJECTED", "tw_get_state returned no active_feature to carry into the closing write");
+  ctx.closing = {
+    workspace_path: root, agent_id: "release-engineer", status: "In_Progress", active_feature: feature,
+    completed_tasks: [], next_role: "pm", pending_notes: [`Released v${opts.version}`, `tag: ${ctx.mergeSha}`],
+  };
+  await stateCall(ctx, "update", ctx.closing, "r14");
+}
+// r15: the read-back (SOP step 15); close-out runs only after a match.
+async function stepReadBack(ctx) {
+  const read = await stateCall(ctx, "get", { workspace_path: ctx.root }, "r15");
+  if (read === null) return;
+  const why = readBackMismatch({ wrote: ctx.closing, read });
+  if (why) throw new ReleaseStop("READBACK_MISMATCH", `${why} — the closing write did not land as written; do not run close-out`);
+  ctx.okSuffix = " — read-back matches the closing write";
+}
 
 // `prepare` stays the first key: tests read its step list from this literal's source.
 const PHASES = {
@@ -1467,7 +1524,7 @@ const PHASES = {
   "close-out": [preGh, preCloseOut, stepCloseOut],
   start: [preWorkDir, preGh, preStart, stepPrecondition, stepOpeningWrite, stepHumanArtifacts, stepPreflightCi, stepVersion, stepReleaseBranch,
     stepBumps, stepBuild, stepTest, stepDoneMark, stepMessage],
-  record: ["pre-3", "r14-1", "r14", "r15"].map(notImplemented),
+  record: [preRecord, stepMergeSha, stepClosingWrite, stepReadBack],
 };
 
 export async function main(argv, deps = {}) {
