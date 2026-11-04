@@ -2,7 +2,7 @@
 schema_version: 15
 active_feature: "e405-release-cd"
 status: "In_Progress"
-last_updated: "2026-11-04T07:03:03.423Z"
+last_updated: "2026-11-04T07:12:40.259Z"
 last_agent: "sr-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
@@ -15,6 +15,8 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
+next_role: "code-reviewer"
+dispatched_at: "2026-11-04T07:12:40.259Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -31,13 +33,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E405-06 done at f712abf (.github/workflows/release.yml new, 170 lines; dist/ clean); next: T-E405-07 (docs/release-cd.md + SOP two lines + CONTRIBUTING)
-- Workflow shape for qa (T-E405-08): name 'Release'; on: workflow_dispatch only; inputs bump (choice [patch, minor, major], default patch, required), tickets (string, required, no default), dry_run (boolean, default true). permissions {contents: read, issues: write}; concurrency {group: release, cancel-in-progress: false}. One job id 'release': runs-on ubuntu-latest, timeout-minutes 120; job env AGC_VERIFY_CI_WAIT_SECONDS '900', AGC_RELEASE_MERGE_WAIT_SECONDS '900', AGC_RELEASE_POLL_SECONDS '15', GIT_AUTHOR_NAME/EMAIL + GIT_COMMITTER_NAME/EMAIL = github-actions[bot] / 41898282+github-actions[bot]@users.noreply.github.com.
-- Steps in order (id|name): -|Require main (env REF=github.ref; exit 1 unless refs/heads/main) ; -|Work directory (mkdir RUNNER_TEMP/release; GITHUB_ENV gets RELEASE_DIR and AGC_RELEASE_STOP_FILE=$RUNNER_TEMP/release/stop-line.txt) ; -|actions/checkout@v4 (unnamed, house style; with fetch-depth 0, token secrets.RELEASE_TOKEN, persist-credentials default) ; -|Use Node.js 22 (actions/setup-node@v4, node-version 22, cache npm) ; -|Install dependencies (npm ci) ; -|Build (npm run build) ; start-dry-run|Start (dry run) ; start|Start ; prepare|Prepare ; publish|Publish ; record|Record ; close-out|Close out ; -|File failure issue.
-- Tokens: GH_TOKEN = '${{ secrets.RELEASE_TOKEN }}' on exactly the six release.mjs steps (start-dry-run, start, prepare, publish, record, close-out); steps 1-6 carry no GH_TOKEN; 'File failure issue' has GH_TOKEN = '${{ github.token }}' (only github.token use; secrets.GITHUB_TOKEN appears nowhere); RELEASE_TOKEN is the only secrets.* name. BUMP/TICKETS via env only; VERSION = '${{ steps.start.outputs.version }}' on prepare/publish/record/close-out; start echoes version=$(cat "$RELEASE_DIR/version") to GITHUB_OUTPUT. No run block contains '${{'.
-- Dry-run conditions: start-dry-run if '${{ inputs.dry_run }}' and its run ends with literal --dry-run; start/prepare/publish/record/close-out each if '${{ !inputs.dry_run }}' (exact string). Issue step if '${{ failure() && !inputs.dry_run }}', runs gh issue create --repo "$GITHUB_REPOSITORY" --title "Release failed: $class" --body-file, no --label; body lines: stop line or 'No RELEASE_STOP line was printed; read the run log.' / 'Run: $RUN_URL' / 'Inputs: bump= tickets= dry_run=' / 'Phase: <start|prepare|publish|record|close-out|setup>'; class NO_STOP_LINE when the stop file is absent, empty or malformed (id must match [A-Z_]+; all 42 EXIT_CLASSES ids do). RUN_URL = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'. Verified: js-yaml load + a scratch structure check of every architecture Test-seams WF bullet (all ok), bash simulation of the stop-line parse (valid line, empty, garbage, lowercase id), H5 hygiene grep clean.
-- Red set unchanged (5, manifest unchanged): build-gate run e298+e296+release-staging 129/130, the one red is the known 'ST E53/E163 Escalation Routes one row per exit class'; RS/SP reds (RS AC-S2 x2, RS AC-S3, SP AC-P4) untouched by this ticket. Commit trailer used per dispatch brief (Claude Fable 5.1) though this hop ran on opus; coordinator may amend if wanted.
-- next: T-E405-07 (docs + SOP two lines + CONTRIBUTING)
+- ready for code review: T-E405-02..07 on branch feat/e405-release-cd, base 18ffbc0, HEAD 4ecf583
+- Files (git diff --stat 18ffbc0...HEAD, .current excluded): scripts/release.mjs +515/-~30 (1559 lines); .github/workflows/release.yml new 170 lines; docs/release-cd.md new 117 lines; content/skill-release-engineer.md +2/-1 (109 lines, 14,690 B = architecture's 14,434+166+90, exactly two changed lines: pointer added directly under '## SOP' with no blank line, step 13 sentence appended); CONTRIBUTING.md +1 (266 lines, contrib.pointer after the npm audit bullet); qa_reports/expected-red_e405-release-cd.txt 21 lines; specs/e405-release-cd.md 258 + specs/e405-release-cd-architecture.md 492 (pm/architect). dist/ clean; check:md-tables OK; check:version OK; check:bookkeeping OK.
+- Full suite (node scripts/test-lock.mjs -- npm test, at 4ecf583): 3951 pass / 5 fail / 2 skip of 3958. All 5 reds are manifest expected-reds, zero regressions: RS 'AC-S2 exit table equals the architecture table row for row', RS 'AC-S2 one exit code per failure class', RS 'AC-S3 isAllowed admits the allow-list and refuses every absent verb' (re-pin owner qa T-E405-10); SP 'AC-P4 one row per exit code, valid next_role', ST 'E53/E163: the Escalation Routes table is one row per exit class ...' (re-pin owner qa T-E405-11).
+- Review notes carried from earlier tasks: (1) start s7 'git show HEAD:package-lock.json' echoes the whole lockfile into the run log; (2) npm test / npm audit stdout go to the run log in full.
+- T-E405-05 design choice: a dry-run 'record' uses the real tag sha when the vX.Y.Z tag already exists (placeholder <merge-commit> only when it does not).
+- T-E405-07 doc choices to check: docs/release-cd.md names v4.19.0 as the first real runner release (OQ3 ruling text); resume-by-hand maps Phase to SOP steps (prepare 12, publish 13, record 14-15, close-out 14-16) with redo of steps 1-2, plus an exception when release/vX.Y.Z-bookkeeping is already on origin. Commit trailer per brief (Claude Fable 5.1) though this hop ran on opus.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
