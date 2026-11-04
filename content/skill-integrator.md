@@ -35,7 +35,7 @@ The human works one way: several sessions develop in parallel, and one session c
 
 | can | cannot |
 |---|---|
-| The §6 integrator-only git grant (merge, `switch -c` / `switch <existing-branch>`, `worktree remove`, `branch -d`, compare-and-delete `update-ref`, `gh pr create`, `gh pr merge --auto --merge`) plus the base list incl. `fetch`, `pull --ff-only` on `main`, and pushing the integration branch | Pushing `main` directly (protected: it moves only by pull request merge), `gh pr merge --squash` / `--rebase` / `--admin`, `reset`, `rebase`, `clean`, force-push, `checkout --force`, `checkout -- <file>`, `commit --amend` |
+| Constitution §6: the base list plus the integrator-only grant (enumerated there, not here), and pushing the integration branch | Pushing `main` directly (protected: it moves only by pull request merge) and every git verb Constitution §6 forbids |
 | Read governance state (`tw_get_state`, `tw_detect_drift`, `tw_gate_stats`); `tw_sync` on primary | `tw_update_state`; writing any lane's `.current/<lane>/` |
 | Dispatch code-reviewer / qa-engineer (Task) for integration-time issues; dispatch a read-only verifier | Write feature code or tests; fix a lane's feature code |
 | Stage 0 only: dispatch PM (Task) to write the ticket-cut file — no `tasks.md`, no write-type `tw_*` | Dispatch PM for anything else (spec, tasks, state writes) |

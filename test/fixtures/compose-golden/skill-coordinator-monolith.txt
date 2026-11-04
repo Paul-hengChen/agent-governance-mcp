@@ -117,7 +117,7 @@ the tool boundary with `DISPATCH_PIN_TIER_REJECTED` naming the role and the valu
 runs, and an on-disk pin outside the four is surfaced by `tw_get_state` as `dispatch_pins_advisory`
 rather than rejected on read (E300).
 
-**Fallback (`tw_switch_role`)** — reserved for genuine tool unavailability<!-- origin:start --> (v3.105.0, E96)<!-- origin:end -->: the host advertises no `Task` tool, or the `Task` call returns a tool-error / unknown-subagent-type. Covers Cursor, Continue, Anti-Gravity, plain MCP clients, and Claude Code without the templates installed. Call `tw_switch_role(<next_role>)` and follow the returned SOP in the same context. This is the pre-v3.20.0 behavior — degradation stays graceful for those hosts; no tw_* tool surface has changed.
+**Fallback (`tw_switch_role`)** — reserved for genuine tool unavailability<!-- origin:start --> (v3.105.0, E96)<!-- origin:end -->: the host advertises no subagent-dispatch tool, or the dispatch call returns a tool-error / unknown-subagent-type. Covers Cursor, Continue, Anti-Gravity, plain MCP clients, and Claude Code without the templates installed. Call `tw_switch_role(<next_role>)` and follow the returned SOP in the same context. This is the pre-v3.20.0 behavior — degradation stays graceful for those hosts; no tw_* tool surface has changed.
 **Dispatch attestation (`switch_role`)**: on your own `tw_update_state` write(s) under that role, set `dispatch_mechanism: "switch_role"` and `dispatch_mechanism_tier` to the model tier you are actually running as, self-identified — never the `dispatch_pins` entry or `recommended_model` (expected values only); re-derive it fresh on every write. A differing pin IS the mismatch signal (E99): never correct your tier to match it.
 **Dispatch attestation (`inline`)**: WHEN you act under a role in-context WITHOUT a fresh `tw_switch_role` call this turn (initial session agent, coordinator/coordinator-lite writing directly under a role, or a role continuing on context it already held from an earlier hop) → DO set `dispatch_mechanism: "inline"` and `dispatch_mechanism_tier` to your own actually-running tier, self-identified — never the `dispatch_pins` entry — fresh on every write, never corrected to match a differing pin.
 
@@ -270,18 +270,10 @@ Per Constitution §3 builder ≠ judge and, when design-armed, §3.2, the coordi
 
 ## Drift Reconcile after out-of-band execution<!-- origin:start --> (v3.26.0, R10)<!-- origin:end -->
 
-The routing chain assumes sequential single-context handoffs. When you dispatched background/parallel
-subagents, OR executed a role inline (subagent unavailable), `tasks.md` can desync from the
-authoritative `handoff.completed_tasks`. Before any PASS or hand-back in those cases:
-
-1. `tw_detect_drift`.
-2. If it reports **handoff-ahead** drift (handoff says complete, tasks.md shows incomplete) → `tw_sync`
-   to mirror the ledger onto tasks.md. Safe + bookkeeping-only.
-3. If it reports **vibe drift** (tasks.md `[x]` not in handoff) → do NOT `tw_sync`-promote it (and
-   `tw_sync` won't); route to qa-engineer for an evidence-backed PASS, or `tw_rollback_task`.
-
-Never hand-edit `tasks.md` checkboxes to paper over drift — use `tw_sync` (authoritative) or the
-qa PASS path.
+Coordinator trigger for Constitution §3 *Sequential-context assumption + reconcile* (R10): you
+dispatched background/parallel subagents, OR executed a role inline (subagent unavailable). In those
+cases run that reconcile before any PASS or hand-back; never hand-edit `tasks.md` checkboxes to paper
+over drift.
 
 ## Subagent Token Observability<!-- origin:start --> (v3.31.0)<!-- origin:end -->
 
