@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Release mechanics in three phases (prepare, publish, close-out); `--help`.
+// Release mechanics in five phases: the manual prepare, publish and close-out,
+// and the runner-only start and record that a workflow adds around them; `--help`.
 // Each failure class has its own exit code and a last stderr line `RELEASE_STOP
 // <CLASS_ID>: <detail>`; `--dry-run` runs every read and only records mutations.
-// Contract: specs/e394-release-sop-rewrite-architecture.md.
+// Contracts: specs/e394-release-sop-rewrite-architecture.md, specs/e405-release-cd-architecture.md.
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, renameSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -11,22 +12,30 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PHASE_OF = { p: "prepare", u: "publish", c: "close-out" };
+const PHASE_OF = { s: "start", p: "prepare", u: "publish", r: "record", c: "close-out" };
 
 // Codes group by decade: 1-9 any phase, 10s preconditions, 20s prepare
-// bookkeeping, 30s prepare commit/push, 40s publish, 50s close-out.
+// bookkeeping, 30s prepare commit/push, 40s publish, 50s close-out, 60s runner
+// state and gates, 70s runner bump, build and checks. Phase letters are in run
+// order: s start, p prepare, u publish, r record, c close-out.
 export const EXIT_CLASSES = Object.freeze([
-  [1, "INTERNAL", "puc"], [2, "USAGE", "puc"], [10, "WRONG_BRANCH", "puc"], [11, "STALE_BASE", "p"],
-  [12, "VERSION_INCOHERENT", "p"], [13, "UNRELATED_CHANGES", "pc"], [14, "GH_UNAVAILABLE", "puc"],
-  [20, "EMPTY_BASELINE", "p"], [21, "DRIFT_BASELINE", "p"], [22, "DONE_MARK", "p"],
+  [1, "INTERNAL", "spurc"], [2, "USAGE", "spurc"], [10, "WRONG_BRANCH", "spurc"], [11, "STALE_BASE", "p"],
+  [12, "VERSION_INCOHERENT", "sp"], [13, "UNRELATED_CHANGES", "pc"], [14, "GH_UNAVAILABLE", "spuc"],
+  [20, "EMPTY_BASELINE", "p"], [21, "DRIFT_BASELINE", "p"], [22, "DONE_MARK", "sp"],
   [23, "BOOKKEEPING_CHECK", "p"], [24, "ADAPTER_STAMP", "p"], [30, "STAGING_INCOMPLETE", "p"],
   [31, "CHANGELOG_CITATION", "p"], [32, "SPEC_REQUIRE", "p"], [33, "SPEC_UNCLASSIFIABLE", "p"],
-  [34, "PUSH_REJECTED", "puc"], [35, "MUTATION_FAILED", "puc"], [40, "TAG_EXISTS", "u"],
+  [34, "PUSH_REJECTED", "puc"], [35, "MUTATION_FAILED", "spuc"], [40, "TAG_EXISTS", "u"],
   [41, "CI_GATE_FAILED", "u"], [42, "PR_CANNOT_MERGE", "uc"], [43, "MERGE_WAIT_TIMEOUT", "uc"],
-  [44, "MAIN_DIVERGED", "uc"], [45, "SELF_CHECK_FAILED", "u"], [50, "CLOSING_WRITE_ABSENT", "c"],
-  [51, "LANE_UNRESOLVED", "c"], [52, "EMPTY_STAGE", "c"], [53, "BRANCH_EXISTS", "c"],
+  [44, "MAIN_DIVERGED", "suc"], [45, "SELF_CHECK_FAILED", "u"], [50, "CLOSING_WRITE_ABSENT", "c"],
+  [51, "LANE_UNRESOLVED", "sc"], [52, "EMPTY_STAGE", "c"], [53, "BRANCH_EXISTS", "c"],
   [54, "CLOSE_OUT_NO_UPSTREAM", "c"], [55, "CLOSE_OUT_AHEAD", "c"], [56, "CLOSE_OUT_UNVERIFIED", "c"],
+  [60, "PRECONDITION_NOT_PASS", "s"], [61, "STATE_WRITE_REJECTED", "sr"], [62, "READBACK_MISMATCH", "r"],
+  [63, "PREFLIGHT_CI_RED", "s"], [64, "RELEASE_BRANCH_EXISTS", "s"], [70, "CHANGELOG_ENTRY_MISSING", "s"],
+  [71, "LOCKFILE_DRIFT", "s"], [72, "BUILD_FAILED", "s"], [73, "TEST_FAILED", "s"], [74, "AUDIT_FAILED", "s"],
+  [75, "ADVISORY_UNDISPOSED", "s"],
 ].map(([code, id, ph]) => Object.freeze({ code, id, phases: Object.freeze([...ph].map((k) => PHASE_OF[k])) })));
+// Phases only the workflow runs; a class whose phases all lie here has no SOP row.
+export const RUNNER_PHASES = Object.freeze(["start", "record"]);
 
 export class ReleaseStop extends Error {
   constructor(classId, detail) {
@@ -108,6 +117,18 @@ function assertAllowed(cmd, args, kind, branch) {
 const show = (args) => args.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(" ");
 const writer = (stream) => (s) => stream.write(s);
 
+// The env a child sees: the runner's env with the per-call overlay on top.
+// npm and npx children also lose the tokens and every AGC_* key, so a test
+// suite run here sees CI's env and cannot reach the workflow's stop-line file.
+const SCRUBBED = (k) => k === "GH_TOKEN" || k === "GITHUB_TOKEN" || k.startsWith("AGC_");
+function childEnv(base, overlay, cmd) {
+  const scrub = cmd === "npm" || cmd === "npx";
+  if (!overlay && !scrub) return base;
+  const env = { ...base, ...overlay };
+  if (scrub) for (const k of Object.keys(env)) if (SCRUBBED(k)) delete env[k];
+  return env;
+}
+
 // Every process call and file write goes through here: argv arrays only,
 // never a shell. Under dry-run mutations are recorded in `actions`, not run.
 export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, env = process.env, out, err } = {}) {
@@ -117,11 +138,11 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
     if (path.isAbsolute(rel) || r === "" || r.startsWith("..")) throw new ReleaseStop("INTERNAL", `runner refused a path outside the repository: ${rel}`);
     return abs;
   };
-  const exec = (cmd, args, step, kind) => {
+  const exec = (cmd, args, step, kind, overlay) => {
     runner.actions.push({ step, kind, cmd, args: [...args], executed: true });
     say(`release: [${step}] $ ${cmd} ${show(args)}\n`);
     const [bin, argv] = cmd === "node" ? [process.execPath, [path.join(root, args[0]), ...args.slice(1)]] : [cmd, args];
-    const res = spawn(bin, argv, { cwd: root, env, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 << 20 });
+    const res = spawn(bin, argv, { cwd: root, env: childEnv(env, overlay, cmd), encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 << 20 });
     const result = { status: res.status ?? -1, stdout: res.stdout ?? "", stderr: res.error ? String(res.error.message) : res.stderr ?? "" };
     if (result.stdout) say(result.stdout.replace(/\0/g, "\n").replace(/\n?$/, "\n"));
     if (result.stderr) warn(result.stderr.replace(/\n?$/, "\n"));
@@ -131,7 +152,8 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
   const fsAct = (op, step, rel, dest, run) => (record({ step, kind: "fs", op, path: rel, ...(dest ? { dest } : {}) }, op === "move" ? `mv ${rel} ${dest}` : `${op} ${rel}`), dryRun || run());
   const runner = {
     actions: [], branch: null, dryRun, root,
-    read(cmd, args, { step }) { assertAllowed(cmd, args, "read", runner.branch); return exec(cmd, args, step, "read"); },
+    // `env` is a per-call overlay on the runner's env (read and deferred only).
+    read(cmd, args, { step, env: overlay }) { assertAllowed(cmd, args, "read", runner.branch); return exec(cmd, args, step, "read", overlay); },
     mutate(cmd, args, { step }) {
       assertAllowed(cmd, args, "mutate", runner.branch);
       if (dryRun) record({ step, kind: "mutate", cmd, args: [...args] }, `${cmd} ${show(args)}`);
@@ -141,9 +163,16 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
     },
     // A read that observes an earlier mutation of the same phase: dry-run
     // records it and returns null, a real run returns the read's result.
-    deferred(cmd, args, { step }) {
+    deferred(cmd, args, { step, env: overlay }) {
       assertAllowed(cmd, args, "read", runner.branch);
-      return dryRun ? (record({ step, kind: "deferred", cmd, args: [...args] }, `${cmd} ${show(args)}`), null) : exec(cmd, args, step, "deferred");
+      return dryRun ? (record({ step, kind: "deferred", cmd, args: [...args] }, `${cmd} ${show(args)}`), null) : exec(cmd, args, step, "deferred", overlay);
+    },
+    // A governance state call (op "get" or "update"): dry-run records it and
+    // returns null without calling `fn`, so nothing is loaded or written.
+    async state(op, label, fn, { step }) {
+      runner.actions.push({ step, kind: "state", op, executed: !dryRun });
+      say(dryRun ? `release: DRY-RUN [${step}] ${label}\n` : `release: [${step}] $ ${label}\n`);
+      return dryRun ? null : fn();
     },
     writeFile(rel, content, { step }) { const abs = inside(rel); fsAct("write", step, rel, null, () => writeFileSync(abs, content)); },
     mkdir(rel, { step }) { const abs = inside(rel); fsAct("mkdir", step, rel, null, () => mkdirSync(abs, { recursive: true })); },
@@ -157,17 +186,29 @@ export function createRunner({ root = ROOT, dryRun = false, spawn = spawnSync, e
 }
 
 const USAGE_TEXT = `Usage:
+  node scripts/release.mjs start     --bump <patch|minor|major> --tickets <E1[,E2…]|none> --work-dir <dir> [--dry-run]
   node scripts/release.mjs prepare   --version X.Y.Z --state <file> --tickets <E1[,E2…]|none> --message-file <file> [--dry-run]
   node scripts/release.mjs publish   --version X.Y.Z [--dry-run]
+  node scripts/release.mjs record    --version X.Y.Z [--dry-run]
   node scripts/release.mjs close-out --version X.Y.Z [--dry-run]
   node scripts/release.mjs --help
 `;
-const FLAGS = { prepare: ["--version", "--state", "--tickets", "--message-file"], publish: ["--version"], "close-out": ["--version"] };
+const FLAGS = {
+  start: ["--bump", "--tickets", "--work-dir"], prepare: ["--version", "--state", "--tickets", "--message-file"],
+  publish: ["--version"], record: ["--version"], "close-out": ["--version"],
+};
+const BUMPS = ["patch", "minor", "major"];
 const usage = (detail) => new ReleaseStop("USAGE", detail);
+// Backlog ids joined by commas, or none; undefined stays undefined.
+function parseTickets(raw) {
+  const tickets = raw === undefined || raw === "none" ? raw : raw.split(",");
+  if (Array.isArray(tickets) && !tickets.every((t) => /^[A-Z]+\d+[A-Za-z0-9]*$/.test(t))) throw usage(`--tickets must be backlog ids or none (got ${raw})`);
+  return tickets;
+}
 export function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) return { phase: "help" };
   const [phase, ...rest] = argv;
-  if (!Object.hasOwn(FLAGS, phase ?? "")) throw usage(`unknown or missing phase ${JSON.stringify(phase ?? null)} — expected prepare, publish or close-out`);
+  if (!Object.hasOwn(FLAGS, phase ?? "")) throw usage(`unknown or missing phase ${JSON.stringify(phase ?? null)} — expected start, prepare, publish, record or close-out`);
   const seen = {};
   let dryRun = false;
   for (let i = 0; i < rest.length; i++) {
@@ -178,13 +219,17 @@ export function parseArgs(argv) {
     if (value === undefined || value.startsWith("--")) throw usage(`${flag} requires a value`);
     seen[flag] = value;
   }
-  const missing = FLAGS[phase].find((f) => f !== "--tickets" && !Object.hasOwn(seen, f));
+  // `start` needs all three flags; `prepare` may omit --tickets.
+  const missing = FLAGS[phase].find((f) => (phase === "start" || f !== "--tickets") && !Object.hasOwn(seen, f));
   if (missing) throw usage(`${phase} requires ${missing}`);
+  if (phase === "start") {
+    if (!BUMPS.includes(seen["--bump"])) throw usage(`--bump must be patch, minor or major (got ${seen["--bump"]})`);
+    // The work directory is created and checked by the phase (pre-1), which knows the repository root.
+    return { phase, bump: seen["--bump"], tickets: parseTickets(seen["--tickets"]), workDir: seen["--work-dir"], dryRun };
+  }
   if (!SEMVER.test(seen["--version"])) throw usage(`--version must be X.Y.Z without a leading v (got ${seen["--version"]})`);
   if (phase !== "prepare") return { phase, version: seen["--version"], dryRun };
-  const raw = seen["--tickets"], tickets = raw === undefined || raw === "none" ? raw : raw.split(",");
-  if (Array.isArray(tickets) && !tickets.every((t) => /^[A-Z]+\d+[A-Za-z0-9]*$/.test(t))) throw usage(`--tickets must be backlog ids or none (got ${raw})`);
-  return { phase, version: seen["--version"], dryRun, statePath: seen["--state"], tickets, messageFile: seen["--message-file"] };
+  return { phase, version: seen["--version"], dryRun, statePath: seen["--state"], tickets: parseTickets(seen["--tickets"]), messageFile: seen["--message-file"] };
 }
 
 // A status path is expected when the release commit may stage it, or it
@@ -974,8 +1019,8 @@ const CLOSE_OUT_REMEDY = {
   CLOSE_OUT_UNVERIFIED: "",
 };
 
-// The lane directory, as the compiled lane resolver names it.
-async function laneDir(ctx) {
+// The lane directory, as the compiled lane resolver names it; `step` labels the log line.
+async function laneDir(ctx, step = "13a-1") {
   const { root, deps } = ctx, load = deps.importLanePaths ?? (() => import(pathToFileURL(path.join(root, "dist/tools/lane-paths.js")).href));
   let lane;
   try { lane = (await load()).resolveCurrentLane(root); } catch (e) {
@@ -983,7 +1028,7 @@ async function laneDir(ctx) {
   }
   const dir = `.current/${lane}`, abs = path.join(root, dir);
   if (!safeSegment(lane) || !existsSync(abs) || !statSync(abs).isDirectory()) throw new ReleaseStop("LANE_UNRESOLVED", `lane ${JSON.stringify(lane)}: ${dir}/ does not exist`);
-  ctx.out(`release: [13a-1] lane ${lane}\n`);
+  ctx.out(`release: [${step}] lane ${lane}\n`);
   return dir;
 }
 
@@ -1069,10 +1114,103 @@ async function stepCloseOut(ctx) {
   ctx.okSuffix = " — CLOSE-OUT PASSED";
 }
 
+// ---- Start (pre-1..s2): work directory, branch, precondition, opening write ----
+
+// pre-1: the work directory holds the hand-offs to prepare and the workflow.
+// Like readInput it must lie outside the repository (realpath compare); the
+// nearest existing ancestor is checked first, so a refused path is never created.
+function preWorkDir(ctx) {
+  const { opts, root } = ctx, abs = path.resolve(opts.workDir), realRoot = realpathSync(root);
+  const outside = (real) => { const rel = path.relative(realRoot, real); return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel); };
+  let probe = abs;
+  while (!existsSync(probe)) probe = path.dirname(probe);
+  if (!outside(path.join(realpathSync(probe), path.relative(probe, abs)))) throw usage(`--work-dir ${opts.workDir} is inside the repository — keep it outside the repository root`);
+  try { mkdirSync(abs, { recursive: true }); } catch (e) { throw usage(`--work-dir ${opts.workDir} cannot be created: ${e.message}`); }
+  if (!statSync(abs).isDirectory() || !outside(realpathSync(abs))) throw usage(`--work-dir ${opts.workDir} is not a directory outside the repository root`);
+  ctx.workDir = abs;
+}
+// Work-directory files are plain fs writes, since the runner refuses paths
+// outside the root; they are made under --dry-run too, as nothing in the repository changes.
+function writeWorkFile(ctx, step, name, content) {
+  writeFileSync(path.join(ctx.workDir, name), content);
+  ctx.out(`release: [${step}] wrote ${path.join(ctx.opts.workDir, name)}\n`);
+}
+// pre-3: on main, tracking origin/main.
+function preStart(ctx) {
+  requireBranch(ctx, (b) => b === "main", "main");
+  const up = gitOut(ctx.runner, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], "pre-3");
+  if (up !== "origin/main") throw new ReleaseStop("WRONG_BRANCH", `main tracks ${up || "no upstream"}, expected origin/main`);
+}
+// s1: the release gate is the checkout's own lane handoff at (qa-engineer, PASS).
+// Nothing is written before that holds; then the handoff is copied byte for
+// byte to <work-dir>/state.md, which prepare reads as --state.
+async function stepPrecondition(ctx) {
+  const handoff = `${await laneDir(ctx, "s1")}/handoff.md`, abs = path.join(ctx.root, handoff);
+  const notPass = (why) => new ReleaseStop("PRECONDITION_NOT_PASS", `${handoff} ${why} — commit the release gate's (qa-engineer, PASS) write to main first`);
+  if (!existsSync(abs)) throw notPass("does not exist");
+  const bytes = readFileSync(abs);
+  let state;
+  try { state = await parseHandoffCopy(ctx, bytes.toString("utf-8")); } catch (e) {
+    if (e instanceof ReleaseStop) throw notPass(`cannot be parsed (${e.detail})`);
+    throw e;
+  }
+  if (state.last_agent !== "qa-engineer" || state.status !== "PASS") throw notPass(`is (${state.last_agent ?? "absent"}, ${state.status ?? "absent"}), expected (qa-engineer, PASS)`);
+  if (!safeSegment(state.active_feature)) throw notPass(`active_feature ${JSON.stringify(state.active_feature ?? null)} cannot name an archive directory`);
+  writeWorkFile(ctx, "s1", "state.md", bytes);
+  ctx.state = state;
+}
+
+// The compiled server, loaded once per process and never under --dry-run (a
+// real get may lazily migrate an old handoff and write it).
+async function loadOrchestrator(ctx) {
+  if (ctx.orchestrator) return ctx.orchestrator;
+  const { root, deps } = ctx, load = deps.importOrchestrator ?? (() => import(pathToFileURL(path.join(root, "dist/tools/handoff-orchestrator.js")).href));
+  const fail = (why) => new ReleaseStop("STATE_WRITE_REJECTED", `cannot load dist/tools/handoff-orchestrator.js (run npm run build) — ${why}`);
+  let mod;
+  try { mod = await load(); } catch (e) { throw fail(e?.message ?? e); }
+  if (typeof mod?.handleGetState !== "function" || typeof mod?.handleUpdateState !== "function") throw fail("handleGetState or handleUpdateState is not exported");
+  return (ctx.orchestrator = mod);
+}
+const stateLabel = (op, a) => (op === "get" ? "tw_get_state"
+  : `tw_update_state agent_id=${a.agent_id} status=${a.status} active_feature=${a.active_feature}${a.next_role ? ` next_role=${a.next_role}` : ""} pending_notes=${JSON.stringify(a.pending_notes)}`);
+// One state call through the runner. A throw or an isError result stops with
+// the server's first text line, which carries the gate code; a get returns the
+// parsed state, an update its text, a dry-run null.
+async function stateCall(ctx, op, args, step) {
+  const label = stateLabel(op, args), tool = label.split(" ")[0];
+  return ctx.runner.state(op, label, async () => {
+    const orch = await loadOrchestrator(ctx);
+    let res;
+    try { res = await (op === "get" ? orch.handleGetState(args) : orch.handleUpdateState(args)); } catch (e) {
+      throw new ReleaseStop("STATE_WRITE_REJECTED", `${tool} threw — ${e?.message ?? e}`);
+    }
+    const text = typeof res?.content?.[0]?.text === "string" ? res.content[0].text : "";
+    if (!res || res.isError) throw new ReleaseStop("STATE_WRITE_REJECTED", text.split("\n").map((l) => l.trim()).find(Boolean) ?? `${tool} failed with no message`);
+    if (op === "update") return text;
+    try { return JSON.parse(text); } catch { throw new ReleaseStop("STATE_WRITE_REJECTED", `${tool} returned non-JSON text`); }
+  }, { step });
+}
+// s2: the opening write (SOP step 2), before the first repository mutation; get
+// comes first in this process for the pre-flight guard and the freshness snapshot.
+async function stepOpeningWrite(ctx) {
+  const { root, state } = ctx, feature = state.active_feature;
+  await stateCall(ctx, "get", { workspace_path: root }, "s2");
+  await stateCall(ctx, "update", {
+    workspace_path: root, agent_id: "release-engineer", status: "In_Progress", active_feature: feature,
+    completed_tasks: [], pending_notes: [`release-engineer: starting release for ${feature}`],
+  }, "s2");
+}
+
+// Steps not built yet stop INTERNAL; later tasks replace each one.
+const notImplemented = (step) => () => { throw new ReleaseStop("INTERNAL", `not implemented: ${step}`); };
+
+// `prepare` stays the first key: tests read its step list from this literal's source.
 const PHASES = {
   prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, step8aSpecs, step8aCommitPushPr],
   publish: [preGh, prePublish, stepPublish],
   "close-out": [preGh, preCloseOut, stepCloseOut],
+  start: [preWorkDir, preGh, preStart, stepPrecondition, stepOpeningWrite, ...["s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"].map(notImplemented)],
+  record: ["pre-3", "r14-1", "r14", "r15"].map(notImplemented),
 };
 
 export async function main(argv, deps = {}) {
@@ -1080,7 +1218,7 @@ export async function main(argv, deps = {}) {
   try {
     const opts = parseArgs(argv);
     if (opts.phase === "help") { out(USAGE_TEXT); return 0; }
-    const root = deps.root ?? ROOT, ctx = { opts, root, deps, out, err };
+    const root = deps.root ?? ROOT, ctx = { opts, root, deps, out, err, now: deps.now ?? (() => new Date()) };
     ctx.runner = createRunner({ root, dryRun: opts.dryRun, spawn: deps.spawn, env: deps.env ?? process.env, out, err });
     for (const step of PHASES[opts.phase]) await step(ctx);
     const v = `v${opts.version}`;
@@ -1089,7 +1227,10 @@ export async function main(argv, deps = {}) {
   } catch (e) {
     const stop = e instanceof ReleaseStop ? e : new ReleaseStop("INTERNAL", e?.stack?.split("\n")[0] ?? String(e));
     if (stop.classId === "USAGE") err(USAGE_TEXT);
-    err(`RELEASE_STOP ${stop.classId}: ${stop.detail}\n`);
+    const line = `RELEASE_STOP ${stop.classId}: ${stop.detail}\n`, stopFile = (deps.env ?? process.env).AGC_RELEASE_STOP_FILE;
+    // The workflow reads the stop line from this file; a failed write never masks the stop.
+    if (stopFile) { try { writeFileSync(stopFile, line); } catch { /* the stderr line below still carries it */ } }
+    err(line);
     return stop.code;
   }
 }
