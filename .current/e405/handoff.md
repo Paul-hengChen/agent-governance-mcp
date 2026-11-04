@@ -2,8 +2,8 @@
 schema_version: 15
 active_feature: "e405-release-cd"
 status: "In_Progress"
-last_updated: "2026-11-04T06:19:08.072Z"
-last_agent: "architect"
+last_updated: "2026-11-04T06:34:39.534Z"
+last_agent: "sr-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "One lane, one feature per specs/fanout-e405.md (Lanes row e405, E405 + E401 absorbed by ruling 7); the eight human rulings of Stage 2 (2026-11-04) are fixed constraints in specs/e405-release-cd.md; full chain pm -> architect -> sr-engineer -> code-reviewer -> qa-engineer, serial inside the lane (workflow, docs and SOP depend on the script's classes and stop-line contract)."
@@ -20,7 +20,7 @@ dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -31,13 +31,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- architect: T-E405-01 architecture at 1b69d3b (specs/e405-release-cd-architecture.md); Open Questions 1-3 go to the integrator mailbox for second pre-review before sr-engineer
-- architecture (1/2): one job `release`, units as steps (C6); new phases `start` (SOP 1-11; --bump --tickets --work-dir) and `record` (SOP 14-15; --version); work-dir outside root holds state.md, message.txt, version (version via $GITHUB_OUTPUT); stop line also written to $AGC_RELEASE_STOP_FILE (AC-R13); 11 runner-only classes 60-64, 70-75 (adds LOCKFILE_DRIFT, AUDIT_FAILED); 9 E394 rows gain start/record phases, none renumbered
-- architecture (2/2): ALLOWED +6 exact shapes (npm install --package-lock-only, npm test, npm audit --audit-level=high --json, npx tsc, check-transitions-sync.mjs, verify-release --ci-check lenient); npm/npx children drop GH_TOKEN/GITHUB_TOKEN/AGC_*; deps.importOrchestrator, get before update per process, not loaded under --dry-run; E401 = per-call AGC_VERIFY_CI_WAIT_SECONDS=0 + classifyCiState; waits 900 s each, timeout-minutes 120; git identity github-actions[bot] in job env; dry_run files no issue; SOP +256 B -> 14,690
-- OQ1: test/release-staging.test.mjs (outside lane ownership) pins SOP exit rows == ALL EXIT_CLASSES; conflicts with AC-R10 + C2 + AC-D3. Proposed: add it to the lane's owned cell for a one-assertion qa re-pin (manual-phase filter). Fallback: separate RUNNER_EXIT_CLASSES export, AC-R10/AC-D2 reworded
-- OQ2: commit summary = <active_feature> (<E1>, <E2>), or <active_feature> for tickets none. Fallback: `Summary:` first line under ## [Unreleased], consumed by the move
-- OQ3: dry_run=true runs only `start --dry-run`, later steps skipped. Fallback: rehearsal (start for real on the throwaway runner + prepare --dry-run), needs an AC-W6 amendment
-- task mapping: 02 skeleton/classes/seams/s1-s2 ~220; 03 s3a,s4-s7 ~240; 04 s3b-c,s8-s11 ~250; 05 record + E401 + dry-run audit ~170; 06 release.yml ~150; 07 docs + SOP 2 lines + CONTRIBUTING ~170
+- sr-engineer: T-E405-02 done at 946278c (scripts/release.mjs only, +167/-26, dist/ clean); next: T-E405-03
+- T-E405-02 implemented: parseArgs start {phase,bump,tickets,workDir,dryRun} + record {phase,version,dryRun}; USAGE_TEXT 5 phases; unknown-phase detail 'expected start, prepare, publish, record or close-out'; export RUNNER_PHASES=['start','record']; EXIT_CLASSES 42 rows (60 PRECONDITION_NOT_PASS s, 61 STATE_WRITE_REJECTED s+r, 62 READBACK_MISMATCH r, 63 PREFLIGHT_CI_RED, 64 RELEASE_BRANCH_EXISTS, 70 CHANGELOG_ENTRY_MISSING, 71 LOCKFILE_DRIFT, 72 BUILD_FAILED, 73 TEST_FAILED, 74 AUDIT_FAILED, 75 ADVISORY_UNDISPOSED all s; 1/2/10 +s,r; 12/14/22/35/44/51 +s); no code/id changed
+- T-E405-02 seams: Runner.read/deferred(cmd,args,{step,env}) env = per-call overlay; childEnv() drops GH_TOKEN/GITHUB_TOKEN/AGC_* for npm/npx children (base env object passed through untouched otherwise); Runner.state(op,label,fn,{step}) records {step,kind:'state',op,executed}, dry-run prints 'release: DRY-RUN [step] label' and returns null, real prints 'release: [step] $ label'; loadOrchestrator(ctx) = deps.importOrchestrator ?? import(dist/tools/handoff-orchestrator.js), cached on ctx; stateCall(ctx,op,args,step) returns parsed get JSON / update text, isError or throw -> STATE_WRITE_REJECTED with the server's first text line; ctx.now = deps.now ?? new Date; main writes the stop line to $AGC_RELEASE_STOP_FILE (try/catch) before the stderr line; laneDir(ctx, step='13a-1') takes a log label
+- T-E405-02 start steps: pre-1 preWorkDir (realpath of nearest existing ancestor checked before mkdir; sets ctx.workDir), pre-2 preGh, pre-3 preStart (main + @{u}=origin/main else WRONG_BRANCH), s1 stepPrecondition (lane handoff tuple + safe active_feature, then writeWorkFile(ctx,'s1','state.md',bytes) byte copy; sets ctx.state), s2 stepOpeningWrite (get then update); s3..s11 and record pre-3/r14-1/r14/r15 are notImplemented(step) stubs -> INTERNAL 'not implemented: <step>'. PHASES keeps prepare as the FIRST key (release-staging tests regex `const PHASES = {\s*prepare: [`) — later tasks must not reorder it
+- expected-red (by design, exit table growth AC-R10; qa re-pins): test/e394-release-script.test.mjs | AC-S2 exit table equals the architecture table row for row (T-E405-10); test/e394-release-script.test.mjs | AC-S2 one exit code per failure class (T-E405-10); test/release-staging.test.mjs | E53/E163: the Escalation Routes table is one row per exit class, in exit-code order, then the situation rows (pre-flight CI step 4, CI gate exit 41, empty baseline exit 20) (AC-P6) (OQ1, T-E405-11); test/e394-release-sop.test.mjs | AC-P4 one row per exit code, valid next_role (SP re-pin, T-E405-11). Runs: RS 57/59, ST+e166/e297/e336/e130/e164/feature-lease/SOP/verify-release 289/293 (2 skips are pre-existing history-dependent e130 checks). qa_reports/expected-red_e405-release-cd.txt NOT written (brief limited edits to scripts/release.mjs) — coordinator to decide who writes the SOP 7a manifest before code review
+- architect: T-E405-01 architecture at 1b69d3b (specs/e405-release-cd-architecture.md); sr-engineer T-E405-02..07 in consecutive dispatches, release.mjs tasks 02-05 first
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
