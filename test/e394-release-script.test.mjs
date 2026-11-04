@@ -24,6 +24,8 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = path.join(REPO, "scripts", "release.mjs");
 const rel = await import(pathToFileURL(SCRIPT).href);
 const ARCH = fs.readFileSync(path.join(REPO, "specs", "e394-release-sop-rewrite-architecture.md"), "utf-8");
+const ARCH405 = fs.readFileSync(path.join(REPO, "specs", "e405-release-cd-architecture.md"), "utf-8");
+const MANUAL_PHASES = ["prepare", "publish", "close-out"];
 
 // ---------------------------------------------------------------- fixture
 
@@ -221,19 +223,30 @@ function snapshot(fx) {
 
 // ---------------------------------------------------------------- AC-S2 contract
 
-const archRows = () => ARCH.split("\n").filter((l) => /^\| \d+ \| [A-Z_]+ \|/.test(l)).map((l) => {
+const archRows = (text = ARCH) => text.split("\n").filter((l) => /^\| \d+ \| [A-Z_]+ \|/.test(l)).map((l) => {
   const c = l.split("|").map((x) => x.trim());
   return { code: Number(c[1]), id: c[2], phases: c[3].split(",").map((x) => x.trim()) };
 });
 
-test("AC-S2 exit table equals the architecture table row for row", () => {
-  const want = archRows();
-  assert.equal(want.length, 31, "the architecture's Exit-Code Table has 31 classes");
+const archRows405 = () => archRows(ARCH405);
+
+test("AC-R10 exit table equals the E394 and E405 architecture tables row for row (AC-S2)", () => {
+  // WHY (AC-R10): the table only grows. The 31 E394 rows keep code and id and may gain the runner phases;
+  // the E405 architecture's table is the union and the code must equal it row for row.
+  const want = archRows405(), e394 = archRows(ARCH);
+  assert.equal(e394.length, 31, "the E394 architecture's Exit-Code Table has 31 classes");
+  assert.equal(want.length, 42, "the E405 architecture's Exit-Code Table has 42 classes (31 + 11 runner-only)");
   assert.deepEqual(rel.EXIT_CLASSES.map((c) => ({ code: c.code, id: c.id, phases: [...c.phases] })), want);
-  assert.equal(new Set(rel.EXIT_CLASSES.map((c) => c.code)).size, 31, "codes are distinct");
-  assert.equal(new Set(rel.EXIT_CLASSES.map((c) => c.id)).size, 31, "ids are distinct");
+  for (const old of e394) {
+    const row = want.find((w) => w.code === old.code);
+    assert.ok(row && row.id === old.id, `${old.id} keeps code ${old.code}`);
+    assert.ok(old.phases.every((p) => row.phases.includes(p)), `${old.id} keeps its E394 phases`);
+  }
+  assert.equal(new Set(rel.EXIT_CLASSES.map((c) => c.code)).size, 42, "codes are distinct");
+  assert.equal(new Set(rel.EXIT_CLASSES.map((c) => c.id)).size, 42, "ids are distinct");
   assert.ok(rel.EXIT_CLASSES.every((c) => c.code > 0 && Object.isFrozen(c)), "no class exits 0; rows are frozen");
   assert.ok(Object.isFrozen(rel.EXIT_CLASSES));
+  assert.deepEqual([...rel.RUNNER_PHASES], ["start", "record"]);
 });
 
 // One trigger per failure class: [phase, setup(fx) -> run options]. Each runs on its own fixture.
@@ -300,9 +313,12 @@ function divergeOriginBranch(fx, branch) {
   for (const a of [["add", "-A"], ["commit", "-q", "-m", "diverge"], ["push", "-q", "origin", branch]]) execFileSync("git", a, { cwd: tmp, env: fx.env });
 }
 
-test("AC-S2 one exit code per failure class", async () => {
-  assert.deepEqual(Object.keys(TRIGGERS).sort(), rel.EXIT_CLASSES.map((c) => c.id).sort(), "every class has a trigger");
-  for (const cls of rel.EXIT_CLASSES) {
+test("AC-R10 one exit code per manual-phase failure class (AC-S2)", async () => {
+  // WHY (AC-R10): these triggers drive the three manual phases; the 11 runner-only classes are driven by test/e405-release-runner.test.mjs.
+  const manual = rel.EXIT_CLASSES.filter((c) => c.phases.some((p) => MANUAL_PHASES.includes(p)));
+  assert.equal(manual.length, 31);
+  assert.deepEqual(Object.keys(TRIGGERS).sort(), manual.map((c) => c.id).sort(), "every manual-phase class has a trigger");
+  for (const cls of manual) {
     const t = TRIGGERS[cls.id];
     assert.ok(cls.phases.includes(t.phase), `${cls.id}: trigger phase ${t.phase} is one of its phases`);
     const fx = mkFixture(t.opts ?? {});
@@ -463,13 +479,16 @@ test("AC-S3 verb allow-list and array argv", async () => {
   assert.ok(!all.some(({ cmd }) => /^git commit .*--amend/.test(cmd)));
 });
 
-test("AC-S3 isAllowed admits the allow-list and refuses every absent verb", () => {
+test("AC-R11 isAllowed admits the allow-list, the six new shapes, and refuses every absent verb (AC-S3)", () => {
   const yes = [
     ["git", ["add", "--", "a.txt"]], ["git", ["commit", "-F", "/m"]], ["git", ["commit", "-m", "msg --amend text"]], ["git", ["tag", "-a", "v1.2.3", "-m", "t"]],
     ["git", ["push", "-u", "origin", "release/v1.2.3"]], ["git", ["push", "origin", "v1.2.3"]], ["git", ["switch", "-c", "release/v1.2.3"]], ["git", ["switch", "main"]],
     ["git", ["branch", "-d", "release/v1.2.3"]], ["git", ["fetch", "origin"]], ["git", ["ls-remote", "--tags", "origin", "refs/tags/v1.2.3"]],
     ["git", ["describe", "--tags", "--abbrev=0"]], ["gh", ["auth", "status"]], ["gh", ["release", "view", "v1.2.3"]], ["gh", ["pr", "create", "--base", "main", "--head", "release/v1.2.3"]],
     ["gh", ["pr", "merge", "7", "--auto", "--merge"]], ["gh", ["pr", "view", "release/v1.2.3"]], ["gh", ["run", "list"]], ["gh", ["run", "view", "1"]], ["gh", ["release", "create", "v1.2.3", "--title", "t"]],
+    // AC-R11: the six exact shapes E405 adds for SOP steps 3-4 and 7-9.
+    ["npm", ["install", "--package-lock-only"]], ["npm", ["test"]], ["npm", ["audit", "--audit-level=high", "--json"]], ["npx", ["tsc"]],
+    ["node", ["scripts/check-transitions-sync.mjs"]], ["node", ["scripts/verify-release.mjs", "--ci-check"]],
   ];
   for (const [cmd, args] of yes) assert.ok(rel.isAllowed(cmd, args, { branch: "release/v1.2.3" }), `${cmd} ${args.join(" ")}`);
   assert.ok(rel.isAllowed("git", ["-c", "pull.rebase=false", "pull", "--ff-only"], { branch: "main" }));
@@ -480,7 +499,11 @@ test("AC-S3 isAllowed admits the allow-list and refuses every absent verb", () =
     ["git", ["tag", "-f", "v1.2.3"]], ["git", ["tag", "-d", "v1.2.3"]], ["git", ["push", "origin", "main"]], ["git", ["push", "-u", "origin", "main"]], ["git", ["push", "origin", "HEAD:main"]],
     ["git", ["branch", "-D", "release/v1.2.3"]], ["git", ["stash", "drop"]], ["git", ["stash", "clear"]], ["git", ["update-ref", "-d", "refs/heads/x"]], ["git", ["commit", "--amend", "-m", "x"]],
     ["git", ["merge", "release/v1.2.3"]], ["git", ["pull", "--rebase"]], ["gh", ["pr", "merge", "7", "--squash"]], ["gh", ["pr", "merge", "7", "--rebase"]], ["gh", ["pr", "merge", "7", "--admin"]],
-    ["gh", ["pr", "merge", "7", "--merge"]], ["gh", ["api", "x"]], ["bash", ["-c", "true"]], ["npm", ["test"]],
+    ["gh", ["pr", "merge", "7", "--merge"]], ["gh", ["api", "x"]], ["bash", ["-c", "true"]],
+    // AC-R11: every other npm / npx form stays refused.
+    ["npm", ["ci"]], ["npm", ["install", "x"]], ["npm", ["install"]], ["npm", ["install", "--package-lock-only", "x"]], ["npm", ["publish"]], ["npm", ["run", "build"]],
+    ["npm", ["test", "--", "x"]], ["npm", ["audit"]], ["npm", ["audit", "fix"]], ["npm", ["audit", "--audit-level=high"]], ["npx", ["eslint"]], ["npx", ["--yes", "tsc"]], ["npx", ["tsc", "--watch"]],
+    ["node", ["scripts/check-transitions-sync.mjs", "x"]], ["node", ["scripts/release.mjs"]], ["node", ["-e", "1"]],
   ];
   for (const [cmd, args] of no) assert.ok(!rel.isAllowed(cmd, args, { branch: "main" }), `${cmd} ${args.join(" ")} must be refused`);
   assert.ok(Object.isFrozen(rel.ALLOWED));

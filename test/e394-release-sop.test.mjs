@@ -51,6 +51,30 @@ test("AC-H6 names GATE_REGISTRY once and states no gate count", () => {
   assert.ok(!/\b\d+\s+gates?\b/i.test(SOP) && !/\bgate count\b/i.test(SOP), "no gate count");
 });
 
+// ---------------------------------------------------------------- AC-E2, AC-D3 (E405)
+
+const E401_SENTENCE = "Under `--dry-run` the CI gate reports the release head's CI state and never waits for it.";
+const CD_POINTER = "Automated path: `.github/workflows/release.yml` runs this procedure on GitHub Actions without an agent — see `docs/release-cd.md`; this SOP is its manual fallback.";
+
+test("AC-E2 step 13 says the dry-run CI gate never waits", () => {
+  // WHY: E401 -- a dry run that waits on CI is mistaken for the real gate; the SOP must state the dry-run behavior at the step that runs it.
+  const step13 = SOP.split("\n").filter((l) => l.startsWith("13. "));
+  assert.equal(step13.length, 1, "one step 13");
+  assert.ok(step13[0].endsWith(` ${E401_SENTENCE}`), "step 13 ends with the E401 sentence, a space before it");
+  assert.equal(tickCount(SOP, E401_SENTENCE), 1, "the sentence appears once in the file");
+});
+
+test("AC-D3 one CD pointer under SOP", () => {
+  // WHY: the SOP stays the manual fallback and points once at the automated path; the pointer is its own paragraph, not a numbered step.
+  assert.equal(tickCount(SOP, CD_POINTER), 1, "exactly one pointer line");
+  const lines = SOP.split("\n"), at = lines.indexOf("## SOP");
+  assert.ok(at >= 0);
+  assert.equal(lines[at + 1], CD_POINTER, "the pointer line is directly under ## SOP");
+  assert.ok(lines[at + 2].startsWith("1. "), "step 1 follows the pointer");
+  assert.equal(Buffer.byteLength(CD_POINTER + "\n", "utf-8"), 166, "166 bytes with its newline");
+  assert.ok(Buffer.byteLength(SOP, "utf-8") <= 15000, "AC-D3 size bound");
+});
+
 // ---------------------------------------------------------------- AC-P2, AC-P3
 
 test("AC-P2 decisions precede the first script call", () => {
@@ -104,7 +128,10 @@ test("AC-P4 one row per exit code, valid next_role", () => {
   const body = rows.slice(1);
   assert.ok(body.every((r) => r.length === 4), "every row has four cells");
   const coded = body.map((r) => /^exit (\d+) ([A-Z_]+)\b/.exec(r[0])).filter(Boolean).map((m) => ({ code: Number(m[1]), id: m[2] }));
-  assert.deepEqual(coded, rel.EXIT_CLASSES.map((c) => ({ code: c.code, id: c.id })), "bijection with the exported exit table, in order");
+  // AC-D3 (E405): the SOP carries the manual-phase classes only; runner-only classes (codes 60-64, 70-75) are documented in docs/release-cd.md.
+  const manual = rel.EXIT_CLASSES.filter((c) => c.phases.some((p) => ["prepare", "publish", "close-out"].includes(p)));
+  assert.deepEqual(coded, manual.map((c) => ({ code: c.code, id: c.id })), "bijection with the exported manual-phase exit rows, in order");
+  assert.equal(manual.length, 31, "the 31 E394 rows keep their SOP rows");
   assert.equal(new Set(coded.map((c) => c.id)).size, coded.length, "no class has two rows");
   // Non-script stops named by AC-P4.
   const rest = body.filter((r) => !/^exit \d+ /.test(r[0])).map((r) => r[0].toLowerCase());
