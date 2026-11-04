@@ -434,22 +434,19 @@ test("S3 [E394 re-pin AC-P4/AC-P10]: the re-baseline step is still the Blocked-r
   );
 });
 
-test("S4: templates/claude-code-agents/release-engineer.md mirrors the re-baseline hint (<=2 sentences, C13 pattern)", () => {
+test("S4 [E404 re-pin]: templates/claude-code-agents/release-engineer.md carries one re-baseline hint pointing at SOP step 5 (<=2 sentences)", () => {
   const template = fs.readFileSync(
     path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
     "utf-8",
   );
-  assert.ok(template.includes("git fetch origin"), "template hint must mention git fetch origin");
-  assert.ok(template.includes("origin/<branch>"), "template hint must mention origin/<branch> HEAD");
+  const hintLines = template.split("\n").filter((l) => l.includes("SOP step 5"));
+  assert.equal(hintLines.length, 1, "exactly one line must point at SOP step 5");
+  const hintLine = hintLines[0];
+  assert.ok(hintLine.includes("git fetch origin"), "template hint must mention git fetch origin");
   assert.ok(
-    template.includes("SOP step 3a"),
-    "template hint must point back at the full SOP step (3a) for details",
+    hintLine.includes("`git -c pull.rebase=false pull --ff-only`"),
+    "template hint must name the ff-only pull form",
   );
-  const sentenceCount = (template.match(/[.!?](?:\s|$)/g) || []).length;
-  // The hint itself is <=2 sentences; the file has other content, so we only
-  // assert the specific hint block's sentence count, not the whole file.
-  const hintLine = template.split("\n").find((l) => l.includes("git fetch origin"));
-  assert.ok(hintLine, "must locate the re-baseline hint line");
   const hintSentences = (hintLine.match(/[.!?](?:\s|$)/g) || []).length;
   assert.ok(hintSentences <= 2, `re-baseline hint must be <=2 sentences (C13 pattern), found ${hintSentences}`);
 });
@@ -1574,12 +1571,10 @@ test("E9A-S5 (regression guard): the pre-existing pinned template blocks survive
     "CRITICAL: End every reply with `— @release-engineer (<the model tier you were actually invoked with>)` per Constitution §1 (watermark).",
     "watermark reminder must remain the first non-blank body line, unshifted by the new E9A paragraph",
   );
-  // The pre-existing push-rejection CRITICAL paragraph is still present verbatim. (D10)
+  // [E404 re-pin] The push-rejection paragraph is no longer restated in the template (the SOP Hard rule holds it).
   assert.ok(
-    tpl.includes(
-      "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP",
-    ),
-    "pre-existing D10 push-rejection CRITICAL paragraph must still be present",
+    !tpl.includes("non-fast-forward push rejection"),
+    "the D10 push-rejection paragraph must not be restated in the template",
   );
 });
 
@@ -1645,34 +1640,17 @@ test("E17-S2 [E394 re-pin AC-P10]: the history keeps the record-integrity incide
   assert.ok(fenceBody.includes("corrected post-release in commit a484a4d"), "reason tail must name the a484a4d correction commit");
 });
 
-test("E17-S3: templates/claude-code-agents/release-engineer.md carries the matching record-integrity CRITICAL paragraph", () => {
+test("E17-S3 [E404 re-pin]: templates/claude-code-agents/release-engineer.md no longer restates the record-integrity paragraph (the SOP Hard rule holds it; E17-S1)", () => {
   const tpl = fs.readFileSync(
     path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
     "utf-8",
   );
-  assert.ok(
-    /CRITICAL: Record integrity — describe the diff, not the brief\./.test(tpl),
-    "template must carry the CRITICAL record-integrity paragraph, byte-identifiable opening",
-  );
-  assert.ok(
-    tpl.includes("MUST appear in the `git diff --stat` of the commit being described"),
-    "(i) template paragraph must carry the git-diff-stat-derived file lists requirement",
-  );
-  assert.ok(
-    tpl.includes("every referenced report/spec path MUST exist on disk at write time"),
-    "(ii) template paragraph must carry the exists-on-disk-at-write-time requirement",
-  );
-  assert.ok(
-    /never from memory of the dispatch brief/.test(tpl),
-    "(iii) template paragraph must carry the never-from-memory-of-the-dispatch-brief prohibition",
-  );
-  assert.ok(
-    /Never claim a code-review or QA round that has no on-disk report/.test(tpl),
-    "(iv) template paragraph must carry the no-fabricated-review/QA-rounds prohibition",
-  );
+  assert.ok(!tpl.includes("Record integrity"), "template must not restate the record-integrity paragraph");
+  assert.ok(!tpl.includes("git diff --stat"), "template must not restate the diff-stat file-list rule");
+  assert.ok(!/never from memory of the dispatch brief/.test(tpl), "template must not restate the never-from-the-brief rule");
 });
 
-test("E17-S4 (regression guard) [E394 re-pin AC-P6]: the pre-existing pinned template blocks and skill Hard rules survive alongside the new E17 paragraph", () => {
+test("E17-S4 (regression guard) [E394 re-pin AC-P6] [E404 re-pin]: the template keeps the watermark first and the RELAY paragraph and restates no push-rejection / driftBaselineIds text; the skill Hard rules survive", () => {
   const tpl = fs.readFileSync(
     path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
     "utf-8",
@@ -1685,24 +1663,20 @@ test("E17-S4 (regression guard) [E394 re-pin AC-P6]: the pre-existing pinned tem
     "CRITICAL: End every reply with `— @release-engineer (<the model tier you were actually invoked with>)` per Constitution §1 (watermark).",
     "watermark reminder must remain the first non-blank body line, unshifted by the new E17 paragraph",
   );
-  // The pre-existing push-rejection CRITICAL paragraph is still present verbatim. (D10)
+  // [E404 re-pin] The push-rejection paragraph is no longer restated in the template. (D10)
   assert.ok(
-    tpl.includes(
-      "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP",
-    ),
-    "pre-existing D10 push-rejection CRITICAL paragraph must still be present",
+    !tpl.includes("non-fast-forward push rejection"),
+    "the D10 push-rejection paragraph must not be restated in the template",
   );
   // The pre-existing no-MCP-path relay paragraph is still present verbatim. (E9A)
   assert.ok(
     /CRITICAL: If this session has no MCP tool-invocation path at all/.test(tpl),
     "pre-existing E9A no-MCP-path relay CRITICAL paragraph must still be present",
   );
-  // Pre-existing driftBaselineIds paragraph, still present — the
-  // record-integrity paragraph sits between the RELAY-REQUIRED and
-  // driftBaselineIds paragraphs, and must not have displaced either. (E17)
+  // [E404 re-pin] The driftBaselineIds paragraph is no longer restated in the template.
   assert.ok(
-    tpl.includes("append this release's shipped task IDs to `driftBaselineIds`"),
-    "pre-existing driftBaselineIds paragraph must still be present",
+    !tpl.includes("driftBaselineIds"),
+    "the driftBaselineIds paragraph must not be restated in the template",
   );
 
   // Skill-side regression [E394 re-pin AC-P6]: the push-rejection, relay and commit-message rules survive the

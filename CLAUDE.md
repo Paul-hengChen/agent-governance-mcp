@@ -47,7 +47,7 @@ workspace path, and picks a transport. The layers themselves live elsewhere:
 3. **Guards + gates** (`guards/{session,file-lock}.ts`) — pre-flight check, file
    lock, mtime freshness check; then the 18-step `UPDATE_STATE_GATE_PIPELINE`
    (`tools/handoff-orchestrator.ts`) whose predicates live in `gates/` and whose
-   metadata is declared once per gate in `gates/registry.ts` (35 entries).
+   metadata is declared once per gate in `gates/registry.ts`.
 
 All four persisted artifacts (`handoff.md`, `tasks.md`, the SQLite DB,
 `.config.json`) carry a `schema_version`; older files are lazily migrated
@@ -88,7 +88,18 @@ tools/rag-coalesce.ts     shared _indexingInFlight registry (v3.3.0)
 tools/lane-paths.ts       lane-layout seam: sole owner of the lane-scoped .current/ filenames
 tools/lane-status.ts      integrator lane observability + roll-up (scripts/lane-status.mjs); read-only, fires no gate
 tools/fanout-*.ts         fan-out manifest parse / render / ownership + cut checks and the wave handoff section (scripts/fanout.mjs)
-gates/registry.ts         GATE_REGISTRY — 35 gate definitions (code, owner, exemptions)
+tools/comment-*.ts        comment-length scan, the sixth `agc check` advisory: scanner, per-language lexers, doc-tag rules, shared types
+tools/dispatch-log.ts     append-only per-hop dispatch-mechanism sidecar (one JSON line per write carrying dispatch_mechanism)
+tools/evidence-lookup.ts  archive-aware QA-evidence lookup for tools/drift.ts (qa_reports/ root + qa_reports/archive/<feature>/)
+tools/feature-rollup.ts   feature-level cost roll-up across lane worktrees; reporting only, fires no gate
+tools/hygiene-scan.ts     information-hygiene scan, the fifth `agc check` advisory; never changes the exit code
+tools/join-precondition.ts  join-ticket build-entry self-check (depends_on lane branches are ancestors of HEAD); not a pipeline gate
+tools/lane-migrate.ts     flat <-> lane-scoped .current/ layout migration runners
+tools/lane-registry.ts    read-only lane registry derived from `git worktree list` (tw_get_state lane_registry, feature roll-up)
+tools/lane-ticket-allocation.ts  collision-free backlog ids for lane findings (<LANE>-NEW-n in .current/<lane>/pending-tickets.md)
+tools/merge-invariants.ts post-merge ledger/sidecar preservation check (scripts/merge-invariants.mjs); fires no gate, writes nothing
+tools/tasks-lane-migrate.ts  legacy tasks.md -> lane-local .current/<lane>/tasks.md migration
+gates/registry.ts         GATE_REGISTRY — one definition per gate (code, owner, exemptions)
 gates/pipeline.ts         runUpdateStatePipeline() step runner
 gates/*.ts                one module per gate predicate (cut-approval, scope-decision,
                           feature-lease, external-refs, code-review, qa-review,
@@ -123,7 +134,7 @@ specs/                    design docs (qa-flow, rag-lifecycle, schema-versioning
 docs/schema-versions.md   how to ship a new schema version (v3.4.0)
 docs/backlog.md           the PRD / backlog (prd_path in handoff state)
 scripts/check-version.mjs verify package.json version matches the index.ts Server() literal, dist/index.js, package-lock.json and the latest CHANGELOG heading (git tag: advisory)
-test/                     229 test files (node --test); test/eval/ = behavioural eval harness
+test/                     node --test suites (test/*.test.mjs); test/eval/ = behavioural eval harness
 dist/                     compiled output (committed for npx remote usage)
 ```
 
@@ -155,12 +166,12 @@ dist/                     compiled output (committed for npx remote usage)
 
 ## Testing changes
 
-`test/` holds 229 test files covering guards, transitions and round caps, every
+`test/` holds the `node --test` suites covering guards, transitions and round caps, every
 gate in `GATE_REGISTRY`, drift and sync, schema migrations, prompt composition
 and context budget, the agc adapters, and RAG. Run with:
 
 ```bash
-npm test          # prebuild + node --test test/*.test.mjs  (pass count: the suite-result: line in the latest qa_reports/archive/release-*/review_*.md)
+npm test          # prebuild + node --test test/*.test.mjs  (pass count: the suite-result: line in the most recent release's qa_reports/archive/release-*/review_*.md, by release date, not folder name)
 npm run eval      # separate behavioural eval harness (test/eval/)
 ```
 

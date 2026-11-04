@@ -343,22 +343,11 @@ test("AC4 (E44/E142(b)): the spec-class check is conditional on dispatch shape �
   }
 });
 
-test("AC5: release-engineer.md shim contains a reinforcement hint (<=2 sentences)", () => {
-  // Contract: the shim must remind haiku-tier that staging scope = all upstream work,
-  // not just files edited in the current turn. The hint is <=2 sentences and must
-  // NOT alter the watermark line or the tw_get_state/tw_switch_role invocation.
-  // Watermark line is now tier-agnostic (v3.58.0, C5a re-baseline) — see
-  // test/subagent-templates.test.mjs v3.21.1/v3.21.2 for the rationale.
-  assert.match(
-    SHIM,
-    /ALL uncommitted upstream work/,
-    "shim must mention 'ALL uncommitted upstream work' in the hint (AC5)",
-  );
-  assert.match(
-    SHIM,
-    /not just files you edited this turn/,
-    "shim must clarify 'not just files you edited this turn' (AC5)",
-  );
+test("AC5 [E404 re-pin]: release-engineer.md shim carries no staging reinforcement hint (staging lives in the SOP / prepare phase); watermark and invocation preserved", () => {
+  // Why: E404 slimmed the shim; the staging hint is no longer restated there.
+  assert.ok(!/ALL uncommitted upstream work/.test(SHIM), "shim must not restate the staging-scope hint (AC5)");
+  assert.ok(!/not just files you edited this turn/.test(SHIM), "shim must not restate the staging-scope hint (AC5)");
+  assert.ok(!/Staging scope/.test(SHIM), "shim must carry no staging-scope line (AC5)");
   // Watermark line must be preserved verbatim
   assert.match(
     SHIM,
@@ -368,20 +357,6 @@ test("AC5: release-engineer.md shim contains a reinforcement hint (<=2 sentences
   // tw_get_state / tw_switch_role invocations must be preserved
   assert.match(SHIM, /tw_get_state/, "shim must preserve tw_get_state instruction (AC5)");
   assert.match(SHIM, /tw_switch_role/, "shim must preserve tw_switch_role instruction (AC5)");
-  // Hint length: extract it and count sentences (rough heuristic: periods/! after a word)
-  // The reinforcement hint is the third non-frontmatter paragraph.
-  // We verify the whole shim body is not bloated — shim should stay compact.
-  const bodyLines = SHIM.split("\n").filter((l) => l.trim() && !l.startsWith("---") && !l.startsWith("#"));
-  const hintLine = bodyLines.find(
-    (l) => l.includes("ALL uncommitted upstream work") || l.includes("Staging scope"),
-  );
-  assert.ok(hintLine, "shim must have a hint line about staging scope (AC5)");
-  // Count sentences in the hint line (split on '. ' or '.' at end-of-string)
-  const sentences = hintLine.split(/\.\s+|\.$/).filter(Boolean);
-  assert.ok(
-    sentences.length <= 2,
-    `shim hint must be <=2 sentences; found ${sentences.length}: ${hintLine} (AC5)`,
-  );
 });
 
 // ---------------------------------------------------------------------------
@@ -862,36 +837,14 @@ test("C13-AC5: skill-release-engineer.md no longer contains the old stamp-as-ups
   );
 });
 
-test("C13-AC6/AC7: release-engineer.md shim contains the verbatim STOP-on-⛔ reinforcement hint", () => {
-  // Contract: AC6.1 — a STOP-on-⛔-rejection reminder mirroring AC5's Hard
-  // rule, ≤2 sentences, present in the template shim (not just the skill
-  // file) so haiku-tier context-budget pressure can't drop it.
-  assert.match(
-    SHIM,
-    /CRITICAL: On any ⛔ rejection from any tw_\* tool call, STOP immediately and hand back to the coordinator\/human\./,
-    "release-engineer.md shim must contain the verbatim STOP-on-⛔ reinforcement hint (C13-AC6/AC7)",
-  );
-  assert.match(
-    SHIM,
-    /NEVER hand-edit `\.current\/handoff\.md` or `tasks\.md` to work around a rejection\./,
-    "release-engineer.md shim must forbid hand-editing both handoff.md and tasks.md verbatim (C13-AC6/AC7)",
-  );
+test("C13-AC6/AC7 [E404 re-pin]: release-engineer.md shim no longer restates the STOP-on-⛔ hint (the SOP Hard rule holds it)", () => {
+  // Why: E404 slimmed the shim; the SOP is the only normative source for the STOP rule.
+  assert.ok(!SHIM.includes("On any ⛔ rejection"), "shim must not restate the STOP-on-⛔ hint (C13-AC6/AC7)");
+  assert.ok(!SHIM.includes("⛔"), "shim must carry no ⛔ text (C13-AC6/AC7)");
 });
 
-test("C13-AC6/AC7: release-engineer.md shim contains the verbatim driftBaselineIds reinforcement hint", () => {
-  // Contract: AC6.2 — a driftBaselineIds append reminder mirroring SOP step
-  // 10/9's text, addressing the incident's third defect (the step existed
-  // but was skipped under haiku-tier load with no shim-level anchor).
-  assert.match(
-    SHIM,
-    /append this release's shipped task IDs to `driftBaselineIds`/,
-    "release-engineer.md shim must remind to append shipped task IDs to driftBaselineIds (C13-AC6/AC7)",
-  );
-  assert.match(
-    SHIM,
-    /Skipping it makes every shipped task resurface as drift noise next session\./,
-    "release-engineer.md shim must state the consequence of skipping the driftBaselineIds append verbatim (C13-AC6/AC7)",
-  );
+test("C13-AC6/AC7 [E404 re-pin]: release-engineer.md shim no longer restates the driftBaselineIds hint", () => {
+  assert.ok(!SHIM.includes("driftBaselineIds"), "shim must not restate the driftBaselineIds append hint (C13-AC6/AC7)");
 });
 
 test("C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines are unaltered by the new hints", () => {
@@ -954,21 +907,10 @@ test("D10-AC3: the Escalation Routes table has the push-rejection / collision ro
   assert.ok(HISTORY.includes("non-fast-forward push rejection / concurrent-release collision (D10) | Blocked |"), "the old D10 row lives in the history file");
 });
 
-test("D10-AC4: release-engineer.md shim contains the verbatim D10 reinforcement hint (<=2 sentences)", () => {
-  // Contract: the shim must mirror the Hard rule's STOP instruction and
-  // forbidden-command list as a compact reinforcement hint in the same style as the earlier write-path hints (C13) —
-  // the anchor that survives even under haiku-tier context pressure.
-  const hint =
-    "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP — NEVER `git reset`, `git rebase`, `git checkout --force`, or `git clean`. Write `status=Blocked` with the local release commit SHA in `pending_notes` and hand back to the coordinator/human for recovery.";
-  assert.ok(
-    SHIM.includes(hint),
-    "release-engineer.md shim must contain the verbatim D10 reinforcement hint (D10-AC4)",
-  );
-  const sentences = hint.split(/\.\s+|\.$/).filter(Boolean);
-  assert.ok(
-    sentences.length <= 2,
-    `D10 shim hint must be <=2 sentences; found ${sentences.length} (D10-AC4)`,
-  );
+test("D10-AC4 [E404 re-pin]: release-engineer.md shim no longer restates the D10 push-rejection hint (the SOP Hard rule holds it)", () => {
+  // Why: E404 slimmed the shim; recovery commands and the push-rejection STOP live only in the SOP.
+  assert.ok(!SHIM.includes("non-fast-forward"), "shim must not restate the push-rejection hint (D10-AC4)");
+  assert.ok(!SHIM.includes("git reset"), "shim must not list forbidden recovery commands (D10-AC4)");
 });
 
 test("D10-AC4: shim watermark and tw_get_state/tw_switch_role invocation lines are unaltered by the D10 hint", () => {
