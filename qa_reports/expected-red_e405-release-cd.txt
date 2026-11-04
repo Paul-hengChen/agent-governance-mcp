@@ -1,0 +1,16 @@
+# e405-release-cd — expected-red manifest (sr-engineer SOP step 7a)
+# Format: <relative test file path> | <exact test name/description string>
+# Reason and re-pin owner are in the comment above each entry.
+
+# AC-R10: EXIT_CLASSES grows to 42 rows (11 runner-only classes, 9 E394 rows
+# gain start/record). These tests compare against the E394 table and trigger
+# keys only. Red by design since the exit-table change; qa re-pins in T-E405-10.
+test/e394-release-script.test.mjs | AC-S2 exit table equals the architecture table row for row
+test/e394-release-script.test.mjs | AC-S2 one exit code per failure class
+
+# AC-R10 + C2 (OQ1, settled at the architecture pre-review): the SOP keeps its
+# 31 exit rows and gets no rows for runner-only classes, so a bijection with
+# all of EXIT_CLASSES no longer holds. qa re-pins both to the manual-phase
+# filter (phases include prepare, publish or close-out) in T-E405-11.
+test/release-staging.test.mjs | E53/E163: the Escalation Routes table is one row per exit class, in exit-code order, then the situation rows (pre-flight CI step 4, CI gate exit 41, empty baseline exit 20) (AC-P6)
+test/e394-release-sop.test.mjs | AC-P4 one row per exit code, valid next_role

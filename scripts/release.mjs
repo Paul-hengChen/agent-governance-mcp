@@ -7,6 +7,7 @@
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, renameSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -84,9 +85,10 @@ export const ALLOWED = Object.freeze([
   rule("gh", "pr merge", true, "pr merge <n> --auto --merge", exact(/^\d+$/, "--auto", "--merge")),
   rule("gh", "release create", true, "release create vX.Y.Z", (a) => TAG.test(a[1] ?? "")),
   ...["scripts/check-version.mjs", "scripts/check-bookkeeping.mjs"].map((s) => rule("node", s, false, "no arguments", exact())),
-  rule("node", "scripts/verify-release.mjs", false, "--ci-check --strict --sha <sha> | vX.Y.Z | --close-out",
-    either(exact("--ci-check", "--strict", "--sha", /^[0-9a-f]{40}([0-9a-f]{24})?$/), exact(TAG), exact("--close-out"))),
+  rule("node", "scripts/verify-release.mjs", false, "--ci-check [--strict --sha <sha>] | vX.Y.Z | --close-out",
+    either(exact("--ci-check"), exact("--ci-check", "--strict", "--sha", /^[0-9a-f]{40}([0-9a-f]{24})?$/), exact(TAG), exact("--close-out"))),
   rule("node", "bin/agc-init.mjs", false, "check", exact("check")),
+  rule("npm", "install", true, "install --package-lock-only", exact("--package-lock-only")),
 ]);
 
 const REFUSED_VERBS = new Set(["reset", "rebase", "clean", "checkout", "stash", "update-ref", "merge"]);
@@ -1201,6 +1203,138 @@ async function stepOpeningWrite(ctx) {
   }, "s2");
 }
 
+// ---- Start (s3-s7): CHANGELOG entry, pre-flight CI, version, release branch, bumps ----
+
+// patch → x.y.(z+1), minor → x.(y+1).0, major → (x+1).0.0.
+export function deriveVersion(current, bump) {
+  if (!SEMVER.test(String(current))) throw new ReleaseStop("VERSION_INCOHERENT", `package.json version ${JSON.stringify(current)} is not x.y.z`);
+  const [x, y, z] = current.split(".").map(Number);
+  if (bump === "patch") return `${x}.${y}.${z + 1}`;
+  if (bump === "minor") return `${x}.${y + 1}.0`;
+  if (bump === "major") return `${x + 1}.0.0`;
+  throw usage(`--bump must be patch, minor or major (got ${bump})`);
+}
+
+const incoherent = (detail) => new ReleaseStop("VERSION_INCOHERENT", detail);
+const jsonObject = (text) => { try { const o = JSON.parse(text); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch { return null; } };
+// The three version targets, each found exactly where it must be: the
+// package.json top-level version (nothing else in the object changes), the one
+// index.ts Server literal (the check-version.mjs pattern), and every README
+// `#v<old>` install pin as a whole token.
+export function bumpVersionFiles({ packageText, indexText, readmeText, oldVersion, newVersion }) {
+  const pkg = jsonObject(packageText), old = reEscape(oldVersion);
+  if (!pkg || typeof pkg.name !== "string") throw incoherent("package.json is not a JSON object with a name");
+  const nextPackage = String(packageText).replace(new RegExp(`("version"\\s*:\\s*")${old}"`), `$1${newVersion}"`);
+  if (!isDeepStrictEqual(jsonObject(nextPackage), { ...pkg, version: newVersion })) throw incoherent(`package.json: the first "version": "${oldVersion}" is not its top-level version`);
+  const literal = new RegExp(`(name:\\s*"${reEscape(pkg.name)}",\\s*version:\\s*")${old}"`, "g");
+  const hits = (String(indexText).match(literal) ?? []).length;
+  if (hits !== 1) throw incoherent(`index.ts has ${hits} Server literal(s) with name "${pkg.name}" and version "${oldVersion}", expected exactly one`);
+  const pin = new RegExp(`#v${old}(?!\\w|\\.\\d)`, "g");
+  if ((String(readmeText).match(pin) ?? []).length === 0) throw incoherent(`README.md has no #v${oldVersion} install pin`);
+  return {
+    packageText: nextPackage, indexText: String(indexText).replace(literal, `$1${newVersion}"`),
+    readmeText: String(readmeText).replace(pin, `#v${newVersion}`),
+  };
+}
+
+const UNRELEASED = "## [Unreleased]";
+// The lines under the exact `## [Unreleased]` line up to the next `## `
+// heading, with blank lines trimmed at both ends; null without the heading.
+function unreleasedSection(text) {
+  const lines = String(text ?? "").split("\n"), at = lines.indexOf(UNRELEASED);
+  if (at < 0) return null;
+  const next = lines.findIndex((l, i) => i > at && l.startsWith("## ")), end = next < 0 ? lines.length : next;
+  const blank = (l) => l.trim() === "";
+  let [a, b] = [at + 1, end];
+  while (a < b && blank(lines[a])) a++;
+  while (b > a && blank(lines[b - 1])) b--;
+  return { lines, at, end, body: lines.slice(a, b) };
+}
+export function unreleasedEntry(changelogText) {
+  const s = unreleasedSection(changelogText);
+  return s && s.body.length > 0 ? s.body.join("\n") : null;
+}
+const entryMissing = () => new ReleaseStop("CHANGELOG_ENTRY_MISSING", `CHANGELOG.md has no entry under "${UNRELEASED}" — commit the release's entry there first`);
+// The [Unreleased] entry becomes `## [X.Y.Z] - <date>` directly below an
+// emptied `## [Unreleased]`; the rest of the file is unchanged.
+export function moveUnreleased(changelogText, version, date) {
+  const s = unreleasedSection(changelogText);
+  if (!s || s.body.length === 0) throw entryMissing();
+  if (s.lines.some((l) => l.startsWith(`## [${version}] - `))) throw incoherent(`CHANGELOG.md already has a "## [${version}] - " heading`);
+  return [...s.lines.slice(0, s.at + 1), "", `## [${version}] - ${date}`, "", ...s.body, "", ...s.lines.slice(s.end)].join("\n");
+}
+
+// The HEAD lockfile with its root version and packages[""].version set to the
+// new version must equal the file npm wrote; else the first differing
+// top-level key. No lockfile at HEAD (`before` null) skips the check.
+export function checkLockfileParity({ before, after, oldVersion, newVersion }) {
+  if (before === null || before === undefined) return null;
+  const head = jsonObject(before), disk = jsonObject(after);
+  if (!head) return "package-lock.json at HEAD is not a JSON object";
+  if (!disk) return "package-lock.json is not a JSON object after npm install --package-lock-only";
+  const want = structuredClone(head);
+  want.version = newVersion;
+  if (want.packages?.[""] && typeof want.packages[""] === "object") want.packages[""].version = newVersion;
+  const key = [...new Set([...Object.keys(want), ...Object.keys(disk)])].find((k) => !isDeepStrictEqual(want[k], disk[k]));
+  return key === undefined ? null
+    : `npm install --package-lock-only (v${oldVersion} → v${newVersion}) changed package-lock.json "${key}" beyond the root version and packages[""].version`;
+}
+
+const readRepo = (ctx, rel) => { const abs = path.join(ctx.root, rel); return existsSync(abs) ? readFileSync(abs, "utf-8") : ""; };
+
+// s3: the human-owned artifacts are checked before any branch, bump or build
+// work, so a missing decision stops in seconds. (a) the CHANGELOG entry.
+function stepHumanArtifacts(ctx) {
+  if (unreleasedEntry(readRepo(ctx, "CHANGELOG.md")) === null) throw entryMissing();
+}
+// s4: lenient pre-flight CI for the checked-out head. A non-zero exit is a
+// definite red; WARN lines (gh unavailable, no completed run) continue. A
+// dry-run's child polls once and never waits.
+function stepPreflightCi(ctx) {
+  const env = ctx.runner.dryRun ? { AGC_VERIFY_CI_WAIT_SECONDS: "0" } : undefined;
+  const ci = ctx.runner.read("node", ["scripts/verify-release.mjs", "--ci-check"], { step: "s4", env });
+  if (ci.status !== 0) throw new ReleaseStop("PREFLIGHT_CI_RED", `verify-release.mjs --ci-check exited ${ci.status} — ${failLines(ci)}`);
+}
+// s5: main is brought up to date (recorded, not run, under --dry-run), then
+// the release version is derived from package.json and --bump.
+function stepVersion(ctx) {
+  const { runner: r, opts } = ctx;
+  const fetched = r.mutate("git", ["fetch", "origin"], { step: "s5" });
+  if (fetched.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git fetch origin", fetched, "s5"));
+  pullMain(ctx, "s5");
+  const pkg = jsonObject(readRepo(ctx, "package.json"));
+  if (!pkg) throw incoherent("package.json is not a JSON object");
+  opts.version = deriveVersion(pkg.version, opts.bump);
+  ctx.oldVersion = pkg.version;
+  ctx.out(`release: [s5] ${opts.bump} bump: v${pkg.version} → v${opts.version}\n`);
+}
+// s6: a release branch of that name, local or on origin, is never reused or deleted.
+function stepReleaseBranch(ctx) {
+  const r = ctx.runner, rel = `release/v${ctx.opts.version}`, ref = `refs/heads/${rel}`;
+  const local = gitOut(r, ["rev-parse", "-q", "--verify", ref], "s6");
+  const remote = r.read("git", ["ls-remote", "--heads", "origin", ref], { step: "s6" });
+  if (remote.status !== 0) throw new ReleaseStop("INTERNAL", `git ls-remote --heads origin exited ${remote.status} — cannot tell whether origin has ${rel}`);
+  const where = [local && "locally", remote.stdout.trim() && "on origin"].filter(Boolean);
+  if (where.length > 0) throw new ReleaseStop("RELEASE_BRANCH_EXISTS", `${rel} exists ${where.join(" and ")} — never reuse or delete it`);
+  const sw = r.mutate("git", ["switch", "-c", rel], { step: "s6" });
+  if (sw.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `git switch -c ${rel}`, sw, "s6"));
+}
+// s7: every bump is computed before the first write, so a stop leaves no file
+// half-bumped; then the lockfile is refreshed and may change only its two
+// version fields. A dry-run records the writes and the install and skips parity.
+function stepBumps(ctx) {
+  const { runner: r, opts, oldVersion } = ctx, v = opts.version, step = "s7";
+  const files = bumpVersionFiles({ packageText: readRepo(ctx, "package.json"), indexText: readRepo(ctx, "index.ts"), readmeText: readRepo(ctx, "README.md"), oldVersion, newVersion: v });
+  const changelog = moveUnreleased(readRepo(ctx, "CHANGELOG.md"), v, ctx.now().toISOString().slice(0, 10));
+  for (const [rel, text] of [["package.json", files.packageText], ["index.ts", files.indexText], ["README.md", files.readmeText], ["CHANGELOG.md", changelog]]) r.writeFile(rel, text, { step });
+  const install = r.mutate("npm", ["install", "--package-lock-only"], { step });
+  if (install.status !== 0) throw new ReleaseStop("MUTATION_FAILED", `npm install --package-lock-only exited ${install.status} — ${lastLine(install.stderr) || "no output"}`);
+  const head = r.deferred("git", ["show", "HEAD:package-lock.json"], { step });
+  if (head === null || head.status !== 0) return;
+  const drift = checkLockfileParity({ before: head.stdout, after: readRepo(ctx, "package-lock.json"), oldVersion, newVersion: v });
+  if (drift) throw new ReleaseStop("LOCKFILE_DRIFT", drift);
+}
+
 // Steps not built yet stop INTERNAL; later tasks replace each one.
 const notImplemented = (step) => () => { throw new ReleaseStop("INTERNAL", `not implemented: ${step}`); };
 
@@ -1209,7 +1343,8 @@ const PHASES = {
   prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, step8aSpecs, step8aCommitPushPr],
   publish: [preGh, prePublish, stepPublish],
   "close-out": [preGh, preCloseOut, stepCloseOut],
-  start: [preWorkDir, preGh, preStart, stepPrecondition, stepOpeningWrite, ...["s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"].map(notImplemented)],
+  start: [preWorkDir, preGh, preStart, stepPrecondition, stepOpeningWrite, stepHumanArtifacts, stepPreflightCi, stepVersion, stepReleaseBranch,
+    stepBumps, ...["s8", "s9", "s10", "s11"].map(notImplemented)],
   record: ["pre-3", "r14-1", "r14", "r15"].map(notImplemented),
 };
 
