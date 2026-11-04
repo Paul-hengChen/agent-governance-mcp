@@ -44,22 +44,13 @@ test("T-E166-01a: template names NO staging path list — a restated run of dire
   }
 });
 
-test("T-E166-01b: template's staging line defers to the SOP's step 8a by name (\"Stage explicitly\" / \"Pre-commit verify\")", () => {
-  const stagingLine = TEMPLATE.split("\n").find((l) => l.includes("Staging scope includes ALL uncommitted upstream work"));
-  assert.ok(stagingLine, "template must still carry its staging-scope reinforcement line (T-E166-01)");
-  assert.match(stagingLine, /step 8a/, "staging line must point to SOP step 8a by name (T-E166-01)");
-  assert.match(
-    stagingLine,
-    /"Stage explicitly"/,
-    'staging line must name the "Stage explicitly" anchor (T-E166-01)',
-  );
-  // "Pre-commit verify" is named either on the same line or the sentence
-  // immediately following it — both read as the single staging paragraph.
-  assert.match(
-    TEMPLATE,
-    /"Pre-commit verify"/,
-    'template must name the "Pre-commit verify" anchor (T-E166-01)',
-  );
+test("T-E166-01b [E404 re-pin]: the template carries no staging line and no step 8a reference; staging lives only in the SOP / prepare phase", () => {
+  // Why: E404 slimmed the template to watermark + load + one re-baseline hint + RELAY, so the
+  // staging reinforcement line (and its step 8a pointer, a step that no longer exists) is gone.
+  assert.ok(!TEMPLATE.includes("Staging scope"), "template must carry no staging-scope line");
+  assert.ok(!/step 8a/.test(TEMPLATE), "template must not name SOP step 8a");
+  assert.ok(!TEMPLATE.includes("Stage explicitly"), 'template must not name the "Stage explicitly" anchor');
+  assert.ok(!TEMPLATE.includes("Pre-commit verify"), 'template must not name the "Pre-commit verify" anchor');
 });
 
 test("T-E166-01c [E394 re-pin AC-S6/AC-P3]: the staging contract the template defers to now lives in the `prepare` phase — SOP step 12 delegates it, scripts/release.mjs holds the single normative list and the pre-commit verify, and the history keeps the named anchors", () => {
