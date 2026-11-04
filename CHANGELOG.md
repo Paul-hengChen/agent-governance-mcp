@@ -16,6 +16,65 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+MINOR release. It ships wave e405 since v4.18.0, landed on `main` by one wave pull request:
+lane `e405` (E405 + E401, absorbed). Plan `specs/fanout-e405.md`, release gate
+`specs/release-cd-v4.19.0.md`, lane spec `specs/e405-release-cd.md` and architecture
+`specs/e405-release-cd-architecture.md`. Semver: MINOR (decided by the human), because
+`scripts/release.mjs` gains two phases and `EXIT_CLASSES` grows. This is the first release
+produced by the `Release` GitHub Actions workflow instead of an agent session.
+
+### Added
+
+- **`.github/workflows/release.yml` (E405).** `workflow_dispatch` with inputs `bump`
+  (`patch` / `minor` / `major`), `tickets` (`E1,E2` or `none`) and `dry_run` (default `true`);
+  one job, one checkout, one step per script phase; pushes, pull requests and the tag use the
+  `RELEASE_TOKEN` repository secret (a fine-grained personal access token), the job token only
+  files the failure issue `Release failed: <CLASS_ID>`.
+- **`scripts/release.mjs` phases `start` and `record`.** `start` runs the SOP's steps 1–11
+  (release gate, opening state write through the compiled server under `dist/`
+  (context, not changed), pre-flight CI, version derivation, release branch, bumps, build, test,
+  audit,
+  backlog done-marks, commit message); `record` runs steps 14–15 (closing write and
+  read-back). `EXIT_CLASSES` grows from 31 to 42 rows: codes 60–64 and 70–75 are runner-only
+  and belong to no SOP row. `prepare`, `publish` and `close-out` keep their command lines,
+  stop lines and exit codes.
+- **`docs/release-cd.md`.** How to trigger a release, the inputs, the secret and its
+  permissions, the pre-trigger checklist, the runner-only class table and the manual fallback.
+- **Three new tests:** `test/e405-release-workflow.test.mjs`,
+  `test/e405-release-runner.test.mjs`, `test/e405-release-docs.test.mjs`.
+
+### Changed
+
+- **`publish --dry-run` never waits on CI (E401).** The dry run reports the release head's CI
+  state with a zero wait budget and continues; a completed red run still stops
+  `CI_GATE_FAILED`. The real run keeps the strict gate.
+- **Release-engineer SOP (`content/skill-release-engineer.md`).** Two lines: a pointer to the
+  automated path under `## SOP`, and the E401 sentence on step 13; the SOP stays the manual
+  fallback.
+- **`CONTRIBUTING.md`** names the release workflow once.
+- **Tests.** `test/e394-release-script.test.mjs` and `test/e394-release-sop.test.mjs` are
+  re-pinned to the 42-row exit table and the filtered SOP bijection; one assertion of
+  `test/release-staging.test.mjs` is re-pinned the same way. 229 top-level test files.
+- **`CLAUDE.md` test-file count** corrected from 226 to 229 in the layout and testing sections
+  (human ruling).
+- Unchanged: `GATE_REGISTRY` stays at 35 entries with an 18-step write pipeline; no gate,
+  schema, error-code, routing, `tools/` (context, not changed), `prompts/` (context, not changed),
+  `bin/` (context, not changed) or dependency change; `dist/` changes only in the
+  version literal; `scripts/verify-release.mjs` (context, not changed),
+  `scripts/check-version.mjs` (context, not changed) and `scripts/check-bookkeeping.mjs`
+  (context, not changed) are untouched.
+
+### Notes
+
+- **First automated release.** v4.19.0 is dispatched with
+  `gh workflow run release.yml -f bump=minor -f tickets=E405,E401 -f dry_run=false` after a
+  dry run; the pre-trigger checklist in `docs/release-cd.md` was followed (release gate PASS and
+  this entry committed to `main` by one docs pull request).
+- The `RELEASE_TOKEN` secret must exist before a real run; a missing or expired secret fails
+  the run at checkout.
+- Deferred: E404 (release-engineer template slimming), E406 (`prepare` stages member
+  directories wholesale; a clean runner checkout is unaffected).
+
 ## [4.18.0] - 2026-11-03
 
 MINOR release. It ships prompt-audit wave 3 since v4.17.0, landed on `main` by one wave pull
