@@ -185,15 +185,15 @@ test("AC7: FILE_PATH_DELEGATES.teamwork regex matches the new line 9 and rejects
 // AC8 / AC9 — release-engineer leaves the haiku tier
 // ---------------------------------------------------------------------------
 
-test("AC8: release-engineer template has no example reply suffix and no (haiku) text; ends with the driftBaselineIds paragraph", () => {
+test("AC8 [E404 re-pin]: release-engineer template has no example reply suffix and no (haiku) text; ends with the RELAY paragraph", () => {
   const raw = readRepo("templates", "claude-code-agents", "release-engineer.md");
   assert.ok(!raw.includes("Example reply suffix:"));
   assert.ok(!raw.includes("(haiku)"));
   assert.ok(raw.endsWith("\n"), "file ends with a newline");
   const lines = raw.replace(/\n$/, "").split("\n");
-  assert.equal(lines.length, 23, "file ends at line 23");
-  assert.ok(lines[22].includes("driftBaselineIds"), "last line is the driftBaselineIds paragraph");
-  assert.ok(lines[22].trim() !== "", "no trailing blank line");
+  assert.equal(lines.length, 13, "file ends at line 13");
+  assert.ok(lines[12].startsWith("CRITICAL: If this session has no MCP tool-invocation path at all"), "last line is the RELAY paragraph");
+  assert.ok(lines[12].trim() !== "", "no trailing blank line");
 });
 
 test("AC9: @release-engineer is absent from the coord-04 haiku list and from the claude-code composition", () => {
