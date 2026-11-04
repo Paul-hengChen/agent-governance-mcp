@@ -67,7 +67,7 @@ test("AC-E336-1 [E394 re-pin AC-S3]: scripts/release.mjs pulls main only through
 
 test("AC-E336-1: the two bare grant-name mentions in the integrator SOP stay as grant names", () => {
   const text = read("skill-integrator.md");
-  assert.ok(text.includes("`pull --ff-only` on `main`"), "Permissions row names the granted operation");
+  assert.ok(sec(text, "## Permissions").includes("Constitution §6"), "Permissions row cites the §6 grant instead of enumerating it");
   assert.ok(text.includes("followed by `pull --ff-only` (6-5)"), "Git operations names the granted operation");
 });
 

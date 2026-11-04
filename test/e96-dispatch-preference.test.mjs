@@ -91,8 +91,8 @@ test("t-fallback-genuine-unavailability: coord-03's fallback is conditioned on g
   );
   assert.match(
     coord03,
-    /host advertises no `Task` tool, or the `Task` call returns a tool-error/,
-    "the two disjuncts (no advertised Task tool; a Task call that errors/unknown-subagent-types) must both be present as the genuine-unavailability test",
+    /host advertises no subagent-dispatch tool, or the dispatch call returns a tool-error/,
+    "the two disjuncts (no advertised subagent-dispatch tool; a dispatch call that errors/unknown-subagent-types) must both be present as the genuine-unavailability test",
   );
 });
 
