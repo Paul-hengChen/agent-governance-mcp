@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.19.0] - 2026-11-04
+
 MINOR release. It ships wave e405 since v4.18.0, landed on `main` by one wave pull request:
 lane `e405` (E405 + E401, absorbed). Plan `specs/fanout-e405.md`, release gate
 `specs/release-cd-v4.19.0.md`, lane spec `specs/e405-release-cd.md` and architecture
