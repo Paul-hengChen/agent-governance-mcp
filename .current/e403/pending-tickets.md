@@ -1,5 +1,7 @@
 # Pending tickets — lane e403
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E403-NEW-1
 title: Core coordinator fragments still name the Claude Code-only `Task` alias outside coord-03 line 1
@@ -17,5 +19,3 @@ body: |
   definition into a core fragment. Re-capture the compose goldens and re-measure the lean and
   teamwork budgets (the lean ceiling has little headroom).
 ```
-
-## Applied
