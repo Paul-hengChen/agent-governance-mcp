@@ -93,7 +93,7 @@ suggested names `test/e403-lean-dispatch-alias.test.mjs` and `test/e407-restatem
   `` `pull --ff-only` on `main` `` in the Permissions row (that text leaves with the enumeration)
   and instead asserts the row cites `Constitution §6`; its second assertion (the Git operations
   `followed by `pull --ff-only` (6-5)` line) stays; the `SITES` count for `skill-integrator.md`
-  stays 4. Needs the ownership grant requested under *Dependencies / Prerequisites*.
+  stays 4. The assertion is assigned to this lane by the integrator at pre-review (fan-out manifest *所有權重劃*, limited to the `AC-E336-1` Permissions-row assertion).
   proof: `node --test test/e336-portable-pull.test.mjs` (all green).
 - **AC9 (no other line moves)** — Given the lane diff against `1000517`, when it is read, then the
   `content/**` changes are confined to coord-03 line 1, coord-05 lines 18–29, lite line 20, qa line
@@ -128,7 +128,7 @@ suggested names `test/e403-lean-dispatch-alias.test.mjs` and `test/e407-restatem
 | `test/e96-dispatch-preference.test.mjs:94-95` | re-pin regex + message to the new disjuncts | AC3 | T-E403-02 |
 | `test/e403-lean-dispatch-alias.test.mjs` (new) | AC1, AC2 | AC1, AC2 | T-E403-02 |
 | `test/e407-restatement-citations.test.mjs` (new) | AC4–AC7 site text + citation-resolves checks | AC4–AC7 | T-E407-05 |
-| `test/e336-portable-pull.test.mjs:70` | re-pin the Permissions-row assertion (ownership grant pending) | AC8 | T-E407-05 |
+| `test/e336-portable-pull.test.mjs:70` | re-pin the Permissions-row assertion (assigned to this lane at pre-review) | AC8 | T-E407-05 |
 | `test/fixtures/compose-golden/skill-coordinator-monolith.txt` | re-capture | AC10 | T-E407-06 |
 | `test/context-budget.test.mjs` | re-measure; record before/after; no cap raised, no edit expected | AC11 | T-E407-06 |
 
@@ -144,7 +144,7 @@ both copies, not in scope). The patched copy added exactly 3 failures:
 | `test/e96-dispatch-preference.test.mjs` | `t-fallback-genuine-unavailability` | red | its regex quotes the old `` no `Task` tool, or the `Task` call `` disjuncts | re-pin (T-E403-02) |
 | `test/e96-dispatch-preference.test.mjs` | `t-fallback-self-contained` | green | new sentence keeps `unknown-subagent-type`, adds no `above` | none |
 | `test/skill-manifest.test.mjs` | `t-golden-byte-identity (AC1/AC5)` | red | the coordinator monolith golden carries coord-03 and coord-05 | golden re-capture only, no test edit (T-E407-06) |
-| `test/e336-portable-pull.test.mjs` | `AC-E336-1: the two bare grant-name mentions in the integrator SOP stay as grant names` | red | line 70 asserts `` `pull --ff-only` on `main` `` in the Permissions row, which ruling 2's row drops | re-pin (T-E407-05) — file is outside the lane's 擁有 cell, see *Dependencies* |
+| `test/e336-portable-pull.test.mjs` | `AC-E336-1: the two bare grant-name mentions in the integrator SOP stay as grant names` | red | line 70 asserts `` `pull --ff-only` on `main` `` in the Permissions row, which ruling 2's row drops | re-pin (T-E407-05) — that one assertion is assigned to this lane, see *Dependencies* |
 | `test/e178a-integrator-role.test.mjs` | AC1, AC6, AC7 | green | AC1 pins only `## Permissions` and `\| can \| cannot \|`; AC6/AC7 read const-15 | none |
 | `test/e393-builder-judge-core.test.mjs` | AC-B | green | coord-05 citation `§3 builder ≠ judge` is in Visual Verdict Boundary (line 3), untouched | none |
 | `test/render-structure.test.mjs` | glue / ratchet sweeps | green | single-paragraph replacement, no fence or origin tag touched | none |
@@ -201,7 +201,7 @@ bundle gets only the lite −114.
 - `content/coord-02-host-dispatch.md` (ruling 1 = option (a)).
 - Other `Task` mentions in core fragments outside coord-03 line 1 (the PM dry run counts 6 left in
   the no-host coordinator composition, e.g. coord-05 line 5 "(Task or `tw_switch_role`)"). Not
-  E403's site; a follow-up ticket is the integrator's call.
+  E403's site; filed as a lane finding in `.current/e403/pending-tickets.md` (`E403-NEW-1`), per integrator pre-review.
 - The rest of the report's lite hunk (the Server-read-only line, the `@@ -46` hunk) and qa hunk
   (`@@ -57`), the integrator `## Git operations` section, and every other flag-only finding.
 - Release bookkeeping (version bump, CHANGELOG, backlog done-marks) — release-engineer / integrator.
@@ -214,11 +214,11 @@ so the cut is human-approved in this lane's session after integrator pre-review.
 
 Rulings applied (not re-asked): ruling 1 (a), ruling 2 (report hunk), ruling 6 (pins).
 
-**Ownership request for integrator pre-review**: `test/e336-portable-pull.test.mjs` is not in
+**Ownership (granted at integrator pre-review, manifest *所有權重劃*)**: `test/e336-portable-pull.test.mjs` was not in
 the e403 擁有 cell, but ruling 2's row removes the `` `pull --ff-only` on `main` `` text that its
-`AC-E336-1` grant-name test asserts at line 70 (PM dry run: red). Requested: add that file to e403,
+`AC-E336-1` grant-name test asserts at line 70 (PM dry run: red). Granted: that file is assigned to e403,
 limited to the line-70 assertion of that one test (the line-71 assertion, `SITES` and every other
-test in the file untouched). It is not in e395's set either. If refused, the lane escalates; the
+test in the file untouched). It is not in e395's set either. The
 cut does not change ruling 2's wording to dodge the pin.
 
 Resource audit: the sources are in-repo documents; no URL, design file or external ticket system
@@ -236,9 +236,9 @@ is referenced (internal ticket ids E392/E397/E404/G2-14 point at `docs/backlog.m
 | Resource Audit Gate | zero external hits; `external_refs` omitted |
 | Source-Credibility Gate | not applicable — no design source |
 | Question Batch Gate | zero questions — rulings 1, 2, 6 fixed by the manifest Decisions row |
-| Ambiguity Gate | clear; the one open item is an ownership request for the integrator (above), not a requirements ambiguity |
+| Ambiguity Gate | clear; the ownership item (above) was granted at integrator pre-review |
 | Cut-Approval Gate | cut below; Task-dispatched PM — `cut_approved` not set; integrator mailbox pre-review, then human approval in the lane session |
-| Manifest-Tier Self-Attestation | `fanout.mjs check --cut` run; not eligible — the workspace has no `cutApprovalAutoTier.manifest`, and the cut carries an ownership request |
+| Manifest-Tier Self-Attestation | `fanout.mjs check --cut` run; not eligible — the workspace has no `cutApprovalAutoTier.manifest` |
 | Integrator Stage 0 cut | not applicable |
 
 ## Cut
@@ -251,5 +251,5 @@ is referenced (internal ticket ids E392/E397/E404/G2-14 point at `docs/backlog.m
 | T-E407-03 | sr-engineer: qa Hard rules ownership bullet line 13 → string `qa.ownership` (AC6; site qa:13) | none | 1 | `content/skill-qa-engineer.md` | — |
 | T-E407-04 | sr-engineer: integrator Permissions first row line 38 → strings `integrator.row1.can` and `integrator.row1.cannot` (AC7; site integrator:38) | none | 1 | `content/skill-integrator.md` | — |
 | T-E403-02 | qa-engineer: re-pin e96 `t-fallback-genuine-unavailability` regex + message to the new disjuncts; new AC1/AC2 test file (AC1, AC2, AC3) | T-E403-01 | 2 | `test/e96-dispatch-preference.test.mjs` `test/e403-*.test.mjs` | — |
-| T-E407-05 | qa-engineer: new AC4–AC7 test file (site text + citation resolves in each composition that loads it); re-pin e336 `AC-E336-1` grant-name line-70 assertion to the §6 citation, ownership grant pending (AC4–AC8) | T-E407-01, T-E407-02, T-E407-03, T-E407-04 | 2 | `test/e407-*.test.mjs` `test/e336-portable-pull.test.mjs` | — |
+| T-E407-05 | qa-engineer: new AC4–AC7 test file (site text + citation resolves in each composition that loads it); re-pin e336 `AC-E336-1` grant-name line-70 assertion to the §6 citation, assertion assigned to this lane at pre-review (AC4–AC8) | T-E407-01, T-E407-02, T-E407-03, T-E407-04 | 2 | `test/e407-*.test.mjs` `test/e336-portable-pull.test.mjs` | — |
 | T-E407-06 | qa-engineer: `npm run build && node scripts/capture-constitution-golden.mjs` — only the coordinator monolith may differ, each hunk explained; re-measure budgets, record before/after, no cap raised; final `node scripts/test-lock.mjs -- npm test` on the last HEAD, `dist/` clean (AC10–AC12; AC9 review) | T-E403-02, T-E407-05 | 1–2 | `test/fixtures/compose-golden/**` `test/context-budget.test.mjs` | — |
