@@ -16,6 +16,52 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+PATCH release. It ships wave prompt-audit-w4 since v4.19.0, landed on `main` by one wave pull
+request: lane `e403` (E403 + E407) and lane `e395` (E395 + E404). Plan
+`specs/fanout-prompt-audit-w4.md`, release gate `specs/release-cd-v4.19.1.md`, lane specs
+`specs/e403-lean-dispatch-alias.md` and `specs/e395-claude-md-template-tail.md`. Semver: PATCH,
+because every change is wording, a citation, documentation or a subagent template; no tool,
+gate, schema or routing behaviour changes.
+
+### Changed
+
+- **Coordinator fallback wording is host-neutral (E403).** `content/coord-03-core-fallback.md`
+  line 1 no longer names the Claude Code-only `Task` alias (defined in the host fragment, which
+  the lean composition does not load): "the host advertises no subagent-dispatch tool, or the
+  dispatch call returns a tool-error / unknown-subagent-type". The claude-code composition reads
+  the same as before. The six remaining `Task` mentions in core fragments are filed as E408.
+- **Four skill sites cite the constitution instead of restating it (E407, prompt-audit finding
+  G2-17).** `content/coord-05-core-visual-drift.md` Drift Reconcile becomes the coordinator
+  trigger for §3 *Sequential-context assumption + reconcile*; `content/skill-coordinator-lite.md`
+  Hop cap-exempt cites the Limits table and §5; `content/skill-qa-engineer.md` cites §3
+  `tw_complete_task` ownership; `content/skill-integrator.md`'s permission row cites §6 instead
+  of enumerating the grant. Compose golden `test/fixtures/compose-golden/skill-coordinator-monolith.txt`
+  re-captured; the lean always-on bundle shrinks (about 5711 to 5681 tokens) and no ceiling in
+  `test/context-budget.test.mjs` (context, not changed) moves.
+- **`CLAUDE.md` (E395).** No test-file or gate-definition counts; the Layout block lists eleven
+  more 4.x `tools/` (context, not changed) modules; the Testing section points at the most recent
+  release's review file for the pass count.
+- **`templates/claude-code-agents/release-engineer.md` (E404).** Slimmed from 23 to 13 lines to
+  the shape of the other eleven templates: frontmatter, the watermark line, the SOP load line,
+  one re-baseline hint pointing at SOP step 5, and the no-MCP-path RELAY paragraph verbatim; no
+  example reply suffix.
+- **Tests.** Four new files: `test/e403-lean-dispatch-alias.test.mjs`,
+  `test/e407-restatement-citations.test.mjs`, `test/e395-claude-md-tail.test.mjs`,
+  `test/e404-release-engineer-template.test.mjs`. Re-pins in
+  `test/e96-dispatch-preference.test.mjs`, `test/e336-portable-pull.test.mjs`,
+  `test/e166-template-defers-staging.test.mjs`, `test/e392-subagent-templates.test.mjs`,
+  `test/feature-lease.test.mjs` and `test/release-staging.test.mjs`.
+- Unchanged: `GATE_REGISTRY` stays at 35 entries with an 18-step write pipeline; no gate,
+  schema, error-code, routing, dependency, `tools/` (context, not changed),
+  `prompts/` (context, not changed), `scripts/` (context, not changed) or
+  `.github/` (context, not changed) change; `dist/` changes only in the version literal.
+
+### Notes
+
+- Filed from the wave: E408 (the remaining core-fragment `Task` mentions, follow-up of E403).
+- Dispatched with `gh workflow run release.yml -f bump=patch -f tickets=E395,E403,E404,E407`
+  after a dry run, per the pre-trigger checklist in `docs/release-cd.md` (context, not changed).
+
 ## [4.19.0] - 2026-11-04
 
 MINOR release. It ships wave e405 since v4.18.0, landed on `main` by one wave pull request:
