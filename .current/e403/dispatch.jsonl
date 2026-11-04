@@ -4,3 +4,4 @@
 {"ts":"2026-11-04T09:51:25.936Z","feature":"e403-lean-dispatch-alias","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-04T09:52:16.630Z","feature":"e403-lean-dispatch-alias","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-04T09:55:13.346Z","feature":"e403-lean-dispatch-alias","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-04T09:56:42.078Z","feature":"e403-lean-dispatch-alias","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
