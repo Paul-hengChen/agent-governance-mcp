@@ -123,7 +123,7 @@ specs/                    design docs (qa-flow, rag-lifecycle, schema-versioning
 docs/schema-versions.md   how to ship a new schema version (v3.4.0)
 docs/backlog.md           the PRD / backlog (prd_path in handoff state)
 scripts/check-version.mjs verify package.json version matches the index.ts Server() literal, dist/index.js, package-lock.json and the latest CHANGELOG heading (git tag: advisory)
-test/                     226 test files (node --test); test/eval/ = behavioural eval harness
+test/                     229 test files (node --test); test/eval/ = behavioural eval harness
 dist/                     compiled output (committed for npx remote usage)
 ```
 
@@ -155,7 +155,7 @@ dist/                     compiled output (committed for npx remote usage)
 
 ## Testing changes
 
-`test/` holds 226 test files covering guards, transitions and round caps, every
+`test/` holds 229 test files covering guards, transitions and round caps, every
 gate in `GATE_REGISTRY`, drift and sync, schema migrations, prompt composition
 and context budget, the agc adapters, and RAG. Run with:
 
