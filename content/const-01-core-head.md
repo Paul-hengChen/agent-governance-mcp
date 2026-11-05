@@ -1,4 +1,4 @@
-# Constitution v3.41.0 <!-- versioned independently of package.json -->
+# Constitution
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
