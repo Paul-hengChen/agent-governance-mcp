@@ -418,7 +418,7 @@ test("AC-4/AC-7/AC-8/DR-5/e2e: env threading, arg-priority-over-env, L1 same-pro
     );
 
     const first = textOf(byId, 2);
-    assert.match(first, /^# Constitution v/m, "1st fetch (env-resolved) must carry the full constitution");
+    assert.match(first, /^# Constitution$/m, "1st fetch (env-resolved) must carry the full constitution");
     assert.ok(first.includes(wsEnv), "footer must name the env-resolved path (AC-4)");
     assert.ok(first.includes("resolved via CLAUDE_PROJECT_DIR env"), "footer must name the CLAUDE_PROJECT_DIR env source (AC-4)");
     assert.ok(!first.includes(S03_HEADLINE), "1st fetch must not be omitted — nothing delivered yet for this workspace");
@@ -426,11 +426,11 @@ test("AC-4/AC-7/AC-8/DR-5/e2e: env threading, arg-priority-over-env, L1 same-pro
     const second = textOf(byId, 3);
     assert.ok(second.includes(S03_HEADLINE), "2nd fetch (same workspace, different prompt) must omit via L1 dedup (AC-8)");
     assert.ok(second.includes(S03_RECOVERY), "S03 must carry the DR-5 recovery clause so a false-omission is self-healable, never silent");
-    assert.ok(!/^# Constitution v/m.test(second), "2nd fetch must NOT re-emit the full constitution text");
+    assert.ok(!/^# Constitution$/m.test(second), "2nd fetch must NOT re-emit the full constitution text");
     assert.ok(second.includes(wsEnv), "the footer's resolved-path line is independent of the omit decision — still names the workspace");
 
     const third = textOf(byId, 4);
-    assert.match(third, /^# Constitution v/m, "3rd fetch, a DIFFERENT workspace via explicit arg, must get the FULL constitution (L1 keyed per-workspace, not global)");
+    assert.match(third, /^# Constitution$/m, "3rd fetch, a DIFFERENT workspace via explicit arg, must get the FULL constitution (L1 keyed per-workspace, not global)");
     assert.ok(third.includes(wsArg), "footer must name the arg-resolved path, not the env one (DR-1 arg > env priority)");
     assert.ok(third.includes("resolved via workspace_path arg"), "footer must attribute resolution to the explicit arg, not the env still set on the process");
   } finally {
@@ -460,7 +460,7 @@ test("C11/AC-7 L2: a fresh hook marker (<120s) causes the FIRST fetch in a brand
     const byId = await sendPromptRequests({ env: { CLAUDE_PROJECT_DIR: ws } }, [{ id: 2, name: "teamwork", arguments: {} }]);
     const text = textOf(byId, 2);
     assert.ok(text.includes(S03_HEADLINE), "a fresh L2 marker must omit on the very FIRST fetch in a fresh process — proves L2 independently of L1 (which has nothing recorded yet)");
-    assert.ok(!/^# Constitution v/m.test(text), "full constitution heading must not appear");
+    assert.ok(!/^# Constitution$/m.test(text), "full constitution heading must not appear");
   } finally {
     rm(ws);
   }
@@ -480,7 +480,7 @@ test("C11/AC-7 L2 fail-safe: stale (>120s), malformed, and absent markers all de
     ]);
     for (const [id, label] of [[2, "stale (>120s)"], [3, "malformed"], [4, "absent"]]) {
       const text = textOf(byId, id);
-      assert.match(text, /^# Constitution v/m, `${label} marker must fail-safe to a FULL constitution emit`);
+      assert.match(text, /^# Constitution$/m, `${label} marker must fail-safe to a FULL constitution emit`);
       assert.ok(!text.includes(S03_HEADLINE), `${label} marker must NOT render the S03 sentinel`);
     }
   } finally {

@@ -2,7 +2,7 @@
 base: aa2609a    integration branch: integ/prompt-audit-w7
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類已核准（2026-11-05，待人類裁定 1–6 全照建議），Stage 3 派工中。** E414 裁「三項維持」：不開 task，整合者 5c 結案。
+**狀態：已結案 2026-11-05。** 兩條 lane 都已合併（`integ/prompt-audit-w7` ← e409 `fc46b37` merge `3f5737f`、← e412 `8defaec` merge `8a16bd1`，零衝突）、finish、拆除；E414 裁「三項維持」、不開 task、在記帳結案；派工 base `6e1a9d4`（本清單的 PR #91 merge）。
 
 範圍由人類指定（integrator prompt：「fan-out E409 + E411 + E412 + E414」，2026-11-05）：`docs/prompt-audit-2026-11-02.md` 在 v4.19.2＋w6 之後剩下的四張票（佇列 #224 E409、#226 E411、#227 E412、#229 E414），都帶待人類裁定的選項，在 Stage 2 一次問完、裁定寫進本清單 Decisions，lane 不再問。兩條 lane、各自 mini-chain（PM cut → sr-engineer → code-reviewer → qa-engineer，無 architect）：四票都是字句／模板描述，沒有介面契約要定。本波不改 gate 程式、routing 表、schema、錯誤碼、`tools/**`、`prompts/**`、`dist/**`、`scripts/**`、`bin/**`、`content/coord-*.md`（coord-05 點名行除外）。E414 裁「維持」就不開 task、整合者在 5c 直接結案。
 
@@ -89,6 +89,13 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 5. 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge`。
 6. merged 之後 `git switch main`、`git -c pull.rebase=false pull --ff-only`，再 `git branch -d integ/prompt-audit-w7`。
 
+## 結案
+- 日期 2026-11-05。`integ/prompt-audit-w7` 自 `main` `6e1a9d4` 開；← `--no-ff` e409 `fc46b37`（merge `3f5737f`）、← `--no-ff` e412 `8defaec`（merge `8a16bd1`），兩次零衝突，無實質合併解決 → 無合併審查；merge-invariants 兩次 PASS（789 task id 全在、0 lost [x]、sidecar 139→140）；合併樹 `npm run build` 後 `dist/` 無差異、`capture-constitution-golden.mjs` byte-identical（兩條 lane 各抓一半 golden，合併後一致）；`context-budget.test.mjs` 54/54、lean 5665；`npm audit --audit-level=high` exit 0；`check:bookkeeping` OK；`agc check` OK（4.19.2）；整合層 CI run 42013248873 在 `8a16bd1` 綠。`finish e409`、`finish e412 --shipped --base integ/prompt-audit-w7` 各一次成功（都無 pending-tickets，不配號）：`.current/e409/` → `.current/history/2026-11/e409/`（`3265c98`）、`.current/e412/` → `.current/history/2026-11/e412/`（`59b7381`）；worktree、信箱、本地與遠端 lane branch 都已移除。
+- 彙總（上限按 lane 計）：e409 5 task／hop 6/14／review 1 輪退回（只補 expected-red manifest）／qa 0 輪、lane 全套 4046/4048；e412 3 task／hop 4/14／review 0／qa 0、lane 全套 4045/4047；證據與 `completed_tasks` 一致。
+- 完成定義：表中「同一波 ✓」的列全部成立（lite 第 16 行兩個 server-rejected＋四個 SOP-forbidden、e391 重釘、`# Constitution` 無版本、四個測試檔的標頭 pin 改 version-free、11 golden 重抓、四個預算在上限內且不動、qa-visual 模板 description／body 與 coord-05 第 5 行、coordinator monolith 重抓、subagent-templates 不動、E414 三項裁維持記在 Decisions、`dist/` 無差異、done-mark 與佇列、本段）。
+- 記帳：`docs/backlog.md` E409、E411、E412 done-mark（not yet released）、E414 done-mark（ruled keep, no edit）；佇列 #224、#226、#227、#229 DONE。接線票：無。新發現：無（兩條 lane 都無 pending-tickets）。lane 回報的兩個全套 load flake（feature-lease E10-AC2b、e132 gap-6）在整合層 CI 未再現，不開票。
+- 給下次發版的 CHANGELOG 提示：lite Hard rules 只把 `tw_update_state`／`tw_complete_task` 寫成 server-rejected，`tw_add_task`／`tw_rollback_task`／`tw_void_task`／`tw_switch_role` 寫成 SOP-forbidden；憲法標頭改為 `# Constitution`（不再帶版本號，憲法變更只由 CHANGELOG 記錄；四個測試檔的標頭 pin 改 version-free、11 golden 重抓）；qa-visual 模板 description／body 說明它是 qa-engineer 的視覺子派工與獨立 judge context，coord-05 說何時選它（coordinator monolith golden 重抓）；E414 三項維持；預算 lean 5675→5665、teamwork 21398→約 21416，上限不動；兩個新測試（`test/e409-lite-write-tool-facts.test.mjs`、`test/e412-qa-visual-template.test.mjs`）；無行為變更，建議 PATCH。
+
 ## Dispatch pins
 - e409：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
 - e412：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
@@ -99,3 +106,30 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-05 | 人類 | 本波範圍：E409＋E411＋E412＋E414（integrator prompt「fan-out E409 + E411 + E412 + E414」）；四票進本里程碑由此裁定；發版不在本波 | 整合者 session |
 | 2026-11-05 | 人類 | 核准清單與待人類裁定 1–6 全部照整合者建議（「approve, 全照建議」）：E409 取 (a)；E411 取 (b)；E412 取 (a)（含 coord-05 第 5 行）；E414 三項（G1-01／G1-02／G1-03）維持、不改字句、不跑 eval、整合者 5c 結案；二 lane 平行（e409 = E409＋E411、e412 = E412）；pins 如 Dispatch pins。這些寫進各 lane 的 spec，lane 不再問 | 整合者 session |
 | 2026-11-05 | 整合者 | 規劃核對修正三處票面／prompt 事實：(1) E412 (a) 會動 `content/coord-05` 第 5 行與 `skill-coordinator-monolith.txt`（prompt 說「不碰 content/」不成立），檔案層級仍與 e409 不重疊；(2) E412 票面「五個讀 qa-visual.md 的測試」實際讀 `content/skill-qa-visual.md`，(a) 不動它們；讀模板的只有 `test/subagent-templates.test.mjs`；(3) E411 (b) 除票面三處外還要重釘 `test/prompt-state-footer.test.mjs` 五處 `/^# Constitution v/m`。草案：二 lane 平行，e409 = E409＋E411（＋E414 若裁改）、e412 = E412；待人類裁定 1–6 見上 | 本檔 |
+| 2026-11-05 | 整合者 | 清單 PR #91 merge `6e1a9d4` = 派工 base（docs branch 已刪，遠端只剩 main）；派工前核對在 `6e1a9d4` 重做：lite 第 16 行、const-01 第 1 行、coord-05 第 5 行、qa-visual.md 9 行未變；golden 12 檔、11 檔含標頭；e391 第 73 行、e393 第 138 行、prompt-state-footer 5 處、deliverable-guard 第 66 行未變；`cutApprovalAutoTier` `{}`、`agc check` OK（4.19.2）、CI 在 `6e1a9d4` 綠；信箱 `_mailbox/e409/`、`_mailbox/e412/` 建為空、watch armed baseline e409=0,e412=0；prompt 由 `fanout.mjs render --base 6e1a9d4` 產生。e409 prompt 擁有欄的「E414 若裁改」條件句因 Decisions 裁維持而不生效 | 整合者 session |
+| 2026-11-05 | 整合者 | e409 cut 預審 close（spec `b83d2b7`，lane state `fb44b61`，to-integrator#2）：5 task（2 sr、3 qa）、check --cut 19 token 0 越界、每個 AC 有實作 task。PM 修正規劃漏點：`test/teamwork-lite.test.mjs` 第 100／143 行以 regex 形式 `/^#\s+Constitution\s+v/m` 釘標頭（規劃 grep 只找字面值），已在擁有集、併入 T-E411-02；整合者重 grep test/、scripts/、bin/ 確認無其他 regex 形式 pin。接受 PM 把 `tw_void_task` 列入 lite 第 16 行 SOP-forbidden（+4 ~tok lean）。試套：lean 5675→5665、stripped 10466→10451、non-design 8466→8452、teamwork 21398→21384，上限不動；design-only strip saving 2000→1999（floor ≥ 1999，零餘裕，e412 不碰憲法、整合層不變，本波不動 floor）。golden 11 檔各一個 1c1 hunk、monolith 不變。無要求修改 | 信箱 e409 to-lane#1 |
+| 2026-11-05 | 整合者 | e412 cut 預審 close（spec `79ea4cc`，to-integrator#1）：3 task（2 sr、1 qa）、check --cut 7 token 0 越界、每個 AC 有實作 task。字句：模板第 4 行 description、第 9 行 body 改成「qa-engineer 的視覺子派工、獨立 judge context、design-armed 且 `design/<feature>.md` 有 `## Visual Baselines` 時取代 qa-engineer」，name／model／CRITICAL 行／`tw_switch_role("qa-engineer")` 不動；coord-05 第 5 行在 e408 釘住的括號之後插入何時選 qa-visual 的子句。試套 teamwork 21398→21430（上限 21715；與 e409 的 −14 合計約 21416）；golden 只有 `skill-coordinator-monolith.txt` 一行。無要求修改 | 信箱 e412 to-lane#1 |
+| 2026-11-05 | 人類 | 在 e409 lane session 核准 cut（spec `specs/e409-lite-wording-const-header.md` @ `b83d2b7`，含 teamwork-lite 兩處 regex 重釘與 `tw_void_task`）；coordinator 寫 cut_approved；sr（opus）已派 T-E409-01、T-E411-01，hop 1/14。只影響 e409、已寫在核准的 spec 裡 | e409 lane session；信箱 e409 to-integrator#3 |
+| 2026-11-05 | 人類 | 在 e412 lane session 核准 cut（spec `specs/e412-qa-visual-template.md` @ `79ea4cc`）；coordinator 寫 cut_approved；sr（opus）完成 `9e9e173`（qa-visual.md 第 4、9 行；coord-05 第 5 行，e408 釘住的括號保留；build exit 0、`dist/` 無差、audit 0；預期紅只有 coordinator monolith golden）；code-reviewer 已派，hop 2/14。只影響 e412、已寫在核准的 spec 裡 | e412 lane session；信箱 e412 to-integrator#2 |
+| 2026-11-05 | 整合者 | e412 lane 層驗證 close（to-integrator#4）：HEAD `8defaec`，5 commits，hop 4/14，review 0 輪退回、qa 0 輪；fanout check 12 檔 0 越界；golden 只有 `skill-coordinator-monolith.txt` 一行、`context-budget` 不動；證據 `qa_reports/review_T-E412-01.md`（covers 3 id，suite-result 4045/4047）＋逐 task 檔、`review_reports/review_T-E412-01.md`（APPROVED r1，covers 2）；handoff PASS、ledger 3 id；worktree porcelain 空、重建後仍空、`dist/` 不變；無 pending-tickets、無本機路徑；整合者 push 後 CI run 42007555831 在 `8defaec` 綠。reviewer 非阻擋一則（模板第 9 行重述 Visual Baselines 條件，spec 設計如此）—— 記錄不處理 | 信箱 e412 to-lane#2 |
+| 2026-11-05 | 整合者 | e409 lane 層驗證 close（to-integrator#8）：HEAD `fc46b37`，11 commits，hop 6/14，review 1 輪退回（reviewer r1 只要求補 expected-red manifest，content diff 無異議；r2 APPROVED `b9bef14`）、qa 0 輪；fanout check 26 檔 0 越界；content 只有 const-01 第 1 行與 lite 第 16 行；golden 11 檔各一個 1c1 hunk、coordinator monolith 不變、`context-budget` 不動；證據 `qa_reports/review_T-E409-01.md`（covers 5 id，suite-result 4046/4048）、`review_reports/review_T-E409-01.md`（r1 CHANGES_REQUESTED → r2 APPROVED）、expected-red manifest 29 行；handoff PASS、ledger 5 id；worktree porcelain 空、重建後仍空、`dist/` 不變；無 pending-tickets、無本機路徑；整合者 push 後 CI run 42012650295 在 `fc46b37` 綠。lane 回報兩個全套 load flake（feature-lease E10-AC2b、e132 gap-6，隔離與重跑皆綠、CI 綠）—— 記錄不開票，整合層再現才開 | 信箱 e409 to-lane#2 |
+| 2026-11-05 | 整合者 | 整合：`integ/prompt-audit-w7` 自 `6e1a9d4` 開，← e409 `fc46b37`（merge `3f5737f`）、← e412 `8defaec`（merge `8a16bd1`），兩次零衝突，merge-invariants PASS；合併樹 `dist/` 無差異、golden capture byte-identical、budget 54/54（lean 5665）、audit 0、`check:bookkeeping` OK、`agc check` OK；整合層 CI run 42013248873 在 `8a16bd1` 綠；信箱與 lane-status watch 已停；finish e409（history `3265c98`）、finish e412（history `59b7381`），都無配號，worktree／信箱／本地與遠端 branch 都已移除；記帳 commit（E409、E411、E412 done-mark not yet released、E414 done-mark ruled keep；佇列 #224、#226、#227、#229 DONE） | 整合者 session |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 6e1a9d4
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/prompt-audit-w7 @ 9c09bd7）
+- lane-status：primary（main ← integ/prompt-audit-w7 @ 9c09bd7）release-cd-v4.19.2／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 兩 lane（e409 = E409＋E411、e412 = E412）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-11/e409/` 與 `.current/history/2026-11/e412/`。記帳與本清單在同一個 wave PR。佇列 #224、#226、#227、#229 至此完成；E414 由人類裁「三項維持」、無 task、在記帳結案。
+- 未配號的新發現：無（兩條 lane 都無 pending-tickets；reviewer 非阻擋各一則、兩個全套 load flake 在整合層 CI 未再現，都不開票）。
+- 本波交付：`content/skill-coordinator-lite.md` 第 16 行只把 `tw_update_state`／`tw_complete_task` 寫成 server-rejected，`tw_add_task`／`tw_rollback_task`／`tw_void_task`／`tw_switch_role` 寫成 SOP-forbidden；`content/const-01-core-head.md` 第 1 行改為 `# Constitution`（無版本、無註解），`constitution-deliverable-guard`／`e393`／`prompt-state-footer`／`teamwork-lite`／`e391` 重釘，11 golden 重抓；`templates/claude-code-agents/qa-visual.md` description／body 改為 qa-engineer 的視覺子派工與獨立 judge context，`content/coord-05-core-visual-drift.md` 第 5 行說何時選它，coordinator monolith golden 重抓；新測試 `test/e409-lite-write-tool-facts.test.mjs`、`test/e412-qa-visual-template.test.mjs`；預算 lean 5675→5665、teamwork 約 21416，上限不動。
+### 待人類決定
+- 是否發版、版號（content 字句、模板 description、golden；無行為變更：建議 PATCH → v4.19.3，走 Release workflow `dry_run=true` 再真跑；E409、E411、E412 列帶 `not yet released` 預標，E410、E413 也還未發版，可同一版收）。
+- `docs/prompt-audit-2026-11-02.md` 的票至此全部收完（E391–E414）；要不要在 CHANGELOG 或稽核文件加一行「全部處理完畢」由人類決定。
+- `.current/_primary/` 的 primary 狀態仍是 release-cd-v4.19.2／release-engineer／In_Progress（v4.19.2 發版後收尾狀態），由下一個 role 的寫入推進。
+### 進行中的背景工作
+無
