@@ -2,7 +2,7 @@
 base: aacf9b0    integration branch: integ/prompt-audit-w6
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-11-05，派工中。**
+**狀態：已結案 2026-11-05。** lane e410 已合併（`integ/prompt-audit-w6` ← e410 `4218d2c` merge `30de798`，零衝突）、finish、拆除；派工 base `cd24f34`（本清單的 PR merge）。
 
 範圍由人類指定（coordinator chat：「用 cheapest path 先收 E410＋E413」，2026-11-05）：`docs/prompt-audit-2026-11-02.md` 在 v4.19.2 之後剩下的兩張不需人類取捨的純字句票。E410（佇列 #225）、E413（#228）都已開票。一條 lane、mini-chain（PM cut → sr-engineer → code-reviewer → qa-engineer，無 architect）：兩票都是字句，沒有介面契約要定；小批合併成一個 feature、一輪 review＋QA。本波不改 gate 程式、routing 表、schema、錯誤碼、`tools/**`、`prompts/**`、`dist/**`、`scripts/**`、`templates/**`、`content/coord-*.md`。
 
@@ -41,11 +41,12 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 ## Lanes
 | lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |
 |---|---|---|---|---|---|---|---|
-| e410 | E410＋E413 | feat/e410-task-alias-content-tail | ../agent-governance-mcp-lanes/e410 | `content/const-01-core-head.md`（只限第 33 行）、`content/const-05-core-standards.md`（只限第 9 行）、`content/const-08-chain-31-mid.md`（只限第 2、5 行）、`content/const-12-chain-r10-s4.md`（只限第 2 行）、`content/skill-coordinator-lite.md`（只限第 43、49 行）、`content/skill-integrator.md`（只限第 40、177、181、248 行）、`content/skill-pm.md`（只限第 109、111 行）、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`test/e178a-integrator-role.test.mjs`、`test/e285-integrator-session-handoff.test.mjs`、`test/skill-manifest.test.mjs`、`test/compose-equivalence.test.mjs`、`test/e90-golden-capture-completeness.test.mjs`、`test/render-structure.test.mjs`、`test/e403-lean-dispatch-alias.test.mjs`、`test/e408-core-task-alias-tail.test.mjs`、`test/teamwork-lite.test.mjs`、`test/e391-prompt-audit-stale-facts.test.mjs`、`test/e410-*.test.mjs`、`test/e413-*.test.mjs`（新，qa 定名）、`specs/e410-*.md`、`.current/e410/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`content/**` 其他檔與點名站點以外的行；`content/coord-*.md` 整個 | 做：12 站 host 中性字句、pm 第 109 行 inline 呈報字句、golden 重抓、五個預算重量、integrator 三站重釘。不做：提高任何上限（E397）、憲法標頭（E411）、qa-visual 模板（E412）、G1-*（E414）、E409 的 lite 第 16 行 | 無 |
+| e410 | E410＋E413 | feat/e410-task-alias-content-tail | ../agent-governance-mcp-lanes/e410 | `content/const-01-core-head.md`（只限第 33 行）、`content/const-05-core-standards.md`（只限第 9 行）、`content/const-08-chain-31-mid.md`（只限第 2、5 行）、`content/const-12-chain-r10-s4.md`（只限第 2 行）、`content/skill-coordinator-lite.md`（只限第 43、49 行）、`content/skill-integrator.md`（只限第 40、41、78、81、177、181、248 行）、`content/skill-pm.md`（只限第 109、111 行）、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`test/e178a-integrator-role.test.mjs`、`test/e285-integrator-session-handoff.test.mjs`、`test/e288-integrator-stage0.test.mjs`、`test/e329-integrator-sop-followups.test.mjs`、`test/skill-manifest.test.mjs`、`test/compose-equivalence.test.mjs`、`test/e90-golden-capture-completeness.test.mjs`、`test/render-structure.test.mjs`、`test/e403-lean-dispatch-alias.test.mjs`、`test/e408-core-task-alias-tail.test.mjs`、`test/teamwork-lite.test.mjs`、`test/e391-prompt-audit-stale-facts.test.mjs`、`test/e410-*.test.mjs`、`test/e413-*.test.mjs`（新，qa 定名）、`specs/e410-*.md`、`.current/e410/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`content/**` 其他檔與點名站點以外的行；`content/coord-*.md` 整個 | 做：12 站 host 中性字句、pm 第 109 行 inline 呈報字句、golden 重抓、五個預算重量、integrator 三站重釘。不做：提高任何上限（E397）、憲法標頭（E411）、qa-visual 模板（E412）、G1-*（E414）、E409 的 lite 第 16 行 | 無 |
 
 ## 所有權重劃（相對於預設）
 - **`content/**` 從共同禁止移出，劃給 e410，只限六檔的點名行**：addendum §2 的共享生成物（`content/**`、golden、budget 測試）本波只有這一條 lane。`content/coord-*.md` 仍禁止（E403／E408 已收，別名定義留在 coord-02）。
 - `test/e178a-integrator-role.test.mjs`、`test/e285-integrator-session-handoff.test.mjs` 劃給 e410（integrator 三站的逐字 pin，qa 重釘）。
+- **integrator 第 41／78／81 行與 `test/e288-integrator-stage0.test.mjs`、`test/e329-integrator-sop-followups.test.mjs` 劃給 e410**（cut 預審 R1 重劃，整合者 2026-11-05）：三行是規劃 grep 漏掉的別名站點（同行含 `tasks.md`，被排除規則吃掉），同一 finding；兩個測試檔逐字釘住它們，qa 重釘。
 - 其餘列出的測試檔劃給 e410 作預期不變／紅了才重釘。
 - **`templates/**`、`tools/**`、`dist/**` 回到共同禁止**（上波 w5 的 lite.md／role.ts 重劃不延續）。
 
@@ -74,6 +75,13 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 4. 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge`。
 5. merged 之後 `git switch main`、`git -c pull.rebase=false pull --ff-only`，再 `git branch -d integ/prompt-audit-w6`。
 
+## 結案
+- 日期 2026-11-05。`integ/prompt-audit-w6` 自 `main` `cd24f34` 開；← `--no-ff` e410 `4218d2c`（merge `30de798`），零衝突，無實質合併解決 → 無合併審查；merge-invariants PASS（784 task id 全在、0 lost [x]、138 sidecar）；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；`check:bookkeeping` OK；`agc check` OK（4.19.2）；整合層 CI 見 Decisions。`finish e410 --shipped --base integ/prompt-audit-w6` 一次成功（無 pending-tickets，不配號）：`.current/e410/` → `.current/history/2026-11/e410/`（`0e529f5`）；worktree、信箱、本地與遠端 lane branch 都已移除。
+- 彙總（上限按 lane 計）：e410 6 task／hop 4/14／review 0 輪退回／qa 0 輪；證據與 `completed_tasks` 一致；lane 全套 4040/4042（2 skipped）。
+- 完成定義：表中「同一波 ✓」的列全部成立（15 站 16 處別名→0、claude-code 語意不變、golden 11 檔重抓、五個上限全在內且不動、e178a／e285／e288／e329 重釘、pm 第 109 行 inline 呈報、`dist/` 無差異、done-mark 與佇列、本段）。
+- 記帳：`docs/backlog.md` E410、E413 done-mark（not yet released）；佇列 #225、#228 DONE。接線票：無。reviewer 非阻擋兩則、AC3 −78/−74 筆誤不開票。
+- 給下次發版的 CHANGELOG 提示：`content/` 裡最後 15 行 16 處 `Task` 別名改 host 中性（憲法四個組合與 lite／pm／integrator skill 在非 Claude Code 宿主不再點名未定義工具；預算 lean 5682→5675、teamwork 21408→21398）；PM Question Batch Gate 改 inline 呈報、不再點名 `AskUserQuestion`；golden 11 檔重抓、上限不動；四個測試重釘、兩個新測試；無行為變更，建議 PATCH。
+
 ## Dispatch pins
 - e410：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
 
@@ -83,3 +91,32 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-05 | 人類 | 本波範圍：E410＋E413，cheapest path（coordinator chat「用 cheapest path 先收 E410＋E413」）；兩票進本里程碑由此裁定 | coordinator session |
 | 2026-11-05 | 整合者 | E410 站點集合以規劃時 grep 為準：票面六處之外再併入 const-08 第 2／5 行、integrator 第 40／177／181 行、pm 第 111 行（同一 finding，「併入既有列」決定權）；票面「無測試逐字釘住」修正為 integrator 第 177／181／248 行被 e178a／e285 釘住，qa 重釘。草案：一 lane mini-chain，e410 = E410＋E413；待人類裁定 1–4 見上 | 本檔 |
 | 2026-11-05 | 人類 | 核准清單與待人類裁定 1–4 全部照整合者建議（「approve」）：E410 站點集合 12 處併入 E410；E410 取 (a)；E413 inline 呈報一句、不比原句長；pins 如 Dispatch pins。這四項寫進 lane 的 spec，lane 不再問 | 整合者 session |
+| 2026-11-05 | 整合者 | 清單 PR merge `cd24f34` = 派工 base（docs branch `docs/2026-11-05-fanout-prompt-audit-w6` 已刪）；派工前核對在 `cd24f34` 重做：12 站點行號與 hit 數未變、pm 第 109 行仍有 `AskUserQuestion`、golden 12 檔、`cutApprovalAutoTier` `{}`、`agc check` OK（4.19.2）、CI 在 `cd24f34` 綠、遠端無 lane／integ／docs／release branch；信箱 `_mailbox/e410/` 建為空、watch armed baseline 0；prompt 由 `fanout.mjs render --base cd24f34` 產生 | 整合者 session |
+| 2026-11-05 | 整合者 | e410 cut 預審 R1（to-integrator#2）：lane 的 PM 找到 `content/skill-integrator.md` 第 41／78／81 行三處規劃 grep 漏掉的別名站點（同行含 `tasks.md`，被排除規則吃掉；稽核 G2-16 原本就點名 40–41、78），被 `test/e288-integrator-stage0.test.mjs`、`test/e329-integrator-sop-followups.test.mjs` 逐字釘住。裁 (a)：併入本 lane（同一 finding、同一檔），三行與兩個測試檔劃給 e410、Lanes 表已改；lane 加 T-E410-05 並修 spec 後再送 close。站點集合變 15 處 | 信箱 e410 to-lane#1 |
+| 2026-11-05 | 整合者 | e410 cut 預審 close（spec `cbbbc9b`，to-integrator#3）：6 task（5 sr、1 qa）、check --cut 16 token 0 越界、每個 AC 有實作 task；T-E410-05 收 integrator 第 41／78／81 行，16 處替換、−78 字、無一變長；AC1 改為 occurrence 層級的 grep 規則（排除清單寫明，16 處→0）；AC7 涵蓋 e178a 第 89／287／292、e285 第 81、e288 第 31／64（＋第 113 行標題）、e329 第 46 行的重釘；PM 試套 lean 5675／stripped 10466／non-design 8466／teamwork 21398／skill-pm 4847，上限不動；11 個 golden 變、coordinator monolith 不變。無要求修改 | 信箱 e410 to-lane#2 |
+| 2026-11-05 | 人類 | 在 e410 lane session 核准 cut（spec `specs/e410-task-alias-content-tail.md` @ `cbbbc9b`，含 R1 併入的三行與 T-E410-05）；coordinator 寫 cut_approved；sr（opus）已派 T-E410-01／02／03／05、T-E413-01，hop 1/14。只影響 e410、已寫在核准的 spec 裡 | e410 lane session；信箱 e410 to-integrator#4 |
+| 2026-11-05 | 整合者 | lane e410 進度（to-integrator#5，不需回覆）：sr 完成 `c216461`（七個 content 檔 1/1/2/1/2/7/2 行，無 coord-*）；AC1 規則找到 0 處別名；build exit 0、`dist/` 不變、audit 0；18 個預期紅全在 qa 的 T-E410-04（compose-equivalence ×11、e178a ×2、e285 ×1、e288 ×3、e329 ×1）；spec AC3 的「−78 字」實測為 −74，qa 逐列核對；code-reviewer（opus）已派，hop 2/14 | 信箱 e410 to-integrator#5 |
+| 2026-11-05 | 整合者 | lane e410 進度（to-integrator#6，不需回覆）：code-reviewer（opus）round 1 APPROVED 五個 task（`review_reports/review_T-E410-01.md`，commit `b840b0a`）；16 個 span 逐 byte 核對、AC1 = 0、coord-* 不變、`dist/` 乾淨；非阻擋：AC3 總數 −78 vs −74（qa 逐列斷言）、無 expected-red manifest（E408 先例）；qa（sonnet）已派 T-E410-04；hop 4/14 | 信箱 e410 to-integrator#6 |
+| 2026-11-05 | 整合者 | e410 lane 層驗證 close（to-integrator#7）：HEAD `4218d2c`，7 commits，hop 4/14，review 0 輪退回、qa 0 輪；fanout check 35 檔 0 越界；worktree porcelain 空、重建後仍空、`dist/` 不變；content 七檔 16 行、coord-* 不變；golden 11 檔變、monolith 不變；`context-budget.test.mjs` 不變；證據 `qa_reports/review_T-E410-04.md`（PASS，covers 6 id，suite-result 4040/4042）＋逐 task PASS 檔、`review_reports/review_T-E410-01.md`（APPROVED，covers 5）；handoff PASS、ledger 6 id；七檔別名掃描 0（integrator 剩的 `Task` 是工具名 `TaskStop`）；無 pending-tickets；無本機路徑；整合者 push 後 CI run 41996534895 在 `4218d2c` 綠。lane 疑慮 (1) 無 expected-red manifest（E408 先例）、(2) sr／reviewer 同 opus（reviewer 以腳本逐 byte 核對）、spec AC3 總數 −78 實測 −74（qa 逐列斷言）—— 記錄不處理 | 信箱 e410 to-lane#3 |
+| 2026-11-05 | 整合者 | 整合層 CI：run 41997162782 在 merge HEAD `30de798` 綠；記帳 HEAD 的 run 見接手步驟後的 PR | 整合者 session |
+| 2026-11-05 | 整合者 | 整合：`integ/prompt-audit-w6` 自 `cd24f34` 開，← e410 `4218d2c`（merge `30de798`），零衝突，merge-invariants PASS；`dist/` 無差異、audit 0、`check:bookkeeping` OK、`agc check` OK；finish e410（history `0e529f5`，無配號，worktree／信箱／本地與遠端 branch 都已移除）；記帳 commit（E410、E413 done-mark，佇列 #225、#228 DONE）；信箱 watch 已停 | 整合者 session |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ cd24f34
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/prompt-audit-w6 @ a97e21e）
+- lane-status：primary（main ← integ/prompt-audit-w6 @ a97e21e）release-cd-v4.19.2／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 一 lane（e410 = E410＋E413）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-11/e410/`。記帳與本清單在同一個 wave PR。佇列 #225、#228 至此完成。
+- 未配號的新發現：無（lane 無 pending-tickets；reviewer 非阻擋兩則與 AC3 筆誤不開票）。
+- 本波交付：`content/` 裡最後 15 行 16 處 `Task` 別名（const-01:33、const-05:9、const-08:2/5、const-12:2、lite:43/49、integrator:40/41/78/81/177/181/248、pm:111）改 host 中性；`content/skill-pm.md` 第 109 行 Question Batch Gate 改 inline 呈報；golden 11 檔重抓（monolith 不變）、五個上限不動；`e178a`／`e285`／`e288`／`e329` 重釘；新測試 `test/e410-task-alias-content-tail.test.mjs`、`test/e413-pm-question-batch-inline.test.mjs`。
+### 待人類決定
+- 是否發版、版號（content 字句與 golden；無行為變更：建議 PATCH → v4.19.3，走 Release workflow `dry_run=true` 再真跑；E410、E413 列帶 `not yet released` 預標）。
+- E409（佇列 #224）：取 (a) 字句或 (b) handler gate，排進哪一波。
+- E411（憲法標頭版本）、E412（qa-visual 模板存廢）、E414（Group 1 prompt 寫法）：三張都要人類先裁選項才能開 cut。
+- `.current/_primary/` 的 primary 狀態仍是 release-cd-v4.19.2／release-engineer／In_Progress（v4.19.2 發版後收尾狀態），由下一個 role 的寫入推進。
+### 進行中的背景工作
+無

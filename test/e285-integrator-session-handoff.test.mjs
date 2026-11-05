@@ -78,7 +78,7 @@ test("AC-E285-4: Stage 4 two-hour idle stop writes the watch-stop handoff and ke
 test("AC-E285-5: every local full suite runs in the verifier; repeated tables shown as differences", () => {
   need("### 5a", "MUST", "pre-push", "never in your own context");
   need("## Output", "differences");
-  assert.ok(SOP.trimEnd().endsWith("(no tier: an MCP-prompt invocation is not Task-spawned, Constitution §1)."), "file still ends with the watermark bullet");
+  assert.ok(SOP.trimEnd().endsWith("(no tier: an MCP-prompt invocation is not a subagent, Constitution §1)."), "file still ends with the watermark bullet");
   const out = sec("## Output");
   assert.ok(out.indexOf("differences") < out.indexOf("End every reply with the watermark"), "differences bullet sits above the watermark bullet");
 });

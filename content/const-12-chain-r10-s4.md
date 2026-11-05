@@ -1,5 +1,5 @@
 - **Sequential-context assumption + reconcile<!-- origin:start --> (R10)<!-- origin:end -->.** The chain assumes sequential single-context
-  handoffs. Background/parallel `Task` fan-out and inline-coordinator execution can desync `tasks.md`
+  handoffs. Background/parallel subagents and inline-coordinator execution can desync `tasks.md`
   from the authoritative `handoff.completed_tasks`. After any out-of-band/inline execution, before a
   PASS or hand-back, `tw_detect_drift`; on handoff-ahead drift run **`tw_sync`** (mirrors the ledger
   onto `tasks.md` — bookkeeping only; NEVER writes `handoff`, NEVER promotes a `tasks.md`-only `[x]`,
