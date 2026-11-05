@@ -11,6 +11,6 @@
    Propose the cheapest compliant path by default and surface the classification to the human in ONE line (e.g. `intake: phase 1 coordinator-direct (forensics), phase 2 mini-chain — cheapest compliant path`). Hard floor — no classification ever bypasses it: §2 test ownership (only qa-engineer authors tests) and §3 builder ≠ judge. Small-batch composition: batch small same-class rows into ONE feature with a single review + QA round.
 5. **Apply Complexity Scope Gate** against the request.
    - **No gate triggered** → execute directly → `tw_update_state` (if step 3 was run).
-   - **Gate triggered** → dispatch via the Auto-Routing preference order (Task-tool subagent if available, else `tw_switch_role(<role>)`) → follow the SOP exclusively. The server increments the persisted `hop_count` on each accepted role-transition write — do not count hops yourself.
+   - **Gate triggered** → dispatch via the Auto-Routing preference order (subagent-dispatch tool if available, else `tw_switch_role(<role>)`) → follow the SOP exclusively. The server increments the persisted `hop_count` on each accepted role-transition write — do not count hops yourself.
 6. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role` field; if `auto_mode = off`, surface the recommendation and wait.
 
