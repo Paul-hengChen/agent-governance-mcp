@@ -68,3 +68,43 @@ No findings. Prompt size goes down slightly: the spec's trial budget shows lean 
 
 ## Verdict
 CHANGES_REQUESTED — the content diff is correct and complete for AC1 and AC3, but the commit intentionally leaves 18 tests red without the required `qa_reports/expected-red_e409-lite-wording-const-header.txt` manifest (SOP step 4a). Add the manifest with the entries above; no change to `content/`.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Scope: fix commit `5c0afdf` (adds `qa_reports/expected-red_e409-lite-wording-const-header.txt`, 29 lines) and lane-state commit `a8843e7`. `git diff --stat fb44b61 HEAD -- content test dist` still shows only the two one-line `content/` edits from `ad2e1f1`, so the round-1 content review stands unchanged.
+
+## Summary
+- The round-1 required finding (expected-red manifest missing) is resolved.
+- The manifest holds 18 entries in SOP 4a format (`<relative test file path> | <exact test name>`), with `#` comments for the header and grouping.
+- Its 18 entries match the 18 in my round-1 Correctness block exactly, in the same order (compared programmatically: `True`).
+- Verdict: APPROVED.
+
+## AC Completeness
+Unchanged from round 1: AC1 and AC3 are implemented. AC2 and AC4–AC8 belong to the qa tasks that follow this hop.
+
+## Correctness
+No findings.
+- **Manifest vs round 1:** the 18 non-comment lines are byte-identical to the round-1 list. The file ends with a newline and is UTF-8.
+- **Parent-suite line:** leaving out a separate entry for `constitution-deliverable-guard (v3.27.0)` is correct. node prints it as `not ok` only as a roll-up of its A3 subtest and does not count it in `# fail`. The manifest's header comment names it, so QA Phase 0.5 can account for that line. This settles the open note I left in round 1.
+- **Step 4a sampling:** I checked all 18 entries, not just 3. Ten are literal strings in the named file: the 2 SessionStart-hook goldens, the monolith golden, A3, AC-C01, the 2 prompt-state-footer tests, the 2 teamwork-lite tests and AC-G2-11. The other 8 `buildPromptForRole(...)` names are built at runtime from the template at `test/compose-equivalence.test.mjs:71` and the golden table at lines 60–67. I matched those 8 against real TAP output instead (next bullet).
+- **Full suite on HEAD (`a8843e7`):** `node scripts/test-lock.mjs -- npm test` gives `# tests 4042`, `# pass 4022`, `# fail 18`, `# skipped 2`. There are 19 `not ok` lines: the 18 manifest entries plus the parent roll-up. No red falls outside the manifest.
+- **`test/feature-lease.test.mjs` "E10-AC2b … LEASE_OVERRIDE_AUDIT_MISSING":**
+  - It was green in my full-suite run on HEAD and passed 67/67 in my isolated run of the file.
+  - The test (`test/feature-lease.test.mjs:1042`) seeds a fresh `os.tmpdir()` workspace through `mkWs`, calls `handleUpdateState`, and asserts on the rejection envelope. It reads nothing under `content/`.
+  - This diff touches only prose in `content/` and a manifest under `qa_reports/`, and no code path links those to that test.
+  - Conclusion: an intermittent full-suite-load flake, unrelated to this feature. It needs nothing from this diff and correctly stays out of the manifest. QA Phase 0.5 may note it if it recurs.
+
+## Quality
+No findings. The manifest's comment lines follow the existing manifest convention (header, format line, grouping comments) and add no sensitive data or local paths.
+
+## Architecture
+No findings. sr touched only `qa_reports/` (its own SOP 7a artifact) and lane state. `content/`, `test/` and `dist/` did not change after round 1.
+
+## Security
+No findings. The new file is plain-text test metadata.
+
+## Performance
+No findings. Nothing changed at runtime.
+
+## Verdict
+APPROVED — the required manifest is present, correctly formatted, identical to the round-1 list, and accounts for every red in a full-suite run on HEAD. The content diff was already correct in round 1.
