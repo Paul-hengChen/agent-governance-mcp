@@ -1,5 +1,7 @@
 # Pending tickets — lane e408
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E408-NEW-1
 title: Lite SOP says tw_add_task and tw_rollback_task are server-rejected, but the server accepts them
@@ -19,5 +21,3 @@ body: |
   only the lite subagent template's parenthetical to cite the SOP prohibition instead of a server
   claim.
 ```
-
-## Applied
