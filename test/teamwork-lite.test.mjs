@@ -97,7 +97,7 @@ test("AC2: prompts/coordinator-lite.ts exports buildCoordinatorLitePrompt", asyn
   assert.ok(Array.isArray(result.messages) && result.messages.length === 1, "1 message");
   const text = result.messages[0].content.text;
   assert.match(text, /Skill:\s+coordinator-lite/, "loaded lite skill");
-  assert.match(text, /^#\s+Constitution\s+v/m, "loaded constitution");
+  assert.match(text, /^# Constitution$/m, "loaded constitution");
 });
 
 test("AC3: ListPromptsRequestSchema response includes 'teamwork-lite'", async () => {
@@ -140,7 +140,7 @@ test("AC3b: GetPromptRequestSchema dispatches 'teamwork-lite' correctly", async 
   assert.ok(getRes.result, `expected result, got: ${JSON.stringify(getRes).slice(0, 200)}`);
   const text = getRes.result.messages[0].content.text;
   assert.match(text, /Skill:\s+coordinator-lite/, "dispatched to lite skill");
-  assert.match(text, /^#\s+Constitution\s+v/m, "constitution still loaded (single source of truth)");
+  assert.match(text, /^# Constitution$/m, "constitution still loaded (single source of truth)");
 });
 
 test("Boundary: unknown workspace_path still returns prompt (graceful, no crash)", async () => {
