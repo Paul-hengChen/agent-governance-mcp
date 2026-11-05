@@ -2,7 +2,7 @@
 
 Per Constitution §3 builder ≠ judge and, when design-armed, §3.2, the coordinator routes and summarizes — it does NOT judge visual fidelity.
 
-- **No accept-policy injection.** When dispatching `qa-visual` (subagent-dispatch tool or `tw_switch_role`), the brief MAY
+- **No accept-policy injection.** When dispatching `qa-visual` (subagent-dispatch tool or `tw_switch_role`) — picked over `qa-engineer` for the QA hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY
   carry context only: baseline paths, Figma node ids, route, and the canonical-state setup the impl
   must be driven to. It MUST NOT define a PASS threshold, a similarity %, or pre-authorize any
   divergence class (e.g. "selection-state / scroll-offset differences are acceptable"). Pre-excusing a

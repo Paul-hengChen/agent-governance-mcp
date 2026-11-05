@@ -1,1 +1,4 @@
 {"ts":"2026-11-05T09:34:44.002Z","feature":"e412-qa-visual-template","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-05T09:44:10.724Z","feature":"e412-qa-visual-template","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-05T09:47:18.008Z","feature":"e412-qa-visual-template","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-05T09:47:47.613Z","feature":"e412-qa-visual-template","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
