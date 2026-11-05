@@ -16,6 +16,43 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+PATCH release. It ships wave prompt-audit-w5 since v4.19.1, landed on `main` by one wave pull
+request: lane `e408` (E408 with the prompt-audit items G2-19 and G2-23 folded in). Plan
+`specs/fanout-prompt-audit-w5.md`, release gate `specs/release-cd-v4.19.2.md`, lane spec
+`specs/e408-core-task-alias-tail.md`. Semver: PATCH, because every change is wording, one
+subagent-template sentence or a source comment; no tool, gate, schema or routing behaviour changes.
+
+### Changed
+
+- **Core coordinator fragments are host-neutral everywhere (E408).** The six `Task` mentions left
+  after v4.19.1 in `content/coord-03-core-fallback.md` (the Crash detection row and Crash-Resume
+  steps 0, 2 and 3), `content/coord-05-core-visual-drift.md` (the accept-policy bullet) and
+  `content/coord-07-core-sop.md` (SOP step 5) now read "dispatched subagent call" /
+  "subagent-dispatch tool", the nouns the host fragment `content/coord-02-host-dispatch.md` (context, not changed) defines.
+  The lean / non-Claude-Code coordinator composition no longer names a tool nothing defines; the
+  claude-code composition keeps the alias defined once and means what it meant before. Compose
+  golden `test/fixtures/compose-golden/skill-coordinator-monolith.txt` re-captured (six one-line
+  hunks); the teamwork bundle grows by about 7 tokens and no ceiling in
+  `test/context-budget.test.mjs` (context, not changed) moves.
+- **`templates/claude-code-agents/lite.md` (prompt-audit G2-19).** Line 9 cites the lite SOP's own
+  prohibition on write tools instead of claiming the server rejects them, and states why the
+  template pins `haiku` while `content/skill-coordinator-lite.md` (context, not changed) recommends
+  `sonnet`: a coordinator that dispatches the subagent validates the reply watermark, a direct
+  session has no such check (`specs/d8-lite-recommended-model.md` (context, not changed) Amendment, AC8).
+- **`tools/role.ts` comment (prompt-audit G2-23).** The post-chain-roles comment no longer claims
+  release-engineer is absent from `tools/transitions.ts` (context, not changed): doc-writer alone is
+  side-channel; release-engineer opens on the qa-engineer PASS edge (v3.49.0, C13). Comment lines
+  only; `dist/tools/role.js` and `dist/tools/role.js.map` rebuilt with the same comment, every
+  executable line byte-identical to v4.19.1.
+- **Tests.** One new file, `test/e408-core-task-alias-tail.test.mjs` (Task-free lean composition,
+  per-site text, claude-code alias precedence, lite template shape, role.ts comment text). No re-pins.
+- **Backlog.** E408 done-marked; E409 filed from the lane (the lite SOP's Hard rules say the server
+  rejects `tw_add_task` and `tw_rollback_task`, but those handlers run only the pre-flight check).
+- Unchanged: `GATE_REGISTRY` stays at 35 entries with an 18-step write pipeline; no gate, schema,
+  error-code, routing, dependency, `prompts/` (context, not changed), `scripts/` (context, not changed)
+  or `.github/` (context, not changed) change; `dist/` changes only in the role.js comment and the
+  version literal.
+
 ## [4.19.1] - 2026-11-04
 
 PATCH release. It ships wave prompt-audit-w4 since v4.19.0, landed on `main` by one wave pull
