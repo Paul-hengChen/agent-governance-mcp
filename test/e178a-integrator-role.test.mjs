@@ -86,7 +86,7 @@ test("AC1: content/skill-integrator.md — frontmatter, purpose, work-overview, 
   // (f) ends with the watermark rule, no tier
   const tail = SOP.trimEnd();
   assert.ok(
-    tail.endsWith("(no tier: an MCP-prompt invocation is not Task-spawned, Constitution §1)."),
+    tail.endsWith("(no tier: an MCP-prompt invocation is not a subagent, Constitution §1)."),
     "SOP must end with the no-tier watermark rule",
   );
   assert.match(SOP, /— @integrator/);
@@ -284,12 +284,12 @@ test("AC8: tool-internal git ops of `agc feature start`/`finish` are sanctioned 
 test("AC9: SOP merge stage — substantive-resolution code-reviewer duty, no-ff-before-APPROVED, qa golden regen, no self-fix", () => {
   assert.ok(SOP.includes("A resolution is *substantive* when any conflict hunk's result is not simply both sides kept verbatim"));
   assert.ok(SOP.includes("a build-output or golden regeneration is not substantive"));
-  assert.ok(SOP.includes("dispatch `code-reviewer` via Task on that merge commit"));
+  assert.ok(SOP.includes("subagent-dispatch `code-reviewer` on that merge commit"));
   assert.ok(SOP.includes("`git show --remerge-diff <merge-sha>`"));
   assert.ok(SOP.includes("`review_reports/review_merge-<short-sha>.md`, committed on the integration branch"));
   assert.ok(SOP.includes("no `tw_update_state` on the integration branch (the E222 precedent)"));
   assert.ok(SOP.includes("never open the pull request before that verdict is APPROVED."));
-  assert.ok(SOP.includes("dispatch `qa-engineer` via Task to regenerate and explain every hunk"));
+  assert.ok(SOP.includes("subagent-dispatch `qa-engineer` to regenerate and explain every hunk"));
   assert.ok(SOP.includes("**Never fix feature code on the integration branch**"));
 });
 

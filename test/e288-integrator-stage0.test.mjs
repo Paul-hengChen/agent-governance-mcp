@@ -28,7 +28,7 @@ const bodyRows = (section) => section.split("\n").filter((l) => l.startsWith("|"
 
 const H0 = "## Stage 0 — Ticket cut (optional)";
 const ROW0 = "| 0. Ticket cut (optional) | Only when the human gives a scope draft or a cross-repo hand-off note: dispatch PM to write the ticket-cut file only; skipped when tickets are already cut |";
-const PERM_ROW = "| Stage 0 only: dispatch PM (Task) to write the ticket-cut file — no `tasks.md`, no write-type `tw_*` | Dispatch PM for anything else (spec, tasks, state writes) |";
+const PERM_ROW = "| Stage 0 only: dispatch PM to write the ticket-cut file — no `tasks.md`, no write-type `tw_*` | Dispatch PM for anything else (spec, tasks, state writes) |";
 const PM_ROW = "| **Integrator Stage 0 cut** | The integrator's brief dispatches you for its Stage 0. | Write only the cut file the brief names: one row per ticket under the Cut-Approval header below (`id` = the backlog id, else `NEW-<n>`), then each open question as a `needs human ruling` item. No spec, no `tasks.md`, no write-type `tw_*` (reads stay). Do not halt for approval — the human approves the file with the integrator's manifest. Final reply: the file path. |";
 const CUT_HEADER = "`id | desc | depends_on | est. files | touches | design-link`";
 
@@ -61,7 +61,7 @@ function checkAC2(sop) {
 function checkAC3(sop) {
   const s = slice(sop, H0, "## Stage 1");
   const f = [];
-  for (const lit of ["Dispatch PM via Task", "specs/ticket-cut-<feature>.md", "no spec, no `tasks.md`, no write-type `tw_*` call", "approved together with the manifest at Stage 2", "does not restate this protocol"]) {
+  for (const lit of ["Subagent-dispatch PM", "specs/ticket-cut-<feature>.md", "no spec, no `tasks.md`, no write-type `tw_*` call", "approved together with the manifest at Stage 2", "does not restate this protocol"]) {
     if (!s.includes(lit)) f.push(`Stage 0 must contain: ${lit}`);
   }
   if (!/the PM SOP's \*Integrator Stage 0 cut\* row carries it/.test(s)) f.push("must say the PM SOP row carries the protocol");
@@ -110,7 +110,7 @@ test("AC-E288-1: Stage 0 heading, Work overview row, Lifecycle row and invocatio
 test("AC-E288-2: Stage 0 is skipped when tickets are cut and runs only on a scope draft / hand-off note", () => {
   assert.deepEqual(checkAC2(SOP), []);
 });
-test("AC-E288-3: PM via Task writes only the cut file; approved with the manifest; Stage 1 input and Stage 2 updated", () => {
+test("AC-E288-3: the Stage 0 PM dispatch writes only the cut file; approved with the manifest; Stage 1 input and Stage 2 updated", () => {
   assert.deepEqual(checkAC3(SOP), []);
 });
 test("AC-E288-4: Permissions gains exactly one Stage 0 PM row (5 body rows); the tw_update_state cell is unchanged", () => {
