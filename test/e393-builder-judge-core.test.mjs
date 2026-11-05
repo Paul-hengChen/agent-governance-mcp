@@ -135,7 +135,7 @@ test("AC-C: named sites restate no bare round number", () => {
 
 test("AC-C01: Limits table has the visual_split row", () => {
   const head = C("const-01-core-head.md");
-  assert.ok(head.startsWith("# Constitution v3.41.0"), "AC-D1: header bumped to v3.41.0");
+  assert.ok(head.startsWith("# Constitution\n"), "AC5: constitution header is the version-free '# Constitution'");
   const row = head.split("\n").find((l) => l.startsWith("| `visual_split` threshold"));
   assert.ok(row, "visual_split row exists in the Limits table");
   const cells = row.split("|").map((c) => c.trim()).filter(Boolean);

@@ -54,22 +54,24 @@ const { REQUIRED_VISUAL_SECTIONS_EXPORT } = await (async () => {
 
 describe("constitution-deliverable-guard (v3.27.0)", () => {
   // -------------------------------------------------------------------------
-  // A3 — Version header
-  // Asserts: constitution header carries a version ≥ v3.27 (not the stale v3.14.1
-  // value that existed before this work). Must match v3.x.y pattern AND NOT be
-  // exactly v3.14.1.
+  // A3 — Version-free header (E411)
+  // Asserts: the constitution header is exactly "# Constitution", with no version
+  // number and no HTML comment, in all four compositions. Why: nothing bumps a
+  // header version, so it rots; the CHANGELOG is the record of constitution changes.
   // -------------------------------------------------------------------------
-  test("A3 (t-a3-version-header): header matches v3.x.y pattern and is not stale v3.14.1", () => {
+  test("A3 (t-a3-version-header): header is exactly '# Constitution' (no version, no comment) in all four compositions", () => {
     const firstLine = CONSTITUTION.split("\n")[0];
-    assert.match(
-      firstLine,
-      /^# Constitution v3\.\d+\.\d+/,
-      "First line must be '# Constitution v3.<major>.<minor>' version header",
-    );
-    assert.ok(
-      !firstLine.includes("v3.14.1"),
-      "Constitution must not carry the stale v3.14.1 version — deliverable A3 not landed",
-    );
+    assert.equal(firstLine, "# Constitution", "First line must be exactly '# Constitution'");
+    for (const chain of [true, false]) {
+      for (const design of [true, false]) {
+        const composed = composeConstitution({ chain, design });
+        assert.ok(
+          composed.startsWith("# Constitution\n"),
+          `composition chain=${chain} design=${design} must start with '# Constitution\\n'`,
+        );
+        assert.doesNotMatch(composed.split("\n")[0], /v\d|<!--/, "header carries no version or HTML comment");
+      }
+    }
   });
 
   // -------------------------------------------------------------------------

@@ -70,10 +70,11 @@ test("AC-G2-08: constitution file names are const-*.md; doc-writer lists coord-*
   assert.equal(count(C("skill-doc-writer.md"), "`content/const-*.md`, `content/coord-*.md`"), 1);
 });
 
-test("AC-G2-11: lite says four write tools server-rejected, tw_switch_role SOP-forbidden", () => {
+test("AC-G2-11: lite says tw_update_state / tw_complete_task server-rejected, the other write tools SOP-forbidden", () => {
   const t = C("skill-coordinator-lite.md");
   assert.equal(count(t, "will be rejected"), 0);
-  assert.equal(count(t, "`tw_rollback_task`: server-rejected; `tw_switch_role`: SOP-forbidden."), 1);
+  assert.equal(count(t, "`tw_update_state` / `tw_complete_task`: server-rejected; `tw_add_task` / `tw_rollback_task` / `tw_void_task` / `tw_switch_role`: SOP-forbidden."), 1);
+  assert.equal(count(t, "`tw_rollback_task`: server-rejected; `tw_switch_role`: SOP-forbidden."), 0);
 });
 
 test("AC-G2-12: QA skills reference each other as <agc install>/content/...", () => {
