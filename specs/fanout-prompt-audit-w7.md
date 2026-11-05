@@ -114,3 +114,22 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-05 | 整合者 | e412 lane 層驗證 close（to-integrator#4）：HEAD `8defaec`，5 commits，hop 4/14，review 0 輪退回、qa 0 輪；fanout check 12 檔 0 越界；golden 只有 `skill-coordinator-monolith.txt` 一行、`context-budget` 不動；證據 `qa_reports/review_T-E412-01.md`（covers 3 id，suite-result 4045/4047）＋逐 task 檔、`review_reports/review_T-E412-01.md`（APPROVED r1，covers 2）；handoff PASS、ledger 3 id；worktree porcelain 空、重建後仍空、`dist/` 不變；無 pending-tickets、無本機路徑；整合者 push 後 CI run 42007555831 在 `8defaec` 綠。reviewer 非阻擋一則（模板第 9 行重述 Visual Baselines 條件，spec 設計如此）—— 記錄不處理 | 信箱 e412 to-lane#2 |
 | 2026-11-05 | 整合者 | e409 lane 層驗證 close（to-integrator#8）：HEAD `fc46b37`，11 commits，hop 6/14，review 1 輪退回（reviewer r1 只要求補 expected-red manifest，content diff 無異議；r2 APPROVED `b9bef14`）、qa 0 輪；fanout check 26 檔 0 越界；content 只有 const-01 第 1 行與 lite 第 16 行；golden 11 檔各一個 1c1 hunk、coordinator monolith 不變、`context-budget` 不動；證據 `qa_reports/review_T-E409-01.md`（covers 5 id，suite-result 4046/4048）、`review_reports/review_T-E409-01.md`（r1 CHANGES_REQUESTED → r2 APPROVED）、expected-red manifest 29 行；handoff PASS、ledger 5 id；worktree porcelain 空、重建後仍空、`dist/` 不變；無 pending-tickets、無本機路徑；整合者 push 後 CI run 42012650295 在 `fc46b37` 綠。lane 回報兩個全套 load flake（feature-lease E10-AC2b、e132 gap-6，隔離與重跑皆綠、CI 綠）—— 記錄不開票，整合層再現才開 | 信箱 e409 to-lane#2 |
 | 2026-11-05 | 整合者 | 整合：`integ/prompt-audit-w7` 自 `6e1a9d4` 開，← e409 `fc46b37`（merge `3f5737f`）、← e412 `8defaec`（merge `8a16bd1`），兩次零衝突，merge-invariants PASS；合併樹 `dist/` 無差異、golden capture byte-identical、budget 54/54（lean 5665）、audit 0、`check:bookkeeping` OK、`agc check` OK；整合層 CI run 42013248873 在 `8a16bd1` 綠；信箱與 lane-status watch 已停；finish e409（history `3265c98`）、finish e412（history `59b7381`），都無配號，worktree／信箱／本地與遠端 branch 都已移除；記帳 commit（E409、E411、E412 done-mark not yet released、E414 done-mark ruled keep；佇列 #224、#226、#227、#229 DONE） | 整合者 session |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 6e1a9d4
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/prompt-audit-w7 @ 9c09bd7）
+- lane-status：primary（main ← integ/prompt-audit-w7 @ 9c09bd7）release-cd-v4.19.2／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 兩 lane（e409 = E409＋E411、e412 = E412）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-11/e409/` 與 `.current/history/2026-11/e412/`。記帳與本清單在同一個 wave PR。佇列 #224、#226、#227、#229 至此完成；E414 由人類裁「三項維持」、無 task、在記帳結案。
+- 未配號的新發現：無（兩條 lane 都無 pending-tickets；reviewer 非阻擋各一則、兩個全套 load flake 在整合層 CI 未再現，都不開票）。
+- 本波交付：`content/skill-coordinator-lite.md` 第 16 行只把 `tw_update_state`／`tw_complete_task` 寫成 server-rejected，`tw_add_task`／`tw_rollback_task`／`tw_void_task`／`tw_switch_role` 寫成 SOP-forbidden；`content/const-01-core-head.md` 第 1 行改為 `# Constitution`（無版本、無註解），`constitution-deliverable-guard`／`e393`／`prompt-state-footer`／`teamwork-lite`／`e391` 重釘，11 golden 重抓；`templates/claude-code-agents/qa-visual.md` description／body 改為 qa-engineer 的視覺子派工與獨立 judge context，`content/coord-05-core-visual-drift.md` 第 5 行說何時選它，coordinator monolith golden 重抓；新測試 `test/e409-lite-write-tool-facts.test.mjs`、`test/e412-qa-visual-template.test.mjs`；預算 lean 5675→5665、teamwork 約 21416，上限不動。
+### 待人類決定
+- 是否發版、版號（content 字句、模板 description、golden；無行為變更：建議 PATCH → v4.19.3，走 Release workflow `dry_run=true` 再真跑；E409、E411、E412 列帶 `not yet released` 預標，E410、E413 也還未發版，可同一版收）。
+- `docs/prompt-audit-2026-11-02.md` 的票至此全部收完（E391–E414）；要不要在 CHANGELOG 或稽核文件加一行「全部處理完畢」由人類決定。
+- `.current/_primary/` 的 primary 狀態仍是 release-cd-v4.19.2／release-engineer／In_Progress（v4.19.2 發版後收尾狀態），由下一個 role 的寫入推進。
+### 進行中的背景工作
+無
