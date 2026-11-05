@@ -2,7 +2,7 @@
 base: e1b9a11    integration branch: integ/prompt-audit-w5
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-11-05，派工中。**
+**狀態：已結案 2026-11-05。** lane e408 已合併（`integ/prompt-audit-w5` ← e408 `6ac6a80` merge `f30a713`，零衝突）、finish、拆除；派工 base `c337d5b`（本清單的 PR #83 merge）。
 
 範圍由人類指定（整合者 prompt：「fan-out E408 + G2-19 + G2-23 合一張票」，2026-11-05）：`docs/prompt-audit-2026-11-02.md` 在 E391（v4.16.1）、E393（v4.17.0）、E392／E394（v4.18.0）、E395／E403／E404／E407（v4.19.1）之後，報告裡剩下三個不需人類取捨、純文字／註解的尾巴。E408（佇列 #223）已開票；G2-19 與 G2-23 無票，整合者依決定權「把發現併入既有票」併進 **E408**（人類在整合者 session 裁定合一張票，見 Decisions），票面擴充寫在 `docs/backlog.md` E408 列。一條 lane、mini-chain（PM cut → sr-engineer → code-reviewer → qa-engineer，無 architect）：字句、一行模板說明、一段原始碼註解、golden／budget 重釘，沒有介面契約要定。本波不改 gate 程式、routing 表、schema、錯誤碼、`prompts/**`、`scripts/**`；`tools/**` 與 `dist/**` 只開 `tools/role.ts` 的註解行與它的編譯產物（見所有權重劃）。
 
@@ -77,6 +77,13 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 4. 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge`。
 5. merged 之後 `git switch main`、`git -c pull.rebase=false pull --ff-only`，再 `git branch -d integ/prompt-audit-w5`。
 
+## 結案
+- 日期 2026-11-05。`integ/prompt-audit-w5` 自 `main` `c337d5b` 開；← `--no-ff` e408 `6ac6a80`（merge `f30a713`），零衝突，無實質合併解決 → 無合併審查；merge-invariants PASS（772 task id 全在、0 lost [x]、137 sidecar）；重建 `dist/` 相對 `main` 只差 `dist/tools/role.js`、`.js.map`（註解 only，與 lane commit 一致，樹仍乾淨）；`npm audit --audit-level=high` exit 0；`check:bookkeeping` OK；`agc check` OK（4.19.1）；整合層 CI 見 Decisions。`finish e408 --shipped --base integ/prompt-audit-w5` 一次成功：配號 E409（commit `49e0906`）、`.current/e408/` → `.current/history/2026-11/e408/`（`e221e5a`）；worktree、信箱、本地與遠端 lane branch 都已移除。
+- 彙總（上限按 lane 計）：e408 4 task／hop 4/14／review 0 輪退回／qa 0 輪；證據與 `completed_tasks` 一致；lane 全套 4030/4032（2 skipped）。
+- 完成定義：表中「同一波 ✓」的列全部成立（六站 host 中性、claude-code 別名唯一、golden monolith 重抓、AC8 21408/21715 上限不動、lite 一句分歧說明、role.ts 註解零非註解行、dist parity、重釘全綠、done-mark 與佇列、本段）。
+- 記帳：`docs/backlog.md` E408 done-mark（not yet released，註明含 G2-19、G2-23）；佇列 #223 DONE；E409（E408-NEW-1，lite SOP 第 16 行過度陳述）配號、佇列 #224。接線票：無。reviewer 選修 O1、建議 R1 不開票。
+- 給下次發版的 CHANGELOG 提示：core coordinator 片段六處 `Task` 字樣改 host 中性（lean／非 Claude Code 組合 `Task` 為 0，claude-code 組合語意不變）；lite 模板一句分歧說明並改引用 SOP 禁令；`tools/role.ts` 註解修正（dist 只有註解差，這是本波唯一的 `.ts` 觸碰）；無行為變更，建議 PATCH。
+
 ## Dispatch pins
 - e408：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
 
@@ -86,3 +93,31 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-05 | 人類 | 本波範圍：E408＋稽核 G2-19＋G2-23 合一張票（整合者 prompt「fan-out E408 + G2-19 + G2-23 合一張票」）；G2-19、G2-23 進本里程碑由此裁定 | 整合者 session |
 | 2026-11-05 | 整合者 | G2-19、G2-23 併入 E408 列（「併入既有列」決定權；票面擴充寫在 `docs/backlog.md` E408 列、佇列 #223 加註），不另開票。草案：一 lane mini-chain，e408 = E408＋G2-19＋G2-23；`tools/role.ts` 註解行與 `dist/tools/role.js`／`.js.map` 開給 lane；待人類裁定 1–5 見上 | 本檔 |
 | 2026-11-05 | 人類 | 核准清單與待人類裁定 1–5 全部照整合者建議（「approve」）：G2-19、G2-23 併入 E408；E408 取 (a)；G2-19 只加一句、`model: haiku` 不動；G2-23 只改註解行＋dist 兩檔；pins 如 Dispatch pins。這五項寫進 lane 的 spec，lane 不再問 | 整合者 session |
+| 2026-11-05 | 整合者 | 清單 PR #83 merge `c337d5b` = 派工 base（docs branch `docs/2026-11-05-fanout-prompt-audit-w5` 已刪）；派工前核對在 `c337d5b` 重做：擁有／讀取的 26 個已追蹤檔都在、golden 12 檔、六處 `Task` 站點行號未變、role.ts 第 36–40 行註解在、lite.md 11 行、`cutApprovalAutoTier` `{}`、`agc check` OK（4.19.1）、遠端無 `feat/*`／`integ/*`；信箱 `_mailbox/e408/` 建為空、watch armed baseline 0；prompt 由 `fanout.mjs render --base c337d5b` 產生 | 整合者 session |
+| 2026-11-05 | 整合者 | e408 cut 預審 close（spec `114f71c`，to-integrator#1）：4 task（3 sr、1 qa）、check --cut 9 token 0 越界、每個 AC 有實作 task；六站字句照裁定 2 (a) 用 coord-02 名詞；lite 第 9 行括號改為「that SOP's Hard rules forbid them」而非 G2-11 的「伺服器拒絕四個寫入工具」—— 整合者核對 `tools/tasks.ts`：`handleAddTask`／`handleRollbackTask` 只跑 `enforcePreFlight`，lite 呼叫過 `tw_get_state` 後伺服器會接受，所以 lane 的說法對、E391 G2-11 寫進 lite 第 16 行的「四個都 server-rejected」過度陳述 → lane 開 `E408-NEW-1`（P3，finish 配號），不在本波修；role.ts 新註解引用的 `qa-engineer:PASS → release-engineer:In_Progress` 邊核對屬實；PM 試套 teamwork 21401→21408（上限 21715）、lean 5682 不變、golden 只有 coordinator monolith 變。無要求修改 | 信箱 e408 to-lane#1 |
+| 2026-11-05 | 人類 | 在 e408 lane session 核准 cut（spec `specs/e408-core-task-alias-tail.md` @ `114f71c`，含 lite 括號措辭決定與 E408-NEW-1 pending ticket）；coordinator 寫 cut_approved；sr（opus）已派 T-E408-01..03，hop 2/14。只影響 e408、已寫在核准的 spec 裡 | e408 lane session；信箱 e408 to-integrator#2 |
+| 2026-11-05 | 整合者 | lane e408 進度（to-integrator#3，不需回覆）：sr 完成 `ce172a6`（六站）、`02c6d05`（lite.md 第 9 行）、`52a3e7a`（role.ts 註解＋dist role.js／.js.map，role.d.ts 不變）、`c090555`（state）；build、tsc、audit high exit 0；預期紅只有 skill-manifest golden，留給 qa；code-reviewer（opus）已派，hop 2/14 | 信箱 e408 to-integrator#3 |
+| 2026-11-05 | 整合者 | lane e408 進度（to-integrator#4，不需回覆）：code-reviewer（opus）round 1 APPROVED T-E408-01..03（`review_reports/review_T-E408-01.md`，commit `a5c99df`）；0 必修、R1 建議（預期紅沒記 expected-red manifest，feature mode 不 load-bearing）、O1 選修（lite.tier 的「it」指涉，spec 核准文字不動）；16 個釘住測試檔 245/246，紅的是已知 golden；qa（sonnet）已派 T-E408-04；hop 4/14 | 信箱 e408 to-integrator#4 |
+| 2026-11-05 | 整合者 | e408 lane 層驗證 close（to-integrator#5）：HEAD `6ac6a80`，8 commits，hop 4/14，review 0 輪退回、qa 0 輪；fanout check 20 檔 0 越界；worktree porcelain 空，重建 `dist/` 後仍空、相對 base 只差 `role.js`／`.js.map`；證據 `qa_reports/review_T-E408-01.md`（PASS，covers 4 id，suite-result 4030/4032）＋伺服器記錄的 02..04、`review_reports/review_T-E408-01.md`（APPROVED，covers 01..03）；handoff PASS、ledger 4 id；role.ts hunk 零非註解行；golden 只有 monolith；九行改動逐行符合 Copy/Strings；pending-tickets E408-NEW-1 一筆；整合者 push 後 CI run 41964621766 在 `6ac6a80` 綠。lane 疑慮 (1) reviewer O1 lite.tier「it」指涉不開票（spec 核准文字）；(2) R1 expected-red 未記（feature mode）；(3) qa 第一次 PASS 被 `AC_EXECUTION_LOG_MISSING` 擋、補 AC Execution Log 後過；worktree 守衛拒 per-file `git diff --exit-code`，以 numstat 代替；(4) sr／reviewer 同 opus，reviewer 檢查為 byte-level 腳本；(5) hop 4/14 —— 記錄不處理 | 信箱 e408 to-lane#2 |
+| 2026-11-05 | 整合者 | 整合層 CI：run 41965099063 在 merge HEAD `f30a713` 綠；記帳 HEAD 的 run 見下一列 | 整合者 session |
+| 2026-11-05 | 整合者 | 整合：`integ/prompt-audit-w5` 自 `c337d5b` 開，← e408 `6ac6a80`（merge `f30a713`），零衝突，merge-invariants PASS；`dist/` 只差 role.js 兩檔、audit 0、`check:bookkeeping` OK、`agc check` OK；finish e408（E409 配號 `49e0906`、history `e221e5a`，worktree／信箱／本地與遠端 branch 都已移除，無未配號發現、無 target_repo 發現）；記帳 commit `25fe063`（E408 done-mark、佇列 #223 DONE、E409 佇列 #224）；信箱 watch 已停 | 整合者 session |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ c337d5b
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/prompt-audit-w5 @ 25fe063）
+- lane-status：primary（main ← integ/prompt-audit-w5 @ 25fe063）release-cd-v4.19.1／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 一 lane（e408 = E408＋稽核 G2-19＋G2-23）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-11/e408/`。記帳與本清單在同一個 wave PR。佇列 #223 至此完成。
+- 未配號的新發現：無（e408 的 E408-NEW-1 已由 finish 配為 E409，佇列 #224；reviewer O1／R1 不開票）。
+- 本波交付：`content/coord-03-core-fallback.md` 第 31／77／88／95 行、`coord-05` 第 5 行、`coord-07` 第 14 行 host 中性（lean／非 Claude Code 組合 `Task` 為 0）；`templates/claude-code-agents/lite.md` 第 9 行改引用 SOP 禁令並加一句 haiku／sonnet 分歧說明；`tools/role.ts` 第 36–40 行註解修正、`dist/tools/role.js`／`.js.map` 重建；golden `skill-coordinator-monolith.txt` 重抓、預算上限不動；新測試 `test/e408-core-task-alias-tail.test.mjs`。
+### 待人類決定
+- 是否發版、版號（三檔六行 content 字句、lite 模板、role.ts 註解；無行為變更：建議 PATCH → v4.19.2，走 Release workflow `dry_run=true` 再真跑；E408 列帶 `not yet released` 預標）。
+- E409（lite SOP 第 16 行過度陳述，P3，佇列 #224）排進哪一波，以及取 (a) 字句或 (b) handler gate。
+- 稽核報告剩下的 flag-only 項：G2-14（憲法標頭版本）、G4-01（qa-visual 模板存廢）、G2-20（pm 的 AskUserQuestion）、G1-01／02／03，都要人類取捨後才能開票。
+- `.current/_primary/` 的 primary 狀態仍是 release-cd-v4.19.1／release-engineer／next_role pm（v4.19.1 發版後收尾狀態），由下一個 role 的寫入推進。
+### 進行中的背景工作
+無

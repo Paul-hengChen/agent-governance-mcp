@@ -24,11 +24,11 @@ const ROLE_SKILL_MAP = {
     "code-reviewer": "skill-code-reviewer.md",
     "qa-engineer": "skill-qa-engineer.md",
     "architect": "skill-architect.md",
-    // Side-channel roles (v3.11.0): present in the prompt + skill loader, but
-    // intentionally absent from tools/transitions.ts AgentName + ALLOWED_TRANSITIONS.
-    // Callers must set agent_id to the upstream chain role when invoking
-    // tw_update_state on behalf of these skills (see skill-doc-writer.md /
-    // skill-release-engineer.md "Side-channel constraint" clause).
+    // Post-chain roles. doc-writer is intentionally absent from tools/transitions.ts
+    // AgentName + ALLOWED_TRANSITIONS: callers set agent_id to the upstream chain role
+    // when invoking tw_update_state on its behalf (skill-doc-writer.md "Side-channel
+    // constraint" clause). release-engineer is in AgentName and opens on the
+    // qa-engineer:PASS -> release-engineer:In_Progress edge there (v3.49.0, C13).
     "doc-writer": "skill-doc-writer.md",
     "release-engineer": "skill-release-engineer.md",
     // Coordinator SOP, composed from the coord-*.md fragments under this logical key; loadable here, not a chain role.
