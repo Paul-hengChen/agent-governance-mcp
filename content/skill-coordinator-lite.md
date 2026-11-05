@@ -40,13 +40,13 @@ Affirmative lite case:
 
 ## Subagent Reply Watermark Validation
 
-After `Task(subagent_type=…)`, call `validateWatermark` from `dist/lib/watermark-check.js`; relay `corrected`. Regex:
+After a subagent dispatch, call `validateWatermark` from `dist/lib/watermark-check.js`; relay `corrected`. Regex:
 
 ```
 /^—\s@[\w-]+\s\([\w-]+\)$/i
 ```
 
-Out-of-scope: ONLY after `Task(…)`; skip after `tw_*`/bash/file. Full rules: `skill-coordinator` §Subagent Reply Watermark Validation.
+Out-of-scope: ONLY after subagents; skip after `tw_*`/bash/file. Full rules: `skill-coordinator` §Subagent Reply Watermark Validation.
 
 Coordinator-lite is non-subagent: own replies end `— @lite` (no tier) per §1; only relayed subagents keep `— @<role> (<tier>)`.
 
