@@ -1,3 +1,5 @@
 {"ts":"2026-11-06T06:56:54.009Z","feature":"e415-coord03-release-wording","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-06T06:59:53.463Z","feature":"e415-coord03-release-wording","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-06T07:00:26.723Z","feature":"e415-coord03-release-wording","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T07:01:43.058Z","feature":"e415-coord03-release-wording","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T07:02:12.517Z","feature":"e415-coord03-release-wording","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
