@@ -124,7 +124,8 @@ hop: <lane 寫：目前 hop_count/上限，例如 7/14；integrator 寫 —>
 - files touched: <git diff --stat main...HEAD>；擁有範圍以外的檔案：<無 / 列出並說明>
 - 需要其他 lane 或共享生成物處理的事：<列出>
 - （票面有接線介面時）給接線票的介面：<匯出簽章與呼叫點>
-- 新發現：`.current/<lane>/pending-tickets.md` 裡本 lane 的 block（`lane_local_id` + title）+ 哪幾筆值得提升、為什麼
+- 新發現：`.current/<lane>/pending-tickets.md` 裡本 lane 的 block（`lane_local_id` + title；只寫過 §4 門檻的）
+- review / QA 的 `recommended` / `optional` 意見：<列出，不開票>
 - 未解決或有疑慮的地方
 ```
 

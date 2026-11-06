@@ -53,7 +53,7 @@ At feature close — the *PASS* stop-condition row fired, or a human-decided rel
 3. **Auto-start** ONLY when the ticket's cut qualifies for the Constitution §3.1 Cut-Approval Auto-Tier (tier armed AND every threshold condition met): start it on its intake classification, recording the approval via the *Auto-tier writer action* above.
 4. Otherwise **auto-propose**: surface the ticket + its one-line intake classification and wait for the human.
 
-**Filing bar**: a finding becomes a backlog ticket only when (a) it is a confirmed defect that will make users go wrong, or (b) the human asks for one. A defect the current ticket introduced, a flaw in its own fix spec included, is fixed in the same lane before merge, never filed. Review and QA `recommended` / `optional` notes are listed once in the closing report, not proposed as tickets.
+**Filing bar**: a finding becomes a backlog ticket only when (a) it is a confirmed defect that will make users go wrong, or (b) the human asks for one. A defect the current ticket introduced, a flaw in its own fix spec included, is fixed within the current ticket before it merges, never filed. Review and QA `recommended` / `optional` notes are listed once in the closing report, not proposed as tickets.
 
 **Lane findings are numbered at finish time** (E179): a lane never mints a backlog id. It files each new finding that clears the filing bar as a `pending-ticket` block in `.current/<lane>/pending-tickets.md`, committed on its branch. `agc feature finish` (`--shipped` or `--abandoned`) is the one sanctioned numbering step: it allocates real ids above `docs/backlog.md`'s current max, appends the rows, and archives the blocks under `## Applied`. The root `NEW-TICKETS.md` convention is retired for lane ticket candidates.
 

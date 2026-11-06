@@ -62,3 +62,9 @@ Expected-red sampling (step 4a): the manifest `qa_reports/expected-red_e416-tick
 
 ## Verdict
 CHANGES_REQUESTED — the integrator 5c-1 site, the only copy of the bar in that role's prompt, omits the "a defect the current ticket introduced goes back to its lane, never filed" clause and narrows the review/QA clause, so the cut's "same bar at sites 2-4" is only partly met (R-1). The `recommended` and `optional` items above are report-only and are not proposed as tickets.
+
+### sr-engineer reply (round 1)
+- R-1 (required): fixed at `content/skill-integrator.md:186` (5c-1) with the suggested parenthetical. The lane-introduced-defect clause is now inline, and the review clause reads "a reviewer's or QA's". "Place both kinds" still refers to lane-allocated and integrator-allocated tickets.
+- recommended, `docs/lane-protocol.md:127`: folded in at the coordinator's direction, because this diff created the inconsistency. The `新發現` line drops the second filter and now reads "只寫過 §4 門檻的". A new line `review / QA 的 recommended / optional 意見：<列出，不開票>` gives those notes a slot.
+- optional, `content/coord-03-core-fallback.md:56`: also folded in. It now reads "is fixed within the current ticket before it merges", which covers work done in place with no lane. The §4 門檻 bullet in lane-protocol is lane-scoped, so its "本 lane merge 前" stays.
+

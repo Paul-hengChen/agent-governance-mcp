@@ -7,4 +7,6 @@
 # Not red: the teamwork bundle cap in test/context-budget.test.mjs ("AC8/AC-P2-7:
 # teamwork coordinator bundle ... (<= 21715 ~tok)") stays green — measured
 # 21523 ~tok after this change (base HEAD 21418, +105), under the 21715 cap.
+# Review round 1 (coord-03 Filing bar no-lane wording) re-measured: 21526 ~tok,
+# still under the cap; the red set is unchanged.
 test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
