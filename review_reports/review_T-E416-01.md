@@ -69,3 +69,60 @@ CHANGES_REQUESTED — the integrator 5c-1 site, the only copy of the bar in that
 - optional, `content/coord-03-core-fallback.md:56`: also folded in. It now reads "is fixed within the current ticket before it merges", which covers work done in place with no lane. The §4 門檻 bullet in lane-protocol is lane-scoped, so its "本 lane merge 前" stays.
 - 5b conflict, which the reviewer noted under R-1 and the coordinator asked to close in this round: `content/skill-integrator.md:179` (5b-5) and `:182` (5b-8) no longer offer "or a new ticket". Each now says the fix belongs to the owning lane, never a new ticket, and that when no single lane owns the defect, the integrator reports to the human. Line 202 (stage 6 step 4, red required check after the pull request opens) is left as it was, per the coordinator.
 - Line 202 (stage 6 step 4, a red required check after the pull request opens): on the coordinator's follow-up, which reverses its earlier "leave it alone", it now says "by the owning lane, never a new ticket and never by hand on `main` (no single owner → report to the human)". The rest of that line is unchanged. No "lane or a new ticket" choice remains anywhere in `content/`.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Round diff: `git diff 6bfb2a5..96c1d88` (362bc4a, 3e80450, 96c1d88). Feature diff re-judged in full: `git diff integ/e416..96c1d88` (7 files: `CLAUDE.md`, `content/coord-03-core-fallback.md`, `content/skill-code-reviewer.md`, `content/skill-integrator.md`, `docs/lane-protocol.md`, the expected-red manifest, this report). Spec: `docs/backlog.md` row E416.
+
+## Summary
+- R-1 is fixed. `content/skill-integrator.md:186` (5c-1) now states the whole bar inline: (a)/(b); "a defect a lane of this wave introduced goes back to that lane, never filed"; and "a reviewer's or QA's `recommended` / `optional` items are listed in the wave report, not filed".
+- The round-1 `recommended` item (`docs/lane-protocol.md:127`) and `optional` item (`content/coord-03-core-fallback.md:56`) are both folded in, and both read correctly.
+- Integrator 5b-5 (:179), 5b-8 (:182) and stage 6 step 4 (:202) no longer offer "lane or a new ticket" as a choice. Each sends the fix to the owning lane and, when no single lane owns it, to the human. `grep -rnE "or a new ticket|lane or a new" content/ docs/ templates/` finds nothing.
+- Scope holds: wording only, no code, gate, schema, script, dist or golden change, and the `CLAUDE.md` `agc-version` stamp is untouched.
+- Verified independently at 96c1d88:
+  - `node scripts/test-lock.mjs -- npm test`: 4053 tests, 4049 pass, 2 fail, 2 skipped.
+    - Fail 1: `t-golden-byte-identity` (`test/skill-manifest.test.mjs`). This is the manifest's one expected red. Diffing the composed monolith against `test/fixtures/compose-golden/skill-coordinator-monolith.txt` shows only the coord-03 hunk (golden line 175 becomes 175-177).
+    - Fail 2: `tracked host-trace: no-op branches …` (`test/e108-eject.test.mjs:952`), with `status` `null` after 16.5 s, which is a spawn timeout. The diff touches nothing on the eject path. Re-running `node scripts/test-lock.mjs -- node --test test/e108-eject.test.mjs` alone gives 35/35 pass, so this is load flakiness, not something this diff introduced.
+  - Teamwork bundle: 21526 ~tok, recomputed with the test's own formula. That is under the 21715 cap, and the cap test itself is green.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC Completeness: SKIP — no specs/e416-ticket-filing-bar.md (backlog-row-as-spec mini-chain)
+
+Re-checked against the E416 row's fix clauses, whole feature diff:
+- Site 1, code-reviewer tiers (`content/skill-code-reviewer.md:31`): done. Non-blocking tiers are report-only, and a defect this diff introduced is `required`.
+- Site 2, integrator 5c-1 (`content/skill-integrator.md:186`): done, with all three clauses. The fix-spec case is covered by "a defect a lane of this wave introduced".
+- Site 3, coord-03 (`content/coord-03-core-fallback.md:56`, `:58`): done. All three clauses are present, and the E179 paragraph files only "each new finding that clears the filing bar".
+- Site 4, lane-protocol §4 (`docs/lane-protocol.md:57`) plus the final-report template (`:127-128`): done. All three clauses are present, and the template now has a slot for review / QA `recommended` / `optional` notes ("列出，不開票").
+- `CLAUDE.md:166-168` repo-only fix-spec self-check: done.
+- None of the shipped sites (`content/**`, `docs/lane-protocol.md`) cites a repo-only path. The only paths in the added text, `docs/backlog.md` and `.current/<lane>/pending-tickets.md`, were already in the surrounding sentences and are workspace-generic.
+
+## Correctness
+No `required` findings. R-1 is closed.
+- The four sites state one bar. coord-03 says "fixed within the current ticket before it merges", which covers work with no lane, and lane-protocol §4 says "本 lane merge 前", which is lane-scoped by design. The two agree.
+- 5c-1 "Place both kinds" still refers to lane-allocated and integrator-allocated tickets. The inserted clauses don't change what it points to.
+- The new "(no single owner → report to the human)" endings agree with the integrator *Decision rights* table (`content/skill-integrator.md:218-224`): sending a lane back is the integrator's call, and anything the table doesn't grant the integrator goes to the human.
+- Expected-red sampling (step 4a): the manifest has one entry, and it is real and locatable (`test/skill-manifest.test.mjs`, `t-golden-byte-identity`). The round-1 re-measure note added to it (21526 ~tok) matches my own measurement.
+
+## Quality
+- **optional, existing before this ticket: `content/skill-integrator.md:202` vs `:182`.** Stage 6 step 4 says "the fix is a commit on the integration branch by the owning lane", while 5b-8 says "Never fix feature code on the integration branch". The "commit on the integration branch" wording was there before E416; this ticket only replaced "or a new ticket". Both lines likely mean the lane fixes it and the fix is then merged into the integration branch, but neither says so. Report-only.
+- **optional: `content/skill-integrator.md:186`** says "listed in the wave report" where coord-03 and lane-protocol say "listed once". The integrator writes one wave report, so the meaning is the same. Report-only.
+- The diff adds no code comments, so step 4b does not apply.
+
+## Architecture
+No architecture spec exists. The boundaries this feature depends on hold:
+- The shipped sites stay workspace-generic.
+- The repo-only rule lives in `CLAUDE.md` only.
+- The integrator prompt (`skill-integrator.md` alone, with no coord-03 composed in) now carries the complete bar inline.
+
+## Security
+No findings. The change is prose only. It adds no secret, private path or confidential reference.
+
+## Performance
+No runtime code changed.
+- Teamwork bundle: 21418 at base, 21526 at 96c1d88 (+108 ~tok for the feature, +3 from this round). That is under the 21715 cap.
+- No context-budget cap covers `skill-integrator.md` or `skill-code-reviewer.md`.
+- No regression.
+
+## Verdict
+APPROVED. All four shipped sites state one consistent filing bar with no repo-only paths, the integrator SOP no longer offers "lane or a new ticket" anywhere, and nothing outside scope changed. The suite matches the declared expected red, plus one unrelated timeout that passes on re-run. The two `optional` items above are report-only and are not proposed as tickets.
