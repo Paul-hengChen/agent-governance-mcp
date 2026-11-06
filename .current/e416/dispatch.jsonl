@@ -1,0 +1,14 @@
+{"ts":"2026-11-06T10:25:43.720Z","feature":"e416-ticket-filing-bar","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T10:31:50.738Z","feature":"e416-ticket-filing-bar","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T10:32:26.456Z","feature":"e416-ticket-filing-bar","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T10:41:54.899Z","feature":"e416-ticket-filing-bar","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T10:42:27.384Z","feature":"e416-ticket-filing-bar","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T10:52:48.385Z","feature":"e416-ticket-filing-bar","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T10:53:36.682Z","feature":"e416-ticket-filing-bar","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T11:02:29.876Z","feature":"e416-ticket-filing-bar","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T11:12:02.050Z","feature":"e416-ticket-filing-bar","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T11:20:59.631Z","feature":"e416-ticket-filing-bar","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T11:21:25.858Z","feature":"e416-ticket-filing-bar","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T11:31:54.057Z","feature":"e416-ticket-filing-bar","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-06T11:32:29.279Z","feature":"e416-ticket-filing-bar","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-06T11:41:32.545Z","feature":"e416-ticket-filing-bar","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
