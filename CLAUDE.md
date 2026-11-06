@@ -163,6 +163,9 @@ dist/                     compiled output (committed for npx remote usage)
   4. call `refreshSnapshotFor` so subsequent same-session writes don't trip.
 - The pre-flight check (`enforcePreFlight`) is in-memory per-process. The
   freshness check + file lock are what give cross-process safety.
+- Before writing a fix spec that edits `content/**`, check it cites no path that
+  exists only in this repo (`content/**` ships to every adopter), and name the
+  test pins, compose goldens and `test/context-budget.test.mjs` caps it moves.
 
 ## Testing changes
 

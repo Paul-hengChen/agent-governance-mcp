@@ -28,7 +28,7 @@ Every review report MUST contain these eight H2 sections in order:
 - **Performance** — O(n²) loops in hot paths, unbatched I/O (loops that should be batch queries / pipelined fetches), obvious memory leaks (event listeners not removed, caches with no eviction), and any algorithmic regression vs the prior implementation. Cite file:line. PASS criterion: no performance regression vs base; new code carries no obvious complexity-class issues. This is review for *obvious* regressions only — micro-benchmarking is qa-engineer scope.
 - **Verdict** — one of `APPROVED` or `CHANGES_REQUESTED`, with one-sentence rationale.
 
-Finding tiers: tag every finding `required` (blocks `APPROVED`), `recommended`, or `optional` (neither blocks `APPROVED`).
+Finding tiers: tag every finding `required` (blocks `APPROVED`), `recommended`, or `optional` (neither blocks `APPROVED`). A defect this diff introduced is `required`; `recommended` and `optional` findings are report-only, never proposed as tickets.
 
 ### Example — minimal complete passing report
 
