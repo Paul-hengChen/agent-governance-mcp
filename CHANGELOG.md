@@ -16,6 +16,60 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+PATCH release. It ships waves prompt-audit-w6 and prompt-audit-w7 since v4.19.2, landed on `main` by
+two wave pull requests: lane `e410` (E410, E413) in w6, lanes `e409` (E409, E411) and `e412` (E412) in
+w7. Plans `specs/fanout-prompt-audit-w6.md` and `specs/fanout-prompt-audit-w7.md`, release gate
+`specs/release-cd-v4.19.3.md`, lane specs `specs/e410-task-alias-content-tail.md`,
+`specs/e409-lite-wording-const-header.md` and `specs/e412-qa-visual-template.md`. Semver: PATCH,
+because every change is prompt wording or one subagent-template description; no tool, gate, schema
+or routing behaviour changes.
+
+### Upgrade notes
+
+- **The constitution header no longer carries a version (E411).** The first line of the composed
+  constitution (`content/const-01-core-head.md`) is now `# Constitution` — no version number and no
+  comment. The old `v3.41.0` header was never bumped; constitution changes are recorded in this
+  CHANGELOG only. Anything that parsed the header version (e.g. a `/^# Constitution v/` check) must
+  match `/^# Constitution/` instead. All four composed forms (full/lite × design/non-design) start
+  with the new line.
+- **The last `Task` alias uses in prompt content are host-neutral (E410).** The last 16 uses of
+  Claude Code's `Task` alias, in 15 lines of the constitution and three SOPs, now say
+  "subagent-dispatched" / "subagent dispatch" / "subagent-dispatch": the watermark row of
+  `content/const-01-core-head.md`, `content/const-05-core-standards.md`,
+  `content/const-08-chain-31-mid.md` (two lines), `content/const-12-chain-r10-s4.md`,
+  `content/skill-coordinator-lite.md`, `content/skill-pm.md` and `content/skill-integrator.md`.
+  The alias stays defined only in the Claude Code host fragment `content/coord-02-host-dispatch.md` (context, not changed).
+  Non-Claude-Code hosts no longer read an undefined tool name; behaviour is unchanged.
+- **PM questions are presented inline (E413).** The PM's Question Batch Gate (`content/skill-pm.md`)
+  no longer tells the PM to call `AskUserQuestion`; it presents the batch inline, numbered (at most
+  four, two batches if more), each with a recommended answer, and ends the turn — a subagent PM
+  presents it through the coordinator.
+- **Lite mode states the write-tool facts precisely (E409).** The lite SOP's server-read-only rule
+  (`content/skill-coordinator-lite.md`) now calls only `tw_update_state` / `tw_complete_task`
+  server-rejected and `tw_add_task` / `tw_rollback_task` / `tw_void_task` / `tw_switch_role`
+  SOP-forbidden, matching what the server enforces in `tools/tasks.ts` (context, not changed). Lite still must not call any of them.
+- **The qa-visual subagent template says what it is (E412).** `templates/claude-code-agents/qa-visual.md`
+  now describes itself as qa-engineer's visual sub-dispatch — an independent judge context that
+  replaces `qa-engineer` for the QA hop on a design-armed feature with `## Visual Baselines` — and the
+  coordinator SOP (`content/coord-05-core-visual-drift.md`) says when to pick it. Adopters get the
+  template on the next `agc init` template refresh.
+
+### Changed
+
+- **Prompt-style review kept as is (E414).** The audit's Group 1 prompt-style items (the §1 "Zero
+  Tolerance" heading, the templates' `CRITICAL:` line, §7) were reviewed and kept; no change.
+- **Goldens and budgets.** All 12 compose goldens under `test/fixtures/compose-golden/` re-captured
+  (11 for the constitution header and alias lines,
+  `test/fixtures/compose-golden/skill-coordinator-monolith.txt` for the coord-05 clause). No ceiling in
+  `test/context-budget.test.mjs` (context, not changed) moves (lean 5682 → 5665, teamwork 21408 → 21416 ~tok).
+- **Tests.** Four new files: `test/e410-task-alias-content-tail.test.mjs`,
+  `test/e413-pm-question-batch-inline.test.mjs`, `test/e409-lite-write-tool-facts.test.mjs` and
+  `test/e412-qa-visual-template.test.mjs`; nine existing tests re-pinned to the new wording and the
+  version-free header.
+- Unchanged: `GATE_REGISTRY` stays at 35 entries with an 18-step write pipeline; no gate, schema,
+  error-code, routing, dependency, `prompts/` (context, not changed), `scripts/` (context, not changed)
+  or `.github/` (context, not changed) change; the compiled output changes only in the version literal.
+
 ## [4.19.2] - 2026-11-05
 
 PATCH release. It ships wave prompt-audit-w5 since v4.19.1, landed on `main` by one wave pull
