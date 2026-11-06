@@ -54,6 +54,7 @@
 
 ## 4. 新發現
 
+- **門檻**：只有兩種發現寫成 block —— 確認會讓使用者出錯的缺陷，或人類要求開票的。本票自己造成的缺陷（包括本票修正規格本身的錯）在本 lane merge 前修掉，不寫成 block；review / QA 的 `recommended` / `optional` 意見只在最終回報列一次。
 - 寫進 **`.current/<lane>/pending-tickets.md`**，隨你的 branch commit（E179）。每筆一個 `pending-ticket` fenced block，**不寫 `id`**：
   ````
   ```pending-ticket
