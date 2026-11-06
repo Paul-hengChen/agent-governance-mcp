@@ -2,3 +2,7 @@
 # coord-03 is core-tagged, so the frozen coordinator monolith golden no longer matches byte-for-byte.
 # T-E415-02 (qa-engineer) re-captures test/fixtures/compose-golden/skill-coordinator-monolith.txt.
 test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# T-E415-03 rewords the same two coord-03 sites again (workspace-generic: no repo-only workflow/doc citation),
+# so the golden T-E415-02 re-captured is stale again. Same test as above, red again; T-E415-04 (qa-engineer) re-captures.
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
