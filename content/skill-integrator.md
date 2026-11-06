@@ -176,10 +176,10 @@ The five verifier constraints (E192) hold: (1) **read-only** — no git writes, 
 5. **Merge-resolution review duty.** A resolution is *substantive* when any conflict hunk's result is not simply both sides kept verbatim (a build-output or golden regeneration is not substantive). For each substantive resolution:
    - subagent-dispatch `code-reviewer` on that merge commit, the resolution shown by `git show --remerge-diff <merge-sha>` — no lane's PASS covers code created at merge time;
    - the verdict comes back as an evidence file, `review_reports/review_merge-<short-sha>.md`, committed on the integration branch; no `tw_update_state` on the integration branch (the E222 precedent);
-   - **never open the pull request before that verdict is APPROVED.** CHANGES_REQUESTED → stop and report; the fix belongs to the owning lane or a new ticket.
+   - **never open the pull request before that verdict is APPROVED.** CHANGES_REQUESTED → stop and report; the fix belongs to the owning lane, never a new ticket (no single owner → report to the human).
 6. All merged: the repo's build (commit the rebuilt tracked output) → `git push -u origin integ/<feature>` → the repo's CI check on `<HEAD>`. The integration-layer verdict is that CI run (the pull request's required checks are the same runs); the local post-merge full suite runs only under the *CI fallback* (5a). Each lane green on its own does not count.
 7. Shared artifacts need regeneration (goldens / budget no longer match after the merge) → subagent-dispatch `qa-engineer` to regenerate and explain every hunk; you never run the capture yourself.
-8. Any red: stop and report. **Never fix feature code on the integration branch** — the fix belongs to that lane or a new ticket.
+8. Any red: stop and report. **Never fix feature code on the integration branch** — the fix belongs to the owning lane, never a new ticket (no single owner → report to the human).
 
 ### 5c. Bookkeeping (on the integration branch, committed before the pull request opens)
 
