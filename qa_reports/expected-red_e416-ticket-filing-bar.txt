@@ -1,0 +1,12 @@
+# e416-ticket-filing-bar — intentional reds left by sr-engineer (T-E416-01).
+# T-E416-01 adds a **Filing bar** paragraph to content/coord-03-core-fallback.md
+# (before the E179 lane-findings paragraph) and edits that paragraph's filing
+# sentence. coord-03 is composed into the coordinator monolith, so the frozen
+# golden test/fixtures/compose-golden/skill-coordinator-monolith.txt no longer
+# matches byte-for-byte. qa-owned T-E416-02 re-captures the golden.
+# Not red: the teamwork bundle cap in test/context-budget.test.mjs ("AC8/AC-P2-7:
+# teamwork coordinator bundle ... (<= 21715 ~tok)") stays green — measured
+# 21523 ~tok after this change (base HEAD 21418, +105), under the 21715 cap.
+# Review round 1 (coord-03 Filing bar no-lane wording) re-measured: 21526 ~tok,
+# still under the cap; the red set is unchanged.
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte

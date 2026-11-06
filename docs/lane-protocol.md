@@ -54,6 +54,7 @@
 
 ## 4. 新發現
 
+- **門檻**：只有兩種發現寫成 block —— 確認會讓使用者出錯的缺陷，或人類要求開票的。本票自己造成的缺陷（包括本票修正規格本身的錯）在本 lane merge 前修掉，不寫成 block；review / QA 的 `recommended` / `optional` 意見只在最終回報列一次。
 - 寫進 **`.current/<lane>/pending-tickets.md`**，隨你的 branch commit（E179）。每筆一個 `pending-ticket` fenced block，**不寫 `id`**：
   ````
   ```pending-ticket
@@ -123,7 +124,8 @@ hop: <lane 寫：目前 hop_count/上限，例如 7/14；integrator 寫 —>
 - files touched: <git diff --stat main...HEAD>；擁有範圍以外的檔案：<無 / 列出並說明>
 - 需要其他 lane 或共享生成物處理的事：<列出>
 - （票面有接線介面時）給接線票的介面：<匯出簽章與呼叫點>
-- 新發現：`.current/<lane>/pending-tickets.md` 裡本 lane 的 block（`lane_local_id` + title）+ 哪幾筆值得提升、為什麼
+- 新發現：`.current/<lane>/pending-tickets.md` 裡本 lane 的 block（`lane_local_id` + title；只寫過 §4 門檻的）
+- review / QA 的 `recommended` / `optional` 意見：<列出，不開票>
 - 未解決或有疑慮的地方
 ```
 
