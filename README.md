@@ -66,7 +66,7 @@ Then `claude mcp list` should show `✓ Connected`. Governance context is invoca
 └────────────────────────────────────────────────────────────┘
 ```
 
-Every `tw_update_state` runs pre-flight → file lock → freshness check → an **18-step gate pipeline** (`UPDATE_STATE_GATE_PIPELINE` in `tools/handoff-orchestrator.ts`) → round accounting → atomic write, all before disk is touched. A rejected write returns `{ error, attempted, allowed, hint }` so the AI can self-correct or escalate. Full pipeline diagram: [docs/architecture.md](docs/architecture.md).
+Every `tw_update_state` runs pre-flight → file lock → freshness check → a **19-step gate pipeline** (`UPDATE_STATE_GATE_PIPELINE` in `tools/handoff-orchestrator.ts`) → round accounting → atomic write, all before disk is touched. A rejected write returns `{ error, attempted, allowed, hint }` so the AI can self-correct or escalate. Full pipeline diagram: [docs/architecture.md](docs/architecture.md).
 
 **Routing chain** (full mode): `researcher? → design-auditor? → pm → architect? → sr-engineer ↔ code-reviewer → qa-engineer → PASS`. Lite mode (`/teamwork-lite`) bypasses the chain for solo 1-file edits — server-read-only, no state writes.
 
@@ -227,7 +227,7 @@ Best-effort by contract: the hook always exits 0 and never blocks or alters the 
 
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md) — every version with rationale
 - **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md) — dev workflow, project layout, schema-version checklist
-- **Architecture**: [docs/architecture.md](docs/architecture.md) — 18-step gate pipeline, state machine, RAG lifecycle
+- **Architecture**: [docs/architecture.md](docs/architecture.md) — 19-step gate pipeline, state machine, RAG lifecycle
 - **Research**: [research/](research/) — token-frugality audits, industry comparisons, retrospectives
 - **Repo**: <https://github.com/Paul-hengChen/agent-governance-mcp>
 

@@ -426,3 +426,21 @@ test("AC2: skill-pm.md's proof: annotation guidance states the convention is con
     "skill-pm.md must document the proof: annotation token itself",
   );
 });
+
+// E396 / e247 AC16 reproduction: same shape as the expected-red covers: defect. The covering file holds the
+// H2, but a direct review_<id>.md without it exists for every covered id, so the covers: fallback never runs.
+test("AC-X: direct per-id files lack the H2 but a covers: file holds it -> present:true", () => {
+  const ws = mkWorkspace();
+  const ids = ["T-E391-01", "T-E391-02", "T-E391-04"];
+  writeReview(
+    ws,
+    "E391",
+    `# review E391\n\ncovers: ${ids.join(", ")}\n\n## AC Execution Log\nAC1 executed, PASS.\n`,
+  );
+  for (const id of ids) writeReview(ws, id, `# ${id}\n\nnotes only\n`);
+  assert.equal(
+    hasAcExecutionLogDisposition(ws, ids).present,
+    true,
+    "the covers: file must still be consulted when the direct file lacks the H2",
+  );
+});

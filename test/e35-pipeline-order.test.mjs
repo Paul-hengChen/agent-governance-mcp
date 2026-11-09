@@ -16,7 +16,7 @@ const { ALL_GATE_CODES, TRANSITION_GATE_CODES } = await import(
   "../dist/gates/registry.js"
 );
 
-// The fixed 18-step sequence, copied from tools/handoff-orchestrator.ts
+// The fixed 19-step sequence, copied from tools/handoff-orchestrator.ts
 // (the source of truth). Order matters — this array IS the order pin. (E35)
 const EXPECTED_PIPELINE = [
   { name: "TRANSITION_VALIDATION", codes: TRANSITION_GATE_CODES },
@@ -38,6 +38,7 @@ const EXPECTED_PIPELINE = [
   { name: "REVIEWER_COMPLETED_TASKS_REJECTED", codes: ["REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"] },
   { name: "QA_REVIEW_RECORD", codes: ["QA_REVIEW_TARGET_REQUIRED"] },
   { name: "QA_COMPLETION_EVIDENCE_MISSING", codes: ["QA_COMPLETION_EVIDENCE_MISSING"] },
+  { name: "PASS_TASKS_INCOMPLETE", codes: ["PASS_TASKS_INCOMPLETE"] },
   { name: "PASS_MISSING_EVIDENCE", codes: ["MISSING_EVIDENCE"] },
   {
     name: "PASS_VISUAL_SUBGATES",
@@ -58,13 +59,13 @@ const EXPECTED_PIPELINE = [
   { name: "MISSING_REVIEW_EVIDENCE", codes: ["MISSING_REVIEW_EVIDENCE"] },
 ];
 
-test("UPDATE_STATE_GATE_PIPELINE exists and has exactly 18 steps", () => {
+test("UPDATE_STATE_GATE_PIPELINE exists and has exactly 19 steps", () => {
   assert.ok(Array.isArray(UPDATE_STATE_GATE_PIPELINE), "pipeline must be an array");
-  assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 18);
-  assert.equal(EXPECTED_PIPELINE.length, 18);
+  assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 19);
+  assert.equal(EXPECTED_PIPELINE.length, 19);
 });
 
-test("t-order-exact: step NAME sequence matches the frozen 18-step order exactly", () => {
+test("t-order-exact: step NAME sequence matches the frozen 19-step order exactly", () => {
   const actualNames = UPDATE_STATE_GATE_PIPELINE.map((s) => s.name);
   const expectedNames = EXPECTED_PIPELINE.map((s) => s.name);
   assert.deepEqual(

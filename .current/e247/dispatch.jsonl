@@ -1,0 +1,14 @@
+{"ts":"2026-11-09T08:06:18.016Z","feature":"e247-qa-pass-unticked-gate","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T08:21:05.448Z","feature":"e247-qa-pass-unticked-gate","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T08:29:22.575Z","feature":"e247-qa-pass-unticked-gate","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T08:29:59.890Z","feature":"e247-qa-pass-unticked-gate","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T08:33:42.332Z","feature":"e247-qa-pass-unticked-gate","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T09:14:55.578Z","feature":"e247-qa-pass-unticked-gate","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T09:15:54.326Z","feature":"e247-qa-pass-unticked-gate","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T09:20:02.618Z","feature":"e247-qa-pass-unticked-gate","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T09:48:48.745Z","feature":"e247-qa-pass-unticked-gate","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-09T09:52:36.332Z","feature":"e247-qa-pass-unticked-gate","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T10:04:21.336Z","feature":"e247-qa-pass-unticked-gate","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T10:05:12.927Z","feature":"e247-qa-pass-unticked-gate","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T10:09:00.834Z","feature":"e247-qa-pass-unticked-gate","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T10:22:33.654Z","feature":"e247-qa-pass-unticked-gate","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

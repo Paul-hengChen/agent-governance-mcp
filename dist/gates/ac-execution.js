@@ -9,36 +9,28 @@ import * as path from "path";
 import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
 // The H2 heading qa-engineer's Phase 3.5 writes (skill-qa-engineer SOP 6a).
 const DISPOSITION_HEADING = "AC Execution Log";
-// Arm regex (architecture Interface Contracts, verified against the live spec
-// that introduced this gate: 8 matches, 0 false positives): a line whose first
-// non-whitespace token is `proof:` (case-insensitive; whitespace allowed
-// around the colon). Anchored per line (`m`) with newline-excluding whitespace
-// classes so mid-line / backtick "proof:" prose never false-arms.
+// Arm regex: a line whose first non-whitespace token is `proof:` (case-insensitive,
+// whitespace allowed around the colon). Per-line anchor with newline-free
+// whitespace classes, so mid-line "proof:" prose never arms.
 const PROOF_LINE_RE = /^[^\S\n]*proof[^\S\n]*:/im;
 function qaReportsDir(workspacePath) {
     return path.join(workspacePath, "qa_reports");
 }
-// Same sanitiser as expectedRedManifestPath / designFilePath (v3.14.1
-// hardening): replace non-allowed chars AND collapse any resulting `..` run
-// to `_` so a hostile feature name never produces a traversal-shaped filename.
+// Same sanitiser as expectedRedManifestPath: replace disallowed chars and collapse
+// `..` runs to `_`, so a hostile feature name cannot form a traversal path.
 export function specFilePath(workspacePath, activeFeature) {
     const safe = activeFeature
         .replace(/[^A-Za-z0-9._-]/g, "_")
         .replace(/\.\.+/g, "_");
     return path.join(workspacePath, "specs", `${safe}.md`);
 }
-// Mirrors gates/expected-red.ts reviewPath (same directory, same
-// encodeEvidenceId stem as gates/qa-review.ts evidencePath).
+// Mirrors gates/qa-review.ts evidencePath (same dir, same encodeEvidenceId stem).
 function reviewPath(workspacePath, taskId) {
     return path.join(qaReportsDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
-// Arm check (AC4/AC5, Decision b): armed iff specs/<feature>.md exists AND
-// contains >= 1 line whose first non-whitespace token is `proof:`. Absence of
-// the file OR of any proof: line ⇒ { armed: false } — zero-cost dormant for
-// every spec written before this gate existed (AC5), the same
-// absence-is-non-blocking polarity as hasExpectedRedManifest. Never throws (fs
-// errors → armed: false). Returns the resolved spec path so the emit site can
-// cite it in the error text.
+// Arm check: armed iff specs/<feature>.md exists and has >= 1 proof: line; a
+// missing file or no proof: line leaves it dormant (absence is non-blocking).
+// Never throws (fs errors give armed: false). Returns the spec path for errors.
 export function hasProofAnnotatedAC(workspacePath, activeFeature) {
     const specPath = specFilePath(workspacePath, activeFeature);
     if (!activeFeature)
@@ -52,52 +44,43 @@ export function hasProofAnnotatedAC(workspacePath, activeFeature) {
     }
     return { armed: PROOF_LINE_RE.test(content), specPath };
 }
-// Disposition check: true iff at least one candidate review file for the ids
-// being PASS'd has a `## AC Execution Log` H2. Candidate per id: the direct
-// qa_reports/review_<id>.md, else (lazily, on first miss) the file that lists the
-// id in a `covers:` line. One log per round covers every id, because the proofs
-// describe the spec. The heading match follows the evidence-schema pin. Never
-// throws (fs errors skip the file). Same traversal as hasExpectedRedDisposition.
+// Disposition: true iff a candidate review file for the PASS'd ids has the H2
+// (match per the evidence-schema pin). Per id: direct review_<id>.md, then its
+// `covers:` file when the direct one is missing or lacks the H2 (index built
+// lazily, once per call). Never throws. Same traversal as expected-red.
 export function hasAcExecutionLogDisposition(workspacePath, taskIds, evidenceSchema) {
+    const dir = qaReportsDir(workspacePath);
     let coverage = null;
     const checked = new Set();
     const checkedPaths = [];
-    for (const id of taskIds) {
-        const direct = reviewPath(workspacePath, id);
-        let candidate = null;
-        if (fs.existsSync(direct)) {
-            candidate = direct;
-        }
-        else {
-            if (coverage === null)
-                coverage = buildCoverageIndex(qaReportsDir(workspacePath));
-            const covering = coverage.get(id);
-            if (covering !== undefined) {
-                candidate = path.join(qaReportsDir(workspacePath), covering);
-            }
-        }
-        if (candidate === null) {
-            // Nothing on disk for this id: record the direct EXPECTED path so
-            // the rejection envelope can name where the server looked (E23 D3).
-            if (!checked.has(direct)) {
-                checked.add(direct);
-                checkedPaths.push(direct);
-            }
-            continue;
-        }
-        if (checked.has(candidate))
-            continue;
-        checked.add(candidate);
-        checkedPaths.push(candidate);
-        let content;
+    const hasHeading = (file) => {
+        if (checked.has(file))
+            return false;
+        checked.add(file);
+        checkedPaths.push(file);
         try {
-            content = fs.readFileSync(candidate, "utf-8");
+            return sliceH2SectionAt(fs.readFileSync(file, "utf-8"), DISPOSITION_HEADING, evidenceSchema) !== null;
         }
         catch {
-            continue;
+            return false;
         }
-        if (sliceH2SectionAt(content, DISPOSITION_HEADING, evidenceSchema) !== null) {
+    };
+    for (const id of taskIds) {
+        const direct = reviewPath(workspacePath, id);
+        const directExists = fs.existsSync(direct);
+        if (directExists && hasHeading(direct))
             return { present: true, checkedPaths };
+        if (coverage === null)
+            coverage = buildCoverageIndex(dir);
+        const covering = coverage.get(id);
+        if (covering !== undefined) {
+            if (hasHeading(path.join(dir, covering)))
+                return { present: true, checkedPaths };
+        }
+        else if (!directExists && !checked.has(direct)) {
+            // Nothing on disk for this id: record where the server looked.
+            checked.add(direct);
+            checkedPaths.push(direct);
         }
     }
     return { present: false, checkedPaths };
