@@ -21,7 +21,7 @@ import { resetSession, markStateRead } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { handleUpdateState } from "../dist/tools/handoff-orchestrator.js";
 import { TOOL_REGISTRY } from "../dist/tools/registry.js";
-import { forceSeedStamp, freshNonSuspectStamp, nonSuspectStampAt } from "./e148-seed-stamp.mjs";
+import { forceSeedStamp, nonSuspectStampAt } from "./e148-seed-stamp.mjs";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 
 let SqliteHandoffStorage;
@@ -151,7 +151,9 @@ async function seedFileState(ws, feature, agent, status) {
   // the lease-override AC1/AC2/AC5 series) need the seeded incumbent to be
   // fresh relative to Date.now() so FEATURE_LEASE_HELD actually holds; a fixed
   // past stamp would let the lease expire and silently break them. (E148)
-  forceSeedStamp(ws, freshNonSuspectStamp());
+  // One minute in the past: well inside the TTL, and never after the gate's own clock read
+  // (a stamp ahead of it has a negative age, which the lease predicate treats as not held).
+  forceSeedStamp(ws, nonSuspectStampAt(-60_000));
 }
 
 test("FM1: a write for a NEW active_feature is REJECTED with FEATURE_LEASE_HELD while the incumbent is fresh + non-terminal (file mode)", async () => {
@@ -1045,6 +1047,11 @@ test("E10-AC2b: lease_override:true with a MISMATCHED pending_notes[0] (does not
   await seedFileState(ws, "flease-a", "sr-engineer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
+  assert.equal(
+    isFeatureLeaseHeld(parseHandoff(ws), "flease-b", Date.now(), LEASE_TTL_MIN),
+    true,
+    `precondition: the seeded incumbent's lease must hold (last_updated=${parseHandoff(ws).last_updated}), else the override classifier never runs`,
+  );
 
   const result = await handleUpdateState({
     workspace_path: ws,
@@ -1085,7 +1092,7 @@ test("E10-AC3: lease_override is transient — write N's bypass does NOT leak fo
   // Write N+1: a DIFFERENT feature, omitting lease_override. flease-b is now the fresh incumbent,
   // so the normal FEATURE_LEASE_HELD predicate must hold; no bypass carries forward from write N.
   // Reseed a fresh stamp that cannot look hand-authored (stamp-provenance check) before N+1.
-  forceSeedStamp(ws, freshNonSuspectStamp());
+  forceSeedStamp(ws, nonSuspectStampAt(-60_000));
   resetSession(ws);
   markStateRead(ws);
   const writeNPlus1 = await handleUpdateState({

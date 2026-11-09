@@ -135,7 +135,7 @@ Column ownership: coordinator pre-fills `order`, `feature id`, `scope`, `depends
 
 ## Dependencies / Prerequisites
 
-- **Resource audit (constitution §7)**: the OOBE PRD path and the `research/*.md`
+- **Resource audit (constitution §7)**: the setup-wizard PRD path and the `research/*.md`
   files mentioned this session are the **motivating example**, not consumed by this
   generic gate → classified `ignore` (no fetch/index).
 - Touches the always-injected `skill-coordinator.md` → the AC5 footprint cap is a

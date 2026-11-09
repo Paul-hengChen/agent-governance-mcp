@@ -1,0 +1,4 @@
+# E381 (T-E381-01): the wave-7 fixture item "自己的 spec／證據／`.current/e177a/`" is a
+# prose-led glob, so `.current/e177a/` is no longer an owned token (implicit bookkeeping
+# still covers `.current/e177a/**`). qa re-pins AC1 under T-E381-04 per the spec's Dependencies.
+test/e177a-manifest.test.mjs | AC1 wave7 parses

@@ -2,7 +2,7 @@
 
 > Synthesised from: pixel-perfect-and-design-coverage.md, why-pixel-perfect-missed.md,
 > design-fidelity-enforcement.md, design-fidelity-workflow.md,
-> oobe-visual-fidelity-improvement-plan.md,
+> visual-fidelity-improvement-plan.md,
 > a cross-AI governance recommendations note (2026-06-05; not retained in the tree)
 > Authors: @researcher (multiple sessions, 2026-05-21 – 2026-06-05)
 > Last synthesised: 2026-06-22

@@ -307,13 +307,17 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
     let effectiveScopeDecision: string | undefined = scopeDecision;
     let effectiveScopeDecisionWhy: string | undefined = scopeDecisionWhy;
     // cut_approved is feature-scoped and re-armed on every PM In_Progress
-    // write (new feature, QA-FAIL bounce, scope rework), so a stale `true`
-    // never survives. Resolution: (1) explicit true → true; (2) PM re-entry →
-    // unset; (3) same active_feature on disk → carry; (4) otherwise → unset.
+    // re-entry (new feature, QA-FAIL bounce, scope rework), so a stale `true`
+    // never survives. A PM In_Progress write over an on-disk pm:In_Progress
+    // tuple of the same feature is an amendment, not a re-entry, and keeps it.
+    // Resolution: (1) explicit true → true; (2) PM In_Progress write with
+    // explicit false → unset; (3) PM In_Progress amendment → carry; (4) any
+    // other PM In_Progress write → unset; (5) same active_feature on disk →
+    // carry; (6) otherwise → unset.
     // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-write.ts — field lifetimes".
     let effectiveCutApproved: boolean | undefined;
-    const isPmReentry = lastAgent === "pm" && _status === "In_Progress";
-    const cutApprovalNeedsExisting = cutApproved !== true && !isPmReentry;
+    const isPmInProgressWrite = lastAgent === "pm" && _status === "In_Progress";
+    const cutApprovalNeedsExisting = cutApproved !== true;
     // external_refs: feature-scoped with no PM re-entry re-arm. Its absence
     // clears the gate (the inverse of cut_approved), so re-arming would
     // discard a valid ledger and unblock EXTERNAL_REFS_UNRESOLVED.
@@ -368,7 +372,7 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
       if (effectiveScopeDecision === undefined) effectiveScopeDecision = existing?.scope_decision;
       if (effectiveScopeDecisionWhy === undefined) effectiveScopeDecisionWhy = existing?.scope_decision_why;
       if (cutApprovalNeedsExisting) {
-        // clauses (3)/(4): carry forward only within the same feature.
+        // clauses (3)/(5)/(6): carry forward only within the same feature.
         effectiveCutApproved =
           existing?.active_feature === _activeFeature ? existing?.cut_approved : undefined;
       }
@@ -474,12 +478,17 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
       effectiveLastUpdated = existing.last_updated;
     }
     frontmatterData.last_updated = effectiveLastUpdated;
-    // clauses (1)/(2): explicit PM approval, or PM re-entry re-arm. These do not
-    // depend on `existing`, so they resolve regardless of the read above.
+    // clauses (1)/(2)/(4): explicit approval, explicit PM revoke, or PM
+    // re-entry re-arm. An amendment keeps the same-feature carry above.
     if (cutApproved === true) {
       effectiveCutApproved = true;
-    } else if (isPmReentry) {
-      effectiveCutApproved = undefined;
+    } else if (isPmInProgressWrite) {
+      const isPmAmendment =
+        cutApproved !== false &&
+        existing?.last_agent === "pm" &&
+        existing.status === "In_Progress" &&
+        existing.active_feature === _activeFeature;
+      if (!isPmAmendment) effectiveCutApproved = undefined;
     }
     // Persist prd_path relative to workspace_path (never absolute). An
     // out-of-bounds value (only reachable from a direct, non-zod caller) is

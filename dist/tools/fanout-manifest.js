@@ -197,7 +197,7 @@ const usageContinuation = (line) => `       ${line.slice("usage: ".length)}`;
 export const USAGE = [
     "usage: node scripts/fanout.mjs validate <manifest>",
     "       node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]",
-    "       node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]",
+    "       node scripts/fanout.mjs check <manifest> <lane> [--base <ref>] [--repo <dir>]",
     "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
     usageContinuation(OWNERS_USAGE),
     usageContinuation(HANDOFF_USAGE),
@@ -294,6 +294,76 @@ export function isPathToken(span) {
 }
 export function pathTokens(cell) {
     return backtickSpans(cell).filter(isPathToken);
+}
+const OWNED_ITEM_SEPARATORS = new Set(["、", "，", ",", "；", ";"]);
+const OPEN_PARENS = new Set(["(", "（"]);
+const CLOSE_PARENS = new Set([")", "）"]);
+/** One leading role label such as `qa：` (no whitespace before the colon). */
+const ROLE_LABEL_RE = /^[^\s：:]+[：:]/;
+/** The declared-new-file marker that may lead an owned item. */
+const NEW_FILE_MARKER = "新檔";
+/**
+ * True when an owned item's leading text (before its first top-level span)
+ * is prose: still non-blank once one role label and then `新檔` are removed.
+ */
+function isProseLead(lead) {
+    let t = lead.trim().replace(ROLE_LABEL_RE, "").trim();
+    if (t.startsWith(NEW_FILE_MARKER))
+        t = t.slice(NEW_FILE_MARKER.length).trim();
+    return t !== "";
+}
+/**
+ * Path tokens of an `擁有` cell. Same spans as pathTokens, except that a glob
+ * span (isGlobToken) is not owned when it sits inside a parenthesis (ASCII or
+ * full-width, any depth) or in a prose-led list item. Items split at `、` `，`
+ * `,` `；` `;` outside spans and parentheses. Why: an explanatory clause such
+ * as "其他跑 `scripts/**` 的 `test/**`（只限 …）" or an exclusion such as
+ * "（`specs/fanout-*.md` 除外）" must not widen the lane to a whole glob. Only
+ * globs are dropped: a concrete prose aside grants one file and is already
+ * reported by the unmatched-owned warning, which skips globs. (E381)
+ */
+export function ownedPathTokens(cell) {
+    const items = [];
+    let item = { lead: "", leadDone: false, spans: [] };
+    items.push(item);
+    let depth = 0;
+    const scanText = (text) => {
+        for (const ch of text) {
+            if (OPEN_PARENS.has(ch))
+                depth++;
+            else if (CLOSE_PARENS.has(ch))
+                depth = Math.max(0, depth - 1);
+            else if (depth === 0 && OWNED_ITEM_SEPARATORS.has(ch)) {
+                item = { lead: "", leadDone: false, spans: [] };
+                items.push(item);
+                continue;
+            }
+            if (!item.leadDone)
+                item.lead += ch;
+        }
+    };
+    let pos = 0;
+    for (const m of cell.matchAll(/`([^`]+)`/g)) {
+        scanText(cell.slice(pos, m.index));
+        item.spans.push({ span: m[1].trim(), depth });
+        if (depth === 0)
+            item.leadDone = true;
+        else if (!item.leadDone)
+            item.lead += m[0];
+        pos = m.index + m[0].length;
+    }
+    const out = [];
+    for (const it of items) {
+        const prose = isProseLead(it.lead);
+        for (const { span, depth: d } of it.spans) {
+            if (!isPathToken(span))
+                continue;
+            if (isGlobToken(span) && (d > 0 || prose))
+                continue;
+            out.push(span);
+        }
+    }
+    return out;
 }
 /** Spec "unquoted path": bare path-shaped words in `擁有` outside backtick spans. */
 export function unquotedPaths(cell) {
@@ -444,7 +514,7 @@ function parseLanes(sections, m) {
                 rowErr("BRANCH_EMPTY", "branch cell is empty");
                 ok = false;
             }
-            const ownedTokens = pathTokens(owned);
+            const ownedTokens = ownedPathTokens(owned);
             if (ownedTokens.length === 0) {
                 rowErr("OWNED_EMPTY", "擁有 cell has no backtick-quoted path token");
                 ok = false;
@@ -1333,6 +1403,39 @@ function diffNames(a, b, repo) {
         return { error: inputErr(FANOUT_CODES.gitDiffFailed, `git diff ${a}...${b} failed in ${repo}: ${gitErrorLine(err)}`) };
     }
 }
+/** REF_NOT_FOUND message for check's base, worded by where the base came from. (E390) */
+function baseNotFoundMessage(base, source, repo) {
+    if (source === "manifest") {
+        return `base "${base}" is the target branch recorded in the manifest (目標分支 under ### 核對 primary) and does not resolve (git rev-parse --verify) in ${repo} — pass --base <ref> to check against another ref`;
+    }
+    if (source === "default") {
+        return `default base "${base}" does not resolve (git rev-parse --verify) in ${repo} and the manifest records no target branch (目標分支 under ### 核對 primary) — pass --base <ref>`;
+    }
+    return `base ref "${base}" does not resolve (git rev-parse --verify) in ${repo}`;
+}
+/** `<branch> @ <sha>`, the value shape of the recorded 目標分支 fact. */
+const RECORDED_TARGET_RE = /^(.+) @ ([0-9a-f]{7,40})$/;
+/**
+ * The target branch recorded by the single `## 接手步驟` section's single
+ * `- 目標分支：<branch> @ <sha>` fact line, else undefined (no or several
+ * sections, no or several fact lines, an unparseable value). Mirrors the
+ * handoff --check default so both commands resolve the same branch; kept
+ * here so check never loads the handoff module. (E390)
+ */
+function recordedTargetBranch(text) {
+    const sections = findHandoffSections(text);
+    if (sections.length !== 1)
+        return undefined;
+    const values = [];
+    for (const l of sections[0].lines) {
+        const fm = /^- ([^：]+)：(.*)$/.exec(l.text);
+        if (fm && fm[1].trim() === "目標分支")
+            values.push(fm[2].trim());
+    }
+    if (values.length !== 1)
+        return undefined;
+    return RECORDED_TARGET_RE.exec(values[0])?.[1];
+}
 function refOk(ref, cwd) {
     try {
         gitOut(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd);
@@ -1355,6 +1458,7 @@ export function checkLane(m, laneId, opts = {}) {
         return { ok: false, errors: found.errors };
     const lane = found.lane;
     const base = opts.base ?? "main";
+    const baseSource = opts.baseSource ?? (opts.base !== undefined ? "flag" : "default");
     const repo = opts.repo ?? process.cwd();
     const errors = [];
     try {
@@ -1371,7 +1475,7 @@ export function checkLane(m, laneId, opts = {}) {
             errors.push(inputErr("REF_INVALID", `${what} ref "${ref}" is not a valid git ref`));
         }
         else if (!refOk(ref, repo)) {
-            errors.push(inputErr("REF_NOT_FOUND", `${what} ref "${ref}" does not resolve (git rev-parse --verify) in ${repo}`));
+            errors.push(inputErr("REF_NOT_FOUND", what === "base" ? baseNotFoundMessage(ref, baseSource, repo) : `${what} ref "${ref}" does not resolve (git rev-parse --verify) in ${repo}`));
         }
     }
     if (errors.length > 0)
@@ -1955,8 +2059,15 @@ export function runCheck(args) {
     const r = readManifest(file);
     if ("error" in r)
         return fail([r.error]);
+    // Without --base, the target branch the manifest records is the base, as for handoff --check (E390).
+    const recorded = base === undefined ? recordedTargetBranch(r.text) : undefined;
+    const baseSource = base !== undefined ? "flag" : recorded !== undefined ? "manifest" : "default";
     // Same default as render: the git repo that holds the manifest, not cwd.
-    const res = checkLane(parseManifest(r.text), lane, { base, repo: repo ?? path.dirname(path.resolve(file)) });
+    const res = checkLane(parseManifest(r.text), lane, {
+        base: base ?? recorded,
+        baseSource,
+        repo: repo ?? path.dirname(path.resolve(file)),
+    });
     if (!res.ok)
         return fail(res.errors);
     return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };

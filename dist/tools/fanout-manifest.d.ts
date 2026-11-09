@@ -196,6 +196,17 @@ export declare function splitRow(row: string): string[];
 /** Spec "path token": a backtick span that is path-shaped; every other span is prose. */
 export declare function isPathToken(span: string): boolean;
 export declare function pathTokens(cell: string): string[];
+/**
+ * Path tokens of an `擁有` cell. Same spans as pathTokens, except that a glob
+ * span (isGlobToken) is not owned when it sits inside a parenthesis (ASCII or
+ * full-width, any depth) or in a prose-led list item. Items split at `、` `，`
+ * `,` `；` `;` outside spans and parentheses. Why: an explanatory clause such
+ * as "其他跑 `scripts/**` 的 `test/**`（只限 …）" or an exclusion such as
+ * "（`specs/fanout-*.md` 除外）" must not widen the lane to a whole glob. Only
+ * globs are dropped: a concrete prose aside grants one file and is already
+ * reported by the unmatched-owned warning, which skips globs. (E381)
+ */
+export declare function ownedPathTokens(cell: string): string[];
 /** Spec "unquoted path": bare path-shaped words in `擁有` outside backtick spans. */
 export declare function unquotedPaths(cell: string): string[];
 /**
@@ -395,6 +406,11 @@ export declare function matchesGlob(filePath: string, token: string): boolean;
 export declare function isImplicitBookkeeping(filePath: string, lane: string): boolean;
 export interface CheckOptions {
     base?: string;
+    /**
+     * Where `base` came from, which picks the REF_NOT_FOUND wording. Default:
+     * `flag` when `base` is given, else `default` (base `main`). (E390)
+     */
+    baseSource?: "flag" | "manifest" | "default";
     /** Directory inside the target repo. Library default: cwd; the CLI defaults to the manifest's directory. */
     repo?: string;
 }

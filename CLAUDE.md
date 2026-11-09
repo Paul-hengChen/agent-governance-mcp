@@ -45,7 +45,7 @@ workspace path, and picks a transport. The layers themselves live elsewhere:
    PRD-derived RAG chunks in target workspaces. `tw_update_state` / `tw_get_state`
    are implemented in `tools/handoff-orchestrator.ts`.
 3. **Guards + gates** (`guards/{session,file-lock}.ts`) — pre-flight check, file
-   lock, mtime freshness check; then the 18-step `UPDATE_STATE_GATE_PIPELINE`
+   lock, mtime freshness check; then the 19-step `UPDATE_STATE_GATE_PIPELINE`
    (`tools/handoff-orchestrator.ts`) whose predicates live in `gates/` and whose
    metadata is declared once per gate in `gates/registry.ts`.
 
@@ -59,7 +59,7 @@ on first read. See `docs/schema-versions.md` for how to ship a new version.
 index.ts                  MCP server entry (~300 lines): iterates the registries,
                           resolves workspace path, picks stdio vs HTTP transport
 tools/registry.ts         TOOL_REGISTRY + PROMPT_REGISTRY — ADD NEW TOOLS HERE
-tools/handoff-orchestrator.ts  tw_update_state / tw_get_state + the 18-step
+tools/handoff-orchestrator.ts  tw_update_state / tw_get_state + the 19-step
                           UPDATE_STATE_GATE_PIPELINE (the write path)
 tools/handoff.ts          read/write .current/handoff.md (uses js-yaml)
 tools/handoff-parse.ts    handoff YAML/markdown parsing (E36 split)
@@ -104,7 +104,7 @@ gates/pipeline.ts         runUpdateStatePipeline() step runner
 gates/*.ts                one module per gate predicate (cut-approval, scope-decision,
                           feature-lease, external-refs, code-review, qa-review,
                           evidence-schema, visual, expected-red, ac-execution,
-                          stamp-provenance, lease-override)
+                          stamp-provenance, lease-override, open-tasks)
 schema/versions.ts        schema_version constants + migration registries (v3.4.0)
 schema/migrations-*.ts    handoff / tasks / sqlite / config migration runners (v3.4.0)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"

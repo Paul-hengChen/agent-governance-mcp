@@ -30,8 +30,7 @@ export function expectedRedManifestPath(
   return path.join(qaReportsDir(workspacePath), `expected-red_${safe}.txt`);
 }
 
-// Mirrors gates/qa-review.ts evidencePath (same directory, same
-// encodeEvidenceId stem).
+// Mirrors gates/qa-review.ts evidencePath (same dir, same encodeEvidenceId stem).
 function reviewPath(workspacePath: string, taskId: string): string {
   return path.join(qaReportsDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
@@ -51,38 +50,32 @@ export function hasExpectedRedManifest(
   return { present: fs.existsSync(manifestPath), manifestPath };
 }
 
-// Disposition check: true iff at least one candidate review file for the ids
-// being PASS'd has a `## Expected-Red Diff` H2. Candidate per id: the direct
-// qa_reports/review_<id>.md, else (lazily, on first miss) the file that lists the
-// id in a `covers:` line. The manifest is feature-scoped, so one diff per round
-// covers every id. Never throws (fs errors skip the file).
+// Disposition: true iff a candidate review file for the PASS'd ids has the H2.
+// Per id: direct review_<id>.md, then its `covers:` file when the direct one is
+// missing or lacks the H2 (index built lazily, once per call). One feature-scoped
+// diff covers every id. Never throws (fs errors skip the file).
 export function hasExpectedRedDisposition(
   workspacePath: string,
   taskIds: string[],
 ): { present: boolean } {
+  const dir = qaReportsDir(workspacePath);
   let coverage: Map<string, string> | null = null;
   const checked = new Set<string>();
+  const hasHeading = (file: string): boolean => {
+    if (checked.has(file)) return false;
+    checked.add(file);
+    try {
+      return sliceH2Section(fs.readFileSync(file, "utf-8"), DISPOSITION_HEADING) !== null;
+    } catch {
+      return false;
+    }
+  };
   for (const id of taskIds) {
     const direct = reviewPath(workspacePath, id);
-    let candidate: string | null = null;
-    if (fs.existsSync(direct)) {
-      candidate = direct;
-    } else {
-      if (coverage === null) coverage = buildCoverageIndex(qaReportsDir(workspacePath));
-      const covering = coverage.get(id);
-      if (covering !== undefined) {
-        candidate = path.join(qaReportsDir(workspacePath), covering);
-      }
-    }
-    if (candidate === null || checked.has(candidate)) continue;
-    checked.add(candidate);
-    let content: string;
-    try {
-      content = fs.readFileSync(candidate, "utf-8");
-    } catch {
-      continue;
-    }
-    if (sliceH2Section(content, DISPOSITION_HEADING) !== null) {
+    if (fs.existsSync(direct) && hasHeading(direct)) return { present: true };
+    if (coverage === null) coverage = buildCoverageIndex(dir);
+    const covering = coverage.get(id);
+    if (covering !== undefined && hasHeading(path.join(dir, covering))) {
       return { present: true };
     }
   }

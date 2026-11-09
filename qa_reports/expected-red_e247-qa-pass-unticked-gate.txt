@@ -1,0 +1,13 @@
+# e247-qa-pass-unticked-gate — expected-red manifest
+# Format: <relative test file path> | <exact test name/description string>
+#
+# sr hop 1 (T-E247-03) listed 14 count / order / allowlist pins that stayed red until qa re-pinned
+# them. qa re-pinned all of them in T-E247-10 (e35 18 -> 19 + PASS_TASKS_INCOMPLETE step, error-code-contract
+# 35 -> 36 + allowlist row, e26 and e308 35 -> 36); they are green and no longer listed.
+#
+# qa hop 1 (T-E247-01, T-E247-11) listed the E396 reproduction (3 rows: e396-covers-expected-red U2 and I,
+# ac-execution AC-X), red on purpose until sr built T-E247-02 and T-E247-12. sr hop 2 built both
+# (the covers: file is now also consulted when the direct review file lacks the H2); all 3 are green and
+# no longer listed.
+#
+# No intentional reds remain for this feature.

@@ -91,10 +91,12 @@ test("AC1 wave7 parses", () => {
     "dist/**",
     "test/e177a-*.test.mjs",
     "test/fixtures/e177a/**",
-    ".current/e177a/",
   ]) {
     assert.ok(e177a.ownedTokens.includes(tok), `owned tokens missing ${tok}`);
   }
+  // E381: "自己的 spec／證據／`.current/e177a/`" is a prose-led glob item, so it is no longer an owned token;
+  // the implicit lane-bookkeeping set already covers `.current/e177a/**` (asserted in test/e177a-check-cli.test.mjs AC9).
+  assert.ok(!e177a.ownedTokens.includes(".current/e177a/"), "prose-led .current/e177a/ must not be owned (E381)");
   const e180 = m.dispatchable.find((d) => d.lane === "e180");
   assert.ok(!e180.ownedTokens.includes("closedLanePointerLine"), "closedLanePointerLine must be excluded as prose");
   assert.ok(!e180.ownedTokens.includes(":1727"), ":1727 must be excluded as prose");

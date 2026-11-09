@@ -451,7 +451,7 @@ SOP edits stay consistent:
 **Migration risk — flagged, intended (per locked Q-OQ1):** any **existing** workspace whose design
 doc has a real (non-`no-design`) mode but no `## Visual Baselines` section will, after this feature
 ships, START blocking PASS with `VISUAL_BASELINES_REQUIRED` where it previously passed. This is the
-deliberate closure of the OOBE-incident hole — those workspaces were silently skipping the entire
+deliberate closure of the setup-wizard-incident hole — those workspaces were silently skipping the entire
 visual chain. The remediation is owner-clear (design-auditor adds the section) and the error message
 names it. Operators upgrading mid-feature should expect this on any armed-but-baseline-less
 workspace; it is correct, not a regression. No automatic migration of old design docs is in scope

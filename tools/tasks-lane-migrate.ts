@@ -346,20 +346,58 @@ function isLinkedWorktree(workspacePath: string): boolean {
 }
 
 /**
+ * true iff `git ls-files --error-unmatch -- <file>` exits 0 in `workspacePath`
+ * (read-only; stderr suppressed). Any error, including no git binary or a
+ * file outside the repo: NOT tracked, which keeps the pre-E388 resolution.
+ */
+function isGitTracked(workspacePath: string, file: string): boolean {
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", "--", path.relative(workspacePath, file)], {
+      cwd: workspacePath,
+      stdio: "ignore",
+      timeout: 5_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The legacy file a feat lane in a linked worktree may use: the first
+ * taskPaths candidate that findLegacyTasksFile would accept (exists, not
+ * nested in a `.current/<dir>/`) and that git does not track. (E388)
+ */
+function findUntrackedLegacyTasksFile(workspacePath: string): string | null {
+  const currentDir = path.join(workspacePath, ".current");
+  return (
+    resolveTaskPaths(workspacePath).find((p) => {
+      const rel = path.relative(currentDir, p);
+      const segs = rel.split(path.sep);
+      const nestedInCurrent = !path.isAbsolute(rel) && segs[0] !== ".." && segs.length > 1;
+      return !nestedInCurrent && fs.existsSync(p) && !isGitTracked(workspacePath, p);
+    }) ?? null
+  );
+}
+
+/**
  * The file tw_* reads and writes as the task ledger (every tools/tasks-file.ts
  * reader and writer resolves through here): the lane ledger, except in a
  * workspace whose absent lane path is git-ignored. There the legacy file stays
- * the ledger (E125a option A). With no legacy file, a feat lane in a linked
- * git worktree still gets its lane ledger, so `agc feature finish` harvests it
- * with `.current/<lane>/` (E383); anywhere else (a primary checkout, or the
- * `_primary` lane) it is the first taskPaths candidate.
+ * the ledger (E125a option A). For a feat lane in a linked git worktree a
+ * git-tracked legacy file never counts, so lane rows are never written into
+ * (and committed with) a team's tracked TODO.md or tasks.md (E388); with no
+ * other legacy file that lane still gets its lane ledger, so `agc feature
+ * finish` harvests it with `.current/<lane>/` (E383). Anywhere else (a primary
+ * checkout, or the `_primary` lane) it is the first taskPaths candidate.
  */
 export function resolveTasksLedgerPath(workspacePath: string, laneTasksPath: string): string {
   if (fs.existsSync(laneTasksPath) || !isLanePathIgnored(workspacePath, laneTasksPath)) return laneTasksPath;
-  const legacyPath = findLegacyTasksFile(workspacePath);
-  if (legacyPath !== null) return legacyPath;
   const lane = path.basename(path.dirname(laneTasksPath));
-  if (lane !== PRIMARY_LANE && isLinkedWorktree(workspacePath)) return laneTasksPath;
+  const laneWorktree = lane !== PRIMARY_LANE && isLinkedWorktree(workspacePath);
+  const legacyPath = laneWorktree ? findUntrackedLegacyTasksFile(workspacePath) : findLegacyTasksFile(workspacePath);
+  if (legacyPath !== null) return legacyPath;
+  if (laneWorktree) return laneTasksPath;
   return resolveTaskPaths(workspacePath)[0] ?? laneTasksPath;
 }
 

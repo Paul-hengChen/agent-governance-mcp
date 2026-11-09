@@ -8,7 +8,7 @@ The visual-fidelity pipeline (design-auditor `## Visual Baselines`, sr-engineer 
 Pre-Flight, qa-visual Phase 1.5, server `VISUAL_EVIDENCE_MISSING` gate, `visual_round` counter)
 is fully implemented but not self-arming: the server arms the gate only when the design file
 happens to contain a `## Visual Baselines` H2, so a well-formed design doc that omits the section
-(exactly what occurred in the `oobe-setup-wizard` incident) silently disables the entire visual
+(exactly what occurred in the `setup-wizard` incident) silently disables the entire visual
 chain and `visual_round` stays 0. Concurrently, composition/layout intent has no owner: the
 design-auditor template has no `## Layout / Canvas` section, no role ever compared the root-frame
 geometry against the build, and the single foundational decision (fixed 1280×720 stage vs fluid

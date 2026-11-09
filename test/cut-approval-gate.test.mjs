@@ -183,14 +183,44 @@ test("R1: PM writes cut_approved=true → field becomes true", async () => {
   assert.equal(state.cut_approved, true, "PM explicit approval must persist to disk");
 });
 
-test("R2: PM re-entry WITHOUT cut_approved re-arms gate (PM re-entry clause)", async () => {
-  // WHY: every PM In_Progress write that does NOT explicitly pass cut_approved must
-  // reset it to undefined — closes the stale-true hole when PM re-enters without
-  // explicit re-approval. This is the primary reset clause in the algorithm.
+test("R2: same-tuple PM amendment WITHOUT cut_approved keeps the approval (E230 amendment clause)", async () => {
+  // WHY: a pm:In_Progress write over an on-disk pm:In_Progress tuple of the same feature is an
+  // amendment of the current tuple, not a re-entry (E230). Dropping the human's approval there
+  // forced a second approval of an already-approved cut, so the approval must be carried.
   const ws = tmpWs();
-  // Step 1: PM approves.
   await seedHandoff(ws, { lastAgent: "pm", status: "In_Progress", cutApproved: true });
-  // Step 2: PM re-enters WITHOUT passing cut_approved (e.g. after scope rework).
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "test-feat",
+    status: "In_Progress",
+    lastAgent: "pm",
+    completedTasks: [],
+    pendingNotes: ["amending notes"],
+    // cutApproved intentionally omitted — amendment carries it
+  });
+  resetSession();
+  const state = parseHandoff(ws);
+  assert.equal(state.cut_approved, true, "same-tuple PM amendment must carry cut_approved");
+  assert.equal(hasCutApproval(state), true);
+});
+
+test("R2b: PM re-entry from a non-pm:In_Progress predecessor WITHOUT cut_approved re-arms the gate", async () => {
+  // WHY: the PM re-entry re-arm clause still holds for every predecessor that is not a
+  // pm:In_Progress tuple (here sr-engineer:In_Progress); only the amendment shape is exempt.
+  const ws = tmpWs();
+  await seedHandoff(ws, { lastAgent: "pm", status: "In_Progress", cutApproved: true });
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "test-feat",
+    status: "In_Progress",
+    lastAgent: "sr-engineer",
+    completedTasks: [],
+    pendingNotes: ["building"],
+  });
   resetSession();
   markStateRead(ws);
   await writeHandoffState({
@@ -200,12 +230,11 @@ test("R2: PM re-entry WITHOUT cut_approved re-arms gate (PM re-entry clause)", a
     lastAgent: "pm",
     completedTasks: [],
     pendingNotes: ["re-evaluating scope"],
-    // cutApproved intentionally omitted — this is the re-arm path
   });
   resetSession();
   const state = parseHandoff(ws);
-  assert.equal(state.cut_approved, undefined, "PM re-entry without explicit cutApproved must re-arm gate");
-  assert.equal(hasCutApproval(state), false, "gate must fire after PM re-entry without approval");
+  assert.equal(state.cut_approved, undefined, "PM re-entry over a non-pm tuple must re-arm");
+  assert.equal(hasCutApproval(state), false);
 });
 
 test("R3: non-PM same-feature write carries cut_approved forward", async () => {

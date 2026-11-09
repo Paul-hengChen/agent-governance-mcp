@@ -35,7 +35,7 @@ function seedDesignWithBaselines(ws, feature) {
   fs.mkdirSync(path.join(ws, "design"), { recursive: true });
   fs.writeFileSync(
     path.join(ws, "design", `${feature}.md`),
-    `# design/${feature}\n\n## Visual Baselines\n\n| surface | baseline | impl | notes |\n| --- | --- | --- | --- |\n| oobe.s1 | design/oobe/s1.png | screenshots/s1.png | landscape |\n`,
+    `# design/${feature}\n\n## Visual Baselines\n\n| surface | baseline | impl | notes |\n| --- | --- | --- | --- |\n| wizard.s1 | design/wizard/s1.png | screenshots/s1.png | landscape |\n`,
   );
 }
 
