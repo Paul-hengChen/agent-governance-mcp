@@ -1,0 +1,116 @@
+# Fan-out: backlog wave A（triage 2026-11-09 之後第一波：E255 ∥ E247＋E396＋E380 ∥ E230＋E151 ∥ E381＋E390＋E388 ∥ E238）
+base: 60a038d    integration branch: integ/backlog-wave-a
+mailbox: ../agent-governance-mcp-lanes/_mailbox
+
+**狀態：人類核准 2026-11-09（清單與待人類裁定 1–5 全照整合者建議）。**
+
+範圍由人類指定（integrator prompt「fan-out：backlog triage 2026-11-09 之後的第一波（wave A），共 11 張」，2026-11-09）：triage（PR #103、#104，`main` = `60a038d`）之後 backlog 剩 23 張 keep，本波做 11 張，其餘 12 張留 wave B（見文末，不排）。E255、E247、E238 的列開頭「Scope ruled 2026-11-09 (triage)」段是 cut 依據，「Original row:」只是歷史；其他票以列本身為準。E254／E257／E278／E378 已併入 E238、E348／E363 由 E238 同 lane 處理、E237 已併入 E247：這些列都已標 CLOSED，本波以母票 done-mark 一併結。
+
+人類已裁定、lane 不再問：E255 的前綴是專案代號（spec、commit、PR、證據一律寫「the product-style prefix」，不得拼出代號）；E247 吸收 E237、做 PASS 時檢查未勾 task、不加 `qa PASS → qa In_Progress` 新邊；E238 是假紅家族母票；E340 走 SOP 例外不做工具（wave B）。
+
+## 派工前核對（整合者，2026-11-09，規劃時；派工時在派工 base 重做一次）
+- `git worktree list` 只有 primary；`main` = `origin/main` = `60a038d`；工作樹乾淨；primary handoff 停在 `release-cd-v4.19.4`（v4.19.4 已發版），drift 無（T-REL4-02 是舊 feature 的 evidence-backed 標記，照 drift 訊息不 sync）。`../agent-governance-mcp-lanes/_mailbox` 存在且為空。`.current/.config.json`：`cutApprovalAutoTier` = `{}`（每條 lane 的 cut 都由人類在該 lane session 核准）、`laneProtocolAddendum` = `docs/lane-protocol-addendum.md`、`artifacts` = `repo`。
+- **四個預算重量**（`npm run build` 後，以 `test/context-budget.test.mjs` 的估算式量）：skill-pm stripped 4847 / 4849（餘 2）、lean 5665 / 5723（餘 58）、stripped constitution 10451 / 10598（餘 147）、non-design 8452 / 8501（餘 49）、teamwork bundle 21526 / 21715（餘 189）。budget 測試 54/54 綠。
+- **E255 的預算事實**：`content/skill-pm.md` 第 30 行整句在第 29 行 `rationale:start` 與行尾 `rationale:end` 之間，量 skill-pm 上限前就被 `stripRationale` 拿掉，替換字串長短不影響 4849 上限（仍照指示不變長）。`skill-qa-engineer.md`、`skill-design-auditor.md` 沒有預算上限，也不在任何 compose golden 裡（golden 12 檔對三個站點字樣 grep 為 0）；`constitution-rationale.md` 不組進任何 prompt，只被 `test/compose-equivalence.test.mjs`（§X 引用）與 `test/e391-prompt-audit-stale-facts.test.mjs` 讀。→ e255 不動任何 golden、任何上限。
+- **E255 的實際面**：tracked 檔案中前綴出現於 29 個 `.md`＋2 個測試檔（與列一致）。`research/` 下以前綴命名的檢討檔一個；它的引用站點：`content/constitution-rationale.md:12`、`docs/prompt-audit-2026-11-02.md:228`、`CHANGELOG.md:4511`、`specs/constitution-restructure.md:98,191`、`specs/decodename-cleanup.md:203`、`specs/e232-leak-cleanup.md:104,107,114,222`、`specs/qa-flow-enforcement-architecture.md:861`、`specs/server-scope-decision-gate.md:113`、`qa_reports/review_T-E232-01.md:52,53,98`、`review_reports/review_T-E232-01.md:6,14`、`review_reports/review_T-E232-05.md:14`、`review_reports/review_T-E232-08.md:13`，另有 `docs/backlog.md:226`（E104 列）與 `.current/history/2026-09/e232/tasks.md:6`。CHANGELOG 4 行 = 第 4460、4511、5933、5982 行。`docs/backlog.md` 另一處在第 1345 行。
+- **E247／E396 的實際面**：pipeline 步驟數 18 寫在 `CLAUDE.md:48,62`、`README.md:69,230`、`docs/architecture.md:37,47,67`（含逐步錯誤碼表）；新錯誤碼要在某個 `content/*.md` 以反引號出現（`test/error-code-contract.test.mjs:186`），`content/skill-qa-engineer.md` 即可滿足，不一定要動憲法。`QA_REVIEW_RECORD` 在 `tools/handoff-orchestrator.ts:753`、`PASS_EXPECTED_RED_DIFF` 在 `:1067`；`gates/expected-red.ts:60-75` 的 `covers:` 回退存在。`test/` 中 39 個檔寫 PASS（`test/feature-lease.test.mjs` 15 處）——新 gate 的波及面要在 cut 裡量。
+- **E230／E151 的實際面**：`cut_approved` 的解析在 `tools/handoff-write.ts:309-316`（`isPmReentry` 對每個 `pm:In_Progress` 寫入成立）；`content/coord-02-host-dispatch.md:19-25` 叫 coordinator 在同 tuple 寫 `dispatch_pins`。E151 的拒絕在 `tools/transitions.ts:474-491`（`allowed` 取自靜態表，不含 `resume_of` 開的兩條邊；hint 取 `gates/registry.ts:144` 的共用 `hintStatic`）；釘住該信封的既有測試只有 `test/qa-flow.test.mjs`（golden 那處是 coordinator 散文）。
+- **E381／E390／E388 的實際面**：`tools/fanout-manifest.ts:423-425` `pathTokens`；`:1627` `opts.base ?? "main"`；`scripts/fanout.mjs:8` usage 寫 `[--base main]`；`tools/tasks-lane-migrate.ts:357-360` 回退 `findLegacyTasksFile`。E386 的 `--target` 修法與測試在 `test/e386-handoff-recorded-target.test.mjs`。
+- **E238 的六個站點**行號與列一致（派工時重核）。`content/skill-integrator.md:156` 的 flake rule 家族清單本波不動（留給 wave B 的 E355 lane）。
+
+### 待人類裁定（Stage 2，2026-11-09）
+1. **E255 CHANGELOG 4 行**：(a) 改成類別描述、內容不動（整合者建議）；(b) 保留原文（先前整合者的裁定）。
+2. **E255 歷史證據檔**：列寫「repo-wide」，但 Stage 1 劃分沒點名 `qa_reports/review_T-E232-01.md`、`review_reports/review_T-E232-0{1,5,6,8}.md`（前綴與舊檔名出現在證據散文）。(a) 一併清洗，只改前綴與檔名、不改 verdict 與證據事實（整合者建議：repo 已公開，證據檔一樣外露）；(b) 不動證據檔、只修檔名引用。`docs/backlog.md:226,1345` 與 `.current/history/2026-09/e232/tasks.md:6` 不屬 lane（lane 不碰 backlog 與 history），由整合者在 e255 合併後的記帳 commit 改。
+3. **E230 修法**：(a) 寫入路徑辨識「同 tuple、同 feature 的 PM 寫入」為修訂、帶過 `cut_approved`，只在真正重新進入（不同前一 tuple、QA-FAIL 退回、`active_feature` 改變）才重武裝——改 `tools/handoff-write.ts`，coord-02 不動（整合者建議：程式修比 SOP 提醒可靠）；(b) coord-02 改叫 coordinator 每次同 tuple 寫入重送 `cut_approved`，並讓寫入回應提示已重武裝。
+4. **e238 的鏈型**：(a) PM cut → 人類核准 → PM 以 `resume_of=qa-engineer` 單角色 judge 派 qa（憲法 §3.1 Amend-Resume Edge 的 test-only 門）→ qa 寫測試並 PASS，不經 sr／code-reviewer（整合者建議：六站全是 qa 擁有的測試、無產品碼）；(b) 完整 mini-chain 加 code-reviewer 審測試 diff（多兩個 hop）。
+5. **lane 數**：(a) 五條平行，照下表重劃（整合者建議）；(b) e247 與 e230 併成一條（同屬 transitions／寫入路徑，消掉 `test/qa-flow.test.mjs` 的軟重疊，但一條 lane 五張票、少一條平行）。
+
+### 所有 lane 共通的範圍（寫進 prompt）
+- `test/**` 的改動只有 qa-engineer 能寫（憲法 §2）。
+- 全套一律包 `node scripts/test-lock.mjs -- npm test`，最後一次全套在最後的 HEAD 上跑；證據與 spec 不寫本機路徑字面值；文件、spec 裡不得出現個人路徑、內部連結；任何 durable 輸出不得拼出 E255 的前綴（寫「the product-style prefix」）。
+- 新測試不得斷言真實 `specs/fanout-*.md` 會增長的內容，也不得對固定 base sha 做 diff。
+- lane 的 git 指令一條一條下；含 git 的複合指令會被守衛拒絕。
+- cut 先寄信箱預審（`type: proposal`），附 lane branch 上已 commit 的 spec sha；整合者 `close` 之後，lane 才呈給人類核准（lane-protocol §5-2）。spec 要有 `## Cut` 段，cut 裡逐檔列出要動的測試檔、每個站點對應的 AC 與實作 task。PM 以 backlog 票列＋本清單的站點集合與 Decisions 裁定為 spec 來源寫 cut，不經 architect；PM 在預審 `close` 之前不寫 `next_role=sr-engineer`（e238 依裁定 4）。
+- 每一站改前對現行檔案重新核對行號；動到 `content/**` 的 lane，PM 在 cut 裡附試套後的預算數字與 golden 變動清單。
+- 跑 `capture-constitution-golden.mjs` 之後只 commit 自己擁有的 golden 檔；其他 golden 有差 → 停、寄信。
+- 每一 hop 都寄信箱進度（不只 cut 預審與最終回報）；lane session 裡的人類裁定一律寄信告知整合者。
+- 不 push、不 merge、不發版、不刪 worktree、不跑 Release workflow；hop 用完 → `type: escalate`。
+- 需要動別條 lane 擁有的檔（例：新 gate 打紅 e230／e238 的測試檔）→ 停、寄信，由整合者改劃或排序，不順手修。
+- 共同禁止：`.github/**`、`docs/backlog.md`、`docs/v4.0.0-new-tickets.md`、`specs/fanout-*.md`、`specs/release-*`、`package.json`、`package-lock.json`、`AGENTS.md`、`.antigravityrules`、`qa_reports/archive/**`、`review_reports/archive/**`、`.current/history/**`、`.current/.config.json`、`.current/_primary/**`、`index.ts`、`guards/**`、`prompts/**`、`schema/**`、`lib/**`、`bin/**`、`templates/**`、`docs/lane-protocol.md`、`docs/lane-protocol-addendum.md`、`docs/dependency-advisories.md`、`content/skill-integrator.md`；以及下表各 lane「擁有」欄以外的 `content/**`、`tools/**`、`gates/**`、`scripts/**`、`dist/**`、`CLAUDE.md`、`README.md`、`CHANGELOG.md`、`docs/**`、`research/**`、`test/**`。
+
+## Lanes
+| lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |
+|---|---|---|---|---|---|---|---|
+| e255 | E255 | feat/e255-product-prefix-cleanup | ../agent-governance-mcp-lanes/e255 | `content/skill-pm.md`（只限第 30 行）、`content/skill-qa-engineer.md`（只限第 52 行）、`content/skill-design-auditor.md`（只限第 55 行）、`content/constitution-rationale.md`（只限第 12、90、237 行）、`test/visual-evidence-gate.test.mjs`（只限第 29 行）、`test/visual-gate-e2e.test.mjs`（只限第 38 行）、`research/**`、`specs/b8-external-ref-ledger.md`、`specs/constitution-restructure.md`、`specs/decodename-cleanup.md`、`specs/e232-leak-cleanup.md`、`specs/feature-scope-gate.md`、`specs/feature-split-lifecycle.md`、`specs/figma-baseline-mechanical-selection.md`、`specs/orientation-reach-matrix.md`、`specs/qa-flow-enforcement-architecture.md`、`specs/server-scope-decision-gate.md`、`specs/visual-fidelity-gate-hardening-architecture.md`、`specs/visual-fidelity-gate-hardening.md`、`docs/postmortem-visual-fidelity-gate.md`、`docs/prompt-audit-2026-11-02.md`、`CHANGELOG.md`（只限第 4460、4511、5933、5982 行）、`qa_reports/review_T-E232-01.md`、`review_reports/review_T-E232-01.md`、`review_reports/review_T-E232-05.md`、`review_reports/review_T-E232-06.md`、`review_reports/review_T-E232-08.md`、`test/e255-*.test.mjs`（新，qa 定名）、`specs/e255-*.md`、`.current/e255/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`content/**` 點名行以外；`test/fixtures/compose-golden/**`；`test/context-budget.test.mjs`；`docs/backlog.md`；`.current/history/**`；git 歷史 | 做：照列的曝險順序——(1) content 四檔六站，套 `specs/decodename-cleanup.md` 的模式（以類別描述事件、不改規則語意），skill-pm 第 30 行替換字串不得變長；(2) 兩個測試的 surface 名（qa 寫）；(3) `research/` 下以前綴命名的檢討檔改成類別名（`git mv`），修所有引用站點（派工前核對列出的清單，backlog 與 history 兩處除外）；(4) 其餘 `research/`、`specs/`、`docs/` 散文；(5) CHANGELOG 4 行改成類別描述、內容不動（裁定 1 = a）；五個 E232 證據檔只改前綴與舊檔名、verdict 與證據事實不動（裁定 2 = a）。PM 在 cut 附「改完後 tracked 檔案前綴 grep 剩餘清單」＝只剩 backlog 兩行與 history 一行（整合者記帳改）。不做：git 歷史改寫、改任何規則語意、改 golden／預算、`docs/backlog.md`、`.current/history/**` | — |
+| e247 | E247＋E396＋E380 | feat/e247-qa-pass-unticked-gate | ../agent-governance-mcp-lanes/e247 | `gates/registry.ts`、`gates/expected-red.ts`、`gates/*.ts`（新 gate 一檔，PM 定名）、`tools/handoff-orchestrator.ts`、`dist/gates/registry.*`、`dist/gates/expected-red.*`、`dist/gates/*`（新 gate 對應產物）、`dist/tools/handoff-orchestrator.*`、`content/skill-qa-engineer.md`（第 52 行除外）、`content/const-08-chain-31-mid.md`（只在 PM 決定加 §3.1 條文時）、`test/fixtures/compose-golden/**`（coordinator monolith 那一檔除外；只在動憲法時）、`test/context-budget.test.mjs`（只在超出上限時）、`CLAUDE.md`（只限第 48、62 行的步驟數）、`README.md`（只限第 69、230 行的步驟數）、`docs/architecture.md`、`test/e35-pipeline-order.test.mjs`、`test/error-code-contract.test.mjs`、`test/gates-expected-red.test.mjs`、`test/covering-evidence.test.mjs`、`test/e161-qa-suite-result.test.mjs`、`test/e128-orchestrator-blocked-repair.test.mjs`、`test/e247-*.test.mjs`、`test/e396-*.test.mjs`、`test/e380-*.test.mjs`（新，qa 定名）、`specs/e247-*.md`、`.current/e247/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`tools/transitions.ts`、`tools/handoff-write.ts`（e230）；`tools/fanout-manifest.ts`、`tools/tasks-lane-migrate.ts`（e381）；`test/qa-flow.test.mjs`、`test/cut-approval-gate.test.mjs`、`test/dispatch-pins.test.mjs`（e230）；e238 的六個測試檔；`test/fixtures/compose-golden/skill-coordinator-monolith.txt` | 做：E247——新 gate：qa-engineer 的 PASS 寫入，在 task list 仍有未勾、未 void、不在 `completed_tasks` 的屬本 feature 的 task 時大聲拒絕並列出 id；`gates/registry.ts` 一筆、pipeline 一步（`test/e35-pipeline-order.test.mjs` 重釘）、`content/skill-qa-engineer.md:90` 改成「PASS 列出 feature 全部 task」；「屬本 feature」的判定方式與既有 39 個寫 PASS 的測試檔的波及面在 cut 裡量清楚、逐檔列出（波及 e230／e238 的檔 → 寄信）；步驟數 18→19 的散文同步（CLAUDE.md、README.md、docs/architecture.md）。E396——先寫一個重現 lane e391 檔名與 `covers:` 行的失敗測試，含 `QA_REVIEW_RECORD` 在 `PASS_EXPECTED_RED_DIFF` 之前建 per-id 檔的整合路徑；重現 → 修；不重現 → 以重現紀錄結案（不改碼）。E380——`content/skill-qa-engineer.md` 的 PASS/FAIL 寫入步驟加一句叫 qa 填 `qa_suite_result`。不做：`qa PASS → qa In_Progress` 新邊；E375（要求該欄位的 gate）；改 transitions 表 | — |
+| e230 | E230＋E151 | feat/e230-pm-amend-and-resume-hint | ../agent-governance-mcp-lanes/e230 | `tools/handoff-write.ts`、`tools/transitions.ts`、`dist/tools/handoff-write.*`、`dist/tools/transitions.*`、`specs/e260a-tools-a-h-rationale.md`（只限 handoff-write 欄位生命週期段）、`test/cut-approval-gate.test.mjs`、`test/e114-cut-approval-inheritance.test.mjs`、`test/dispatch-pins.test.mjs`、`test/qa-flow.test.mjs`、`test/e230-*.test.mjs`、`test/e151-*.test.mjs`（新，qa 定名）、`specs/e230-*.md`、`.current/e230/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`gates/**`（含 `gates/registry.ts` 的 `hintStatic`）、`tools/handoff-orchestrator.ts`（e247）；`specs/qa-flow-enforcement-architecture.md`（e255）；`content/**`；`test/context-budget.test.mjs`；`test/fixtures/compose-golden/**`；e238 的六個測試檔 | 做：E230——裁定 3 = a：`tools/handoff-write.ts` 的 `cut_approved` 解析把「同 feature、前一 tuple 已是 `pm:In_Progress` 的 PM 寫入」視為修訂、帶過 `cut_approved`，QA-FAIL 退回、其他前一 tuple、`active_feature` 改變仍重武裝；憲法 §3.1「Feature-scoped re-arm」字句不需改（同 tuple 修訂不是 fresh entry）——PM 在 cut 裡確認；coord-02 不動。E151——`pm:In_Progress → code-reviewer／qa-engineer` 不帶 `resume_of` 的拒絕信封：`allowed` 列出這兩條以 `resume_of` 開的邊（標明條件）、hint 點名 `resume_of` 欄位；修在 `tools/transitions.ts`，不改 `gates/registry.ts`、不改靜態表（`check:transitions-sync` 不動）。PM 判定非改 registry 或 orchestrator 不可 → 寄信，整合者改劃。不做：改 Amend-Resume 機制本身、新邊 | — |
+| e381 | E381＋E390＋E388 | feat/e381-fanout-and-ledger-fixes | ../agent-governance-mcp-lanes/e381 | `tools/fanout-manifest.ts`、`scripts/fanout.mjs`（只限 usage 字串）、`tools/tasks-lane-migrate.ts`、`tools/config.ts`（只在 PM 選 taskPaths opt-in 時）、`dist/tools/fanout-manifest.*`、`dist/tools/tasks-lane-migrate.*`、`dist/tools/config.*`（同上）、`test/e177a-manifest.test.mjs`、`test/e177a-check-cli.test.mjs`、`test/e383-lane-ledger-worktree.test.mjs`、`test/e125a-lane-local-ledgers.test.mjs`、`test/lane-paths.test.mjs`、`test/e381-*.test.mjs`、`test/e388-*.test.mjs`、`test/e390-*.test.mjs`（新，qa 定名）、`specs/e381-*.md`、`.current/e381/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`content/**`；golden；budget；`tools/handoff-*.ts`、`tools/transitions.ts`、`gates/**`；`docs/**` | 做：E381——`pathTokens` 不再把括號或散文子句裡的反引號 span 當擁有路徑（真實清單有「`test/**`（只限…）」這種寫法），三個候選擇一並在 cut 說明；E390——`check` 的 `--base` 預設比照 E386：清單 `## 接手步驟` 的 `### 核對 primary` 記錄的目標 branch，否則 `main`；預設情況的 REF_NOT_FOUND 訊息點名 `--base`；usage 字串同步；明示 `--base` 的行為、錯誤碼、exit code 不變；E388——lane 路徑被 git-ignore 時，`resolveTasksLedgerPath` 不再回退到 tracked 的非 agc 檔（`TODO.md`、root `tasks.md`），寫法由 PM 在列的兩個方向中選。不做：改 manifest 格式、改 `validate`／`render`／`handoff` 的其他語意 | — |
+| e238 | E238（含 E254、E257、E278、E378、E348、E363 的站點） | feat/e238-load-sensitive-tests | ../agent-governance-mcp-lanes/e238 | `test/verify-release.test.mjs`、`test/e132-lane-registry.test.mjs`、`test/teamwork-lite.test.mjs`、`test/feature-lease.test.mjs`、`test/e177b-mailbox-watch.test.mjs`、`test/usage-accounting.test.mjs`（只確認、不動）、`specs/e238-*.md`、`.current/e238/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`content/**`（含 `content/skill-integrator.md:156` 的 flake rule，留 wave B 的 E355）；`test/e295-hop-cap-and-sop-halves.test.mjs`；所有非測試檔 | 做：一站一 task——(1) `test/verify-release.test.mjs:958` 拿掉 `elapsedMs < 5000`、保留 gh 呼叫計數；(2) `test/e132-lane-registry.test.mjs:354-377`（gap-6）與 `:284-305`（gap-7）改用確定性訊號或明示 `timeoutMs`；(3) `test/teamwork-lite.test.mjs:129-143` 改對隔離的暫存 workspace 啟動；(4) `test/feature-lease.test.mjs:1042-1061`（E10-AC2b）找出並拿掉負載耦合；(5) `test/e177b-mailbox-watch.test.mjs:169-170` 的 deadline 改成確定性；(6) `test/usage-accounting.test.mjs:8-11` 確認保留 20 s 上限、沒紅就不動。鏈型（裁定 4 = a）：PM cut → 人類核准 → PM 以 `resume_of=qa-engineer` 單角色派 qa → qa 寫測試並 PASS，不經 sr／code-reviewer。不做：任何產品碼、SOP 散文、flake rule 清單 | — |
+
+## 所有權重劃（相對於 prompt 的建議分 lane）
+- **`content/skill-qa-engineer.md` 依行切**：第 52 行 → e255；其餘 → e247（照建議）。兩站相距 38 行，預期合併零衝突。
+- **`gates/registry.ts`、`gates/**`、`tools/handoff-orchestrator.ts` 只劃給 e247**：E151 的修法限在 `tools/transitions.ts` 的拒絕信封（不改共用 `hintStatic`），E230 限在 `tools/handoff-write.ts`。建議分 lane 原文把 E151 的出處寫成 `gates/registry.ts:144`、E396 的出處寫成 orchestrator，兩者在 e230 與 e247 之間會重疊，故此劃。
+- **`test/qa-flow.test.mjs` 劃給 e230**（唯一釘 E151 拒絕信封的既有測試）；e247 的新 gate 若打紅它 → 寄信，由整合者裁定（改劃該檔，或合併後由整合層派 qa 處理）。
+- **共享生成物**：`test/fixtures/compose-golden/**`（monolith 除外）與 `test/context-budget.test.mjs` → e247（只在 PM 加 §3.1 條文時才動）；monolith 本波無 lane 動（裁定 3 = a）。e255 不動任何 golden 或上限（派工前核對已量）。
+- **步驟數散文**：`CLAUDE.md`、`README.md` 的步驟數行與 `docs/architecture.md` → e247（新 gate 使 18→19）。
+- **`docs/backlog.md:226,1345` 與 `.current/history/2026-09/e232/tasks.md:6`** → 整合者在 e255 合併之後的記帳 commit（lane 不碰 backlog 與 history；`:226` 要用 e255 定的新檔名）。
+- **`dist/**` 按檔案切**，各 lane 只 commit 自己原始碼對應的產物；其他 `dist/` 重建應為零差異，有差異 → 寄信。整合後照例重建一次。
+
+## 完成定義 → 票
+| 完成定義條目 | 由哪張票讓它成立 | 同一波？ |
+|---|---|---|
+| tracked 檔案中前綴 grep 為 0（git 歷史除外）；content 四檔六站以類別描述、規則語意不變；skill-pm 第 30 行不變長 | e255（E255）＋整合者記帳（backlog 兩行、history 一行） | ✓ |
+| 兩個視覺測試的 surface 名改為類別名、測試仍綠 | e255（E255，qa） | ✓ |
+| `research/` 檢討檔改名、所有引用指到新名、無斷鏈 | e255（E255）＋整合者（backlog `:226`） | ✓ |
+| CHANGELOG 4 行依裁定 1；證據檔依裁定 2 | e255（E255） | ✓ |
+| qa PASS 寫入在本 feature 仍有未勾、未 void、不在 `completed_tasks` 的 task 時被拒絕，錯誤碼列出 id；registry 一筆、pipeline 一步、order pin 重釘、error-code contract 綠 | e247（E247） | ✓ |
+| `content/skill-qa-engineer.md` PASS 句說列出 feature 全部 task（E237 (a)） | e247（E247） | ✓ |
+| 步驟數散文（CLAUDE.md、README.md、docs/architecture.md）與實際 pipeline 一致 | e247（E247） | ✓ |
+| `covers:` 證據檔名不叫 `review_<id>.md` 時 PASS 的 expected-red 檢查行為有整合測試釘住（重現則修、不重現則記錄） | e247（E396） | ✓ |
+| qa SOP 叫 qa 填 `qa_suite_result` | e247（E380） | ✓ |
+| 同 tuple 的 PM 修訂寫入不再無聲洗掉 `cut_approved`（裁定 3 的修法） | e230（E230） | ✓ |
+| `pm → code-reviewer／qa-engineer` 缺 `resume_of` 的拒絕信封列出條件邊並點名欄位 | e230（E151） | ✓ |
+| `fanout.mjs check --cut`／`check` 不再把括號散文裡的 glob 當擁有路徑 | e381（E381） | ✓ |
+| `check` 的 `--base` 預設比照 E386、訊息點名 `--base` | e381（E390） | ✓ |
+| lane 路徑被 ignore 時不把 lane task 寫進 tracked 的 `TODO.md`／root `tasks.md` | e381（E388） | ✓ |
+| E238 六站各一 task 完成（第 6 站只確認）；全套不再依賴機器負載與 primary 的 hook marker | e238（E238） | ✓ |
+| 每條 lane `dist/` 只含自己原始碼的產物、`npm audit --audit-level=high` exit 0、`check:bookkeeping` exit 0 | 全部 lane（qa 核對） | ✓ |
+| E255、E247、E396、E380、E230、E151、E381、E390、E388、E238 done-mark；E237、E254、E257、E278、E378、E348、E363 已 CLOSED 的列加註由母票完成 | 整合者（5c） | ✓ |
+| 本清單結案時寫 `## 接手步驟`，狀態行以「已結案」開頭 | 整合者（5c） | ✓ |
+
+沒有空格。
+
+## 整合後（整合者自己的 commit／接線）
+- 合併順序見下；每次 merge 後 `node scripts/merge-invariants.mjs`。
+- 合併後 `npm run build`、`dist/` 無差異；`capture-constitution-golden.mjs` 對合併樹 byte-identical（只有 e247 動憲法時才可能有差 → 派 qa 重抓並解釋每個 hunk）；四個預算在上限內。
+- 記帳：`docs/backlog.md:226,1345` 與 `.current/history/2026-09/e232/tasks.md:6` 的前綴清洗（用 e255 的新檔名）；done-mark；`npm run check:bookkeeping` exit 0；之後 tracked 檔案前綴 grep 為 0。
+- `content/skill-integrator.md:156` 的 flake rule 家族清單 → wave B 的 E355 lane（本波不動，結案的待人類決定列出）。
+- 給下次發版的 CHANGELOG 提示：由各 lane 實際變更決定（新 gate 與錯誤碼 → 依慣例至少 MINOR；不由本波決定）。
+
+## 合併順序
+1. `integ/backlog-wave-a` 自派工 base 開。
+2. ← `--no-ff` e247（共享生成物 lane 先）→ merge-invariants。
+3. ← `--no-ff` e230 → merge-invariants（`test/qa-flow.test.mjs` 若兩邊都有 hunk 屬改劃錯誤 → 停）。
+4. ← `--no-ff` e381、e238、e255（誰先過 lane 層誰先），每次 merge-invariants。
+5. `npm run build`、golden byte-identical、預算、`check:bookkeeping`、audit；記帳 commit。
+6. 依序 `finish <lane> --shipped --base integ/backlog-wave-a`；`fanout.mjs handoff --closing`；push、CI、`gh pr create`、`gh pr merge --auto --merge`；merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only`、`git branch -d integ/backlog-wave-a`。不發版。
+
+## Wave B（本波結案後再 fan-out，不排）
+- E262＋E355＋E360＋E340（SOP 文字 lane，`content/**` 與 golden；E355 一併處理 `content/skill-integrator.md:156` 的 flake rule 家族清單）
+- E196＋E225＋E353＋E205（`bin/agc-init.mjs` lane）
+- E359＋E376＋E172（server core）
+- E406＋E203（release／merge 腳本）
+
+## Dispatch pins
+- e255：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
+- e247：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
+- e230：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
+- e381：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
+- e238：`pm=opus`、`qa-engineer=sonnet`（裁定 4 = a，無 sr／code-reviewer hop）。
+
+## Decisions
+| 日期 | 裁決者 | 內容 | 出處 |
+|---|---|---|---|
+| 2026-11-09 | 人類 | 本波範圍：E255、E247＋E396＋E380、E230＋E151、E381＋E390＋E388、E238（含 E254／E257／E278／E378／E348／E363 的站點）；11 張進本里程碑由此裁定；E255 前綴為專案代號、一律寫「the product-style prefix」；E247 吸收 E237、PASS 時檢查未勾 task、不加新邊；E238 為假紅家族母票；pins pm／sr／code-reviewer=opus、qa=sonnet；`cutApprovalAutoTier` 維持 `{}`；五條合進 `integ/<feature>` 後一次 PR、不發版；wave B 不排 | 整合者 session（integrator prompt） |
+| 2026-11-09 | 整合者 | Stage 1 核對：E151 修法限 `tools/transitions.ts`、E230 限 `tools/handoff-write.ts`，`gates/**` 與 orchestrator 只劃 e247；`test/qa-flow.test.mjs` 劃 e230；步驟數散文劃 e247；backlog 兩行與 history 一行由整合者記帳；skill-pm 第 30 行在 rationale fence 內、不受 4849 上限約束；e255 不動 golden／預算；待人類裁定 1–5 見上 | 本檔 |
+| 2026-11-09 | 人類 | 核准清單與待人類裁定 1–5 全照整合者建議（「approve，全照建議」）：1 = a（CHANGELOG 4 行改類別描述、內容不動）；2 = a（五個 E232 證據檔一併清洗，只改前綴與舊檔名）；3 = a（E230 改 `tools/handoff-write.ts`，同 feature、前一 tuple 為 `pm:In_Progress` 的 PM 寫入帶過 `cut_approved`，coord-02 不動）；4 = a（e238 以 `resume_of=qa-engineer` 單角色 judge 派 qa，不經 sr／code-reviewer）；5 = a（五條平行，含本檔所有權重劃）。這些寫進各 lane 的 spec，lane 不再問 | 整合者 session |
