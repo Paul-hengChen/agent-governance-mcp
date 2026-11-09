@@ -38,7 +38,7 @@ part of setup an agent operationally needs — flag, leave, justify).
 | # | File | Line | Context (abridged) | Class | Action |
 |---|------|------|--------------------|-------|--------|
 | 1 | content/constitution.md | 49 | "...Closes the routing-chain half of **<client-codename>** finding A0..." | PURE PROVENANCE | Genericize → "...the scope-creep finding (see `content/constitution-rationale.md`)." Rule sentence (the `SCOPE_DECISION_REQUIRED` mechanics) untouched. |
-| 2 | content/constitution.md | 60–61 | §3.2 header para: "Hard governance rules that emerged from the **<client-codename>** false-PASS retrospective (`research/<client-codename>-oobe-...-2026-06-05.md`)." | PURE PROVENANCE | Genericize → "...that emerged from a visual false-PASS retrospective (see `content/constitution-rationale.md` / `research/`)." This is the section's attribution prose, NOT a normative rule. (See §3.2 decision below.) |
+| 2 | content/constitution.md | 60–61 | §3.2 header para: "Hard governance rules that emerged from the **<client-codename>** false-PASS retrospective (`research/<client-codename>-<product-style-prefix>-...-2026-06-05.md`)." | PURE PROVENANCE | Genericize → "...that emerged from a visual false-PASS retrospective (see `content/constitution-rationale.md` / `research/`)." This is the section's attribution prose, NOT a normative rule. (See §3.2 decision below.) |
 | 3 | content/skill-pm.md | 21 | Copy/Strings rationale (inside `<!-- rationale -->`): "...(<client-codename> shipped `"Select your language"`...)." | PURE PROVENANCE | Genericize → "(a prior rollout shipped `"Select your language"` because nobody pinned the Figma title `"Language"`...)" |
 | 4 | content/skill-pm.md | 22 | Visual Tokens rationale: "...the kind of silent drift that ate the **<client-codename>** rollout." | PURE PROVENANCE | Genericize → "...silent drift that ate a prior visual rollout." |
 | 5 | content/skill-pm.md | 23 | Visual Widgets: "...closes the gap that ate **<client-codename>** DateTime picker (column-scroller widget never enumerated...)." | PURE PROVENANCE | Genericize → "...the gap where a column-scroller widget was never enumerated → primitive `<input type="date">` shipped → no role had grounds to reject." (keeps the instructive mechanism, drops the name) |
@@ -88,7 +88,7 @@ remain verbatim (byte-identical):
   global-frame metric; Sequential-context assumption) — **byte-identical, untouched.**
 
 The ONLY §3.2 bytes that change: the noun phrase "the <client-codename> false-PASS retrospective
-(`research/<client-codename>-oobe-...-2026-06-05.md`)" → "a visual false-PASS retrospective (see
+(`research/<client-codename>-<product-style-prefix>-...-2026-06-05.md`)" → "a visual false-PASS retrospective (see
 `content/constitution-rationale.md` / `research/`)". No MUST / MUST NOT / ONLY / VOID /
 enforcement clause is added, removed, or reworded.
 
@@ -181,7 +181,7 @@ unchanged — this decision touches only the AC8 numeric floor, nothing normativ
   genericized, Then the `audited`-only-after-content-match rule, the interactive-states
   inventory requirement, and the Visual Structural Assertions requirement read
   identically; only example labels change.
-- **AC-GREP** — Given the five always-loaded files, When `grep -rin "<client-codename>[-_ ]?oobe"`
+- **AC-GREP** — Given the five always-loaded files, When `grep -rin "<client-codename>[-_ ]?<product-style-prefix>"`
   is run over them, Then it returns **zero** matches (no LOAD-BEARING leftovers were
   identified, so a clean grep is required).
 - **AC-TEST** — Given the repo, When `npm test` runs after the edits AND after the
@@ -200,7 +200,7 @@ unchanged — this decision touches only the AC8 numeric floor, nothing normativ
 
 ## Out of Scope
 
-- `research/` (incl. `research/oobe-visual-fidelity-retrospective-2026-06-05.md`,
+- `research/` (incl. `research/visual-fidelity-retrospective-2026-06-05.md`,
   `research/process-retrospective.md`) — the named war-story belongs here; do NOT touch.
 - `content/constitution-rationale.md` — destination for named specifics; not edited by
   this feature (it already / may carry the named provenance).

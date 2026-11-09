@@ -225,7 +225,7 @@ Diff 以 `diff -u` 由腳本產生於工作樹副本，每個 finding 一個 hun
 -> Rationale target: v3.32.0. Scope: §1, §3.1, §3.2, §5, §6, §7.
 +> Scope: §1, §3.1, §3.2, §5, §6, §7.
  >
- > Primary sources: `research/oobe-visual-fidelity-retrospective-2026-06-05.md`
+ > Primary sources: `research/visual-fidelity-retrospective-2026-06-05.md`
  > (the false-PASS retrospective), `research/process-retrospective.md` (the Language-step
  > token/cost retrospective), and the inline `<!-- rationale -->` notes already in
 -> `content/constitution.md` and the skill files.
