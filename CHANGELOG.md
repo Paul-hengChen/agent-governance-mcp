@@ -4457,7 +4457,7 @@ and the cross-AI review trail that drove v3.26.0–v3.27.0.
 - `docs/postmortem-visual-fidelity-gate.md` — postmortem of the visual-fidelity gate failure.
 - A cross-AI governance recommendations note on visual fidelity (Codex/GPT-5; not retained in
   the tree).
-- `research/oobe-visual-fidelity-improvement-plan.md` — Antigravity/Gemini 3.1 Pro improvement plan.
+- A visual-fidelity improvement plan (Antigravity/Gemini 3.1 Pro).
 - `research/design-fidelity-workflow.md`, `research/multi-ai-agent-pipeline-report.md` — supporting
   analysis.
 
@@ -4508,7 +4508,7 @@ error) makes this a MINOR.
 ## [3.26.0] - 2026-06-05
 
 MINOR release delivering **visual-verdict integrity** — the response to the prior visual rollout
-retrospective (`research/oobe-visual-fidelity-retrospective-2026-06-05.md`), where a run burned
+retrospective (`research/visual-fidelity-retrospective-2026-06-05.md`), where a run burned
 heavy tokens and shipped a UI far from Figma under a *nominal* PASS. v3.25.0 made visual evidence
 *exist*; v3.26.0 makes the visual verdict *hard to corrupt*: authority separation, canonical-state
 parity, structural assertions, server-validated report schema, and a ledger-reconcile op. All
@@ -5930,7 +5930,7 @@ existing `tw_*` surface.
 v3.7.3's Copy Audit Gate fixed text drift. Visual properties (colors,
 spacing, typography literals) still relied on PM-authored stylistic
 ACs, which only catch what the spec already enumerates. An unsourced
-hex slipping into `OobeTheme.kt` — exactly what kicked off the
+hex slipping into `Theme.kt` — exactly what kicked off the
 prior-rollout Figma-alignment re-work — stayed invisible. v3.7.4 makes
 every literal a tracked, sourced contract, audited at QA time. This is
 the cheapest of the four design-fidelity options surveyed in
@@ -5979,7 +5979,7 @@ design?" gap; v3.7.3 closes the "did anyone audit the words?" gap.
   silently dropped a Figma URL during a prior visual rollout (2026-05-20).
 
 ### Why
-First triggered when a prior OOBE wizard shipped without ever loading the
+First triggered when a prior setup wizard shipped without ever loading the
 Figma mockup linked seven times in the PRD. Architect's own design doc had
 unilaterally declared the link out-of-scope; nothing in the SOPs forced a
 user confirmation. These three changes turn "did anyone fetch the link?"

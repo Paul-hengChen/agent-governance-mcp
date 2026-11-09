@@ -9,7 +9,7 @@
 
 ## Problem Statement
 
-During the Orientation feature (a prior OOBE rollout), the design-auditor froze 4 Figma baselines
+During the Orientation feature (a prior setup-wizard rollout), the design-auditor froze 4 Figma baselines
 representing 4 distinct canonical UI states. The architect's blueprint specified only ONE
 test-reach hook (`?step=orientation`), meaning QA could drive only 1 of 4 baselines to its
 capture state. The remaining 3 failed as unreachable, triggering a full second round of
