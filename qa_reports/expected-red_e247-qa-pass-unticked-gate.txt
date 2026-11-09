@@ -5,9 +5,9 @@
 # them. qa re-pinned all of them in T-E247-10 (e35 18 -> 19 + PASS_TASKS_INCOMPLETE step, error-code-contract
 # 35 -> 36 + allowlist row, e26 and e308 35 -> 36); they are green and no longer listed.
 #
-# qa hop 1 (T-E247-01, T-E247-11): the E396 reproduction is red on purpose until sr builds T-E247-02
-# (gates/expected-red.ts) and T-E247-12 (gates/ac-execution.ts). The covers: file is only consulted when
-# the id's direct review file is missing; it must also be consulted when the direct file lacks the H2.
-test/e396-covers-expected-red.test.mjs | E396 U2: per-id file without the H2 exists for every id, covering file has it -> present:true
-test/e396-covers-expected-red.test.mjs | E396 I: PASS over seven ids, manifest armed, qa_review without the H2, covering file has it -> not EXPECTED_RED_DIFF_MISSING
-test/ac-execution.test.mjs | AC-X: direct per-id files lack the H2 but a covers: file holds it -> present:true
+# qa hop 1 (T-E247-01, T-E247-11) listed the E396 reproduction (3 rows: e396-covers-expected-red U2 and I,
+# ac-execution AC-X), red on purpose until sr built T-E247-02 and T-E247-12. sr hop 2 built both
+# (the covers: file is now also consulted when the direct review file lacks the H2); all 3 are green and
+# no longer listed.
+#
+# No intentional reds remain for this feature.
