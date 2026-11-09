@@ -40,8 +40,9 @@
 //   NON_REVIEWER_VERDICT_REJECTED   const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
+//   PASS_TASKS_INCOMPLETE           skill-qa-engineer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
-// The 35-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
+// The 36-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
 // added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
 // generalized to every non-qa identity; the dispatch_pins tier enum, E300, added the 34th,
 // DISPATCH_PIN_TIER_REJECTED — the first tool-boundary producer, raised by zod before the
@@ -49,7 +50,8 @@
 // coord-02-host-dispatch.md quoted it, E295; the review_verdict authorship gate, E139, added
 // the 35th, NON_REVIEWER_VERDICT_REJECTED — the authorship half of the review_verdict
 // consistency gate, shipped documentedInProse: false and flipped to true when
-// const-08-chain-31-mid.md quoted it, E365). Array order is DOC order only — it MUST NOT be relied
+// const-08-chain-31-mid.md quoted it, E365; the PASS-time open-task gate, E247, added the
+// 36th, PASS_TASKS_INCOMPLETE, placed before the tool-boundary entry so it stays last). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
@@ -527,7 +529,25 @@ export const GATE_REGISTRY = [
             "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",
         documentedInProse: true,
     },
-    // ---- tool-boundary (code 35, producer: zod at tools/registry.ts) ----
+    {
+        // PASS-time open-task gate: a qa PASS must account for every open row of the
+        // feature's own lane ledger (gates/open-tasks.ts); post-PASS role rows are exempt.
+        // Shared, legacy and configured ledgers leave it dormant. File mode only.
+        // Spec: specs/e247-qa-pass-unticked-gate.md.
+        errorCode: "PASS_TASKS_INCOMPLETE",
+        producer: "orchestrator",
+        envelope: "plain-text",
+        triggerEdge: "qa-engineer:In_Progress -> qa-engineer:PASS (every status=PASS write; file-mode only)",
+        armCondition: "status=PASS && featureLaneLedger().armed && listOpenFeatureTasks() non-empty; FileHandoffStorage only",
+        clearingArtifact: "every listed id in completed_tasks (this write or on disk for the same feature), ticked, or voided via tw_void_task",
+        hintStatic: "A qa-engineer PASS must account for every open task in the feature's lane " +
+            "ledger: add each listed id to completed_tasks with its QA evidence (a covers: " +
+            "line counts), or void a dropped task with tw_void_task, then retry the PASS. " +
+            "Rows whose description starts with release-engineer or doc-writer (post-PASS " +
+            "work) are exempt. See docs/backlog.md E247.",
+        documentedInProse: true,
+    },
+    // ---- tool-boundary (code 36, producer: zod at tools/registry.ts) ----
     {
         // dispatch_pins tier enum (E300): each value must be one of the four tier
         // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no

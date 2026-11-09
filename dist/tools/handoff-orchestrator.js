@@ -19,6 +19,7 @@ import { classifyLeaseOverride } from "../gates/lease-override.js";
 import { isHandAuthoredStamp, hasStampRemediationAudit } from "../gates/stamp-provenance.js";
 import { hasEvidenceInFile, qaEvidencePath, recordReviewInFileUndoable } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
+import { featureLaneLedger, listOpenFeatureTasks } from "../gates/open-tasks.js";
 import { gate, TRANSITION_GATE_CODES } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
 import { emitGateTelemetry, extractGateCodeFromText } from "./telemetry.js";
@@ -767,6 +768,42 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                         `Expected evidence file(s): ${expectedPaths} ` +
                                         `(or an existing qa_reports/ report covering the id via a covers: line). ` +
                                         gate("QA_COMPLETION_EVIDENCE_MISSING").hintStatic,
+                                }],
+                            isError: true,
+                        };
+                    }
+                }
+            }
+            return null;
+        },
+    },
+    {
+        name: "PASS_TASKS_INCOMPLETE",
+        codes: ["PASS_TASKS_INCOMPLETE"],
+        run: (ctx) => {
+            const { parsed, storage, prevState, feature_changed } = ctx;
+            // PASS-time open-task gate: a PASS is terminal, so every open row of the
+            // feature's own lane ledger must be in the completed set (this write's
+            // ids plus the on-disk ids of the same feature), ticked, or voided.
+            // Post-PASS role rows are exempt. A ledger parse error propagates.
+            // File mode only. Spec: specs/e247-qa-pass-unticked-gate.md.
+            if (storage instanceof FileHandoffStorage && parsed.status === "PASS") {
+                const ledger = featureLaneLedger(parsed.workspace_path, parsed.active_feature);
+                const tasks = ledger.armed ? storage.listTasks(parsed.workspace_path) : null;
+                if (tasks) {
+                    const completedIds = new Set(parsed.completed_tasks);
+                    if (!feature_changed) {
+                        for (const id of prevState?.completed_tasks ?? [])
+                            completedIds.add(id);
+                    }
+                    const open = listOpenFeatureTasks(tasks, completedIds);
+                    if (open.length > 0) {
+                        return {
+                            content: [{
+                                    type: "text",
+                                    text: `⛔ PASS_TASKS_INCOMPLETE: ${open.join(", ")}. ` +
+                                        `Lane ledger ${ledger.ledgerPath} has open task(s) not in completed_tasks. ` +
+                                        gate("PASS_TASKS_INCOMPLETE").hintStatic,
                                 }],
                             isError: true,
                         };

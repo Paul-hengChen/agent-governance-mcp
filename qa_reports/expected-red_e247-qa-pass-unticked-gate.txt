@@ -1,0 +1,31 @@
+# e247-qa-pass-unticked-gate — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+#
+# sr hop 1 (T-E247-03) adds one GATE_REGISTRY entry (35 -> 36) and one
+# UPDATE_STATE_GATE_PIPELINE step (18 -> 19, new step at index 13). sr cannot edit
+# test/, so the count / order pins below stay red until qa re-pins them in
+# T-E247-10 (spec D9 and Blast radius). test/e128-orchestrator-blocked-repair.test.mjs
+# carries "18-step" in prose only and stays green, so it is not listed.
+
+# Pipeline step count and frozen order: 18 -> 19, PASS_TASKS_INCOMPLETE at index 13 (AC6).
+test/e35-pipeline-order.test.mjs | UPDATE_STATE_GATE_PIPELINE exists and has exactly 18 steps
+test/e35-pipeline-order.test.mjs | t-order-exact: step NAME sequence matches the frozen 18-step order exactly
+test/e35-pipeline-order.test.mjs | t-order-exact: each step's codes[] matches the frozen sequence exactly, in order
+
+# Registry count 35 -> 36 (AC-1/AC-5, mapping-comment count, E308/AC3), and the AC3 (c12)
+# closure: PASS_TASKS_INCOMPLETE's free-English triggerEdge needs a FREE_TEXT_ALLOWLIST row (AC5).
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 35 entries (34 in, 35 out — e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions
+test/error-code-contract.test.mjs | E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: "<echo>" ` + gate hintStatic byte-for-byte; registry still has 35 codes
+
+# Hardcoded GATE_REGISTRY size 35 -> 36 in the gate-stats coverage pins (re-allocated to this lane).
+test/e26-gate-stats.test.mjs | R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 35
+test/e26-gate-stats.test.mjs | R2: fired.length + zero_fire.length === 35 always, and the two sets are disjoint (no code counted twice)
+test/e26-gate-stats.test.mjs | U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 35/35 coverage
+test/e26-gate-stats.test.mjs | D1: both sidecars absent -> never throws, full 35-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths
+test/e26-gate-stats.test.mjs | D2: only metrics.jsonl present (telemetry absent) -> telemetry side degrades independently, metrics side still fully populated
+test/e26-gate-stats.test.mjs | T3b: handleGateStats never throws even against a workspace with no .current directory at all
+
+# E303-AC12 pins GATE_REGISTRY.length === 35 -> 36 (re-allocated to this lane).
+test/e308-single-source-tier-enum.test.mjs | E303-AC12: no new gate code beyond E139 (35 entries) and DISPATCH_PIN_TIER_REJECTED is the only tool-boundary producer
