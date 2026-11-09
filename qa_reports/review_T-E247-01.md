@@ -15,6 +15,15 @@ Command: `node --test test/e396-covers-expected-red.test.mjs test/ac-execution.t
 | AC-X | test/ac-execution.test.mjs | RED | same traversal gap in `hasAcExecutionLogDisposition`; existing 27 cases in that file stay green |
 
 Verdict: E396 reproduces (U2 and I red, AC-X red). T-E247-02 (expected-red fix) and T-E247-12 (ac-execution fix) must be built by sr. Root cause: both predicates take the direct file as the only candidate whenever it exists, and consult the `covers:` index only when the direct file is missing.
+
+After-fix result (qa closing hop, HEAD after 0f67342 and 4f46d8c): `node --test test/e396-covers-expected-red.test.mjs test/ac-execution.test.mjs` exits 0, 31/31 pass.
+
+| case | before 0f67342 / 4f46d8c | after |
+|---|---|---|
+| U1 | green | green |
+| U2 | RED | green |
+| I | RED | green |
+| AC-X | RED | green |
 ## 2026-11-09T09:48:48.728Z — FAIL — by qa-engineer
 
 suite-result: 4069/4074 passed (server-recorded from qa_suite_result; command: node scripts/test-lock.mjs -- npm test)
