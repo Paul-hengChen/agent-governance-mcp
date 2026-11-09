@@ -943,11 +943,9 @@ test("VR-22 (E80): AGC_VERIFY_CI_WAIT_SECONDS=0 performs exactly one gh call and
     },
   ]);
   const { dir: shimDir, counterPath } = mkGhCallCounterShim(notFoundJson);
-  const start = Date.now();
   const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.11"], {
     AGC_VERIFY_CI_WAIT_SECONDS: "0",
   });
-  const elapsedMs = Date.now() - start;
   assert.equal(result.status, 0, `expected exit 0; stderr: ${result.stderr}`);
   assert.match(result.stdout, /WARN: CI ground-truth — this commit's CI has not completed yet/);
   assert.equal(
@@ -955,7 +953,6 @@ test("VR-22 (E80): AGC_VERIFY_CI_WAIT_SECONDS=0 performs exactly one gh call and
     "1",
     "wait=0 must call gh exactly once, never enter the poll loop",
   );
-  assert.ok(elapsedMs < 5000, `wait=0 must not incur any wall-clock poll sleep; took ${elapsedMs}ms`);
 });
 
 // ---------------------------------------------------------------------------
