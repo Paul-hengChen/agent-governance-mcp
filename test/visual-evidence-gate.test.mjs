@@ -26,7 +26,7 @@ function writeDesignWithBaselines(ws, feature, hasH2) {
   const dir = path.join(ws, "design");
   fs.mkdirSync(dir, { recursive: true });
   const body = hasH2
-    ? `# design/${feature}\n\n## Source manifest\n- figma | 1:1 | yes | audited | -\n\n## Visual Baselines\n\n| surface | baseline | impl | notes |\n| --- | --- | --- | --- |\n| oobe.step1 | design/oobe/step1.png | screenshots/step1.png | landscape |\n`
+    ? `# design/${feature}\n\n## Source manifest\n- figma | 1:1 | yes | audited | -\n\n## Visual Baselines\n\n| surface | baseline | impl | notes |\n| --- | --- | --- | --- |\n| wizard.step1 | design/wizard/step1.png | screenshots/step1.png | landscape |\n`
     : `# design/${feature}\n\n## Source manifest\n- figma | 1:1 | yes | audited | -\n`;
   fs.writeFileSync(path.join(dir, `${feature}.md`), body);
 }
