@@ -31,6 +31,9 @@ export interface TransitionRejection {
     allowed: Array<{
         new_agent: AgentName;
         new_status: StatusName;
+        requires?: {
+            resume_of: "code-reviewer" | "qa-engineer";
+        };
     }>;
     hint: string;
 }

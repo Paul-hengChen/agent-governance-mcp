@@ -132,7 +132,14 @@ export interface TransitionRejection {
     qa_round: number;
     visual_round?: number;
   };
-  allowed: Array<{ new_agent: AgentName; new_status: StatusName }>;
+  // `requires` appears only on the conditional Amend-Resume entries of a
+  // rejected pm:In_Progress -> {code-reviewer, qa-engineer}:In_Progress write:
+  // the edge exists, but only when the write's own resume_of names that role.
+  allowed: Array<{
+    new_agent: AgentName;
+    new_status: StatusName;
+    requires?: { resume_of: "code-reviewer" | "qa-engineer" };
+  }>;
   hint: string;
 }
 
@@ -485,12 +492,38 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
   const allowed = ALLOWED.get(key) ?? [];
   const accepted = allowed.some((c) => c.agent === req.next.agent && c.status === req.next.status);
   if (accepted) return null;
-  return rejection(
+  const base = rejection(
     req,
     "TRANSITION_REJECTED",
     allowed,
     `No edge ${key} → ${keyOf(req.next)}${gate("TRANSITION_REJECTED").hintStatic}`,
   );
+  // A judge resuming after a PM amendment without a matching resume_of lands
+  // here, and the static table never lists the resume edge, so the envelope
+  // names it and the field that opens it. Every other rejection is unchanged.
+  if (
+    req.prev.agent === "pm" &&
+    req.prev.status === "In_Progress" &&
+    req.next.status === "In_Progress" &&
+    (req.next.agent === "code-reviewer" || req.next.agent === "qa-engineer")
+  ) {
+    const role = req.next.agent;
+    const received =
+      req.next_resume_of === undefined ? "absent" : JSON.stringify(req.next_resume_of);
+    return {
+      ...base,
+      allowed: [
+        ...base.allowed,
+        { new_agent: "code-reviewer", new_status: "In_Progress", requires: { resume_of: "code-reviewer" } },
+        { new_agent: "qa-engineer", new_status: "In_Progress", requires: { resume_of: "qa-engineer" } },
+      ],
+      hint:
+        `${base.hint} Amend-Resume edge: set resume_of: "${role}" on this write itself ` +
+        `(the resuming write, not only the PM amendment) to open pm:In_Progress → ` +
+        `${role}:In_Progress; received resume_of: ${received}.`,
+    };
+  }
+  return base;
 }
 
 /**
