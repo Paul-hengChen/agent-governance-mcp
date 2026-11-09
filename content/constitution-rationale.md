@@ -9,7 +9,7 @@
 >
 > Scope: §1, §3, §3.1, §3.2, §5, §6, §7.
 >
-> Primary sources: `research/oobe-visual-fidelity-retrospective-2026-06-05.md`
+> Primary sources: `research/visual-fidelity-retrospective-2026-06-05.md`
 > (the false-PASS retrospective), `research/process-retrospective.md` (the Language-step
 > token/cost retrospective), and the inline `<!-- rationale -->` notes already in
 > `content/const-*.md` and the skill files.
@@ -87,7 +87,7 @@ assertions section entirely, PASS returns `VISUAL_ASSERTIONS_REQUIRED` — a har
 deliberately *not* a silent fallback, because a silent fallback is how the late-armed gate (B6) happened.
 
 **Scope-decision gate (v3.30.0).** This closes the routing-chain half of retrospective
-finding A0 — "the oversized → ask-the-human gate never fired". The whole 9-screen OOBE
+finding A0 — "the oversized → ask-the-human gate never fired". The whole 9-screen setup wizard
 was scoped as one feature and driven in-context, bypassing the PM → feature-split →
 design-auditor path that would have prompted a human to split it. The gate blocks a
 transition *into build* (`pm → architect` or `pm → sr-engineer`) with
@@ -234,7 +234,7 @@ The rule therefore presumes a spec referencing external artifacts (URLs, design 
 ticket IDs, mockups, "see XYZ") **incomplete** until each reference is (a) fetched,
 (b) indexed via `tw_index_prd` or equivalent, or (c) user-confirmed ignorable. Critically,
 **no role may unilaterally treat a reference as out-of-scope** — that unilateral drop is
-exactly how the OOBE run lost fidelity. Ownership is explicit: PM runs the initial audit
+exactly how the setup-wizard run lost fidelity. Ownership is explicit: PM runs the initial audit
 (the Resource Audit Gate), and the architect surfaces leftover references under
 `Deferred Resources` so nothing falls through silently. This is also why §1's
 Design-baseline rule says to *flag* a design-versus-spec gap rather than drop it: the two
