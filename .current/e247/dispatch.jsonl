@@ -4,3 +4,5 @@
 {"ts":"2026-11-09T08:29:59.890Z","feature":"e247-qa-pass-unticked-gate","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-09T08:33:42.332Z","feature":"e247-qa-pass-unticked-gate","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-09T09:14:55.578Z","feature":"e247-qa-pass-unticked-gate","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T09:15:54.326Z","feature":"e247-qa-pass-unticked-gate","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T09:20:02.618Z","feature":"e247-qa-pass-unticked-gate","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
