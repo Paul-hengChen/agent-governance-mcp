@@ -1,4 +1,4 @@
-# Research: 自動化開發流程回顧 — 某次視覺改版 OOBE「Language」功能
+# Research: 自動化開發流程回顧 — 某次視覺改版設定精靈「Language」功能
 
 > Topic: 本次 `/teamwork` 鏈在實作 Language 步驟時的耗時、token 消耗、成本、以及 sr↔qa 反覆 reject 的根因與流程優化建議。
 > Scope: 單一功能（Language, A.3.1）。資料來源為本 session 的 subagent 遙測（每次 dispatch 回傳的 `<usage>` 區塊）+ 官方定價文件。
@@ -79,7 +79,7 @@
 
 ### 4. 「為何 Language 燒這麼多」與「sr 一直被 reject」的根因 [T1: 各輪 qa_reports/visual_*.md + sr handoff notes]
 
-- **視覺閘門不看整體 %（憲法 §3.2）**：第 2 輪起整體 diff 已低於 3.5% 門檻（2.13%→1.86%→1.33%→0.92%），但 QA 依規定做 region-weighted 分析，每輪在「已達標」數字底下挖出真實結構偏差。這是憲法刻意防 false-PASS 的設計（源自 `oobe-visual-fidelity-retrospective`）。
+- **視覺閘門不看整體 %（憲法 §3.2）**：第 2 輪起整體 diff 已低於 3.5% 門檻（2.13%→1.86%→1.33%→0.92%），但 QA 依規定做 region-weighted 分析，每輪在「已達標」數字底下挖出真實結構偏差。這是憲法刻意防 false-PASS 的設計（源自 `visual-fidelity-retrospective-2026-06-05`）。
 - **缺陷層層遮蔽**：卡片內容撐小（巨大位移）→ 遮住 stepper 高度未傳遞 + 缺 gap → 遮住 8px 非對稱邊距溢出 → 遮住圓點自身 8px 左內距。外層不修好，內層量不到，天生需序列發現。
 - **規格幾何有損（§1 design-baseline）**：design-auditor 抽了 tokens/VSA，但精確逐元素幾何（40/32 非對稱邊距、圓點貼齊左緣、stepper 填滿傳遞、精確 pitch）未釘進 spec；sr 照 architecture 的「文字」實作，而文字是 Figma 的有損轉錄。
 - **coordinator 把修正框太窄**：每輪指示 sr「只改這一個屬性、別碰相鄰」。利於防迴歸，但保證每輪只修一個缺陷——sr 在 stepper 重建輪已看到圓點偏移，卻被要求守在範圍內。等於用「輪數」換「安全」。
@@ -103,7 +103,7 @@
 
 ## Alternatives Considered
 
-- **維持現狀（每輪一個屬性）**：最安全、零迴歸，但本功能因此花 55.6% token 在返工。對單一功能可接受，對 7 步 OOBE 全做會放大 7×，故不建議作為預設。
+- **維持現狀（每輪一個屬性）**：最安全、零迴歸，但本功能因此花 55.6% token 在返工。對單一功能可接受，對 7 步設定精靈全做會放大 7×，故不建議作為預設。
 - **降低視覺門檻或允許 coordinator 預先豁免差異**：被憲法 §3.2 明文禁止（coordinator 不得定義/放寬視覺差異；違者 server 拒絕 PASS）。否決。
 - **跳過 design-auditor、直接讓 sr 讀 Figma**：會失去 VSA 契約與 server 端視覺證據閘門，回到 false-PASS 風險。否決。
 

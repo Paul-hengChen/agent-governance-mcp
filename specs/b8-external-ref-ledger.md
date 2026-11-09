@@ -9,7 +9,7 @@ external artifacts (URLs, design files, ticket IDs, mockups, "see XYZ") is
 presumed **incomplete** until each reference is fetched, indexed, or
 user-confirmed ignorable — but this is prose only. `tw_update_state` never
 verifies it (compare §3 pre-flight, which IS server-enforced). The origin
-incident: an OOBE PRD had per-section Figma placeholders while the real
+incident: a setup-wizard PRD had per-section Figma placeholders while the real
 Figma link sat only in a trailing "相關連結" section; a PM reading
 section-by-section could skip it with every other gate green. This spec adds
 a server-enforced ledger — mirroring the proven `scope_decision`/`cut_approved`

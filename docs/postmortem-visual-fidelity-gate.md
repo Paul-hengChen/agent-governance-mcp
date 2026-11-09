@@ -6,7 +6,7 @@
 
 ## 1. Symptom
 
-All 8 implemented OOBE screens (Language, Orientation, Mode, Mode Overview,
+All 8 implemented setup-wizard screens (Language, Orientation, Mode, Mode Overview,
 Network, Time, Consent, Summary) diverged from the Figma design at a
 **structural / layout level**, not pixel-drift level. The human's words:
 "幾乎是要回鍋重造的等級". Yet the chain state showed:

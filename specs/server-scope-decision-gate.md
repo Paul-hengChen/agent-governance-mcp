@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-The Feature-Scope Gate (coordinator skill) and design-auditor Volume Gate are skill-advisory only: nothing in `tools/transitions.ts` or `index.ts` blocks a design-backed feature from entering build without a recorded scope decision. The prior visual rollout retrospective finding A0 identified this gap — the whole 9-screen OOBE was scoped as one feature, driven in-context, and no "ask the human to split" gate ever fired. The state machine currently has no enforceable checkpoint between PM handing off and build roles (architect, sr-engineer) beginning work, allowing an oversized, un-split feature to enter build silently. This feature adds a server-side transition reject at that exact edge, analogous to `VISUAL_BASELINES_REQUIRED`, that fires when a design reference is present but no scope decision has been recorded.
+The Feature-Scope Gate (coordinator skill) and design-auditor Volume Gate are skill-advisory only: nothing in `tools/transitions.ts` or `index.ts` blocks a design-backed feature from entering build without a recorded scope decision. The prior visual rollout retrospective finding A0 identified this gap — the whole 9-screen setup wizard was scoped as one feature, driven in-context, and no "ask the human to split" gate ever fired. The state machine currently has no enforceable checkpoint between PM handing off and build roles (architect, sr-engineer) beginning work, allowing an oversized, un-split feature to enter build silently. This feature adds a server-side transition reject at that exact edge, analogous to `VISUAL_BASELINES_REQUIRED`, that fires when a design reference is present but no scope decision has been recorded.
 
 ---
 
@@ -110,7 +110,7 @@ The only external reference in the requirement documents is:
 
 | ref | location | classification |
 |-----|----------|---------------|
-| `research/oobe-visual-fidelity-retrospective-2026-06-05.md` | Requirement prompt (finding A0), retro §2.A | **ignore** — already in-repo; no fetch needed. Content consumed directly in this spec. |
+| `research/visual-fidelity-retrospective-2026-06-05.md` | Requirement prompt (finding A0), retro §2.A | **ignore** — already in-repo; no fetch needed. Content consumed directly in this spec. |
 
 No HTTP/Figma/Azure DevOps/Jira URLs present in the requirement documents.
 

@@ -95,7 +95,7 @@ requires §3.2 surgery — a bad trade per human decision above.**
     (e.g., "See constitution.md §3.2") — these are navigational anchors in the rationale doc only.
   - And it does NOT add any reverse-links or back-references INTO `content/constitution.md`
     (that would require editing the constitution — out of scope for option a).
-  - And it draws from and cites `research/oobe-visual-fidelity-retrospective-2026-06-05.md`
+  - And it draws from and cites `research/visual-fidelity-retrospective-2026-06-05.md`
     and `research/process-retrospective.md` where relevant.
 
 - **AC5 (DESCOPED — build.ts unchanged constraint)**
@@ -188,7 +188,7 @@ N/A — no design file; `## Mode` = no-design (governance-doc authoring only).
 
 ## Dependencies / Prerequisites
 
-- **Resource audit (§7)**: internal files only — `research/oobe-visual-fidelity-retrospective-2026-06-05.md`
+- **Resource audit (§7)**: internal files only — `research/visual-fidelity-retrospective-2026-06-05.md`
   and `research/process-retrospective.md` are the primary source material for the rationale doc.
   No remote fetch needed. No external URLs found.
 - **Predecessor work**: F-B (`governance-text-load`) shipped at v3.31.0. No F-B artifacts are

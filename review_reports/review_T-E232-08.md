@@ -10,7 +10,7 @@ Commit `d8f09d9`, judged on its own diff (per-task review).
 
 ## AC Completeness
 AC2 — implemented (content slice) — 0 class-2 hits in `content/`.
-AC3 — implemented (rationale referrer) — line 12 cites `research/oobe-visual-fidelity-retrospective-2026-06-05.md`.
+AC3 — implemented (rationale referrer) — line 12 cites `research/visual-fidelity-retrospective-2026-06-05.md`.
 AC5 — implemented — `content/constitution-rationale.md:209` now reads "governance-internal artifacts (qa/review reports, `pending_notes`, handoff)". That is word-for-word the same list as `content/const-15-core-tail.md:27-28`: "governance-internal artifacts (qa/review reports, `pending_notes`, handoff)". The line sits inside the `## §6 — Information hygiene and Generic citation` section, which starts at line 189.
 AC1/AC4 — n/a (0 hits in the file).
 AC6 — deferred to qa.
