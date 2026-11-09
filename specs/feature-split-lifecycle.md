@@ -51,7 +51,7 @@ human-named row id) without regenerating the plan.
   - When resuming,
   - Then that row is never re-run.
 - **AC5 (by-id resume)**
-  - Given the human references a row id (e.g. "execute F0", "F0", "oobe-foundation"),
+  - Given the human references a row id (e.g. "execute F0", "F0", "wizard-foundation"),
   - When the coordinator handles it,
   - Then it reads `.current/feature-split.md`, hydrates that row (scope + figma link +
     key visual widgets + notes) as the feature input, and runs the chain — the human

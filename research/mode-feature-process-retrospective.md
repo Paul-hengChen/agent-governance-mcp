@@ -1,4 +1,4 @@
-# Research: 自動化開發流程回顧（整合版）— 某次視覺改版 OOBE「Mode」功能全線（選擇頁 → F0/F1 → F2–F6 → 視覺保真返修）
+# Research: 自動化開發流程回顧（整合版）— 某次視覺改版設定精靈「Mode」功能全線（選擇頁 → F0/F1 → F2–F6 → 視覺保真返修）
 
 > Topic: 把 Mode 功能線**四個階段**的 `/teamwork` + `/teamwork-lite` 開發回顧整合為一份：(1) Mode 選擇頁（手風琴）、(2) F0 ModeConfig 共用骨架 + F1 ENERGY STAR、(3) F2–F6 per-mode 預設、(4) toggle / OK button / stepper 視覺保真返修。本篇取代並合併 `mode-process` / `modeconfig-energystar` / `mode-presets-f2-f6` / `mode-presets-visual-fix` 四份原始回顧。
 > Scope: Mode 功能線（不含 Orientation / Language / React 遷移，各自另有回顧保留）。資料來源：各 dispatch 回傳的 `<usage>`（`subagent_tokens`，分母未知、低信心，僅作相對比例；精確成本應改讀 `agent-*.jsonl` 的 `usage.*`，憲法 v3.31.0，本回顧未做該層解析）。lite 階段為 main-loop 內聯，無 dispatch token。
