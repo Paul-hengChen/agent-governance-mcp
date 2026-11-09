@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
 // Orchestrator end-to-end regression guard (E128): a same-agent Blocked->Blocked repair
-// write must land through the real 18-step pipeline, not just pass validateTransition.
+// write must land through the real 19-step pipeline, not just pass validateTransition.
 // Drives handleUpdateState from dist/ against a scratch workspace, replaying the 2026-09-15
 // release incident. After the repair: fields persist, status stays Blocked, hop_count and
 // next_role are untouched, and the feature lease is not released.
@@ -50,7 +50,7 @@ async function seedCutApprovedPm(ws, feature) {
   forceSeedStamp(ws);
 }
 
-test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the real 18-step pipeline WITHOUT releasing the feature lease", async () => {
+test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the real 19-step pipeline WITHOUT releasing the feature lease", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e128orc-repair-");
   const feature = "e128orc-incident";

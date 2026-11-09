@@ -115,18 +115,18 @@ function fmt(codeMap, codes) {
     .join("; ");
 }
 
-// GATE_REGISTRY is the single source of truth. The entry count (35) is pinned so adding or
+// GATE_REGISTRY is the single source of truth. The entry count (36) is pinned so adding or
 // dropping a gate is a deliberate, visible change here. (AC-1, AC-5, E40)
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 35 entries (34 in, 35 out — e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 36 entries (36 in, 36 out — e247 added PASS_TASKS_INCOMPLETE; before it e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    35,
-    `expected exactly 35 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    36,
+    `expected exactly 36 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    35,
+    36,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -502,8 +502,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    35,
-    `expected the mapping comment to list all 35 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    36,
+    `expected the mapping comment to list all 36 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -535,6 +535,7 @@ const FREE_TEXT_ALLOWLIST = [
   { code: "EXTERNAL_REFS_UNRESOLVED", field: "armCondition", reason: "compound free-English condition over the external_refs ledger; no single named predicate/function-call literal" },
   { code: "MISSING_EVIDENCE", field: "triggerEdge", reason: "\"status=PASS with completed_tasks\" — free English, no role:Status edge pair or named constant" },
   { code: "MISSING_REVIEW_EVIDENCE", field: "triggerEdge", reason: "a role:Status-shaped substring exists (code-reviewer:In_Progress -> qa-engineer:In_Progress), but skill-code-reviewer.md (its sole mapped doc) documents this hop only as comma-tuple prose ('(sr-engineer, In_Progress)' -> '(code-reviewer, In_Progress)'), never restating the colon form verbatim — asserting doc-verbatim presence here would be a guaranteed false failure, not a real check" },
+  { code: "PASS_TASKS_INCOMPLETE", field: "triggerEdge", reason: "free English (\"every status=PASS write; file-mode only\") after the edge pair, same shape as QA_COMPLETION_EVIDENCE_MISSING and REPRO_MANIFEST_MISSING; no checkable literal" },
   { code: "EXPECTED_RED_DIFF_MISSING", field: "triggerEdge", reason: "free English precondition list, no role:Status edge pair or named constant" },
   { code: "VISUAL_BASELINES_REQUIRED", field: "triggerEdge", reason: "free English (\"PASS, armed, ... absent\"), no checkable literal" },
   { code: "VISUAL_EVIDENCE_MISSING", field: "triggerEdge", reason: "free English, no checkable literal" },
@@ -657,7 +658,7 @@ test("E300: SUFFIX_RE classifies DISPATCH_PIN_TIER_REJECTED as a gate-shaped cod
   assert.ok(SUFFIX_RE.test("DISPATCH_PIN_TIER_REJECTED"));
 });
 
-test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 35 codes", async () => {
+test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 36 codes", async () => {
   // WHY: tools/registry.ts composes its hint from MODEL_TIERS while gates/registry.ts
   // keeps hintStatic as a literal (import-free leaf). This is the only check that the
   // two renderings cannot drift apart.
@@ -681,6 +682,6 @@ test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `D
   const g = GATE_REGISTRY.find((e) => e.errorCode === "DISPATCH_PIN_TIER_REJECTED");
   assert.equal(issues[0].message, `DISPATCH_PIN_TIER_REJECTED: "${echo}" ` + g.hintStatic);
   assert.equal(g.hintStatic, "is not a model tier; allowed: opus, sonnet, haiku, fable");
-  assert.equal(GATE_REGISTRY.length, 35);
-  assert.equal(ALL_GATE_CODES.length, 35);
+  assert.equal(GATE_REGISTRY.length, 36);
+  assert.equal(ALL_GATE_CODES.length, 36);
 });
