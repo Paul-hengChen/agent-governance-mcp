@@ -7,6 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -126,12 +127,17 @@ test("AC4: 'teamwork-lite' is in RAG_SKIP_ROLES (no PRD chunk injection)", async
   );
 });
 
-test("AC3b: GetPromptRequestSchema dispatches 'teamwork-lite' correctly", async () => {
+test("AC3b: GetPromptRequestSchema dispatches 'teamwork-lite' correctly", async (t) => {
+  // Isolated workspace: the handler reads a hook marker under the workspace's .current/, so
+  // pointing it at the repo root would let a live session there change this test's outcome.
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "teamwork-lite-ac3b-"));
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  t.after(() => fs.rmSync(ws, { recursive: true, force: true }));
   const getRes = await spawnAndAwait(
     [
       { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "qa-test", version: "0" } } },
       { jsonrpc: "2.0", method: "notifications/initialized" },
-      { jsonrpc: "2.0", id: 2, method: "prompts/get", params: { name: "teamwork-lite", arguments: { workspace_path: PROJECT_ROOT } } },
+      { jsonrpc: "2.0", id: 2, method: "prompts/get", params: { name: "teamwork-lite", arguments: { workspace_path: ws } } },
     ],
     2,
   );

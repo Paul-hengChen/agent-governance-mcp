@@ -165,11 +165,24 @@ test("AC19/AC15: multi-file mode names WHICH file changed and keeps watching the
   const fileB = mkMailboxFile(t, "e180");
   fs.writeFileSync(fileA, "");
   fs.writeFileSync(fileB, "");
-  const { outLines, io } = collectIo();
-  const watchPromise = main([fileA, fileB, "--baseline", "0", "--interval", "0.05", "--deadline", "0.006"], io);
-  setTimeout(() => appendMsg(fileA), 100);
-  const code = await watchPromise;
+  // Fake clock (as AC16): the append lands inside the first sleep, strictly after arming and
+  // strictly before the next poll's read, so the outcome never races a real timer.
+  let clock = 0;
+  let injected = false;
+  const { outLines, io } = collectIo({
+    now: () => clock,
+    date: () => new Date(clock),
+    sleep: async (ms) => {
+      clock += ms;
+      if (!injected) {
+        appendMsg(fileA);
+        injected = true;
+      }
+    },
+  });
+  const code = await main([fileA, fileB, "--baseline", "0", "--interval", "10", "--deadline", "1"], io);
   assert.equal(code, EXIT_EXPIRED, "multi-file mode never exits early — it runs to the deadline");
+  assert.ok(outLines.includes("expiring — re-arm"), `expected the expiry line after continued polling, got: ${JSON.stringify(outLines)}`);
   assert.ok(outLines.some((l) => l === `changed: e204 count 1 (was 0) — ${fileA}`), `expected a changed line naming e204, got: ${JSON.stringify(outLines)}`);
   assert.ok(!outLines.some((l) => l.includes("changed: e180")), "the untouched file must never report a change");
 });
