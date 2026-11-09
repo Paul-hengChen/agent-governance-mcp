@@ -1187,11 +1187,19 @@ test("C1-07/AC-3: pm:In_Progress -> code-reviewer:In_Progress REJECTED with next
   });
   assert.ok(r);
   assert.equal(r.error, "TRANSITION_REJECTED");
-  // Byte-identical fall-through: allowed is the unchanged static pm:In_Progress
-  // set — code-reviewer/qa-engineer must NOT appear absent the field.
+  // E151: no UNCONDITIONAL code-reviewer/qa-engineer entry (every such entry must carry
+  // `requires`), and the two conditional Amend-Resume entries are present.
   assert.ok(
-    !r.allowed.some((a) => a.new_agent === "code-reviewer" || a.new_agent === "qa-engineer"),
-    `allowed list must NOT contain code-reviewer/qa-engineer without next_resume_of; got ${JSON.stringify(r.allowed)}`,
+    !r.allowed.some((a) => (a.new_agent === "code-reviewer" || a.new_agent === "qa-engineer") && !a.requires),
+    `no unconditional code-reviewer/qa-engineer entry allowed without resume_of; got ${JSON.stringify(r.allowed)}`,
+  );
+  assert.ok(
+    r.allowed.some((a) => a.new_agent === "code-reviewer" && a.requires?.resume_of === "code-reviewer"),
+    "conditional code-reviewer entry must be present",
+  );
+  assert.ok(
+    r.allowed.some((a) => a.new_agent === "qa-engineer" && a.requires?.resume_of === "qa-engineer"),
+    "conditional qa-engineer entry must be present",
   );
 });
 

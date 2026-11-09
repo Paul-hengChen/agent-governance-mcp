@@ -1,0 +1,8 @@
+# e230-pm-amend-and-resume-hint: intentional reds left by sr-engineer (T-E230-01, T-E151-01).
+# qa-engineer rewrites both (T-E230-02, T-E151-02) per the spec Site Map rows 9 and 11.
+
+# T-E230-01: R2 asserts a pm:In_Progress -> pm:In_Progress write without cut_approved clears it; that shape is now a same-tuple amendment that carries the approval (AC1).
+test/cut-approval-gate.test.mjs | R2: PM re-entry WITHOUT cut_approved re-arms gate (PM re-entry clause)
+
+# T-E151-01: asserts the rejection's allowed list has no code-reviewer/qa-engineer entry; the enriched rejection now appends the two conditional entries carrying requires.resume_of (AC9).
+test/qa-flow.test.mjs | C1-07/AC-3: pm:In_Progress -> code-reviewer:In_Progress REJECTED with next_resume_of absent

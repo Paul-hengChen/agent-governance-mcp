@@ -303,7 +303,29 @@ export function validateTransition(req) {
     const accepted = allowed.some((c) => c.agent === req.next.agent && c.status === req.next.status);
     if (accepted)
         return null;
-    return rejection(req, "TRANSITION_REJECTED", allowed, `No edge ${key} → ${keyOf(req.next)}${gate("TRANSITION_REJECTED").hintStatic}`);
+    const base = rejection(req, "TRANSITION_REJECTED", allowed, `No edge ${key} → ${keyOf(req.next)}${gate("TRANSITION_REJECTED").hintStatic}`);
+    // A judge resuming after a PM amendment without a matching resume_of lands
+    // here, and the static table never lists the resume edge, so the envelope
+    // names it and the field that opens it. Every other rejection is unchanged.
+    if (req.prev.agent === "pm" &&
+        req.prev.status === "In_Progress" &&
+        req.next.status === "In_Progress" &&
+        (req.next.agent === "code-reviewer" || req.next.agent === "qa-engineer")) {
+        const role = req.next.agent;
+        const received = req.next_resume_of === undefined ? "absent" : JSON.stringify(req.next_resume_of);
+        return {
+            ...base,
+            allowed: [
+                ...base.allowed,
+                { new_agent: "code-reviewer", new_status: "In_Progress", requires: { resume_of: "code-reviewer" } },
+                { new_agent: "qa-engineer", new_status: "In_Progress", requires: { resume_of: "qa-engineer" } },
+            ],
+            hint: `${base.hint} Amend-Resume edge: set resume_of: "${role}" on this write itself ` +
+                `(the resuming write, not only the PM amendment) to open pm:In_Progress → ` +
+                `${role}:In_Progress; received resume_of: ${received}.`,
+        };
+    }
+    return base;
 }
 /**
  * New round counters from the prior counters and the incoming and prev
