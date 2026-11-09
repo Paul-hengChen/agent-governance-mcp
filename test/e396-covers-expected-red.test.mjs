@@ -1,11 +1,10 @@
 // Coded by @qa-engineer
-// E396 reproduction (specs/e247-qa-pass-unticked-gate.md AC11): a batched `covers:` review file holds the
-// `## Expected-Red Diff` section for a whole feature, but gates/expected-red.ts only consults the covering file
-// when an id's direct review_<id>.md is MISSING. Once QA_REVIEW_RECORD (or an earlier FAIL round) creates a
-// per-id file without the H2, the covering file is never checked and PASS is wrongly rejected.
-// U1: no per-id files (known-good control). U2: per-id files without the H2 exist for every id.
-// I: integration through handleUpdateState, per-id files created by the qa_review record.
-// Each case asserts the CORRECT behaviour, so a red case is the defect.
+// E396 reproduction record (spec AC11): gates/expected-red.ts consulted a batched `covers:` review file only when
+// an id's own review_<id>.md was missing, so once QA_REVIEW_RECORD or an earlier FAIL created a per-id file
+// without the `## Expected-Red Diff` H2, PASS was rejected. Red before 0f67342, green after.
+// U1: no per-id files (control). U2: per-id files without the H2 for every id.
+// I: integration through handleUpdateState with per-id files created by the qa_review record.
+// Each case asserts the correct behaviour.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
