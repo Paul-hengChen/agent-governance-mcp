@@ -2,7 +2,7 @@
 base: 60a038d    integration branch: integ/backlog-wave-a
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類核准 2026-11-09（清單與待人類裁定 1–5 全照整合者建議）。**
+**狀態：已結案 2026-11-09。** 五條 lane 都已合併進 `integ/backlog-wave-a`（e230 merge `426f8ff`、e381 `0bbcc61`、e238 `1edb02a`、e255 `bc1b3f8`、e247 `2fa3054`，零衝突）、finish、拆除；派工 base `2425e04`（清單 PR #105 merge）；本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out：backlog triage 2026-11-09 之後的第一波（wave A），共 11 張」，2026-11-09）：triage（PR #103、#104，`main` = `60a038d`）之後 backlog 剩 23 張 keep，本波做 11 張，其餘 12 張留 wave B（見文末，不排）。E255、E247、E238 的列開頭「Scope ruled 2026-11-09 (triage)」段是 cut 依據，「Original row:」只是歷史；其他票以列本身為準。E254／E257／E278／E378 已併入 E238、E348／E363 由 E238 同 lane 處理、E237 已併入 E247：這些列都已標 CLOSED，本波以母票 done-mark 一併結。
 
@@ -142,3 +142,19 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-09 | 整合者 | 合併順序調整：e247 實際未動 golden、budget、`const-08`（共享生成物 lane 的理由不成立），且 e247 仍在 qa 退回中，先合已驗證的四條。`integ/backlog-wave-a` 自 `2425e04` 開，← `--no-ff` e230 `0098b6d`（merge `426f8ff`）、e381 `c1dc597`（`0bbcc61`）、e238 `7e23cef`（`1edb02a`）、e255 `60f424d`（`bc1b3f8`），四次零衝突、無實質合併解決，merge-invariants 四次 PASS；合併樹 `npm run build` 後 `dist/` 無差異、golden capture 無差異、audit 0；push 後 CI run 42596887737 在 `bc1b3f8` 綠 | 本檔 |
 | 2026-11-09 | 整合者 | e247 lane 層驗證 close（to-integrator#10）：HEAD `7b85b27`，22 commits，hop 7/14，review 2 輪皆核准（r1 `review_T-E247-03.md`、r2 `review_T-E247-02.md`）、qa 1 輪（E396 重現依設計 FAIL）；E396 重現（U2、I 紅）並修 `gates/expected-red.ts`，依 R3 = a 同修 `gates/ac-execution.ts`；新 gate `PASS_TASKS_INCOMPLETE`（`gates/open-tasks.ts`，pipeline 第 14 步、共 19 步，registry 36）；fanout check 52 檔 0 越界；證據 10 個 id 皆 PASS（suite-result 4072/4074）；ledger 10/10（T-E247-05／-06 void）；worktree porcelain 空；無 pending-tickets；golden、budget、憲法未動；整合者 push 後 CI run 42600554850 在 `7b85b27` 綠。optional（registry 兩段既有長註解、第 125 行長行、信封以絕對路徑點名帳本、`buildCoverageIndex` 每 id 只留第一個涵蓋檔）列入結案報告、不開票 | 信箱 e247 to-lane#3 |
 | 2026-11-09 | 整合者 | 記帳：done-mark 10 列、CLOSED 列加註 7 列、佇列 DONE 10 列；backlog 兩行與 history 一行前綴清洗；`docs/lane-protocol.md:45` 補 E388；E396 原列從未 commit 的檔名改散文；`check:bookkeeping` exit 0、`check-md-tables` OK；彙總見結案段 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 2425e04
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/backlog-wave-a @ 090a3d2）
+- lane-status：primary（main ← integ/backlog-wave-a @ 090a3d2）release-cd-v4.19.4／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 5 條 lane、10 張票（E255、E247＋E396＋E380、E230＋E151、E381＋E390＋E388、E238）全部 qa PASS、合併、finish；7 張併入的 CLOSED 票（E237、E254、E257、E278、E378、E348、E363）加註由母票完成。lane 紀錄在 `.current/history/2026-11/{e230,e381,e238,e255,e247}/`；判定與驗證細節在本檔 Decisions 與結案段。無新票、無未配號的新發現。
+### 待人類決定
+- 是否發版：本波含新 gate 與新錯誤碼，整合者建議 MINOR；CHANGELOG 提示見結案段。
+- 是否開 wave B：清單「Wave B」段列的四條 lane 範圍（E262＋E355＋E360＋E340、E196＋E225＋E353＋E205、E359＋E376＋E172、E406＋E203）；E355 那條要處理 `content/skill-integrator.md:156` 的 flake rule 家族清單，並評估本波記下的兩個負載敏感候選（e108-eject AC7、verify-release VR-20）。
+### 進行中的背景工作
+無
