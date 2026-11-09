@@ -30,10 +30,12 @@ export declare function isLanePathIgnored(workspacePath: string, lanePath: strin
  * The file tw_* reads and writes as the task ledger (every tools/tasks-file.ts
  * reader and writer resolves through here): the lane ledger, except in a
  * workspace whose absent lane path is git-ignored. There the legacy file stays
- * the ledger (E125a option A). With no legacy file, a feat lane in a linked
- * git worktree still gets its lane ledger, so `agc feature finish` harvests it
- * with `.current/<lane>/` (E383); anywhere else (a primary checkout, or the
- * `_primary` lane) it is the first taskPaths candidate.
+ * the ledger (E125a option A). For a feat lane in a linked git worktree a
+ * git-tracked legacy file never counts, so lane rows are never written into
+ * (and committed with) a team's tracked TODO.md or tasks.md (E388); with no
+ * other legacy file that lane still gets its lane ledger, so `agc feature
+ * finish` harvests it with `.current/<lane>/` (E383). Anywhere else (a primary
+ * checkout, or the `_primary` lane) it is the first taskPaths candidate.
  */
 export declare function resolveTasksLedgerPath(workspacePath: string, laneTasksPath: string): string;
 /** The one-line option-A advisory (Copy `tasks.ignored-lane-advisory`), or null. */
