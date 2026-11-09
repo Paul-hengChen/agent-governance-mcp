@@ -3,7 +3,7 @@
 Commit `78c2fb2`, judged on its own diff (per-task review, spec Decisions: task-size exemption).
 
 ## Summary
-- Renames the one research file whose name carried the client codename to `research/oobe-visual-fidelity-retrospective-2026-06-05.md` (a `git mv` with 100% similarity, so the body is unchanged).
+- Renames the one research file whose name carried the client codename to `research/visual-fidelity-retrospective-2026-06-05.md` (a `git mv` with 100% similarity, so the body is unchanged).
 - Removes the codename (class 2) and absolute local paths (class 3) from 7 research files. Local `file://` links become repo-relative links; codename mentions become neutral "prior rollout" wording, in Chinese where the surrounding prose is Chinese.
 - 8 files changed, +26/−26. Every file is inside `research/**`.
 - Verdict: APPROVED.
@@ -11,7 +11,7 @@ Commit `78c2fb2`, judged on its own diff (per-task review, spec Decisions: task-
 ## AC Completeness
 AC1 — implemented — research/** has no class-1 hits (it had none before either).
 AC2 — implemented (research slice) — `git grep -wiE <class2>` over research/ at d8f09d9 finds 0 hits.
-AC3 — implemented (file half) — rename 78c2fb2, `test -f research/oobe-visual-fidelity-retrospective-2026-06-05.md` exits 0. The in-research referrer (`research/process-retrospective.md:82`) is updated. The other referrers belong to T-02/05/06/08 and were checked in those reviews.
+AC3 — implemented (file half) — rename 78c2fb2, `test -f research/visual-fidelity-retrospective-2026-06-05.md` exits 0. The in-research referrer (`research/process-retrospective.md:82`) is updated. The other referrers belong to T-02/05/06/08 and were checked in those reviews.
 AC4 — implemented (research slice) — no class-3 hits in research/.
 AC5 — n/a to this task.
 AC6 — deferred to T-E232-10 (qa). The full suite is green at d8f09d9 (2838 pass / 0 fail / 3 skipped).
