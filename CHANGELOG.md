@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.19.4] - 2026-11-09
+
 PATCH release. It ships E415 and E416 since v4.19.3, landed on `main` by two pull requests from
 lanes `e415` and `e416`. Release gate `specs/release-cd-v4.19.4.md`; neither lane wrote its own
 spec, so the backlog rows in `docs/backlog.md` are the specs. Semver: PATCH, because every change is
