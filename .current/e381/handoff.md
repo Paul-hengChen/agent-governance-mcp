@@ -2,8 +2,8 @@
 schema_version: 15
 active_feature: "e381-fanout-and-ledger-fixes"
 status: "In_Progress"
-last_updated: "2026-11-09T08:40:32.339Z"
-last_agent: "sr-engineer"
+last_updated: "2026-11-09T08:49:22.882Z"
+last_agent: "qa-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "Lane e381 of fan-out specs/fanout-backlog-wave-a.md (human-approved manifest): three small owned-file fixes E381 (owned-cell clause globs), E390 (check --base recorded default), E388 (tracked legacy ledger in lane worktrees) batched as one feature with one review + QA round; cut spec specs/e381-fanout-and-ledger-fixes.md @ cafeee5."
@@ -14,14 +14,15 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-11-09T08:40:32.339Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-11-09T08:49:22.882Z"
+review_verdict: "APPROVED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 2
+hop_count: 4
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -32,11 +33,9 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E381-01, T-E381-02, T-E381-03 ready for code review — commit 7e2700c on feat/e381-fanout-and-ledger-fixes (16 files: tools/fanout-manifest.ts, tools/tasks-lane-migrate.ts, scripts/fanout.mjs usage comment line only, 8 owned dist files, qa_reports/expected-red_e381-fanout-and-ledger-fixes.txt, .current/e381).
-- E390 import-vs-duplicate: DUPLICATED (private recordedTargetBranch + baseNotFoundMessage in tools/fanout-manifest.ts, ~30 lines incl. doc). Why: the E386 resolver in tools/fanout-handoff.ts is not a standalone function — it is inline in runHandoff on top of readHandoffFacts (which returns errors on duplicate sections/facts, where check must fall back to main) and the module-private TARGET_FACT_RE; and fanout-handoff has runtime imports of config.js and lane-status.js, so importing it would load handoff/lane-status code on every check run. Parity is by construction: same findHandoffSections, same fact-line regex /^- ([^：]+)：(.*)$/, same value regex ^(.+) @ ([0-9a-f]{7,40})$; AC-E390-6 pins it.
-- Tests: node --test test/e177a-*.test.mjs test/e178b-*.test.mjs test/e383-*.test.mjs test/e125a-*.test.mjs test/e125c-*.test.mjs test/e386-*.test.mjs test/e296-*.test.mjs test/e235b-*.test.mjs test/e331-*.test.mjs test/lane-paths.test.mjs -> 214 tests, 213 pass, 1 fail = test/e177a-manifest.test.mjs 'AC1 wave7 parses' (expected red, listed in qa_reports/expected-red_e381-fanout-and-ledger-fixes.txt; qa re-pins under T-E381-04). Full suite not run by sr (T-E381-07 / AC-L1 is qa's).
-- Verification: npm run build zero errors; npm audit --audit-level=high exit 0; AC-E381-4 one-liner prints 'lanes 5 differ 0'; validate output for all 39 specs/fanout-*.md byte-identical vs the HEAD dist (captured before the change); owned-token changes across historical manifests are exactly the spec's planning-simulation list (prose-led test/**, dist/** '上列…的' items, parenthesised specs/fanout-*.md, tools/*.ts, test/eval/fixtures/**, two parenthesised test/e1xx-*.test.mjs, prose-led .current/<lane>/ items); AC-E390-7 greps both print 1; AC-L3 fanout check e381 --base main exit 0 (16 files, 0 OUT); git diff main...HEAD -- dist/ lists only the 8 owned dist files; worktree clean after commit. Ad-hoc throwaway-repo runs (not resident tests) matched AC-E381-1..3/6 cell cases, AC-E390-1/3/4/5 messages and AC-E388-1..5 outcomes.
-- Deviations from spec: none. Implementation notes for review: ownedPathTokens reuses the same backtick-span regex as pathTokens so non-glob spans are identical; an unbalanced open paren makes the rest of the cell depth>0 (globs there dropped — loud direction). E388: no per-process tracked-file cache (spec made it optional) so a file's tracked state is never stale within a server process; one git ls-files spawn per existing candidate, only while the lane ledger is absent and the lane path is ignored in a linked lane worktree. checkLane library default without base now reports err.base-default wording on REF_NOT_FOUND (baseSource defaults to 'default'); test/e177a-check-cli.test.mjs only asserts the flag-case message, passes unedited.
+- code-reviewer: APPROVED T-E381-01, T-E381-02, T-E381-03 (commit 7537dea). review_report: review_reports/review_T-E381-01.md (covers all three; per-task reports review_T-E381-02.md, review_T-E381-03.md beside it). No required findings.
+- Optional notes for qa: (1) besides the spec's simulation list, historical drops also include wave5.1 e179 qa_reports/ + review_reports/ (prose-led) and wave7 e177a dist/tools/*.js (parenthesised) — both covered, nothing red; (2) `qa : \`t/**\`` (space before colon) is prose per the rule — pinnable; (3) duplicated 目標分支 line falls back to main with the 'records no target branch' copy (spec-sanctioned); (4) isGitTracked uncached — one ls-files per tracked candidate per resolve in the AC-E388-3 shape.
+- Expected red unchanged: test/e177a-manifest.test.mjs 'AC1 wave7 parses' (re-pin under T-E381-04). Targeted run 188 tests / 187 pass / 1 fail = that entry. Next: qa T-E381-04..07.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
