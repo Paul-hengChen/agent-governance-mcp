@@ -1,0 +1,13 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [ ] T-E247-01 [P0] qa (E396 repro, first hop): new test/e396-covers-expected-red.test.mjs reproducing lane e391's covers: file shape (cases U1, U2, I per spec AC11) against the unfixed build; record each case red/green under ## E396 Reproduction in qa_reports/review_T-E247-01.md; commit; hand to sr | depends_on: none
+- [ ] T-E247-02 [P0] sr (E396 fix, only if T-E247-01 recorded U2 or I red): hasExpectedRedDisposition in gates/expected-red.ts also checks an id's covers: file when its direct review file exists but lacks ## Expected-Red Diff; rebuild dist; if all cases green, void this task per spec AC12 | depends_on: T-E247-01
+- [ ] T-E247-03 [P0] sr (E247 gate): new gates/open-tasks.ts (featureLaneLedger, listOpenFeatureTasks per spec D1-D3, D8); one GATE_REGISTRY entry PASS_TASKS_INCOMPLETE after AC_EXECUTION_LOG_MISSING (Copy/Strings e247.*); one pipeline step at index 13 after QA_COMPLETION_EVIDENCE_MISSING; no lane-paths/resolveCurrentLane/resolveLanePaths substring (AC8); rebuild dist; expected-red manifest per D9 | depends_on: T-E247-01
+- [ ] T-E247-04 [P1] sr (E247 + E380 SOP): replace content/skill-qa-engineer.md line 90 with Copy/Strings qa.pass-write byte-exact; line 52 and every other line untouched; file stays <= 18500 bytes (AC9, AC13, AC14) | depends_on: T-E247-03
+- [ ] T-E247-05 [P1] sr (step-count prose): 18 -> 19 in CLAUDE.md l48, l62 and README.md l69, l230; docs/architecture.md l37 (15 modules, 19-step), l47, l67, new row 14 (e247.arch-row) with rows 14-18 renumbered 15-19, l112 36 entries; nothing else (AC10) | depends_on: T-E247-03
+- [ ] T-E247-06 [P0] qa (E247 tests + re-pins): new test/e247-pass-tasks-incomplete.test.mjs (AC1-AC4, AC7); re-pin test/e35-pipeline-order.test.mjs (AC6) and test/error-code-contract.test.mjs (AC5); prose 18->19 in test/e128-orchestrator-blocked-repair.test.mjs; e26-gate-stats / e308-single-source-tier-enum 35->36 only if the integrator re-allocates them | depends_on: T-E247-03, T-E247-04
+- [ ] T-E247-07 [P1] qa (E380 + E237(a) SOP pin): new test/e380-qa-suite-result-sop.test.mjs asserting skill-qa-engineer.md line 90 equals qa.pass-write and the file is <= 18500 bytes (AC9, AC13, AC14) | depends_on: T-E247-04
+- [ ] T-E247-08 [P0] qa (lane close): on the final committed HEAD with a clean tree run every proof: and AC15, full suite under node scripts/test-lock.mjs -- npm test; any red outside the spec's blast-radius list = STOP + mail integrator; ## Expected-Red Diff + ## AC Execution Log; PASS lists every T-E247 id | depends_on: T-E247-02, T-E247-05, T-E247-06, T-E247-07
