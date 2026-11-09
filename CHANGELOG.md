@@ -16,6 +16,40 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+PATCH release. It ships E415 and E416 since v4.19.3, landed on `main` by two pull requests from
+lanes `e415` and `e416`. Release gate `specs/release-cd-v4.19.4.md`; neither lane wrote its own
+spec, so the backlog rows in `docs/backlog.md` are the specs. Semver: PATCH, because every change is
+SOP wording; no tool, gate, schema or routing behaviour changes.
+
+### Changed
+
+- **The coordinator's release wording is workspace-generic (E415).** The *PASS* Escalation Routes
+  row and the Backlog Intake Loop *Bounds* in `content/coord-03-core-fallback.md` now say the release
+  is a deliberate human decision made through the project's own release process, with
+  release-engineer named as agc's release role; the intake loop still never auto-hops to
+  release-engineer. Neither site cites a file or workflow that exists only in the agc repository.
+  Behaviour unchanged.
+- **One filing bar for when a finding becomes a backlog ticket (E416).** A finding becomes a ticket
+  only when it is a confirmed defect that will make users go wrong, or the human asks for one; a
+  defect the current ticket introduced (its own fix spec included) is fixed inside that ticket
+  before it merges, never filed; review and QA `recommended` / `optional` notes are listed once in
+  the closing report, never proposed as tickets. Stated in the coordinator SOP
+  (`content/coord-03-core-fallback.md`, a new *Filing bar* paragraph; lane findings are filed only
+  when they clear it), the code-reviewer SOP (`content/skill-code-reviewer.md`, finding tiers), the
+  integrator SOP (`content/skill-integrator.md`: 5c-1 allocation, and 5b-5 / 5b-8 / stage-6 step 4
+  now send a fix to the owning lane, never a new ticket, or to the human when no single lane owns
+  it) and the lane protocol (`docs/lane-protocol.md` §4 and the final-report template). For
+  contributors to this repository, `CLAUDE.md` gains a dev-workflow check: a fix spec that edits
+  shipped prompt content cites no repo-only path and names the pins, goldens and budget caps it moves.
+
+### Notes
+
+- Tests and goldens: `test/fixtures/compose-golden/skill-coordinator-monolith.txt` re-captured (the
+  coord-03 lines only); new `test/e416-filing-bar.test.mjs` pins the bar at the four shipped sites.
+- The teamwork bundle grows from about 21416 to 21526 tokens, under the unchanged 21715 cap in `test/context-budget.test.mjs` (context, not changed).
+- No constitution fragment, gate, schema, error code, routing, dependency, TypeScript source, build
+  output, script, template or CI workflow changed; `GATE_REGISTRY` stays at 35.
+
 ## [4.19.3] - 2026-11-06
 
 PATCH release. It ships waves prompt-audit-w6 and prompt-audit-w7 since v4.19.2, landed on `main` by
