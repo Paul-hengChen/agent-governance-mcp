@@ -1,1 +1,2 @@
 {"ts":"2026-11-09T08:07:25.473Z","feature":"e381-fanout-and-ledger-fixes","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-09T08:28:43.267Z","feature":"e381-fanout-and-ledger-fixes","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
