@@ -94,24 +94,24 @@ literal out loud.
   untouched. Added to T-E232-05 (docs task) — see that task's line for the exact
   disposition. No AC4 addition: the file has zero `class3_local_path` hits.
   `content/skill-design-auditor.md` (1 occurrence — an illustrative "e.g. a full
-  OOBE flow board" aside) and `test/visual-gate-e2e.test.mjs` (1 occurrence — a
+  setup-wizard flow board" aside) and `test/visual-gate-e2e.test.mjs` (1 occurrence — a
   generic test-fixture surface id) were inspected under the same ruling and
   confirmed generic, with no client-specific pairing on either line. Per ruling
   (i) both stay unchanged — no edit, and therefore no golden-fixture or
   context-budget refresh for either file.
 - **AC3 — Codename-bearing filename renamed.** Given the one research file whose name
   is `research/` + the `class2_client_codename` token +
-  `-oobe-visual-fidelity-retrospective-2026-06-05.md`: its own body already has zero
+  `-<product-style-prefix>-visual-fidelity-retrospective-2026-06-05.md`: its own body already has zero
   codename occurrences (a 2026-09-04 de-identification pass already cleaned the prose),
   but the filename itself still carries the token; when it is renamed (`git mv`) to
-  `research/oobe-visual-fidelity-retrospective-2026-06-05.md` — dropping only the
-  codename prefix; "oobe" is a generic UX-industry term, not the leak — and every one
+  `research/<product-style-prefix>-visual-fidelity-retrospective-2026-06-05.md` (renamed again by E255 to `research/visual-fidelity-retrospective-2026-06-05.md`) — dropping only the
+  codename prefix; the product-style prefix was then judged a generic UX-industry term, not the leak (E255 later ruled it a codename) — and every one
   of its 7 referrers (`CHANGELOG.md`, `content/constitution-rationale.md`,
   `docs/backlog.md`, `specs/constitution-restructure.md`,
   `specs/decodename-cleanup.md`, `specs/qa-flow-enforcement-architecture.md`,
   `specs/server-scope-decision-gate.md`) is updated to the new path, then no owned-set
   file references the old path and the new path resolves.
-  proof: `grep -rl "$(awk -F'\t' '/^class2_client_codename/{print $2}' "$TMPDIR/e232-leak-patterns.txt")-oobe-visual-fidelity-retrospective-2026-06-05" <owned-set file list>` prints nothing AND `test -f research/oobe-visual-fidelity-retrospective-2026-06-05.md` exits 0.
+  proof: `grep -rl "$(awk -F'\t' '/^class2_client_codename/{print $2}' "$TMPDIR/e232-leak-patterns.txt")-<product-style-prefix>-visual-fidelity-retrospective-2026-06-05" <owned-set file list>` prints nothing AND `test -f research/visual-fidelity-retrospective-2026-06-05.md` exits 0.
 - **AC4 — Absolute local paths with a username removed.** Given 61 owned-set files
   (docs 3, multi-agent-scripts 2, NEW-TICKETS.md 1, qa_reports 21, research 2,
   review_reports 11, specs 20, test 1) contain one of two username variants under
@@ -219,7 +219,7 @@ Reference table for AC1/AC2/AC4 file loads (informational, not new copy):
   (`docs/lane-protocol.md`, `specs/fanout-feedback-leftovers-wave2.md` e232 row,
   `docs/backlog.md` E232/E235 rows, `content/const-15-core-tail.md` §6,
   `CONTRIBUTING.md`).
-- The rename target `research/oobe-visual-fidelity-retrospective-2026-06-05.md` must
+- The rename target `research/<product-style-prefix>-visual-fidelity-retrospective-2026-06-05.md` must
   not already exist (verified clear this session).
 
 ## Decisions

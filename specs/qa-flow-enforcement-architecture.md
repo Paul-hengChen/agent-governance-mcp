@@ -858,7 +858,7 @@ This gate complements v3.38.0 provenance gate — provenance validates *how* the
 
 | Reference | Classification | Reason (PM Resource Audit, spec §Dependencies) |
 |---|---|---|
-| `research/oobe-visual-fidelity-retrospective-2026-06-05.md` (finding A0) | **ignore** | Already in-repo; no fetch needed. Content consumed directly in the spec. |
+| `research/visual-fidelity-retrospective-2026-06-05.md` (finding A0) | **ignore** | Already in-repo; no fetch needed. Content consumed directly in the spec. |
 
 No HTTP / Figma / Azure DevOps / Jira URLs present in the requirement documents. No `## Visual Baselines`
 in this feature's design (mode = `no-design`), so no Visual Harness section applies. No Open Questions.
