@@ -134,3 +134,64 @@ No architecture spec. Layering is unchanged: everything lives in `bin/agc-init.m
 
 ## Verdict
 CHANGES_REQUESTED — R1: the first-run `--shipped` tracked shape drops E287's carry refusal and overwrites primary's own differing `pending-tickets.md`, a data-loss regression vs base. The declared `--abandoned` deviation (D1) is correct and should be recorded in the spec by PM.
+
+## Round 2 — APPROVED — by code-reviewer
+
+covers: T-E196-01, T-E196-02, T-E196-03, T-E196-08
+
+Range: `7f02063..HEAD` (PM spec amend 328c300, sr fix 38e2181, lane state 62bbea1), and the whole lane `e5da97a..HEAD` re-checked against the amended spec.
+
+## Summary
+- The sr fix moves the `e287.preserve-carry-refuse` check in `planFindingsPreserve` (bin/agc-init.mjs:2584-2597) out of `if (!target.covered)`. It now runs whenever `target.carryAbs !== null`. The `e287.preserve-differs-refuse` destination check stays inside `!covered` (:2598). This is option (a) from round 1.
+- PM amend 328c300 records option (a) and adds case `AC-E196-6-carry`. It also writes down the D1 `--abandoned` carve-out (the AC-E196-5 `pending-tickets.md` exception) and adds the C1 line under Out of Scope. The code matches all of it.
+- Since round 1, only `bin/agc-init.mjs`, `specs/e196-agc-init-lane-checks.md` and `.current/e196/**` changed. Scope is still clean.
+- Verdict: APPROVED. R1 is resolved, nothing regressed, and no required findings remain.
+
+## AC Completeness
+Round 1's lines still hold for every AC except the two below, which the amend changed:
+AC-E196-5 — implemented — the `pending-tickets.md` exception (refuse with `e287.preserve-differs-refuse`, no overwrite) is `abandonedFindingsTarget` :2553-2556 plus `planFindingsPreserve` :2598-2606, unchanged since round 1. Every other ignored file keeps the copy-over rule.
+AC-E196-6 — implemented — `--shipped` first run: `covered` comes from the copy list (:2539), and the carry check runs regardless of it (:2586-2597). `--abandoned`: covered only when the plan includes the file and no destination exists (:2553-2556). Probes below.
+AC-E196-9 / AC-E196-6-carry test case / AC-L2..L7 — qa scope (T-E196-04, -09, -10)
+
+## Correctness
+**R1 — resolved.** I re-ran the round-1 fixture in a temp repo in $TMPDIR. It has a tracked lane dir, `pending-tickets.md` excluded, an ignored worktree-only lane `pending-tickets.md`, an extra ignored `notes.local` and a merged lane. Each case ran against HEAD and against base `e5da97a`, which was staged in the scratchpad.
+- **Case 1, primary holds a differing `.current/e9/pending-tickets.md`.** HEAD: exit 1 with the `e287.preserve-carry-refuse` text.
+  - Primary's bytes are intact, HEAD is unchanged (no close commit), and `git status --porcelain --untracked-files=all --ignored` is byte-identical before and after.
+  - No history dir was created. The worktree, the lane file and the branch are all kept.
+  - Base gives the identical result. Round-1 HEAD exited 0 and lost primary's bytes.
+- **Case 2, no primary copy.** HEAD: exit 0, no refusal. `<hist>/pending-tickets.md` is one regular file holding the lane's bytes, the E287 warning names it, `notes.local` is copied (the E196 copy) and the worktree is removed. Base gives the same result, except that it does not copy `notes.local`, which is the E196 gap.
+- **Case 3, primary holds an identical copy.** HEAD: exit 0, no refusal, the history file holds the lane's bytes. Base gives the same result.
+
+**No regression from the move:**
+- Only first-run `--shipped` sets `carryAbs`, and only for the tracked shape (:2540). The `alreadyClosed` re-run (:2533) and both `--abandoned` targets (:2557, :2573) pass `carryAbs: null`, so the re-run, `--abandoned` and the D1 rule are byte-for-byte unaffected.
+- `harvestSrc` is non-null only when `!tracked` (planLaneClose). So for the untracked shape `carryAbs` is null and the old `covered`-via-harvest path is unchanged.
+- The move therefore changes behaviour only in the new E196 combination (tracked and covered via `ignoredCopy`), and there it restores base behaviour.
+- The suites below cover E287 (incl. AC-E287-3 and the R1-* re-run pins) and E335 (AC-E335-4).
+
+**Expected-red sampling (4a):** the manifest is unchanged since round 1. Both entries are locatable (`test/e351-lane-protocol-gaps.test.mjs:81`, `test/e383-lane-ledger-worktree.test.mjs:182`) and are the only two reds.
+
+## Quality
+- The fix is a pure move plus a two-line comment, with no duplication. The header comment of `planFindingsPreserve` (:2577-2579) now says only the destination check is skipped, which matches the code.
+- Comment discipline (4b): the new comment is short, says why (the `git mv` carry would be overwritten), has no ticket ids, no local paths and nothing sensitive. `agc check` in the lane reports OK (4.19.4), with no comment warnings on the diff.
+
+## Architecture
+No architecture spec. The change stays inside `bin/agc-init.mjs`, and the station map row in the spec now names `planFindingsPreserve`.
+
+## Security
+No new input, shell or path surface. The refusal fails closed before any mutation.
+
+## Performance
+No change: one `lstat` and one byte compare, as on base, now also run on the covered path.
+
+## Verification
+- Probes: see Correctness (scratchpad fixture, HEAD vs base, Node 22).
+- Targeted suites (Node 22): agc-feature-lifecycle, agc-feature-finish-history, e213, e180, e217, e287, e335, agc-adapters, e246, e291, e298, lane-ticket-allocation, e290, e351 and e383. Result: 310 tests, 308 pass, 2 fail. The 2 fails are exactly AC-E351-3 and AC-E383-7 from `qa_reports/expected-red_e196-agc-init-lane-checks.txt`, confirmed by running e351 and e383 on their own.
+- `agc check` in the lane: OK.
+
+**Findings:**
+- required: none.
+- recommended: none new. C1 and D1 are now recorded in the spec.
+- optional: carried from round 1, still not blocking: `e196.copy-item` prints `rel` unescaped, the same as the existing `e125b` item line.
+
+## Verdict
+APPROVED. The carry refusal is armed again whenever `git mv` would carry a differing primary copy, so behaviour matches base. The amended AC-E196-5 and AC-E196-6 are met, and the targeted suites show no reds beyond the two in the manifest.
