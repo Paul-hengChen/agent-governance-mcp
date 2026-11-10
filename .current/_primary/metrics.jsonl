@@ -77,3 +77,4 @@
 {"ts":"2026-11-05T06:16:27.297Z","feature":"release-cd-v4.19.2","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.19.2"}
 {"ts":"2026-11-06T06:14:48.160Z","feature":"release-cd-v4.19.3","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.19.3"}
 {"ts":"2026-11-09T03:25:25.148Z","feature":"release-cd-v4.19.4","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.19.4"}
+{"ts":"2026-11-10T08:11:45.259Z","feature":"release-cd-v4.20.0","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.20.0"}
