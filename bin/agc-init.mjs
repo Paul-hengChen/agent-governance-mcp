@@ -720,11 +720,10 @@ function checkWorktreeEvidence(cwd) {
 
 // Orphan-lane advisory (E179 AC5): a local branch with no live worktree whose
 // committed `.current/<lane>/pending-tickets.md` still holds an unapplied entry
-// or a malformed block (listed after the branch's warning).
-// Every git read is repo-global, so unlike checkWorktreeEvidence this is not
-// gated on isLinkedWorktree. A branch is judged only by its own lane's file
-// (the lane resolveCurrentLane would name); a branch with no lane is skipped.
-// Never reads `.current/history/`. Advisory: never throws or exits.
+// or a malformed block. Every git read is repo-global, so unlike
+// checkWorktreeEvidence this is not gated on isLinkedWorktree. A branch is
+// judged only by its own lane's file (the lane resolveCurrentLane would name);
+// a lane-less one is skipped. Never reads `.current/history/`, throws or exits.
 // Why each rule holds: see specs/e260c-bin-scripts.md.
 async function checkOrphanLanes(cwd) {
   let probe;
