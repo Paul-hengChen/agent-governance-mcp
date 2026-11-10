@@ -205,3 +205,5 @@
 {"ts":"2026-11-10T07:31:14.876Z","feature":"release-cd-v4.20.0","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T07:31:37.731Z","feature":"release-cd-v4.20.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-11-10T07:43:20.430Z","feature":"release-cd-v4.20.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-10T08:07:34.372Z","feature":"release-cd-v4.20.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T08:11:45.233Z","feature":"release-cd-v4.20.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
