@@ -43,3 +43,7 @@ No findings. One status read as before; `planNamedPaths` is a Set built once per
 
 ## Verdict
 APPROVED — all seven E406 ACs are implemented within the hard constraints, with no required findings; the round as a whole returns to sr-engineer only for T-E203-01.
+
+## Round 2 — APPROVED (confirmation) — by code-reviewer
+
+Covered by the round-2 report in `review_reports/review_T-E203-01.md` (`covers: T-E203-01, T-E406-01`). `git diff b38ad15 HEAD -- scripts/release.mjs` is empty, so T-E406-01 is byte-unchanged since its round-1 APPROVED. `node --test test/e394-release-script.test.mjs` still fails exactly the 27 tests listed in `qa_reports/expected-red_e406-release-and-merge-scripts.txt` (T-E406-02 re-pins). The round-1 verdict stands: APPROVED.
