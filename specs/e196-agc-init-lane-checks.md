@@ -2,7 +2,7 @@
 
 Lane `e196` of backlog wave B (`specs/fanout-backlog-wave-b.md`). Tickets: **E196** (+ **E206** folded in), **E225** (+ **E353** folded in), **E205**. Human rulings that apply (Decisions table of the fan-out plan, 2026-11-09; the lane does not re-ask): ruling 2 = a (E205 warns only), ruling 3 = a (E225 directions (1) + (2), not (3)), ruling 6 = a (four lanes, ownership as re-cut in the plan).
 
-All three tickets change `agc feature start` / `agc feature finish` / `agc check` in `bin/agc-init.mjs`; E225 also adds one line to `docs/lane-protocol.md` §6.
+All three tickets change `agc feature start` / `agc feature finish` / `agc check` in `bin/agc-init.mjs`. E225 also adds one line to `docs/lane-protocol.md` §6. E196 also removes the §3 known-gaps sub-item that names it, because fixing E196 makes that line false; its two test pins are re-pinned in this lane (integrator re-assignment, fan-out plan Decisions 2026-11-10).
 
 ## Problem Statement
 
@@ -53,6 +53,18 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
   proof: `node --test test/e287-finish-findings.test.mjs test/e335-symlinked-pending-harvest.test.mjs test/e196-ignored-lane-state.test.mjs` all pass (case `AC-E196-6` in the new file).
 - **AC-E196-7 (untracked shape unchanged).** When `.current/<lane>/` has no tracked content, both dispositions keep today's whole-dir harvest (`harvestSrc` / `planAbandonCurrentHarvest` copy). The new per-file copy never runs for that shape.
   proof: `node --test test/e213-shipped-ignored-shape.test.mjs test/e180-abandoned-harvest.test.mjs test/e217-abandoned-specs-harvest.test.mjs` pass unmodified.
+- **AC-E196-8 (stale known-gap line removed).** `docs/lane-protocol.md` §3 line 44 is the sub-item `  - 已知缺口：E196（…）。`. E196 is the only gap it lists, so the whole line is deleted, not just the ticket name. After the change:
+  - §3 has no `已知缺口` line;
+  - the harvest sub-item (`  - 證據不靠 commit 進到 primary…`) is directly followed by the E383 ledger sub-item (`  - task 帳本（E383）：…`);
+  - nothing else in §3 changes;
+  - `E196` appears nowhere in `docs/lane-protocol.md`.
+  proof: `grep -c "已知缺口" docs/lane-protocol.md` prints `0`, and `git diff $(git merge-base main HEAD)..HEAD -- docs/lane-protocol.md` shows exactly one removed line in §3.
+- **AC-E196-9 (re-pins of the two tests that pin the removed line).** Only these two tests change:
+  - `test/e351-lane-protocol-gaps.test.mjs` AC-E351-3 asserts that the line after the harvest sub-item is the E383 ledger sub-item (`  - task 帳本（E383）：` prefix), and that `E196` and `E217` each occur 0 times in the generic file. The `S3_GAPS` const, used only by AC-E351-3, may be deleted.
+  - `test/e383-lane-ledger-worktree.test.mjs` AC-E383-7 asserts that `doc.s3-ledger` appears exactly once, directly after the harvest sub-item (`/^ {2}- 證據不靠 commit 進到 primary/`); its other assertions are unchanged.
+
+  No other test in either file is edited. AC-E351-1/-2/-4, AC-E352-* and the other E383 cases stay with their current owners and stay green.
+  proof: `node --test test/e351-lane-protocol-gaps.test.mjs test/e383-lane-ledger-worktree.test.mjs` passes, and `git diff $(git merge-base main HEAD)..HEAD -- test/e351-lane-protocol-gaps.test.mjs test/e383-lane-ledger-worktree.test.mjs` touches only the AC-E351-3 / AC-E383-7 test bodies (plus the `S3_GAPS` const).
 
 ### E225 + E353: malformed pending-ticket blocks reported early
 
@@ -69,8 +81,8 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
   proof: `node --test test/e225-pending-tickets-check.test.mjs` (case `AC-E225-4`) and `node --test test/agc-feature-lifecycle.test.mjs` passes unmodified.
 - **AC-E225-5 (parser and finish untouched).** `tools/lane-ticket-allocation.ts` is not modified. Finish still refuses a malformed block with today's message.
   proof: `git diff --name-only $(git merge-base main HEAD)..HEAD -- tools/ dist/` prints nothing; `node --test test/lane-ticket-allocation.test.mjs test/agc-feature-lifecycle.test.mjs` pass.
-- **AC-E225-6 (lane-protocol §6 checklist line).** `docs/lane-protocol.md` §6 gains exactly one line, string `doc.s6-agc-check`, placed directly after the `## 6. 收工回報格式` heading and its blank line, before `寫進 \`to-integrator.md\``. No other section changes, and the line holds no repo-only string (`test/e290-lane-protocol-generic.test.mjs` AC-E290-3 stays green).
-  proof: `git diff $(git merge-base main HEAD)..HEAD -- docs/lane-protocol.md` shows one added line inside §6 and nothing else; `node --test test/e290-lane-protocol-generic.test.mjs test/e351-lane-protocol-gaps.test.mjs test/e383-lane-ledger-worktree.test.mjs` pass unmodified.
+- **AC-E225-6 (lane-protocol §6 checklist line).** `docs/lane-protocol.md` §6 gains exactly one line, string `doc.s6-agc-check`, placed directly after the `## 6. 收工回報格式` heading and its blank line, before `寫進 \`to-integrator.md\``. Outside §6, the only change to the file is AC-E196-8's §3 line removal. The new line holds no repo-only string (`test/e290-lane-protocol-generic.test.mjs` AC-E290-3 stays green).
+  proof: `git diff $(git merge-base main HEAD)..HEAD -- docs/lane-protocol.md` shows one added line inside §6 plus AC-E196-8's one removed §3 line, and nothing else; `node --test test/e290-lane-protocol-generic.test.mjs` passes unmodified.
 
 ### E205: primary side-effect detector (ruling 2 = a)
 
@@ -93,7 +105,7 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
   So a re-run after a refused `git worktree remove` does not name the first run's own harvest copies.
   proof: `node --test test/e205-primary-side-effects.test.mjs` (case `AC-E205-4`: first finish refused by a dirty lane worktree, then the re-run; neither run names a `.current/history/` path)
 - **AC-E205-5 (no snapshot: silent skip).** If the snapshot file is absent (a lane started before this change, or a worktree made with plain `git worktree add`), finish prints no `e205.*` line and behaves as today. If `git status` in primary fails at finish, finish prints `e205.finish-check-skip` and goes on.
-  proof: `node --test test/e205-primary-side-effects.test.mjs` (case `AC-E205-5`) and every existing finish suite passes unmodified: `test/agc-feature-lifecycle.test.mjs`, `test/agc-feature-finish-history.test.mjs`, `test/e180-abandoned-harvest.test.mjs`, `test/e213-shipped-ignored-shape.test.mjs`, `test/e217-abandoned-specs-harvest.test.mjs`, `test/e246-mailbox-teardown.test.mjs`, `test/e287-finish-findings.test.mjs`, `test/e298-finish-remote-delete.test.mjs`, `test/e335-symlinked-pending-harvest.test.mjs`, `test/e383-lane-ledger-worktree.test.mjs`.
+  proof: `node --test test/e205-primary-side-effects.test.mjs` (case `AC-E205-5`) and every existing finish suite passes, unmodified except where noted: `test/agc-feature-lifecycle.test.mjs`, `test/agc-feature-finish-history.test.mjs`, `test/e180-abandoned-harvest.test.mjs`, `test/e213-shipped-ignored-shape.test.mjs`, `test/e217-abandoned-specs-harvest.test.mjs`, `test/e246-mailbox-teardown.test.mjs`, `test/e287-finish-findings.test.mjs`, `test/e298-finish-remote-delete.test.mjs`, `test/e335-symlinked-pending-harvest.test.mjs`, and `test/e383-lane-ledger-worktree.test.mjs` (where only AC-E383-7 is re-pinned, per AC-E196-9).
 - **AC-E205-6 (snapshot write failure is loud, not fatal).** If start cannot record the snapshot, it prints `e205.start-snapshot-warn` on stderr, still exits 0, and prints the `lane:` line. The same contract as the `base-sha` write.
   proof: code-reviewer reads the diff (the failure is hard to force portably; no test required).
 - **AC-E205-7 (nothing tracked, nothing harvested).** The snapshot is never inside any working tree. It cannot be committed, does not show in `git status`, is never copied by any finish harvest (E196's included), and goes away with the worktree's admin dir on `git worktree remove`.
@@ -107,7 +119,7 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
 - **AC-L4 (full suite).** On the final committed HEAD with a clean tree, `node scripts/test-lock.mjs -- npm test` passes. qa records `qa_suite_result`.
 - **AC-L5 (Node 20).** The targeted suites in *Dependencies / Prerequisites → Node 20 verification* pass under Node 20.
 - **AC-L6 (audit + bookkeeping).** `npm audit --audit-level=high` and `npm run check:bookkeeping` both exit 0.
-- **AC-L7 (forbidden tests untouched and green).** `test/e130-lane-default.test.mjs`, `test/e125a-lane-local-ledgers.test.mjs` and `test/e383-lane-ledger-worktree.test.mjs` are unmodified and green. So are the non-owned suites named above: e106, e108, e246, e290, e291, e298, e335 and e351. If one turns red, stop and send mail. Do not edit it.
+- **AC-L7 (forbidden tests untouched and green).** `test/e130-lane-default.test.mjs` and `test/e125a-lane-local-ledgers.test.mjs` are unmodified and green. So are the non-owned suites named above: e106, e108, e246, e290, e291, e298 and e335. In `test/e351-lane-protocol-gaps.test.mjs` and `test/e383-lane-ledger-worktree.test.mjs`, everything except AC-E351-3 / AC-E383-7 (AC-E196-9) is unmodified and green. If any of these turns red, stop and send mail. Do not edit it.
 
 ## Copy / Strings
 
@@ -149,7 +161,7 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
 - Refusing finish on new primary paths (ruling 2 = b was not chosen). The same goes for any automatic clean-up of them.
 - Detecting writes into git-ignored primary paths, or content changes to a path already dirty at start. The snapshot is a path set of the default porcelain view.
 - Symlinks under `.current/<lane>/` other than the E335 `pending-tickets.md` case. The first-run copy treats them exactly as the existing re-run copy does.
-- `docs/lane-protocol.md` §3's known-gaps line naming E196 (`  - 已知缺口：E196…`). It goes stale once E196 ships, but §3 is common-forbidden for this lane. The line is pinned by `test/e351-lane-protocol-gaps.test.mjs` (owned by lane e262) and `test/e383-lane-ledger-worktree.test.mjs` AC-E383-7 (forbidden here). **Flagged for the integrator** in the cut pre-review: post-merge doc edit + qa re-pin. No ticket is filed.
+- Every other line of `docs/lane-protocol.md` §3, and every test in `test/e351-lane-protocol-gaps.test.mjs` / `test/e383-lane-ledger-worktree.test.mjs` other than AC-E351-3 / AC-E383-7. Those stay with lane e262 or stay common-forbidden.
 - `STR_USAGE_FEATURE` help text and `docs/install.md` descriptions of finish.
 - Release bookkeeping: version bump, CHANGELOG, `docs/backlog.md` done-marks (E353 marked CLOSED by E225). These belong to the integrator / release-engineer after the merge.
 
@@ -175,7 +187,10 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
     - `executeLaneClose` :2754 (`git mv` :2811, commit :2852), `executeHarvestRefresh` :2885;
     - `applyPendingOnAbandoned` :3103, `runFeatureFinish` :3211;
   - `parsePendingTickets` at `tools/lane-ticket-allocation.ts:389`;
-  - `docs/lane-protocol.md` §4 :55–74, §6 :114–132.
+  - `docs/lane-protocol.md` §3 known-gaps sub-item :44 (the only `已知缺口` line in the file), §4 :55–74, §6 :114–132;
+  - test pins of that line: `test/e351-lane-protocol-gaps.test.mjs` `S3_GAPS` :46–47 and AC-E351-3 :81–85; `test/e383-lane-ledger-worktree.test.mjs` AC-E383-7 :182–190 (the `已知缺口：E196` match at :187).
+- **Ownership re-cut (integrator, fan-out plan Decisions 2026-11-10, cut pre-review flag (a)):** this lane now also owns the §3 line 44 of `docs/lane-protocol.md`, plus AC-E351-3 of `test/e351-lane-protocol-gaps.test.mjs` and AC-E383-7 of `test/e383-lane-ledger-worktree.test.mjs`. The rest of e351 stays with e262.
+- **Intentional reds between T-E196-08 and T-E196-09:** after the §3 removal, AC-E351-3 and AC-E383-7 fail until qa re-pins them. sr records both in `qa_reports/expected-red_e196-agc-init-lane-checks.txt`.
 - **Order inside finish (E205):** the snapshot compare runs after the target worktree is resolved and before the `--shipped` merge guard and every other check or mutation. That way it never sees finish's own writes, and it prints even when finish later refuses.
 - **Order inside finish (E196 `--shipped`):** the per-file copy runs after `executeLaneClose` returns, so the close commit has landed. It runs before `executeFindingsPreserve`, `applyIgnoredEvidenceHarvest` and `removeWorktreeNoForce`. Copying before the commit would let the `git mv` rollback carry the copies back into `.current/<lane>/`.
 - **Node 20 verification (CI runs Node 20 and 22; this lane touches filesystem copies).** The local default is Node 22. qa runs the targeted suites under Node 20 with fnm:
@@ -198,7 +213,9 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
 | T-E196-04 | qa (E196 tests): new `test/e196-ignored-lane-state.test.mjs` covering AC-E196-1..6 in temporary fixture repos (an info/exclude rule for one ignored lane file; tracked lane dir; both dispositions; failed-copy re-run; E287 interplay). No real `specs/fanout-*.md`, no fixed base sha | T-E196-01 | 1 | `test/e196-ignored-lane-state.test.mjs` | — |
 | T-E196-05 | qa (E225 tests): new `test/e225-pending-tickets-check.test.mjs` covering AC-E225-1..4 (lane-side advisory in a fixture linked worktree; silent cases; exit code; orphan branch with malformed-only file). AC-E225-5/6 by the diff commands | T-E196-02 | 1 | `test/e225-pending-tickets-check.test.mjs` | — |
 | T-E196-06 | qa (E205 tests): new `test/e205-primary-side-effects.test.mjs` covering AC-E205-1..5 and 7 (snapshot location + not in lane `git status`; new untracked + newly modified paths named for both dispositions; pre-existing dirty paths not named; re-run after a refused worktree remove names no `.current/history/` path; absent snapshot is silent; snapshot gone after teardown) | T-E196-03 | 1 | `test/e205-primary-side-effects.test.mjs` | — |
-| T-E196-07 | qa (lane verification): no re-pins planned. If an owned existing test needs one (`test/agc-feature-lifecycle.test.mjs`, `test/agc-feature-finish-history.test.mjs`, `test/agc-adapters.test.mjs`, `test/e213-shipped-ignored-shape.test.mjs`, `test/e180-abandoned-harvest.test.mjs`, `test/e217-abandoned-specs-harvest.test.mjs`, `test/e287-finish-findings.test.mjs`, `test/lane-ticket-allocation.test.mjs`, `test/lane-paths.test.mjs`), explain it in evidence. A red non-owned test means stop and send mail. On the final committed HEAD with a clean tree, run AC-L1..L7, including the Node 20 command above and the full suite under `node scripts/test-lock.mjs -- npm test` with `qa_suite_result` recorded | T-E196-04, T-E196-05, T-E196-06 | 0 | — | — |
+| T-E196-08 | sr (E196 doc; AC-E196-8): first re-check the line number. In `docs/lane-protocol.md` §3, delete the whole known-gaps sub-item at line 44 (`  - 已知缺口：E196（…）。`); E196 is the only gap it lists. Nothing else in §3 changes. Record the two intentional reds (AC-E351-3, AC-E383-7) in `qa_reports/expected-red_e196-agc-init-lane-checks.txt`. 1 line | T-E196-03 | 1 | `docs/lane-protocol.md` | — |
+| T-E196-09 | qa (E196 re-pins; AC-E196-9): re-pin only AC-E351-3 in `test/e351-lane-protocol-gaps.test.mjs` (harvest sub-item directly followed by the E383 ledger sub-item; `E196` and `E217` counts 0; `S3_GAPS` may be deleted) and only AC-E383-7 in `test/e383-lane-ledger-worktree.test.mjs` (ledger line directly after the harvest sub-item). Dispose of both expected-red entries. No other test in either file changes | T-E196-08 | 2 | `test/e351-lane-protocol-gaps.test.mjs`、`test/e383-lane-ledger-worktree.test.mjs` | — |
+| T-E196-10 | qa (lane verification; replaces the voided T-E196-07, which lacked the re-pin dependency): no other re-pins planned. If an owned existing test needs one (`test/agc-feature-lifecycle.test.mjs`, `test/agc-feature-finish-history.test.mjs`, `test/agc-adapters.test.mjs`, `test/e213-shipped-ignored-shape.test.mjs`, `test/e180-abandoned-harvest.test.mjs`, `test/e217-abandoned-specs-harvest.test.mjs`, `test/e287-finish-findings.test.mjs`, `test/lane-ticket-allocation.test.mjs`, `test/lane-paths.test.mjs`), explain it in evidence. A red non-owned test means stop and send mail. On the final committed HEAD with a clean tree, run AC-L1..L7, including the Node 20 command above and the full suite under `node scripts/test-lock.mjs -- npm test` with `qa_suite_result` recorded | T-E196-04, T-E196-05, T-E196-06, T-E196-09 | 0 | — | — |
 
 ## Station Map
 
@@ -210,12 +227,15 @@ Station → AC → task (companion to the Cut table above).
 | `bin/agc-init.mjs` : `planAbandonCurrentHarvest`, `executeAbandonCurrentHarvest`, `abandonedFindingsTarget` | AC-E196-2, -3, -5, -6, -7 | T-E196-01 |
 | `bin/agc-init.mjs` : `runCheck` + new lane pending-tickets advisory | AC-E225-1, -2, -3 | T-E196-02 |
 | `bin/agc-init.mjs` : `checkOrphanLanes` | AC-E225-4 | T-E196-02 |
+| `docs/lane-protocol.md` : §3 line 44 (known-gaps sub-item, removed) | AC-E196-8 | T-E196-08 |
 | `docs/lane-protocol.md` : §6 | AC-E225-6 | T-E196-02 |
 | `bin/agc-init.mjs` : `runFeatureStart` | AC-E205-1, -6, -7 | T-E196-03 |
 | `bin/agc-init.mjs` : `runFeatureFinish` (compare before first check) | AC-E205-2, -3, -4, -5 | T-E196-03 |
 | `test/e196-ignored-lane-state.test.mjs` | AC-E196-1..6 | T-E196-04 |
 | `test/e225-pending-tickets-check.test.mjs` | AC-E225-1..4 | T-E196-05 |
 | `test/e205-primary-side-effects.test.mjs` | AC-E205-1..5, 7 | T-E196-06 |
-| lane-wide | AC-E225-5, AC-L1..L7 | T-E196-07 |
+| `test/e351-lane-protocol-gaps.test.mjs` : AC-E351-3 (+ `S3_GAPS`) | AC-E196-9 | T-E196-09 |
+| `test/e383-lane-ledger-worktree.test.mjs` : AC-E383-7 | AC-E196-9 | T-E196-09 |
+| lane-wide | AC-E225-5, AC-L1..L7 | T-E196-10 |
 
-The three sr tasks touch the same file, so they run serially. Each one is within the task-size budget (≤ 5 files, ≤ 300 lines).
+The four sr tasks run serially (T-E196-01 → 02 → 03 → 08): 01–03 share `bin/agc-init.mjs`, and 02 and 08 share `docs/lane-protocol.md`. T-E196-07 was voided at the pre-review amendment and replaced by T-E196-10. The §3 removal is a separate sr task (T-E196-08) so the already-recorded ledger rows T-E196-01..06 stay as written. Each one is within the task-size budget (≤ 5 files, ≤ 300 lines).
