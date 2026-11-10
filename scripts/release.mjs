@@ -56,6 +56,8 @@ export const STAGE_PATHS = Object.freeze({
 });
 
 const STAGE_MEMBERS = Object.freeze([...STAGE_PATHS.featureDirs, ...STAGE_PATHS.metadataPaths]);
+// The members that name one file: step 8a-1 stages them even while untracked.
+const STAGE_FILES = Object.freeze(STAGE_MEMBERS.filter((m) => !m.endsWith("/")));
 // `p` is the member itself, or lies under it when the member is a directory.
 const under = (p, member) => (member.endsWith("/") ? p.startsWith(member) : p === member);
 
@@ -71,7 +73,8 @@ const reads = (cmd, verbs) => verbs.map((v) => rule(cmd, v, false, `${v} (read-o
 // The only child-process calls this script makes; `match` sees [verb, ...rest] and the
 // branch the runner believes is checked out. Node children run with the current node binary.
 export const ALLOWED = Object.freeze([
-  rule("git", "add", true, "add -- <paths>", (a) => a[1] === "--" && a.length > 2),
+  rule("git", "add", true, "add -- <paths> | add --update -- <paths>",
+    (a) => (a[1] === "--" && a.length > 2) || (a[1] === "--update" && a[2] === "--" && a.length > 3)),
   rule("git", "commit", true, "commit -F <file> | -m <msg>, never --amend", either(exact("-F", /./), exact("-m", /./))),
   rule("git", "tag", true, "tag -a vX.Y.Z -m <msg>", exact("-a", TAG, "-m", /./)),
   rule("git", "push", true, "push -u origin release/* | push origin vX.Y.Z", either(exact("-u", "origin", REL), exact("origin", TAG))),
@@ -326,15 +329,20 @@ function viewPr(ctx, branch, step = "pre-3", how = "read") {
   if (res === null || res.status !== 0) return null;
   try { return JSON.parse(res.stdout); } catch { throw new ReleaseStop("INTERNAL", `gh pr view ${branch} printed non-JSON output`); }
 }
-// Every path `git status` reports; entries are "XY path\0", and a rename
-// or copy adds "origin\0" after it.
-function readStatusPaths(r, step) {
+// Every entry `git status` reports, as { path, untracked }; entries are
+// "XY path\0", and a rename or copy adds "origin\0" after it. XY `??` is untracked.
+function readStatusEntries(r, step) {
   const st = r.read("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { step });
   if (st.status !== 0) throw new ReleaseStop("INTERNAL", `git status exited ${st.status}`);
-  const f = st.stdout.split("\0"), paths = [];
-  for (let i = 0; i < f.length; i++) if (f[i]) { paths.push(f[i].slice(3)); if (/^[RC]/.test(f[i]) && f[i + 1]) paths.push(f[++i]); }
-  return paths;
+  const f = st.stdout.split("\0"), entries = [];
+  for (let i = 0; i < f.length; i++) {
+    if (!f[i]) continue;
+    entries.push({ path: f[i].slice(3), untracked: f[i].startsWith("??") });
+    if (/^[RC]/.test(f[i]) && f[i + 1]) entries.push({ path: f[++i], untracked: false });
+  }
+  return entries;
 }
+const readStatusPaths = (r, step) => readStatusEntries(r, step).map((e) => e.path);
 function prePrepare(ctx) {
   const { opts, root, runner: r } = ctx, v = opts.version, rel = `release/v${v}`;
   requireBranch(ctx, (b) => b === rel, rel);
@@ -463,8 +471,14 @@ function step7a(ctx) {
   const dirs = new Set(TREES.filter(([key]) => on[key]).map(([, tree]) => `${tree}/archive/${feature}`));
   for (const m of plan) dirs.add(path.posix.dirname(m.to));
   for (const d of dirs) r.mkdir(d, { step: "7a" });
-  for (const m of plan) if (!r.move(m.from, m.to, { step: "7a" })) ctx.out(`release: [7a] kept ${m.from} — ${m.to} already exists\n`);
-  Object.assign(ctx, { codes, archived: plan });
+  const moved = new Set();
+  for (const m of plan) {
+    if (r.move(m.from, m.to, { step: "7a" })) moved.add(m.from);
+    else ctx.out(`release: [7a] kept ${m.from} — ${m.to} already exists\n`);
+  }
+  // Root files new to this release that no move took away; step 8a-1 stages them.
+  const freshRoots = TREES.filter(([key]) => on[key]).flatMap(([key, tree]) => trees[key].fresh.map((n) => `${tree}/${n}`)).filter((p) => !moved.has(p));
+  Object.assign(ctx, { codes, archived: plan, freshRoots });
 }
 
 // ---- Step 7b: drift-baseline acknowledgment (.current/.config.json) ----
@@ -610,29 +624,63 @@ export function planStage({ changed, exists }) {
   return STAGE_MEMBERS.filter((m) => exists(m) && changed.some((p) => under(p, m)));
 }
 
-// `changed`: status paths before staging; `staged`: the index after it (or,
-// under dry-run, the changed paths the plan covers); `unstaged` / `untracked`:
-// leftovers outside .current/, which never ships in the release commit.
-export function checkStagingCompleteness({ changed, staged, unstaged = [], untracked = [] }) {
+// `changed`: the planned paths (tracked changes plus the plan-named untracked
+// paths); `staged`: the index after staging (or, under dry-run, the planned
+// paths the stage covers); `unstaged` / `untracked`: leftovers outside
+// .current/, which never ships in the release commit — tracked changes, and
+// plan-named untracked paths. `unplanned`: untracked paths no plan entry
+// names; they are returned as `warnings` and never affect `pass`.
+export function checkStagingCompleteness({ changed, staged, unstaged = [], untracked = [], unplanned = [] }) {
   const missing = STAGE_PATHS.featureDirs.filter((d) => changed.some((p) => p.startsWith(d)) && !staged.some((p) => p.startsWith(d)));
   const problems = [];
   if (missing.length > 0) problems.push(`feature dir(s) with changes absent from the index: ${missing.join(" ")}`);
   if (unstaged.length > 0) problems.push(`tracked file(s) left unstaged: ${unstaged.join(" ")}`);
   if (untracked.length > 0) problems.push(`untracked file(s) never staged: ${untracked.join(" ")}`);
-  return { pass: problems.length === 0, missing, problems };
+  return { pass: problems.length === 0, missing, problems, warnings: [...unplanned] };
+}
+
+// The untracked paths the release plan names: the single-file members, the
+// specs step 8a-3 can require, the step-7a move destinations, and the root
+// files 7a admitted as new and left in place.
+function planNamedPaths(ctx) {
+  const { state } = ctx, notes = Array.isArray(state.pending_notes) ? state.pending_notes.filter((n) => typeof n === "string") : [];
+  const specs = [state.active_feature, ...(multiFeatureNames(notes) ?? [])].filter(safeSegment).map((n) => `specs/${n}.md`);
+  return new Set([...STAGE_FILES, ...specs, ...(ctx.archived ?? []).map((m) => m.to), ...(ctx.freshRoots ?? [])]);
 }
 
 function step8aStage(ctx) {
   const { root, runner: r, opts } = ctx, step = "8a-1";
-  // A dry-run never ran the earlier writes and moves, so their paths stand in for the status.
-  const planned = r.dryRun ? r.actions.filter((a) => a.kind === "fs" && a.op !== "mkdir").flatMap((a) => (a.dest ? [a.path, a.dest] : [a.path])) : [];
-  const changed = [...new Set([...readStatusPaths(r, step), ...planned])];
-  const plan = planStage({ changed, exists: (m) => existsSync(path.join(root, m)) || planned.some((p) => under(p, m)) });
+  const entries = readStatusEntries(r, step);
+  const tracked = new Set(entries.filter((e) => !e.untracked).map((e) => e.path));
+  const untracked = new Set(entries.filter((e) => e.untracked).map((e) => e.path));
+  // A dry-run never ran the earlier writes and moves, so their paths stand in
+  // for the status: a move source leaves (an untracked one is simply gone), its
+  // destination arrives untracked, and a write to an absent path is untracked.
+  const gone = new Set(), standIns = [];
+  if (r.dryRun) {
+    for (const a of r.actions) {
+      if (a.kind !== "fs" || a.op === "mkdir") continue;
+      standIns.push(a.path, ...(a.dest ? [a.dest] : []));
+      if (a.op === "move") {
+        if (untracked.delete(a.path)) gone.add(a.path); else tracked.add(a.path);
+        untracked.add(a.dest);
+      } else if (!untracked.has(a.path)) (existsSync(path.join(root, a.path)) ? tracked : untracked).add(a.path);
+    }
+  }
+  const named = planNamedPaths(ctx);
+  const plan = planStage({ changed: [...tracked], exists: (m) => existsSync(path.join(root, m)) || standIns.some((p) => under(p, m)) });
+  const paths = [...untracked].filter((p) => named.has(p)).sort();
+  const changed = [...tracked, ...paths];
   ctx.stagePlan = plan;
   if (plan.length > 0) {
-    const add = r.mutate("git", ["add", "--", ...plan], { step });
+    const add = r.mutate("git", ["add", "--update", "--", ...plan], { step });
+    if (add.status !== 0) throw new ReleaseStop("MUTATION_FAILED", `git add --update exited ${add.status} — ${lastLine(add.stderr)}`);
+  }
+  if (paths.length > 0) {
+    const add = r.mutate("git", ["add", "--", ...paths], { step });
     if (add.status !== 0) throw new ReleaseStop("MUTATION_FAILED", `git add exited ${add.status} — ${lastLine(add.stderr)}`);
-  } else {
+  }
+  if (plan.length === 0 && paths.length === 0) {
     // Nothing to stage on top of the release commit means a re-run after it; the commit step is then skipped.
     const head = gitOut(r, ["log", "-1", "--format=%s"], step);
     if (head === null || !releaseSubject(opts.version).test(head)) {
@@ -641,21 +689,24 @@ function step8aStage(ctx) {
     ctx.commitMade = true;
     ctx.out(`release: [${step}] nothing to stage — HEAD is already the v${opts.version} release commit\n`);
   }
-  const covered = (p) => plan.some((m) => under(p, m));
+  const added = new Set(paths), covered = (p) => added.has(p) || (tracked.has(p) && plan.some((m) => under(p, m)));
   const cached = r.deferred("git", ["diff", "--cached", "--name-only", "-z", "--no-renames"], { step });
   if (cached && cached.status !== 0) throw new ReleaseStop("INTERNAL", `git diff --cached exited ${cached.status}`);
   const staged = cached ? nulList(cached.stdout) : changed.filter(covered);
-  // Dry-run reads the untouched index, so what the plan would stage is not a leftover.
+  // Dry-run reads the untouched index, so what the stage would cover, or a move would take away, is not a leftover.
   const leftovers = (args) => {
     const res = r.read("git", args, { step });
     if (res.status !== 0) throw new ReleaseStop("INTERNAL", `git ${args[0]} exited ${res.status}`);
-    return nulList(res.stdout).filter((p) => !r.dryRun || !covered(p));
+    return nulList(res.stdout).filter((p) => !r.dryRun || !(covered(p) || gone.has(p)));
   };
+  const unstaged = leftovers(["diff", "--name-only", "-z", "--", ".", ":!.current"]);
+  const others = leftovers(["ls-files", "--others", "--exclude-standard", "-z", "--", ".", ":!.current"]);
   const verdict = checkStagingCompleteness({
-    changed, staged,
-    unstaged: leftovers(["diff", "--name-only", "-z", "--", ".", ":!.current"]),
-    untracked: leftovers(["ls-files", "--others", "--exclude-standard", "-z", "--", ".", ":!.current"]),
+    changed, staged, unstaged,
+    untracked: others.filter((p) => named.has(p)),
+    unplanned: others.filter((p) => !named.has(p)),
   });
+  for (const p of verdict.warnings) ctx.err(`release: [${step}] warning: untracked ${p} is named by no release plan entry — left out of the release commit\n`);
   if (!verdict.pass) throw new ReleaseStop("STAGING_INCOMPLETE", `${verdict.problems.join("; ")} — stage them and re-run`);
   ctx.staged = staged;
 }
@@ -736,6 +787,13 @@ const SPEC_UNCLASSIFIABLE_TEXT = "AC4 unclassifiable: no specs/<active_feature>.
 // No commit exists yet when this check stops, so the remedy is to stage, never to amend.
 const specRequireText = (spec) => `Release commit incomplete: ${spec} is absent from the release range <prev-tag>..HEAD. Stage the missing files and re-run.`;
 
+// The feature names a pending note "Multi-feature release: a, b (…)" lists,
+// or null when no note has that shape. Steps 8a-1 and 8a-3 both read it here.
+export function multiFeatureNames(pendingNotes) {
+  const m = [pendingNotes].flat().join("\n").match(/^Multi-feature release:\s*(.+?)\.?\s*$/m);
+  return m ? m[1].split(",").map((s) => s.replace(/\s*\([^)]*\)\s*$/, "").trim()).filter(Boolean) : null;
+}
+
 // M = a pending note "Multi-feature release: a, b (…)"; R = the range holds a
 // feature spec other than the active one. M or R → MULTI-FEATURE (R alone keeps
 // the active feature's single-feature outcome); else spec in tree → REQUIRE;
@@ -745,7 +803,7 @@ export function classifySpecCheck({ feature, unionFiles, specExists, scopeWhy = 
   const files = new Set(typeof unionFiles === "string" ? unionFiles.split("\n") : unionFiles);
   const own = `specs/${feature}.md`, rangeDerived = deriveRangeSpecs([...files]), logs = [], range = `${prevTag}..HEAD`;
   const R = rangeDerived.some((p) => p !== own);
-  const m = [pendingNotes].flat().join("\n").match(/^Multi-feature release:\s*(.+?)\.?\s*$/m);
+  const m = multiFeatureNames(pendingNotes);
   const done = (branch, classId = null, errorMsg = null) => ({ pass: classId === null, branch, classId, errorMsg, rangeDerived, logs });
   const skipLog = `AC4: SKIP branch — no ${own} in tree; scope_decision_why records backlog-row-as-spec mini-chain`;
   if (m || R) {
@@ -756,7 +814,7 @@ export function classifySpecCheck({ feature, unionFiles, specExists, scopeWhy = 
       else return done("MULTI-FEATURE", "SPEC_UNCLASSIFIABLE", SPEC_UNCLASSIFIABLE_TEXT);
       return done("MULTI-FEATURE");
     }
-    for (const n of m[1].split(",").map((s) => s.replace(/\s*\([^)]*\)\s*$/, "").trim()).filter(Boolean)) {
+    for (const n of m) {
       const spec = `specs/${n}.md`;
       if (!specExists(n)) { logs.push(`AC4: MULTI-FEATURE branch — ${n} has no ${spec}; logged and skipped by design (mini-chain convention)`); continue; }
       if (!files.has(spec)) return done("MULTI-FEATURE", "SPEC_REQUIRE", specRequireText(spec));

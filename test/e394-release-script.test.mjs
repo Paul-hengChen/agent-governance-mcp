@@ -120,6 +120,8 @@ function buildTemplate({ baseVersion, version, spec, baseline }) {
   put("AGENTS.md", `# Agents\n# agc-version: ${baseVersion}\n`);
   put(".antigravityrules", `# rules\n# agc-version: ${baseVersion}\n`);
   put("tasks.md", "# Tasks\n- [x] T-E7-01\n");
+  // E406: the feature file is a tracked file the release edits; an untracked file is no longer swept into the commit.
+  put("content/foo.md", "base\n");
   put(".current/lane1/handoff.md", "---\nlast_agent: qa-engineer\nstatus: PASS\n---\n# Handoff\n\n## Pending & Handoff Notes\n- QA PASS\n");
   put(".current/lane1/events.jsonl", "{\"n\":1}\n");
   put("scripts/release.mjs", fs.readFileSync(SCRIPT, "utf-8"));
@@ -165,7 +167,7 @@ function workTree(fx, o = {}) {
   }
   const cited = o.cite ?? "`content/foo.md`";
   fx.put("CHANGELOG.md", `# Changelog\n\n## [${v}] - 2026-01-02\n\n### Added\n- Thing in ${cited}.\n\n## [${b}] - 2026-01-01\n- initial\n`);
-  fx.put("content/foo.md", "foo\n");
+  fx.put("content/foo.md", "foo\n"); // edits the file the template committed
   if (!fx.spec && !o.noSpec) fx.put("specs/feat.md", "# feat\n");
   fx.put("qa_reports/review_T-E7-01.md", "review\n");
   if (o.doneMark !== false) fx.put("docs/backlog.md", `# Backlog\n\n| id | desc |\n|---|---|\n| E7 | **DONE v${v}**: feature seven |\n| E8 | other feature |\n`);
@@ -437,7 +439,7 @@ test("AC-S1 runner records mutations without spawning under dry-run, and refuses
 // ---------------------------------------------------------------- AC-S3 verb allow-list
 
 const ALLOW = [
-  /^git add -- \S/, /^git commit -F \S/, /^git commit -m \S/, /^git tag -a v\d+\.\d+\.\d+ -m \S/, /^git push -u origin release\/\S+$/,
+  /^git add -- \S/, /^git add --update -- \S/, /^git commit -F \S/, /^git commit -m \S/, /^git tag -a v\d+\.\d+\.\d+ -m \S/, /^git push -u origin release\/\S+$/,
   /^git push origin v\d+\.\d+\.\d+$/, /^git switch -c release\/\S+$/, /^git switch main$/, /^git branch -d release\/\S+$/,
   /^git -c pull\.rebase=false pull --ff-only$/, /^git (fetch|diff|log|status|show|ls-tree|ls-files|rev-parse|rev-list|describe|ls-remote)( |$)/,
   /^gh auth status$/, /^gh release view /, /^gh pr create /, /^gh pr merge \d+ --auto --merge$/, /^gh pr view /, /^gh run (list|view)/, /^gh release create /,
@@ -481,7 +483,7 @@ test("AC-S3 verb allow-list and array argv", async () => {
 
 test("AC-R11 isAllowed admits the allow-list, the six new shapes, and refuses every absent verb (AC-S3)", () => {
   const yes = [
-    ["git", ["add", "--", "a.txt"]], ["git", ["commit", "-F", "/m"]], ["git", ["commit", "-m", "msg --amend text"]], ["git", ["tag", "-a", "v1.2.3", "-m", "t"]],
+    ["git", ["add", "--", "a.txt"]], ["git", ["add", "--update", "--", "docs/"]], ["git", ["commit", "-F", "/m"]], ["git", ["commit", "-m", "msg --amend text"]], ["git", ["tag", "-a", "v1.2.3", "-m", "t"]],
     ["git", ["push", "-u", "origin", "release/v1.2.3"]], ["git", ["push", "origin", "v1.2.3"]], ["git", ["switch", "-c", "release/v1.2.3"]], ["git", ["switch", "main"]],
     ["git", ["branch", "-d", "release/v1.2.3"]], ["git", ["fetch", "origin"]], ["git", ["ls-remote", "--tags", "origin", "refs/tags/v1.2.3"]],
     ["git", ["describe", "--tags", "--abbrev=0"]], ["gh", ["auth", "status"]], ["gh", ["release", "view", "v1.2.3"]], ["gh", ["pr", "create", "--base", "main", "--head", "release/v1.2.3"]],
@@ -494,6 +496,8 @@ test("AC-R11 isAllowed admits the allow-list, the six new shapes, and refuses ev
   assert.ok(rel.isAllowed("git", ["-c", "pull.rebase=false", "pull", "--ff-only"], { branch: "main" }));
   assert.ok(!rel.isAllowed("git", ["-c", "pull.rebase=false", "pull", "--ff-only"], { branch: "release/v1.2.3" }), "pull only while on main");
   const no = [
+    // E406 AC-E406-5: `add --update` is admitted only with the `--` separator and a path; the other add forms stay refused.
+    ["git", ["add", "--update"]], ["git", ["add", "--update", "docs/"]], ["git", ["add", "-A"]],
     ["git", ["reset", "--hard"]], ["git", ["rebase", "main"]], ["git", ["clean", "-fd"]], ["git", ["checkout", "--force", "main"]], ["git", ["checkout", "main"]],
     ["git", ["push", "--force", "origin", "release/v1.2.3"]], ["git", ["push", "-f", "origin", "release/v1.2.3"]], ["git", ["push", "--force-with-lease", "origin", "release/v1.2.3"]],
     ["git", ["tag", "-f", "v1.2.3"]], ["git", ["tag", "-d", "v1.2.3"]], ["git", ["push", "origin", "main"]], ["git", ["push", "-u", "origin", "main"]], ["git", ["push", "origin", "HEAD:main"]],
@@ -1157,9 +1161,102 @@ test("L:E94 root-file completeness: four workspace shapes", () => {
 
 test("L:E71b a status path with spaces survives (NUL-separated, never word-split)", async () => {
   const fx = mkFixture();
-  workTree(fx);
+  // E406: an untracked file under docs/ is no longer swept in, so the spaced path is a TRACKED change
+  // (committed first, then edited); the NUL-separated status must still hand it to `git add --update` whole.
   fx.put("docs/a file with spaces.md", "x\n");
+  git(fx, "add", "--", "docs/a file with spaces.md");
+  git(fx, "commit", "-q", "-m", "add spaced doc");
+  workTree(fx);
+  fx.put("docs/a file with spaces.md", "y\n");
   const r = await runMain(fx, prepareArgs(fx));
   assert.equal(r.code, 0, r.err);
   assert.ok(git(fx, "show", "--name-only", "--format=", "HEAD").split("\n").includes("docs/a file with spaces.md"));
+});
+
+// ---------------------------------------------------------------- E406 explicit-path staging (step 8a-1)
+
+const UNPLANNED_WARNING = (p) => `release: [8a-1] warning: untracked ${p} is named by no release plan entry — left out of the release commit`;
+const addCalls = (r) => r.calls.filter((c) => c.bin === "git" && c.args[0] === "add").map((c) => c.args);
+const committed = (fx) => git(fx, "show", "--name-only", "--format=", "HEAD").split("\n");
+
+test("E406 AC-E406-1 an unplanned untracked file under docs/ is warned by path, left out of the commit, still untracked, exit 0", async () => {
+  // WHY: a release must neither ship nor stop on a file the operator deliberately keeps untracked.
+  const fx = mkFixture();
+  workTree(fx);
+  fx.put("docs/scratch-notes.md", "keep me out\n");
+  const r = await runMain(fx, prepareArgs(fx));
+  assert.equal(r.code, 0, r.err);
+  assert.ok(!committed(fx).includes("docs/scratch-notes.md"), "not in the release commit");
+  assert.ok(committed(fx).includes("content/foo.md"), "the tracked release edits are");
+  assert.ok(exists(fx, "docs/scratch-notes.md"), "still on disk");
+  assert.ok(git(fx, "status", "--porcelain=v1", "-uall").split("\n").includes("?? docs/scratch-notes.md"), "still untracked");
+  const warnings = r.err.split("\n").filter((l) => l.includes("release.8a1.unplanned") || l.includes("[8a-1] warning:"));
+  assert.deepEqual(warnings, [UNPLANNED_WARNING("docs/scratch-notes.md")], "exactly one warning line, naming the path");
+});
+
+test("E406 AC-E406-2 step 8a-1 stages tracked changes by one `add --update` and plan-named untracked paths by one exact-path `add`", async () => {
+  const fx = mkFixture();
+  workTree(fx);
+  fx.put("docs/scratch-notes.md", "keep me out\n");
+  const r = await runMain(fx, prepareArgs(fx));
+  assert.equal(r.code, 0, r.err);
+  const adds = addCalls(r);
+  const upd = adds.filter((a) => a[1] === "--update"), plain = adds.filter((a) => a[1] === "--");
+  assert.equal(upd.length, 1, "one add --update call");
+  assert.equal(upd[0][2], "--");
+  assert.ok(upd[0].slice(3).includes("content/") || upd[0].slice(3).includes("docs/"), "members are planStage over the tracked changes");
+  assert.equal(plain.length, 1, "one explicit-path add call");
+  const named = plain[0].slice(2);
+  assert.ok(named.includes("specs/feat.md"), "the plan-named untracked spec is named exactly");
+  assert.ok(named.every((p) => !p.endsWith("/")), "never a directory");
+  assert.ok(!adds.flat().includes("docs/scratch-notes.md"), "the unplanned path is never handed to add");
+  for (const a of plain) assert.ok(!a.slice(2).some((p) => p.endsWith("/")), "no directory member without --update");
+});
+
+test("E406 AC-E406-3 every plan-named untracked kind lands in the release commit and 8a-3 finds the specs", async () => {
+  const fx = mkFixture();
+  workTree(fx);
+  fx.put("specs/newone.md", "# newone\n");
+  fx.put("qa_reports/misc_notes.md", "fresh root evidence, covers no code\n");
+  const note = ["Multi-feature release: feat, newone (shipped together)."];
+  const r = await runMain(fx, prepareArgs(fx, [], { state: state(fx, { pending_notes: note }) }));
+  assert.equal(r.code, 0, r.err);
+  const files = committed(fx);
+  for (const p of ["specs/feat.md", "specs/newone.md", "qa_reports/archive/feat/review_T-E7-01.md", "qa_reports/misc_notes.md", ".current/.config.json"]) {
+    assert.ok(files.includes(p), `${p} is in the release commit`);
+  }
+  assert.ok(!/warning: untracked/.test(r.err), `no warning for a plan-named path: ${r.err}`);
+});
+
+test("E406 AC-E406-4 checkStagingCompleteness returns unplanned paths as warnings and never lets them affect pass", () => {
+  const ok = rel.checkStagingCompleteness({ changed: ["content/a.md"], staged: ["content/a.md"], unstaged: [], untracked: [], unplanned: ["docs/x.md"] });
+  assert.equal(ok.pass, true);
+  assert.deepEqual(ok.warnings, ["docs/x.md"]);
+  const bad = rel.checkStagingCompleteness({ changed: ["content/a.md"], staged: [], unplanned: ["docs/x.md"] });
+  assert.equal(bad.pass, false, "a planned path that did not reach the index still fails");
+  assert.deepEqual(bad.warnings, ["docs/x.md"]);
+  assert.equal(rel.checkStagingCompleteness({ changed: [], staged: [], untracked: ["CONTRIBUTING.md"], unplanned: [] }).pass, false, "a plan-named leftover still fails");
+  assert.deepEqual(rel.checkStagingCompleteness({ changed: ["content/a.md"], staged: ["content/a.md"] }).warnings ?? [], [], "no unplanned input, no warnings");
+});
+
+test("E406 AC-E406-6 dry-run records the two add shapes, prints the same warning, and changes nothing", async () => {
+  const fx = mkFixture();
+  workTree(fx);
+  fx.put("docs/scratch-notes.md", "keep me out\n");
+  const before = snapshot(fx);
+  const r = await runMain(fx, prepareArgs(fx, ["--dry-run"]));
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(snapshot(fx), before, "index, refs and working tree unchanged");
+  assert.deepEqual(addCalls(r), [], "no git add actually executed");
+  assert.ok(/git add --update -- /.test(r.out), `records the add --update shape:\n${r.out}`);
+  assert.ok(/git add -- .*specs\/feat\.md/.test(r.out), `records the exact-path add shape:\n${r.out}`);
+  assert.ok(r.err.split("\n").includes(UNPLANNED_WARNING("docs/scratch-notes.md")), "same warning line");
+});
+
+test("E406 AC-E406-7 pre-6 still stops on an untracked root stray file (exit 13)", async () => {
+  const fx = mkFixture();
+  workTree(fx);
+  fx.put("stray-root.txt", "x\n");
+  const r = await runMain(fx, prepareArgs(fx));
+  assert.equal(r.code, 13, r.err);
 });
