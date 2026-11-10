@@ -41,16 +41,18 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
   proof: code-reviewer reads the diff; `grep -n "laneIgnoredStateFiles(" bin/agc-init.mjs` shows exactly the definition, the `alreadyClosed` call, the first-run `--shipped` call and the `--abandoned` call.
 - **AC-E196-5 (a failed copy is safe to re-run).** If a copy fails, finish throws `e196.copy-fail`, the worktree and branch stay in place, and exit is non-zero.
   - `--shipped`: the copy runs only after the close commit has landed. A re-run therefore takes the existing `alreadyClosed` path and finishes the copy through `executeHarvestRefresh`.
-  - `--abandoned`: a re-run copies again. A history file with identical bytes is skipped; one with different bytes is overwritten (the copy-over rule `executeAbandonCurrentHarvest` already uses).
+  - `--abandoned`: a re-run copies again. A history file with identical bytes is skipped; one with different bytes is overwritten (the copy-over rule `executeAbandonCurrentHarvest` already uses). **Exception, `pending-tickets.md` only** (AC-E196-6, amended after code-review round 1): a differing history copy of `pending-tickets.md` is not overwritten. The run refuses with `e287.preserve-differs-refuse` before any mutation, so nothing is lost. Every other ignored file keeps the copy-over rule.
 
   proof: `node --test test/e196-ignored-lane-state.test.mjs` (case `AC-E196-5`; a history destination that cannot be written, such as a dir at a file's path, forces the failure)
-- **AC-E196-6 (E287 findings stay correct).** Setup: an ignored, worktree-only `.current/<lane>/pending-tickets.md` inside a tracked lane dir, which the E196 copy now covers. Then:
-  - for `--shipped` first run, the findings target's `covered` flag is true when the copy list includes that file (the rule the `alreadyClosed` branch of `shippedFindingsTarget` already applies);
-  - for `--abandoned`, `abandonedFindingsTarget` is covered only when the per-file plan includes that file;
-  - the end state is still exactly one regular file at `<hist>/pending-tickets.md` with the lane's bytes, plus the existing E287 warning;
-  - no refusal occurs.
+- **AC-E196-6 (E287 findings stay correct).** Setup: an ignored, worktree-only `.current/<lane>/pending-tickets.md` inside a tracked lane dir, which the E196 copy now covers. Rules (amended after code-review round 1):
+  - **`--shipped` first run:**
+    - the findings target's `covered` flag is true when the copy list includes that file (the rule the `alreadyClosed` branch of `shippedFindingsTarget` already applies);
+    - **the E287 carry check stays armed regardless of `covered`**. Whenever primary itself holds a `.current/<lane>/pending-tickets.md` that `git mv` would carry into history (`carryAbs` exists) and its bytes differ from the lane's file, finish refuses with `e287.preserve-carry-refuse` before any mutation (nothing applied, nothing removed), exactly as on base. Coordinator's ruling: option (a) of the round-1 review.
+  - **`--abandoned`:** `abandonedFindingsTarget` counts the file as covered only when the per-file plan includes it **and** no history destination for it exists yet. A differing existing destination is refused with `e287.preserve-differs-refuse`, which is the AC-E196-5 exception. This keeps `test/e287-finish-findings.test.mjs` AC-E287-3 and the non-owned `test/e335-symlinked-pending-harvest.test.mjs` AC-E335-4 green (AC-L7).
+  - With no primary copy and no prior history copy, the end state is still exactly one regular file at `<hist>/pending-tickets.md` with the lane's bytes, plus the existing E287 warning; no refusal occurs.
+  - With a carried primary copy whose bytes differ (`--shipped` first run): exit non-zero, the `e287.preserve-carry-refuse` text on stderr, primary's file unchanged, no close commit, and the worktree and branch left in place. Base `e5da97a` refuses this case the same way; the round-1 code also refused it.
 
-  proof: `node --test test/e287-finish-findings.test.mjs test/e335-symlinked-pending-harvest.test.mjs test/e196-ignored-lane-state.test.mjs` all pass (case `AC-E196-6` in the new file).
+  proof: `node --test test/e287-finish-findings.test.mjs test/e335-symlinked-pending-harvest.test.mjs test/e196-ignored-lane-state.test.mjs` all pass. The new file has cases `AC-E196-6` (covered, no refusal) and `AC-E196-6-carry` (tracked lane dir, ignored worktree-only `pending-tickets.md`, primary holds a differing copy at the same path, so `--shipped` refuses with `e287.preserve-carry-refuse` and primary's bytes survive).
 - **AC-E196-7 (untracked shape unchanged).** When `.current/<lane>/` has no tracked content, both dispositions keep today's whole-dir harvest (`harvestSrc` / `planAbandonCurrentHarvest` copy). The new per-file copy never runs for that shape.
   proof: `node --test test/e213-shipped-ignored-shape.test.mjs test/e180-abandoned-harvest.test.mjs test/e217-abandoned-specs-harvest.test.mjs` pass unmodified.
 - **AC-E196-8 (stale known-gap line removed).** `docs/lane-protocol.md` §3 line 44 is the sub-item `  - 已知缺口：E196（…）。`. E196 is the only gap it lists, so the whole line is deleted, not just the ticket name. After the change:
@@ -162,6 +164,7 @@ Every new test lives in a temporary fixture repo (`mkTmp` + `git init`) and neve
 - Detecting writes into git-ignored primary paths, or content changes to a path already dirty at start. The snapshot is a path set of the default porcelain view.
 - Symlinks under `.current/<lane>/` other than the E335 `pending-tickets.md` case. The first-run copy treats them exactly as the existing re-run copy does.
 - Every other line of `docs/lane-protocol.md` §3, and every test in `test/e351-lane-protocol-gaps.test.mjs` / `test/e383-lane-ledger-worktree.test.mjs` other than AC-E351-3 / AC-E383-7. Those stay with lane e262 or stay common-forbidden.
+- Preserving primary's own copy of a git-ignored non-findings file that `git mv` carries. If primary holds a file at `.current/<lane>/<rel>` with the same relpath as a git-ignored lane file, the first-run `--shipped` copy overwrites the carried bytes with the lane's bytes (lane bytes win, per the copy rule). Only `pending-tickets.md` is protected, by the E287 carry check (AC-E196-6).
 - `STR_USAGE_FEATURE` help text and `docs/install.md` descriptions of finish.
 - Release bookkeeping: version bump, CHANGELOG, `docs/backlog.md` done-marks (E353 marked CLOSED by E225). These belong to the integrator / release-engineer after the merge.
 
@@ -223,7 +226,7 @@ Station → AC → task (companion to the Cut table above).
 
 | station (file : site) | ACs | task |
 |---|---|---|
-| `bin/agc-init.mjs` : `laneIgnoredStateFiles`, `planLaneClose`, `executeLaneClose` / new copy step, `executeHarvestRefresh`, `shippedFindingsTarget` | AC-E196-1, -3, -4, -5, -6, -7 | T-E196-01 |
+| `bin/agc-init.mjs` : `laneIgnoredStateFiles`, `planLaneClose`, `executeLaneClose` / new copy step, `executeHarvestRefresh`, `shippedFindingsTarget`, `planFindingsPreserve` (carry check armed whenever `carryAbs` exists) | AC-E196-1, -3, -4, -5, -6, -7 | T-E196-01 |
 | `bin/agc-init.mjs` : `planAbandonCurrentHarvest`, `executeAbandonCurrentHarvest`, `abandonedFindingsTarget` | AC-E196-2, -3, -5, -6, -7 | T-E196-01 |
 | `bin/agc-init.mjs` : `runCheck` + new lane pending-tickets advisory | AC-E225-1, -2, -3 | T-E196-02 |
 | `bin/agc-init.mjs` : `checkOrphanLanes` | AC-E225-4 | T-E196-02 |
