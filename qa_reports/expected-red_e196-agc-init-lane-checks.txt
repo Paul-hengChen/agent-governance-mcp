@@ -1,0 +1,6 @@
+# e196-agc-init-lane-checks — intentional reds left by sr-engineer (T-E196-08).
+# T-E196-08 deletes the docs/lane-protocol.md §3 known-gaps sub-item (AC-E196-8):
+# its only listed gap is closed by T-E196-01. Both tests below pin that line and
+# go red until qa re-pins them in T-E196-09 (AC-E196-9).
+test/e351-lane-protocol-gaps.test.mjs | AC-E351-3: known-gaps sub-bullet follows harvest; E196 appears once with its clause; E217 no longer appears (closed by the --abandoned specs/ copy)
+test/e383-lane-ledger-worktree.test.mjs | AC-E383-7: lane-protocol §3 holds doc.s3-ledger exactly once, directly after the E196 known-gaps line
