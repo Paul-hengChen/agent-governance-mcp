@@ -1,5 +1,7 @@
 # Pending tickets — lane e406
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E203-NEW-1
 title: merge-invariants (c) passes silently when the compacting side summarized a row it added after the merge-base and the merge drops a row from the other side
@@ -23,5 +25,3 @@ body: |
   and drops T-D-01 -> PASS with T-D-01 reported COMPACTED. Also pre-existing (same result
   before E203).
 ```
-
-## Applied
