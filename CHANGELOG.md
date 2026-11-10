@@ -16,6 +16,74 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+MINOR release. It ships two backlog waves since v4.19.4: wave A (lanes `e230`, `e381`, `e238`,
+`e255`, `e247`; manifest `specs/fanout-backlog-wave-a.md`) and wave B (lanes `e262`, `e196`,
+`e359`, `e406`; manifest `specs/fanout-backlog-wave-b.md`), 22 backlog tickets in all. Each lane
+has its own spec; release gate `specs/release-cd-v4.20.0.md`. Semver: MINOR, because a new gate
+and error code are added and one constitution rule is extended; no schema version changes.
+
+### Added
+
+- **A qa-engineer PASS is refused while the feature still has open tasks (E247).** New gate
+  `PASS_TASKS_INCOMPLETE` (`gates/open-tasks.ts`, declared in `gates/registry.ts`, wired into
+  `tools/handoff-orchestrator.ts`): the PASS write is rejected while the feature's own lane task
+  list has an open, non-voided task that is not in `completed_tasks`; `release-engineer` and
+  `doc-writer` task rows are exempt. The write pipeline grows to 19 steps and the gate registry to
+  36. The qa-engineer SOP (`content/skill-qa-engineer.md`) now says the PASS lists every feature
+  task and fills `qa_suite_result` (E380).
+- **The constitution lets the role amending a cut edit a task in place (E340).** In
+  `content/const-05-core-standards.md`, the role amending the cut (pm, or the coordinator for it)
+  may edit an unchecked, non-voided task's description and `depends_on` in place, disclosed in
+  `pending_notes`; ids, checkboxes and voided rows still go through the task tools.
+- **`agc` warns about more lane hazards (E205, E225).** `agc feature finish` warns about paths that
+  appeared on the primary checkout while the lane was open, and `agc check` in a lane worktree
+  parses the lane's pending-tickets file and reports malformed blocks instead of skipping them
+  (`bin/agc-init.mjs`).
+
+### Changed
+
+- **Batched evidence counts in two more gates (E396).** The expected-red and AC-execution checks
+  now consult a `covers:` batch evidence file when a per-task evidence file lacks the section
+  (`gates/expected-red.ts`, `gates/ac-execution.ts`).
+- **A PM amend write on the same feature keeps the cut approval (E230)** (`tools/handoff-write.ts`),
+  and the refusal for a missing `resume_of` field now lists the conditional edges and names the
+  field (E151; `tools/transitions.ts`).
+- **Fan-out manifest checks are stricter and need fewer flags.** A glob inside a parenthesised
+  clause of an owned-path cell is no longer treated as an owned path (E381), and `check` defaults
+  `--base` to the target branch recorded in the manifest's handoff section (E390)
+  (`tools/fanout-manifest.ts`, `scripts/fanout.mjs`). A git-tracked legacy task list inside a lane
+  worktree is no longer used as the lane's task list (E388; `tools/tasks-lane-migrate.ts`,
+  `docs/lane-protocol.md`).
+- **The integrator SOP reads as a workspace-generic procedure (E262, E355).** The pre-review order
+  around the architect hop is now executable step by step (`content/skill-integrator.md`,
+  `docs/lane-protocol.md`), and facts that hold only for this repository (CI trigger, full-suite
+  command, post-merge restart, load-sensitive test list) move into
+  `docs/lane-protocol-addendum.md`, leaving generic sentences in the shipped SOP.
+- **qa-visual FAIL rows carry `review_task_ids` (E360)** (`content/skill-qa-visual.md`).
+- **The void-task refusal names the qa FAIL write it pairs with (E359)** (`tools/tasks-file.ts`,
+  `tools/storage-sqlite.ts`).
+- **The release script stages by explicit path (E406).** `prepare` in `scripts/release.mjs` stages
+  only the files it planned to change; an unplanned untracked file is reported as a warning, never
+  committed, and no longer stops the run.
+- **Product-specific naming removed from tracked files (E255).** Shipped SOP wording, test surface
+  names and research prose now describe the category instead; the visual-fidelity retrospective is
+  now `research/visual-fidelity-retrospective-2026-06-05.md`.
+
+### Fixed
+
+- **The state block no longer shows `dispatch_mechanism_tier` (E376)** (`prompts/build.ts`).
+- **Workspace paths starting with `~\` expand on Windows (E172)** (`index.ts`).
+- **`agc feature finish` keeps git-ignored lane files on the first tracked-shape run (E196)**
+  (`bin/agc-init.mjs`).
+- **The merge-invariants check no longer reports a row still present after the merge as missing
+  (E203)** (`tools/merge-invariants.ts`, `specs/e126-merge-invariants.md`).
+
+### Notes
+
+- Tests: six load-sensitive test sites decoupled from machine load (E238); `test/usage-accounting.test.mjs` (context, not changed) keeps its existing coverage.
+- Goldens and budgets: 11 compose goldens re-captured for the constitution change; the lean and non-design context-budget caps in `test/context-budget.test.mjs` are re-baselined from 5723 to 5731 and from 8501 to 8518 tokens.
+- No schema version, dependency, template, transition table or CI workflow changed; `.github/workflows/release.yml` (context, not changed) is untouched.
+
 ## [4.19.4] - 2026-11-09
 
 PATCH release. It ships E415 and E416 since v4.19.3, landed on `main` by two pull requests from
