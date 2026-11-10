@@ -67,3 +67,9 @@ Resident-test hygiene: temp repos only; no real `specs/fanout-*.md`, no fixed ba
 - Code-review optional finding carried: `e196.copy-item` rel is unescaped (same as e125b).
 - Review C1: primary's own non-findings ignored file with the same relpath is overwritten by the lane's bytes; documented in the spec's Out of Scope.
 - Backlog `docs/backlog.md` done-marks (E196, E206, E225, E353 CLOSED, E205) are release/integrator work.
+## 2026-11-10T06:21:18.549Z — PASS — by qa-engineer
+
+suite-result: 4140/4142 passed (server-recorded from qa_suite_result; command: node scripts/test-lock.mjs -- npm test)
+
+covers: T-E196-01, T-E196-02, T-E196-03, T-E196-04, T-E196-05, T-E196-06, T-E196-08, T-E196-09, T-E196-10. Full detail incl. Expected-Red Diff and AC Execution Log in the pre-written review section above. Summary: new suites e196 (9), e225 (6), e205 (7) all green on Node 22 and Node 20; AC-E351-3 / AC-E383-7 re-pinned (15/15); expected-red manifest confirmed 2/2 red pre-re-pin, 0 unexplained. Node 20 (v20.20.2) spec command 184/184. Build dist zero diff; agc check exit 0; npm audit --audit-level=high exit 0; check:bookkeeping exit 0. Full suite on committed HEAD dfe584b, clean tree: 4140 pass, 0 fail, 2 skipped of 4142.
+
