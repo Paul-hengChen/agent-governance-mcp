@@ -2,25 +2,26 @@
 schema_version: 15
 active_feature: "e196-agc-init-lane-checks"
 status: "In_Progress"
-last_updated: "2026-11-10T03:25:52.594Z"
-last_agent: "pm"
+last_updated: "2026-11-10T03:56:02.427Z"
+last_agent: "sr-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "One lane, three integrator-scoped tickets (E196+E206, E225+E353, E205) in bin/agc-init.mjs plus docs/lane-protocol.md §3 line 44 / §6 and two re-pinned AC tests; four serial sr tasks + qa tests/verification, each within the task_size budget. No design arm; architect skipped per fan-out plan."
+cut_approved: true
 dispatch_pins:
   pm: "opus"
   sr-engineer: "opus"
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-11-10T03:25:52.594Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-11-10T03:56:02.427Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 1
+hop_count: 2
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -31,10 +32,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM cut amended per integrator pre-review (mailbox to-lane#2): stale §3 E196 known-gap line fixed in-lane (re-assigned 2026-11-10). New T-E196-08 (sr: delete docs/lane-protocol.md §3 line 44 whole sub-item + expected-red manifest for AC-E351-3/AC-E383-7), T-E196-09 (qa: re-pin AC-E351-3 and AC-E383-7 only), T-E196-10 (qa lane verification) replacing voided T-E196-07. New ACs AC-E196-8, AC-E196-9; AC-E225-6, AC-E205-5, AC-L7 adjusted; Station Map updated.
-- cut_approved NOT set — awaiting integrator close then human approval in the lane session; manifest tier not eligible (cutApprovalAutoTier = {}).
-- fanout check --cut against the primary manifest -> exit 0 (9 tickets, 10 tokens, 0 out of bounds).
-- sr order: T-E196-01 -> 02 -> 03 -> 08 (serial). Node 20 verification via fnm per spec Dependencies.
+- sr-engineer: T-E196-01, T-E196-02, T-E196-03, T-E196-08 ready for code review
+- T-E196-01 (7dd6775): laneIgnoredStateFiles gains a verb param (--shipped text unchanged); planLaneClose first-run tracked branch plans ignoredCopy {src,dst,rel}; executeShippedIgnoredCopy runs after executeLaneClose, before executeFindingsPreserve; copy loop factored out of executeHarvestRefresh into copyLaneIgnoredFiles (e125b.harvest-refresh-line byte-identical); planAbandonCurrentHarvest returns a per-file plan (`files`, identical history copies skipped via sameFileBytes) instead of the AC8 early return when ignored files remain; executeAbandonCurrentHarvest runs it; shippedFindingsTarget/abandonedFindingsTarget covered follow the plan. grep 'laneIgnoredStateFiles(' = definition + 3 calls (AC-E196-4).
+- DEVIATION (T-E196-01, AC-E196-6 --abandoned): abandonedFindingsTarget counts pending-tickets.md as covered only when the per-file plan includes it AND the history destination is absent. Reason: with 'covered = plan includes it' alone, an existing differing/symlinked destination skipped E287's plan-time collision refusal and turned red test/e287-finish-findings.test.mjs AC-E287-3 and non-owned test/e335-symlinked-pending-harvest.test.mjs AC-E335-4 (x2). With the refinement they stay green; AC-E196-6's setup (no prior destination) is covered, no refusal. Side effect: an --abandoned re-run whose lane pending-tickets.md changed since a failed first run's copy gets e287.preserve-differs-refuse (pre-E196 behaviour for this shape) instead of copy-over; other ignored files follow AC-E196-5 copy-over. --shipped first run follows the spec literally (covered when the copy list includes it).
+- T-E196-02 (d36626d + comment reflow f17754f): checkLanePendingTickets in runCheck (linked worktree, lane != _primary, parse with appliedLaneLocalIds from findAppliedProvenance over the worktree's docs/backlog.md or ''), prints e225.lane-check-*, skip line on any error; checkOrphanLanes keeps the two-arg parse, has = live non-target_repo entries OR errors>0, prints e225.orphan-errors-* after the unchanged orphan line; docs/lane-protocol.md §6 gains doc.s6-agc-check directly after heading + blank line (no blank line after it, per 'exactly one line').
+- T-E196-03 (aeaa7a9): start writes `git --no-optional-locks status --porcelain -z --untracked-files=all` bytes (primary) to `git rev-parse --git-path agc-primary-status` resolved against the lane worktree, after the base-sha write; e205.start-snapshot-warn on failure. finish calls warnPrimaryNewPaths right after the target worktree is resolved (before the merge guard): ENOENT snapshot = silent, other failures = e205.finish-check-skip; path-set diff via parsePorcelainZ minus .current/history/*/<lane>/, <dir>/archive/<lane>/, <dir>/abandoned/<lane>/ and the lane path prefix; sorted, escapeSegmentForDisplay. --no-optional-locks is the only addition to the spec'd command (read-only intent; output identical).
+- T-E196-08 (119c9a2): §3 known-gaps line removed (grep -c 已知缺口 = 0, E196 count 0); qa_reports/expected-red_e196-agc-init-lane-checks.txt names AC-E351-3 and AC-E383-7.
+- Verification: npm run build exit 0, dist zero diff; npm audit --audit-level=high exit 0; node --check ok; agc check in lane exit 0, no comment warnings. Targeted suites (agc-feature-lifecycle, agc-feature-finish-history, e213, e180, e217, e287, agc-adapters, e335, e246, e291, e298, lane-ticket-allocation, e290, e351, e383): 308/310 pass, the 2 fails = exactly the expected-red manifest entries. No tools/*.ts or dist/ change.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
