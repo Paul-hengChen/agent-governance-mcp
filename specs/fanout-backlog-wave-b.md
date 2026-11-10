@@ -2,7 +2,7 @@
 base: e8e11da    integration branch: integ/backlog-wave-b
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-11-09，派工中。**
+**狀態：已結案 2026-11-10。** 四條 lane 都已合併進 `integ/backlog-wave-b`（e262 merge `4170814`、e196 `221bc44`、e359 `2bad5a0`、e406 `c549a1a`，零衝突）、finish、拆除；派工 base `4b25061`（清單 PR #107 merge）；本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out：backlog wave B（wave A 之後的第二波），共 13 張，四條 lane」，2026-11-09）：wave A 清單 `specs/fanout-backlog-wave-a.md`「Wave B」段的 13 張。本波不發版：四條合進 `integ/backlog-wave-b` 後一次 PR。
 
@@ -100,6 +100,14 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 5. `npm run build`、golden byte-identical、預算、`check:bookkeeping`、audit；記帳 commit。
 6. 依序 `finish <lane> --shipped --base integ/backlog-wave-b`；`fanout.mjs handoff --closing`；push、CI、`gh pr create`、`gh pr merge --auto --merge`；merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only`、`git branch -d integ/backlog-wave-b`。不發版。
 
+## 結案
+- 日期 2026-11-10。`integ/backlog-wave-b` 自 `main` `4b25061` 開；← `--no-ff` e262 `811bcc0`（merge `4170814`）、e196 `de839dd`（`221bc44`）、e359 `1701de9`（`2bad5a0`）、e406 `e929171`（`c549a1a`），四次零衝突；`docs/lane-protocol.md` 由 git 自動合併（兩邊原樣保留，非實質解決）→ 無合併審查；merge-invariants 四次 PASS；合併樹 `npm run build` 後 `dist/` 無差異、golden capture 無差異、context-budget 54/54、`npm audit --audit-level=high` exit 0；整合層 CI run 42771327273 在 `c549a1a` 綠。
+- 彙總（上限按 lane 計，全部在上限內、證據與帳本一致）：e262 9 task／hop 4/14／review 0 退回／qa 0；e196 9 task（另 1 void）／hop 7/14／review 1 退回（cut 修訂後人類重新核准）／qa 0；e359 6 task／hop 4/14／review 0／qa 0；e406 4 task／hop 7/14／review 1 退回（cut 修訂、人類裁 E203 取捨 = a 並重新核准）／qa 0。合計 28 task、22 hop。
+- 完成定義：表中「同一波 ✓」的列全部成立。
+- 記帳：`docs/backlog.md` 12 列 done-mark（not yet released）、E353 標 CLOSED（併入 E225）；佇列 12 列 DONE、E353 CLOSED；finish 由 lane e406 配出 E417（merge-invariants (c) 壓縮側 base 之後新增列的靜默缺口），佇列第 230 列、排在本里程碑之後；`check:bookkeeping` OK。接線票：無。
+- 不開票的觀察（reviewer／qa 的 optional）：e262——步驟 (3) 預設 architect 有 Open Questions、SOP:156 CI fallback 措辭預設 GitHub、addendum 第 35 行重複 test-lock；e196——`e196.copy-item` 路徑未跳脫（同 e125b）、E205 也會點名 lane 期間 primary 的合法修改（只警告）、AC-E196-5 的 --shipped 測試以 POSIX sh hook 製造失敗；e359——storage-sqlite 從 file-mode 模組 import 訊息 helper、`_omitTier` 丟棄綁定、e137 AC11 一個刻意例外鍵；e406——`release.mjs:674` `ctx.stagePlan` 寫了沒人讀、`:672` 變數 `paths` 命名易混。負載觀察：`test/e108-eject.test.mjs` 在多 lane 並行負載下 AC1、AC7、AC15、AC19、AC20 不同次逾時（隔離都綠、CI 都綠），補充規則的清單只列兩個 AC7 與 VR-20。
+- 給下次發版的 CHANGELOG 提示：integrator SOP 的 architect-hop 順序改成可執行；integrator SOP 的 repo 專屬事實改由補充規則點名（CI 觸發、全套指令、退役發現檔、合併後重啟、負載敏感清單）；qa-visual FAIL 列帶 `review_task_ids`；憲法 const-05 加「修 cut 的角色可就地改未勾 task 的描述與 depends_on」窄例外（lean、non-design 預算上限重定）；`agc feature finish` 第一次 tracked 形狀保留 git-ignored lane 檔、警告 lane 期間 primary 新出現的路徑；`agc check` 在 lane worktree 解析 `pending-tickets.md` 並報錯、orphan 偵測不再沉默略過壞 block；void 拒絕訊息點名配對的 qa FAIL 寫入；狀態區塊不再顯示 `dispatch_mechanism_tier`；win32 的 `~\` 路徑展開；`release.mjs prepare` 改按明確路徑 stage；merge-invariants (c) 不再對合併後仍在的列誤報 MISSING。無新 gate、無新錯誤碼、無 schema 變更；憲法字句有改 → 建議 MINOR。
+
 ## Dispatch pins
 - e262：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
 - e196：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
@@ -132,3 +140,19 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-10 | 整合者 | e406 lane 層驗證 close（to-integrator#11）：HEAD `e929171`，17 commits，hop 7/14，review 2 輪（T-E406-01 r1 APPROVED；T-E203-01 r1 CHANGES_REQUESTED → r2 APPROVED）、qa 0 輪；fanout check 20 檔 0 越界；證據 `qa_reports/review_T-E406-01.md`（covers 4 id）等 4 檔 PASS（lane 在最後 HEAD 乾淨樹重跑全套 4129/4131）；ledger 4/4；worktree porcelain 空；pending-tickets 一筆 `E203-NEW-1`（parser 0 errors，finish 配號）；`dist/` 只 merge-invariants；content、golden、budget 未動；整合者 push 後 CI run 42770767578 在 `e929171` 綠。optional（`release.mjs:674` `ctx.stagePlan` 寫了沒人讀、`:672` 區域變數 `paths` 命名易混；`test/release-staging.test.mjs` 的 E94 註解原樣保留）列入結案報告、不開票 | 信箱 e406 to-lane#4 |
 | 2026-11-10 | 整合者 | 合併：`integ/backlog-wave-b` 自 `main` `4b25061` 開，← `--no-ff` e262 `811bcc0`（merge `4170814`）、e196 `de839dd`（`221bc44`）、e359 `1701de9`（`2bad5a0`）、e406 `e929171`（`c549a1a`），四次零衝突（`docs/lane-protocol.md` 由 git 自動合併：e262 §5 第 101 行、e196 §3 第 44 行與 §6，兩邊原樣保留，非實質解決）→ 無合併審查；merge-invariants 四次 PASS；合併樹 `npm run build` 後 `dist/` 無差異、`capture-constitution-golden.mjs` 無差異、context-budget 54/54、`npm audit --audit-level=high` exit 0、`agc check` OK | 本檔 |
 | 2026-11-10 | 整合者 | 記帳：`docs/backlog.md` 12 列 done-mark（not yet released）＋E353 標 CLOSED（併入 E225）；`docs/v4.0.0-new-tickets.md` 佇列 12 列 DONE＋E353 CLOSED；`check:bookkeeping` OK | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 4b25061
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/backlog-wave-b @ d79778d）
+- lane-status：primary（main ← integ/backlog-wave-b @ d79778d）release-cd-v4.19.4／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 4 條 lane、13 張票（E262＋E355＋E360＋E340、E196＋E225＋E353＋E205、E359＋E376＋E172、E406＋E203）全部 qa PASS、合併、finish；E353 併入 E225（CLOSED）。lane 紀錄在 `.current/history/2026-11/{e262,e196,e359,e406}/`；判定與驗證細節在本檔 Decisions 與結案段。新發現 1 筆已配號 E417（佇列第 230 列）；無未配號的新發現。
+### 待人類決定
+- 是否發版：本波改了憲法字句與多個 SOP、工具行為，無新 gate／錯誤碼／schema，整合者建議 MINOR；CHANGELOG 提示見結案段。
+- `test/e108-eject.test.mjs` 的負載敏感：多 lane 並行時 AC1、AC7、AC15、AC19、AC20 都逾時過，補充規則清單只列 AC7。可擴大清單、整檔去耦（開票），或維持現狀。
+### 進行中的背景工作
+無
