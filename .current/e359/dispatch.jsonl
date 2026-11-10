@@ -1,3 +1,5 @@
 {"ts":"2026-11-10T03:19:13.150Z","feature":"e359-server-core-fixes","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T03:32:51.497Z","feature":"e359-server-core-fixes","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T03:34:55.873Z","feature":"e359-server-core-fixes","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T03:35:34.097Z","feature":"e359-server-core-fixes","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T03:38:02.548Z","feature":"e359-server-core-fixes","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
