@@ -36,7 +36,7 @@ test("AC-E349-1: the SOP states none of this repo's facts, and carries the gener
     "- the worktree's `status --porcelain` taken **after** a local run of the repo's build command (the addendum names it) — non-empty is itself a finding (tracked build output not rebuilt at commit);",
     // sop.5b-4
     "Tracked build output is never hand-resolved: rebuild it after merging.",
-    "After merging, run the repo's build and restart the primary MCP server",
+    "After merging, run the repo's build, plus the post-merge restart the addendum names, if any (so the next `tw_*` call runs the merged code).",
     // sop.5b-5
     "(a build-output or golden regeneration is not substantive)",
     // sop.5b-6
@@ -55,7 +55,7 @@ test("AC-E349-1: the SOP states none of this repo's facts, and carries the gener
   assert.ok(SOP.slice(i5c, SOP.indexOf("## Stage 6", i5c)).includes(mustHave[7]), "sop.5c-3 inside 5c");
 });
 
-test("AC-E349-2: addendum heading list unchanged; the three §5 bullets follow the fanout line in order; §7 unchanged; every called tool has its repo-relative call", () => {
+test("AC-E349-2: addendum heading list unchanged; the nine §5 bullets follow the fanout line in order; §7 unchanged; every called tool has its repo-relative call", () => {
   const headings = addLines.filter((l) => l.startsWith("## "));
   assert.deepEqual(headings, ["## §1 開工", "## §2 檔案邊界", "## §3 執行與驗證", "## §4 新發現", "## §5 信箱", "## §7 中途修 base"]);
 
@@ -65,9 +65,17 @@ test("AC-E349-2: addendum heading list unchanged; the three §5 bullets follow t
   const BOOK = "- 整合者 5c 的記帳檢查是 `npm run check:bookkeeping`：記帳 commit 前跑、要 exit 0；它也透過測試檔在 `npm test` 裡，PR 的 CI 會再跑一次。";
   const f = addLines.indexOf(FANOUT);
   assert.ok(f >= 0, "existing §5 fanout line byte-identical");
-  assert.deepEqual(addLines.slice(f + 1, f + 4), [TOOLS, CI, BOOK], "add.5-tools, add.5-ci, add.5-bookkeeping directly after, in order");
-  assert.equal(addLines[f + 4], "", "§5 ends after the three bullets");
-  assert.equal(addLines[f + 5], "## §7 中途修 base");
+  // E355 (W9): five bullets join the existing three, in this order
+  const W9 = [
+    "- 整合者 5a 的 lane 層 CI：本 repo 的 `.github/workflows/ci.yml` 在 push 到 `feat/**`（另有 `main`、`integ/**`、`release/**`）時觸發，所以整合者 push lane branch 就會跑 CI（E298）。",
+    "- 整合者 SOP 的「repo 的全套指令」在本 repo 是 `npm test`，一律包成 `node scripts/test-lock.mjs -- npm test`。",
+    "- 整合者 5a 與 verifier 檢查的「補充規則點名的退役發現檔」是 root 的 `NEW-TICKETS.md`（§4）：lane branch 不得改動它。",
+    "- 整合者 5b-4 的合併後重啟：本 repo 就是 agc 的 MCP server，合併並建置之後重啟 primary 的 MCP server，下一次 `tw_*` 呼叫才會跑合併後的程式。",
+    "- 整合者 flake rule 的負載敏感測試清單（只有清單上的測試在 CI 紅時可以 `gh run rerun --failed` 一次）：`test/e108-eject.test.mjs` 名稱以 `AC7` 開頭的兩個測試、`test/verify-release.test.mjs` 的 `VR-20 (E80)`。E238 處理過的六個站點（五個已去耦，usage-accounting 的 20 s 上限確認不動）不在清單上：再紅代表退化，照一般紅燈送回 lane。",
+  ];
+  assert.deepEqual(addLines.slice(f + 1, f + 9), [TOOLS, CI, BOOK, ...W9], "four existing bullets' tail + five W9 bullets directly after, in order");
+  assert.equal(addLines[f + 9], "", "§5 ends after the nine bullets");
+  assert.equal(addLines[f + 10], "## §7 中途修 base");
 
   const sec7 = ADD.slice(ADD.indexOf("## §7 中途修 base"));
   assert.equal(

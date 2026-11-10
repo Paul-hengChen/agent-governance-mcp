@@ -187,7 +187,7 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
 
 // --- reduction (AC2) -------------------------------------------------------
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5723 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5731 ~tok)", () => {
   // Cap rule: each raise is a re-measure (qa-owned unless noted sr-owned), and the cap is the
   // exact measured size (zero headroom).
   // Bump history: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
@@ -197,7 +197,8 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
   // E336 re-baseline: portable pull command form (`git -c pull.rebase=false pull --ff-only`), +6 ~tok; was 5717, zero headroom.
-  assert.ok(lean <= 5723, `lean always-on (${lean} ~tok) must meet the <= 5723 target (E336 re-baseline, zero headroom)`);
+  // E340 re-baseline: const-05 line 17 narrow in-place task-list edit exception, +8 ~tok; was 5723, zero headroom.
+  assert.ok(lean <= 5731, `lean always-on (${lean} ~tok) must meet the <= 5731 target (E340 re-baseline, zero headroom)`);
 });
 
 // --- enforcement preserved (AC3) ------------------------------------------
@@ -897,19 +898,20 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- rebaseline + pin the new non-design figure (AC8) ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8501 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8518 ~tok)", () => {
   // WHY: the budget win that justified the feature, regression-guarded. Both sides are measured
   // like production (origin tags, then rationale, stripped); the non-design side composes without
   // the design fragments. The cap is the exact measured size (zero headroom) and the design-only
   // saving must stay at least 1999 ~tok, since core and chain edits land on both arms.
   // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10598 (E365 re-baseline, zero headroom)
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 8501 (E365 re-baseline, zero headroom)
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 8518 (E340 re-baseline, zero headroom)
   // Floor bumps from e43 (test-file ask at dispatch) through E258 (comment-discipline bullet)
   // continue the same cap history, pointed to above.
   // E336 re-baseline: portable pull command form (const-15 site), +6 ~tok; was 8420, zero headroom.
   // E350 re-baseline: const-08 cond 3 `<agc install>/scripts/fanout.mjs`, +3 ~tok; was 8426, zero headroom.
-  assert.ok(nonDesign <= 8501, `non-design constitution (${nonDesign} ~tok) must be ≤ 8501 (AC8 non-design floor, E365 re-baseline, zero headroom)`);
+  // E340 re-baseline: const-05 line 17 narrow in-place task-list edit exception, +17 ~tok; was 8501, zero headroom.
+  assert.ok(nonDesign <= 8518, `non-design constitution (${nonDesign} ~tok) must be ≤ 8518 (AC8 non-design floor, E340 re-baseline, zero headroom)`);
   assert.ok(
     ratStripped - nonDesign >= 1999,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 1999 (E393 re-baseline: builder ≠ judge moved from the design-only §3.2 fragment into core §3)`,

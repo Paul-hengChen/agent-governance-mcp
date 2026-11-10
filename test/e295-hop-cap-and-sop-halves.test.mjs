@@ -91,9 +91,15 @@ test("AC8: verifier brief returns CI run id + verdict, never suite output; porce
   }
 });
 
-test("AC9: CI fallback Decisions row wording and the E238/E254/E278 flake rule", () => {
+test("AC9: CI fallback Decisions row wording and the flake rule (the load-sensitive list lives in the addendum)", () => {
   assert.ok(count(INTEGRATOR, "CI was not consulted") >= 1);
-  assert.ok(INTEGRATOR.split("\n").some((l) => l.includes("E238") && l.includes("E254") && l.includes("E278")));
+  // E355: the SOP flake rule is generic — it points at the repo's list; the repo's list (the two
+  // load-sensitive candidates, not the E238/E254/E278 family) lives in the addendum.
+  assert.ok(INTEGRATOR.includes("is on the repo's load-sensitive test list (the addendum names it; no list, no re-run); any other red"));
+  assert.ok(INTEGRATOR.split("\n").every((l) => !(l.includes("E238") || l.includes("E254") || l.includes("E278"))));
+  const addendumList = rd("docs/lane-protocol-addendum.md").split("\n").filter((l) => l.includes("負載敏感測試清單"));
+  assert.equal(addendumList.length, 1, "addendum carries exactly one load-sensitive list bullet");
+  assert.ok(addendumList[0].includes("`test/e108-eject.test.mjs`") && addendumList[0].includes("`test/verify-release.test.mjs`"));
   assert.ok(INTEGRATOR.includes("gh run rerun --failed <run id>"));
 });
 

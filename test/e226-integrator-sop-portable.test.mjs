@@ -35,7 +35,7 @@ const STAGE6_FINISH =
 const EVIDENCE_CMD =
   "`git show <branch>:<evidence path>` — verdict line and task id match; under `artifacts: \"local\"` the evidence paths are excluded from the branch, so read `<worktree>/<evidence path>` instead";
 const FINDINGS_CMD =
-  "`git show <branch>:.current/<lane>/pending-tickets.md`; no block below `## Applied`; root `NEW-TICKETS.md` untouched; under `artifacts: \"local\"` read `<worktree>/.current/<lane>/pending-tickets.md` instead — it is never committed, so finish numbers none of it: hand-file each finding from the copy finish leaves under primary's `.current/history/<YYYY-MM>/<lane>/` (Stage 6 step 1)";
+  "`git show <branch>:.current/<lane>/pending-tickets.md`; no block below `## Applied`; any retired findings file the addendum names untouched; under `artifacts: \"local\"` read `<worktree>/.current/<lane>/pending-tickets.md` instead — it is never committed, so finish numbers none of it: hand-file each finding from the copy finish leaves under primary's `.current/history/<YYYY-MM>/<lane>/` (Stage 6 step 1)";
 
 test("AC-E226-1: no repo-relative `node scripts/`; each called tool appears in the <agc install> form", () => {
   assert.equal(count(SOP, "node scripts/"), 0);
