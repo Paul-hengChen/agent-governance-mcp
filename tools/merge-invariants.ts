@@ -324,9 +324,12 @@ function perParentIneligibility(occ: ParentRowRef, parentSnap: CommitSnapshot, m
 /**
  * Condition (c) over the UNION across parents (spec amendment R-1): for each
  * file F / section S, U = distinct closed task_ids under F/S from every parent
- * occurrence passing (a)/(b)/(d) — a (d)-barred parent contributes nothing.
- * A task_id closed as `[x]` in any contributing occurrence counts as done,
- * otherwise voided. Returns the (c) failure reason per failing F/S key.
+ * occurrence passing (a)/(b)/(d) — a (d)-barred parent contributes nothing —
+ * that the whole-tree identity search does not find anywhere at the merge
+ * (E203: a row the merge still holds is proven present, so counting it would
+ * only make the manifest look short). A task_id closed as `[x]` in any
+ * contributing occurrence counts as done, otherwise voided. Returns the (c)
+ * failure reason per failing F/S key.
  */
 function unionReconciliationFailures(
   occsById: Map<string, Array<{ ref: ParentRowRef; snap: CommitSnapshot }>>,
@@ -334,6 +337,7 @@ function unionReconciliationFailures(
 ): Map<string, string> {
   const union = new Map<string, Map<string, RowState>>(); // F/S key -> task_id -> state
   for (const [taskId, occs] of occsById) {
+    if ((merge.rowsById.get(taskId)?.length ?? 0) > 0) continue;
     for (const { ref, snap } of occs) {
       if (ref.section === null || perParentIneligibility(ref, snap, merge) !== null) continue;
       const key = fileSectionKey(ref.file, ref.section);
@@ -357,7 +361,8 @@ function unionReconciliationFailures(
       failures.set(
         key,
         `(c) manifest under-reconciles ${file} § ${section}: manifest ${entry.done} done/` +
-          `${entry.voided} voided < union across parents ${done} [x]/${voided} [-] (${ids.size} distinct task_id(s))`,
+          `${entry.voided} voided < closed rows not found at merge, union across parents ${done} [x]/${voided} [-] ` +
+          `(${ids.size} distinct task_id(s))`,
       );
     }
   }
