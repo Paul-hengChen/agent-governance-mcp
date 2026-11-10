@@ -31,7 +31,7 @@ const W7 = "- the `pending-tickets.md` / `## Applied` / retired-findings-file ch
 const W8 =
   "After merging, run the repo's build, plus the post-merge restart the addendum names, if any (so the next `tw_*` call runs the merged code).";
 const W9_LOAD =
-  "- 整合者 flake rule 的負載敏感測試清單（只有清單上的測試在 CI 紅時可以 `gh run rerun --failed` 一次）：`test/e108-eject.test.mjs` 名稱以 `AC7` 開頭的兩個測試、`test/verify-release.test.mjs` 的 `VR-20 (E80)`。E238 處理過的六個站點（五個已去耦，usage-accounting 的 20 s 上限確認不動）不在清單上：再紅代表退化，照一般紅燈送回 lane。";
+  "- 整合者 flake rule 的負載敏感測試清單（只有清單上的測試在 CI 紅時可以 `gh run rerun --failed` 一次）：`test/e108-eject.test.mjs` 的六個測試（名稱以 `AC1:`、`AC15:`、`AC19:`、`AC20:` 開頭的四個測試，加上名稱以 `AC7` 開頭的兩個測試）、`test/verify-release.test.mjs` 的 `VR-20 (E80)`。E238 處理過的六個站點（五個已去耦，usage-accounting 的 20 s 上限確認不動）不在清單上：再紅代表退化，照一般紅燈送回 lane。";
 
 test("AC-E355-1: the SOP contains none of this repo's CI / findings / test-list / restart facts", () => {
   for (const banned of [
@@ -64,8 +64,9 @@ test("AC-E355-3: addendum §5 gains the five W9 bullets after the existing four,
   assert.equal(tail[4], W9_LOAD, "load-sensitive bullet verbatim");
 });
 
-test("AC-E355-4: the load-sensitive list names exactly the two candidates and says the E238 sites are off it", () => {
-  assert.equal(count(ADD, "`test/e108-eject.test.mjs` 名稱以 `AC7` 開頭的兩個測試"), 1);
+test("AC-E355-4: the load-sensitive list names the two test files (six eject tests plus VR-20) and says the E238 sites are off it", () => {
+  assert.equal(count(ADD, "名稱以 `AC7` 開頭的兩個測試"), 1);
+  assert.equal(count(ADD, "名稱以 `AC1:`、`AC15:`、`AC19:`、`AC20:` 開頭的四個測試"), 1);
   assert.equal(count(ADD, "`test/verify-release.test.mjs` 的 `VR-20 (E80)`"), 1);
   assert.ok(W9_LOAD.includes("E238 處理過的六個站點") && W9_LOAD.includes("不在清單上"));
   // the other test files the list could be confused with are not named on the list

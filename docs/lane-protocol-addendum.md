@@ -35,7 +35,7 @@
 - 整合者 SOP 的「repo 的全套指令」在本 repo 是 `npm test`，一律包成 `node scripts/test-lock.mjs -- npm test`。
 - 整合者 5a 與 verifier 檢查的「補充規則點名的退役發現檔」是 root 的 `NEW-TICKETS.md`（§4）：lane branch 不得改動它。
 - 整合者 5b-4 的合併後重啟：本 repo 就是 agc 的 MCP server，合併並建置之後重啟 primary 的 MCP server，下一次 `tw_*` 呼叫才會跑合併後的程式。
-- 整合者 flake rule 的負載敏感測試清單（只有清單上的測試在 CI 紅時可以 `gh run rerun --failed` 一次）：`test/e108-eject.test.mjs` 名稱以 `AC7` 開頭的兩個測試、`test/verify-release.test.mjs` 的 `VR-20 (E80)`。E238 處理過的六個站點（五個已去耦，usage-accounting 的 20 s 上限確認不動）不在清單上：再紅代表退化，照一般紅燈送回 lane。
+- 整合者 flake rule 的負載敏感測試清單（只有清單上的測試在 CI 紅時可以 `gh run rerun --failed` 一次）：`test/e108-eject.test.mjs` 的六個測試（名稱以 `AC1:`、`AC15:`、`AC19:`、`AC20:` 開頭的四個測試，加上名稱以 `AC7` 開頭的兩個測試）、`test/verify-release.test.mjs` 的 `VR-20 (E80)`。E238 處理過的六個站點（五個已去耦，usage-accounting 的 20 s 上限確認不動）不在清單上：再紅代表退化，照一般紅燈送回 lane。
 
 ## §7 中途修 base
 

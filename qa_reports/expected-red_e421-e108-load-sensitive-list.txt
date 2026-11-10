@@ -1,0 +1,9 @@
+# T-E421-01 (sr-engineer): docs/lane-protocol-addendum.md §5 load-sensitive bullet replaced with NEW_BULLET.
+# These two qa-owned tests pin the old bullet verbatim; red until T-E421-02 (qa-engineer) re-pins W9 / W9_LOAD.
+test/e349-integrator-repo-facts.test.mjs | AC-E349-2: addendum heading list unchanged; the nine §5 bullets follow the fanout line in order; §7 unchanged; every called tool has its repo-relative call
+test/e355-integrator-generic-wording.test.mjs | AC-E355-3: addendum §5 gains the five W9 bullets after the existing four, §7 follows
+
+# Third red, not predicted by the spec: AC-E355-4 line 68 pins the AC7 phrase WITH its file-path prefix
+# ("`test/e108-eject.test.mjs` 名稱以 `AC7` 開頭的兩個測試"), which NEW_BULLET splits apart by design.
+# Re-pin to the NEW_BULLET form in T-E421-02 alongside the four-test-span assertion (spec AC4).
+test/e355-integrator-generic-wording.test.mjs | AC-E355-4: the load-sensitive list names exactly the two candidates and says the E238 sites are off it
