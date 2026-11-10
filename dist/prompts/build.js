@@ -2,6 +2,7 @@
 // Shared prompt-builder: every role prompt is constitution + skill + state.
 // Each prompts/<role>.ts is a thin wrapper around buildPromptForRole().
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { getActiveStorage } from "../tools/storage.js";
@@ -98,13 +99,33 @@ const STATE_BLOCK_HEADING = "## 📍 Current Project State (Auto-injected)";
 const STATE_LOOKUP_FAILED_HEADING = "## ⚠️ Current Project State — Lookup Failed";
 const SPEC_CONTEXT_HEADING = "## 📄 Spec Context (RAG — top-5 chunks)";
 /**
+ * Make a resolved workspace path absolute and normalized for every source.
+ * A bare `~` or a leading `~/` expands to the home directory (a JSON-arg `~`
+ * never reached a shell), and so does a leading `~\` when `platform` is win32
+ * (on POSIX `\` is a legal filename character, so it stays literal). `~user`
+ * forms are not expanded. path.resolve anchors a relative path at the server
+ * cwd; an already absolute, normalized input comes back unchanged. (E172)
+ */
+export function normalizeWorkspacePath(p, platform = process.platform) {
+    let expanded = p;
+    if (p === "~")
+        expanded = os.homedir();
+    else if (p.startsWith("~/") || (platform === "win32" && p.startsWith("~\\"))) {
+        expanded = path.join(os.homedir(), p.slice(2));
+    }
+    return path.resolve(expanded);
+}
+/**
  * The one renderer for a parsed handoff state, shared by buildPromptForRole
  * and the SessionStart hook (via dist/) so both emit byte-identical blocks.
  * sanitizeForRender deep-clones first, JSON encoding escapes every newline,
  * and renderDataBlock supplies the unclosable fence (specs/e137-render-sanitise.md).
+ * The previous hop's dispatch_mechanism_tier is left out, as tw_get_state does,
+ * so the next writer reports its own tier instead of copying it. (E376)
  */
 export function renderHandoffStateBlock(state) {
-    const safeState = sanitizeForRender(state);
+    const { dispatch_mechanism_tier: _omitTier, ...rendered } = state;
+    const safeState = sanitizeForRender(rendered);
     return renderDataBlock({
         heading: STATE_BLOCK_HEADING,
         notice: STATE_BLOCK_DATA_NOTICE,

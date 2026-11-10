@@ -8,6 +8,7 @@ import Database from "better-sqlite3";
 import { markStateRead, snapshotExtra, verifyExtra, } from "../guards/session.js";
 import { cosineSim, embedText, DEFAULT_EMBEDDING_MODEL, } from "./rag.js";
 import { runSqliteMigrations } from "../schema/migrations-sqlite.js";
+import { voidRefusalMessage } from "./tasks-file.js";
 // The same word-boundary escape tools/drift.ts and tools/sync.ts use when
 // matching a task id against the free-text handoff.completed_tasks ledger
 // entries. (E117)
@@ -529,8 +530,7 @@ export class SqliteHandoffStorage {
         const ledgerCompleted = !!handoff && handoff.completed_tasks.some((c) => ledgerRe.test(c));
         if (existing.completed === 1 || ledgerCompleted) {
             return Promise.resolve(JSON.stringify({
-                error: `Task ${taskId} is already completed and cannot be voided — ` +
-                    `roll it back first (tw_rollback_task) if it needs to be undone.`,
+                error: voidRefusalMessage(taskId, existing.completed === 1, ledgerCompleted),
             }));
         }
         // The DELETE and the tombstone INSERT run inside one db.transaction

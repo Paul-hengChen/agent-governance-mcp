@@ -22,6 +22,7 @@ import {
   type InvalidationKey,
 } from "./rag.js";
 import { runSqliteMigrations } from "../schema/migrations-sqlite.js";
+import { voidRefusalMessage } from "./tasks-file.js";
 
 // The same word-boundary escape tools/drift.ts and tools/sync.ts use when
 // matching a task id against the free-text handoff.completed_tasks ledger
@@ -765,9 +766,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
     if (existing.completed === 1 || ledgerCompleted) {
       return Promise.resolve(
         JSON.stringify({
-          error:
-            `Task ${taskId} is already completed and cannot be voided — ` +
-            `roll it back first (tw_rollback_task) if it needs to be undone.`,
+          error: voidRefusalMessage(taskId, existing.completed === 1, ledgerCompleted),
         }),
       );
     }

@@ -10,6 +10,14 @@ export declare function getNextTaskFromFile(workspacePath: string): string;
 export declare function completeTaskInFile(workspacePath: string, taskId: string, note?: string): Promise<string>;
 export declare function rollbackTaskInFile(workspacePath: string, taskId: string, reason: string): Promise<string>;
 /**
+ * The void refusal text, shared by file and SQLite storage so both return the
+ * same bytes. The caller still decides WHETHER to refuse (row or ledger marks
+ * the task done); this only picks the recovery advice for the state found. A
+ * ledger-only hit cannot be fixed by rollback (the row is already open), so it
+ * names the qa-engineer FAIL write that clears the ledger. (E359)
+ */
+export declare function voidRefusalMessage(taskId: string, rowCompleted: boolean, ledgerCompleted: boolean): string;
+/**
  * Void a task with the `- [-] <id>` marker, which the `[ x]` checkbox class
  * cannot match, so the row vanishes from every parseTasksFromFile consumer
  * (E117). A voided id can never be re-cut: evidence is keyed by id alone

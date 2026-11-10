@@ -7,7 +7,6 @@
 // Methodology-agnostic: defaults to a generic markdown checkbox task format;
 // teams override task pattern / paths / constitution via <workspace>/.current/.
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -17,7 +16,8 @@ import { z } from "zod";
 import { cleanupStaleSessions } from "./guards/session.js";
 import { setActiveStorage } from "./tools/storage.js";
 import { TOOL_REGISTRY, PROMPT_REGISTRY } from "./tools/registry.js";
-import { appendSpecContext, buildPromptForRole, } from "./prompts/build.js";
+import { appendSpecContext, buildPromptForRole, normalizeWorkspacePath, } from "./prompts/build.js";
+export { normalizeWorkspacePath };
 // Shape-only check: does the string look like a path attempt at all? Claude
 // Code's slash-command convention puts free text typed after the command into
 // the `workspace_path` slot, so prose arrives here as a "path". True for Unix,
@@ -26,20 +26,6 @@ import { appendSpecContext, buildPromptForRole, } from "./prompts/build.js";
 // Spec: specs/d1-prompt-arg-workspace-fallback.md.
 export function looksLikePath(s) {
     return /[/\\]/.test(s) || s.startsWith(".") || s.startsWith("~");
-}
-// e123b8 J1 (spec AC2): make a resolved workspace path absolute + normalized
-// for EVERY source. A bare `~` or a leading `~/` expands to os.homedir() (the
-// shell never saw a JSON-arg `~`, so nothing expanded it upstream); `~user`
-// forms are NOT expanded. path.resolve then anchors a relative path at the
-// server cwd and normalizes `.`/`..`/duplicate separators. An already
-// absolute, normalized input comes back unchanged.
-export function normalizeWorkspacePath(p) {
-    let expanded = p;
-    if (p === "~")
-        expanded = os.homedir();
-    else if (p.startsWith("~/"))
-        expanded = path.join(os.homedir(), p.slice(2));
-    return path.resolve(expanded);
 }
 export function resolveWorkspacePath(args) {
     let resolved;
