@@ -6,3 +6,6 @@
 {"ts":"2026-11-10T04:17:03.587Z","feature":"e406-release-and-merge-scripts","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T04:26:26.236Z","feature":"e406-release-and-merge-scripts","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T04:32:52.208Z","feature":"e406-release-and-merge-scripts","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T05:46:09.332Z","feature":"e406-release-and-merge-scripts","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T05:48:22.158Z","feature":"e406-release-and-merge-scripts","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T06:00:21.649Z","feature":"e406-release-and-merge-scripts","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
