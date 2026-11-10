@@ -113,6 +113,7 @@ hop: <lane 寫：目前 hop_count/上限，例如 7/14；integrator 寫 —>
 
 ## 6. 收工回報格式
 
+送出回報前，在 worktree 跑 `agc check`：它用 `agc feature finish` 的同一個 parser 解析 `.current/<lane>/pending-tickets.md`；印出的每一個 pending-tickets 問題都先在本 branch 修好、commit，再回報。
 寫進 `to-integrator.md`（`type: report`），同一份也留在對話裡：
 
 ```

@@ -719,7 +719,8 @@ function checkWorktreeEvidence(cwd) {
 }
 
 // Orphan-lane advisory (E179 AC5): a local branch with no live worktree whose
-// committed `.current/<lane>/pending-tickets.md` still holds an unapplied entry.
+// committed `.current/<lane>/pending-tickets.md` still holds an unapplied entry
+// or a malformed block (listed after the branch's warning).
 // Every git read is repo-global, so unlike checkWorktreeEvidence this is not
 // gated on isLinkedWorktree. A branch is judged only by its own lane's file
 // (the lane resolveCurrentLane would name); a branch with no lane is skipped.
@@ -744,6 +745,7 @@ async function checkOrphanLanes(cwd) {
       .filter((r) => r.length > 0);
     const candidates = [];
     const laneOf = new Map(); // branch -> its own lane
+    const errorsOf = new Map(); // branch -> its file's parse errors, when any
     for (const ref of refs) {
       const branch = ref.slice("refs/heads/".length);
       // The branch -> lane mapping resolveCurrentLane applies to a checked-out
@@ -755,21 +757,68 @@ async function checkOrphanLanes(cwd) {
       const text = readBlob(cwd, ref, path.posix.join(".current", lane, filename));
       // Two-argument parse (E124 AC7's contract): no backlog cross-check.
       // target_repo entries are another repo's (E287 D4): never this repo's orphans.
-      const has = text !== null && ta.parsePendingTickets(text, lane).entries.some((e) => e.targetRepo === undefined);
+      // Malformed blocks count too: finish refuses them, so they are stranded as well.
+      const parsed = text === null ? null : ta.parsePendingTickets(text, lane);
+      const has =
+        parsed !== null &&
+        (parsed.entries.some((e) => e.targetRepo === undefined) || parsed.errors.length > 0);
       laneOf.set(branch, lane);
+      if (parsed !== null && parsed.errors.length > 0) errorsOf.set(branch, parsed.errors);
       candidates.push({ branch, hasUnappliedPendingTickets: has });
     }
     for (const branch of ta.detectOrphanLanes(candidates, live).orphans) {
+      const lane = laneOf.get(branch);
       process.stderr.write(
         `agc check — warning: branch ${branch} carries an unapplied pending-tickets file ` +
           `with no live worktree — findings may be stranded; re-attach it ` +
           `(\`git worktree add <dir> ${branch}\`) and run \`agc feature finish --abandoned ` +
-          `${laneOf.get(branch)}\` to apply and retire it, or investigate why the worktree is gone\n`
+          `${lane}\` to apply and retire it, or investigate why the worktree is gone\n`
       );
+      const errors = errorsOf.get(branch);
+      if (errors !== undefined) {
+        // Copy / Strings e225.orphan-errors-head + e225.orphan-errors-item.
+        process.stderr.write(
+          `agc check — warning: branch ${branch}'s .current/${lane}/${filename} has ${errors.length} ` +
+            `malformed pending-ticket block(s) — agc feature finish will refuse it until they are fixed:\n` +
+            errors.map((e) => `  ${e}\n`).join("")
+        );
+      }
     }
   } catch (err) {
     process.stderr.write(
       `agc check — warning: orphan-lane scan skipped (${err && err.message ? err.message : String(err)})\n`
+    );
+  }
+}
+
+// Lane-side pending-tickets advisory: in a linked worktree on a real lane,
+// parses `.current/<lane>/pending-tickets.md` the way finish does
+// (planPendingApply's options, the worktree's backlog standing in for --base)
+// and lists every error finish would refuse, while the lane can still fix
+// them. Silent when the file is absent or clean. Never touches the exit code.
+async function checkLanePendingTickets(cwd) {
+  if (!isLinkedWorktree(cwd)) return;
+  try {
+    const lp = await loadLanePaths();
+    const lane = lp.resolveCurrentLane(cwd);
+    if (lane === lp.PRIMARY_LANE || !lp.isSafeLaneName(lane)) return;
+    const filename = lp.laneFile("pendingTickets").filename;
+    const text = readFileOrNull(path.join(cwd, ".current", lane, filename));
+    if (text === null) return;
+    const ta = await loadTicketAllocation();
+    const prov = ta.findAppliedProvenance(readFileOrNull(path.join(cwd, BACKLOG_REL)) ?? "", lane);
+    const { errors } = ta.parsePendingTickets(text, lane, { appliedLaneLocalIds: new Set(prov.keys()) });
+    if (errors.length === 0) return;
+    // Copy / Strings e225.lane-check-head + e225.lane-check-item.
+    process.stderr.write(
+      `agc check — warning: .current/${lane}/${filename} has ${errors.length} problem(s) that ` +
+        `agc feature finish will refuse — fix them on this branch before the lane report:\n` +
+        errors.map((e) => `  ${e}\n`).join("")
+    );
+  } catch (err) {
+    // Copy / Strings e225.lane-check-skip.
+    process.stderr.write(
+      `agc check — warning: pending-tickets check skipped (${err && err.message ? err.message : String(err)})\n`
     );
   }
 }
@@ -892,6 +941,7 @@ async function checkComments(cwd) {
 async function runCheck(cwd) {
   checkResearchBinaries(cwd); // advisory; never affects exit code
   checkWorktreeEvidence(cwd); // advisory; never affects exit code
+  await checkLanePendingTickets(cwd); // advisory; never affects exit code
   await checkOrphanLanes(cwd); // advisory; never affects exit code
   checkArtifactsDrift(cwd); // advisory; never affects exit code
   await checkHygiene(cwd); // advisory; never affects exit code
