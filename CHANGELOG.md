@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.20.0] - 2026-11-10
+
 MINOR release. It ships two backlog waves since v4.19.4: wave A (lanes `e230`, `e381`, `e238`,
 `e255`, `e247`; manifest `specs/fanout-backlog-wave-a.md`) and wave B (lanes `e262`, `e196`,
 `e359`, `e406`; manifest `specs/fanout-backlog-wave-b.md`), 22 backlog tickets in all. Each lane
