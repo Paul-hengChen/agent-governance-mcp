@@ -298,7 +298,11 @@ test("AC10: SOP execution stage — mailbox + cut pre-review formalized", () => 
   assert.ok(SOP.includes("The human approves each lane **once**, typed in that lane's own session. The mailbox never carries approval."));
   assert.ok(SOP.includes("confirm **every AC has an implementing task, not only a qa task**"));
   assert.ok(SOP.includes("**Architect-hop tickets pre-review twice**"));
-  assert.ok(SOP.includes("Both must converge before the lane presents to the human."));
+  // E262: the runnable order — cut approval first (the pm -> architect hop is refused until it is recorded),
+  // then the architect, then a second pre-review of the Open Questions before the human's ruling and sr-engineer.
+  assert.ok(SOP.includes("in this order: (1) the PM cut converges here, then the lane presents it and the human approves it — the pm → architect hop is refused until that approval is recorded; (2) the architect runs; (3) its Open Questions"));
+  assert.ok(SOP.includes("converge before the lane presents them for the human's ruling, and before sr-engineer starts."));
+  assert.ok(!SOP.includes("Both must converge before the lane presents to the human."));
   assert.ok(SOP.includes("**Read `hop:` before asking for changes.**"));
   assert.ok(SOP.includes("batch your requests"));
   assert.ok(SOP.includes("**`close` ends one topic**"));
@@ -349,7 +353,7 @@ test("AC13: SOP verification stage — E192 generic read-only verifier (D10), st
     "the worktree's `status --porcelain` taken **after** a local run of the repo's build command (the addendum names it) — non-empty is itself a finding (tracked build output not rebuilt at commit)",
     "it runs the repo's CI check on `<reported sha>` and returns the CI run id plus the verdict (green, or red with the failing job names), never suite output",
     "under the *CI fallback* it returns the local full-suite pass/total instead, with the full log saved to a scratch file, not returned",
-    "the `pending-tickets.md` / `## Applied` / root `NEW-TICKETS.md` check",
+    "the `pending-tickets.md` / `## Applied` / retired-findings-file check",
   ]) {
     assert.ok(SOP.includes(item), `E192 verifier structured result missing item: ${item}`);
   }

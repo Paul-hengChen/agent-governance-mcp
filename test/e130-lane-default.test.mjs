@@ -214,7 +214,9 @@ test("AC9: const-05's task-list hand-edit rule no longer carries the stale PM-bo
   const bulletMatch = CONST_05.match(/- \*\*Task list edits go through tools\*\*:.*$/m);
   assert.ok(bulletMatch, "must find the task-list-edits-go-through-tools bullet");
   const bullet = bulletMatch[0];
-  assert.match(bullet, /Do NOT hand-edit the task-list file from a role\./, "the rule must read as an unqualified 'Do NOT hand-edit ... from a role.'");
+  // E340: the rule now carries one narrow exception (pm / the coordinator amending the cut, description and depends_on only).
+  assert.match(bullet, /Do NOT hand-edit the task-list file from a role, except: the role amending the cut \(pm, or the coordinator for it\) may edit an unchecked, non-voided task's description and `depends_on` in place, disclosed in `pending_notes`/, "the rule must state the hand-edit ban with its one narrow exception");
+  assert.match(bullet, /never ids, checkboxes or voided rows; anything else is `tw_void_task` \+ `tw_add_task`\./, "the exception must not widen past description and depends_on");
   assert.doesNotMatch(bullet, /only PM's initial bootstrapping write is exempt/, "the stale bootstrapping-exemption clause must be gone");
   assert.doesNotMatch(bullet, /when no list exists yet/, "the stale exemption's parenthetical must be gone");
 });
