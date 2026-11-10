@@ -10,3 +10,5 @@
 {"ts":"2026-11-10T05:46:02.798Z","feature":"e196-agc-init-lane-checks","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T05:47:20.109Z","feature":"e196-agc-init-lane-checks","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T05:51:22.654Z","feature":"e196-agc-init-lane-checks","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T05:52:05.234Z","feature":"e196-agc-init-lane-checks","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-10T05:58:40.615Z","feature":"e196-agc-init-lane-checks","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
