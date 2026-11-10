@@ -102,13 +102,19 @@ Definitions used below.
   lane may not edit stay green without edits.
   proof: `node --test test/e166-template-defers-staging.test.mjs test/e130-lane-default.test.mjs test/e405-release-runner.test.mjs` passes.
 
-### E203 — merge-invariants condition (c) counts only rows not found at the merge
+### E203 — merge-invariants condition (c) drops a kept row only when the manifest cannot have counted it
 
 Spec first: the (c) paragraph of `specs/e126-merge-invariants.md` is amended
-in this PM commit (U collects only closed `task_id`s the whole-tree identity
-search does NOT find at the merge); the code change follows in a later commit.
+by PM before the code. First amendment (cut commit): `U` dropped every kept
+`task_id`. Re-amended after code review round 1, which showed a merge that
+keeps a compacted row and drops the new row passing silently (the kept row
+freed a manifest slot for the lost one). The rule now in force: a closed
+`task_id` not found at the merge always stays in `U`; a kept `task_id`
+stays in `U` only when (i) it had a row under F/S at the merge-base AND
+(ii) no parent whose own copy of F carries a manifest naming S holds it
+anywhere; otherwise it leaves `U`. The code change follows in a later commit.
 
-Fixture shape for AC-E203-1..4 (the backlog row's repro): base and parent2
+Fixture shape for AC-E203-1..4 and -6 (the backlog row's repro): base and parent2
 (the lane) hold `## Wave` with `- [x] T-A-01`, `- [x] T-A-02`, `- [x] T-A-03`;
 parent2 compacts `## Wave` into a `## Compacted History` manifest bullet
 `- Wave: 3 done, 0 voided`; parent1 (main) keeps the three rows and adds
@@ -116,15 +122,16 @@ parent2 compacts `## Wave` into a `## Compacted History` manifest bullet
 set the AC names.
 
 - **AC-E203-0** — Given `specs/e126-merge-invariants.md`, when its (c)
-  paragraph is read, then `U` is defined over closed `task_id`s the
-  whole-tree identity search does NOT find anywhere at MERGE, and the
-  amendment commit precedes the `tools/merge-invariants.ts` change on the
-  lane branch.
-  proof: `grep -n "does NOT find anywhere at" specs/e126-merge-invariants.md` prints the (c) line.
+  paragraph is read, then it keeps every closed `task_id` not found at
+  MERGE in `U`, keeps a kept `task_id` only under conditions (i) and (ii),
+  states the known limit, and the re-amendment commit precedes the
+  `tools/merge-invariants.ts` change that implements it on the lane branch.
+  proof: `grep -n "only when BOTH (i)" specs/e126-merge-invariants.md` prints the (c) line.
 - **AC-E203-1** — Given the repro fixture with the merge keeping `- [x]
   T-D-01` under `## Wave`, when merge-invariants runs, then it exits 0
   (`PASS`), MISSING and LOST_DONE are empty, and the COMPACTED set is exactly
-  `T-A-01`, `T-A-02`, `T-A-03` (`T-D-01` is present, not compacted).
+  `T-A-01`, `T-A-02`, `T-A-03` (`T-D-01` is present, not compacted; it
+  leaves `U` by (i): no row under `## Wave` at the merge-base).
   proof: `node --test --test-name-pattern "E203" test/e126-merge-invariants.test.mjs` — the repro case qa names passes.
 - **AC-E203-2** (verification point 1) — Given the existing AC11 (iv) R-1
   5-vs-4 fixture, when merge-invariants runs, then it still FAILs with all
@@ -138,10 +145,29 @@ set the AC names.
 - **AC-E203-4** (verification point 3, only genuinely compacted rows are
   exempted) — Given the repro fixture with the merge keeping `T-D-01` but the
   manifest under-counting (`- Wave: 2 done, 0 voided`), when merge-invariants
-  runs, then it FAILs with exactly `T-A-01..03` reported MISSING: a row the
-  merge keeps neither counts toward `U` nor absorbs the manifest's shortfall,
-  and is itself never reported MISSING or COMPACTED.
+  runs, then it FAILs with exactly `T-A-01..03` reported MISSING: the kept
+  `T-D-01` (absent from the merge-base) neither counts toward `U` nor absorbs
+  the manifest's shortfall, and is itself never reported MISSING or
+  COMPACTED.
   proof: `node --test --test-name-pattern "E203" test/e126-merge-invariants.test.mjs` — the under-count case qa names passes.
+- **AC-E203-6** (verification point 4, a kept compacted row never frees a
+  slot) — Given the repro fixture with the merge keeping `- [x] T-A-03` under
+  `## Wave` and dropping `T-D-01`, when merge-invariants runs, then
+  `T-A-03` stays in `U` (it had a row under `## Wave` at the merge-base, and
+  parent2, the side carrying the manifest, holds no `T-A-03` row), `U` = 4
+  done > 3, it FAILs, and MISSING is exactly `T-A-01`, `T-A-02`, `T-D-01`,
+  each with the `(c) manifest under-reconciles` reason; `T-A-03` is in
+  neither MISSING nor COMPACTED.
+  proof: `node --test --test-name-pattern "E203" test/e126-merge-invariants.test.mjs` — the keep-compacted-drop-new case qa names passes.
+- **AC-E203-7** (verification point 5, rule (ii)) — Given base and parent1
+  holding `## Wave` with `- [x] T-A-01` .. `- [x] T-A-04`, parent2 moving
+  `- [x] T-A-04` to a `## Other` section of the same `tasks.md` and
+  compacting `## Wave` into `- Wave: 3 done, 0 voided`, and the merge equal
+  to parent2's `tasks.md`, when merge-invariants runs, then it exits 0
+  (`PASS`), MISSING is empty, and COMPACTED is exactly `T-A-01..03`:
+  `T-A-04` is kept and had a base row under `## Wave`, but parent2 carries
+  the manifest and still holds it, so it leaves `U`.
+  proof: `node --test --test-name-pattern "E203" test/e126-merge-invariants.test.mjs` — the moved-row case qa names passes.
 - **AC-E203-5** — Every existing case in `test/e126-merge-invariants.test.mjs`
   passes unchanged, and `npm run build` leaves `dist/tools/merge-invariants.*`
   byte-identical to the committed files.
@@ -152,7 +178,7 @@ set the AC names.
 | string id | exact text (quote verbatim) | source |
 |---|---|---|
 | release.8a1.unplanned | `release: [8a-1] warning: untracked <path> is named by no release plan entry — left out of the release commit` (stderr, one line per path, `<path>` repo-relative) | authored-here — E406 row asks for "a warning naming the path"; the `release: [<step>]` prefix matches the script's existing stderr lines |
-| merge.c.reason | `(c) manifest under-reconciles <file> § <section>: manifest <D> done/<V> voided < closed rows not found at merge, union across parents <d> [x]/<v> [-] (<n> distinct task_id(s))` | authored-here — E203 changes what `U` holds; the `(c) manifest under-reconciles` prefix is kept because `test/e126-merge-invariants.test.mjs` matches it |
+| merge.c.reason | `(c) manifest under-reconciles <file> § <section>: manifest <D> done/<V> voided < closed rows it must cover, union across parents <d> [x]/<v> [-] (<n> distinct task_id(s))` | authored-here — E203 changes what `U` holds (rows not found at the merge plus kept rows the manifest may have counted); the `(c) manifest under-reconciles` prefix is kept because `test/e126-merge-invariants.test.mjs` matches it |
 
 ## Visual Tokens
 
@@ -186,6 +212,12 @@ set the AC names.
   `STAGE_PATHS` lists, or `planStage`'s signature and behaviour.
 - AC11's wording in `specs/e126-merge-invariants.md` and every other
   paragraph of that spec except the (c) union paragraph.
+- The (c) known limit stated in that paragraph (a row the compacting side
+  added after the merge-base and summarized frees a manifest slot; rule (i)
+  adds the cherry-picked instance): closing it needs the compacting side's
+  pre-compaction rows from history between the merge-base and that parent,
+  outside the four snapshots the check reads. No test asserts the limit's
+  outcome.
 
 ## Dependencies / Prerequisites
 
@@ -225,7 +257,7 @@ set the AC names.
 | id | desc | depends_on | est. files | touches | design-link |
 |---|---|---|---|---|---|
 | E406 | `release.mjs prepare` stages by explicit path: tracked changes via `git add --update -- <members>`, untracked only when plan-named (N); unplanned untracked warned by path, never staged, never fatal; exit 30 only for a planned path that did not stage | — | 4 | `scripts/release.mjs`, `test/e394-release-script.test.mjs`, `test/release-staging.test.mjs`, `specs/e406-release-and-merge-scripts.md` | — |
-| E203 | merge-invariants (c): `U` counts only closed rows not found at the merge; spec (c) amended first; three verification points tested | — | 4 + dist | `specs/e126-merge-invariants.md`, `tools/merge-invariants.ts`, `dist/tools/merge-invariants.*`, `test/e126-merge-invariants.test.mjs` | — |
+| E203 | merge-invariants (c): a kept row leaves `U` unless it had a base row under F/S and no manifest-carrying parent holds it; spec (c) amended first; five verification points tested | — | 4 + dist | `specs/e126-merge-invariants.md`, `tools/merge-invariants.ts`, `dist/tools/merge-invariants.*`, `test/e126-merge-invariants.test.mjs` | — |
 
 ## Cut Sites
 
@@ -243,10 +275,10 @@ Per-site breakdown of the Cut above (line numbers re-verified at cut on the lane
 | `scripts/release.mjs` | `:625-661` `step8aStage`: split status into tracked / untracked; build N; `git add --update -- <planStage(tracked)>` then `git add -- <untracked ∩ N>`; partition the `ls-files --others` leftovers into plan-named (→ `untracked`, fatal) and unplanned (→ `unplanned`, warning line per path); dry-run stand-ins classified the same way; nothing-to-commit branch unchanged | AC-E406-1, -2, -4, -6, -7 | T-E406-01 |
 | `test/e394-release-script.test.mjs` | `buildTemplate` / `workTree` (`:107-172`): commit `content/foo.md` in the template, edit it in `workTree`; AC-S3 `ALLOW` (`:439-444`) gains `/^git add --update -- \S/`; AC-R11 (`:482-510`) gains the AC-E406-5 shapes; new E406 cases for AC-E406-1/2/3/4/6 | AC-E406-1..6 | T-E406-02 |
 | `test/release-staging.test.mjs` | AC2 (E94) Shape 2 (`:254-268`): stays green as written (the pure function still fails on a plan-named leftover); qa updates its comment or adds an `unplanned` assertion so it describes the step's new partition; other pins hold | AC-E406-4 | T-E406-02 |
-| `specs/e126-merge-invariants.md` | (c) union paragraph (`:98-130`): `U` = closed ids not found at the merge — done in this PM commit | AC-E203-0 | PM (this hop) |
-| `tools/merge-invariants.ts` | `:324-366` `unionReconciliationFailures` (function at `:331`): skip an occurrence whose `task_id` has any row in `merge.rowsById`; reason text per `merge.c.reason`; doc comment updated | AC-E203-1..4 | T-E203-01 |
+| `specs/e126-merge-invariants.md` | (c) union paragraph (`:98-153`): rows not found at the merge stay in `U`; a kept row stays only under (i) and (ii); known limit stated — re-amended in the PM re-entry commit after review round 1 | AC-E203-0 | PM |
+| `tools/merge-invariants.ts` | `:324-366` `unionReconciliationFailures` (function at `:334`): replace the whole-`task_id` `continue` on any `merge.rowsById` row with a per-occurrence test — a kept `task_id` contributes only when `base.rowsById` has a row with the same file and section (i) and no parent snapshot whose `ledgers.get(file).manifest` names the section has the `task_id` in its `rowsById` (ii); the function gains the base snapshot and the two parent snapshots (call site `evaluateMergeInvariants`, which already receives them); reason text per `merge.c.reason`; doc block rewritten to at most 7 body lines (review round 1 recommended: drop the `(E203: …)` parenthetical, the spec carries the rationale) so `agc check` raises no comments long-block warning on it | AC-E203-1..4, -6, -7 | T-E203-01 |
 | `dist/tools/merge-invariants.*` | rebuilt by `npm run build`, committed with the source | AC-E203-5 | T-E203-01 |
-| `test/e126-merge-invariants.test.mjs` | new E203 cases (repro passes; dropped T-D-01 fails; under-count with kept T-D-01 fails); existing cases unchanged | AC-E203-1..5 | T-E203-02 |
+| `test/e126-merge-invariants.test.mjs` | new E203 cases (repro passes; dropped T-D-01 fails; under-count with kept T-D-01 fails; kept T-A-03 with dropped T-D-01 fails; moved T-A-04 passes); existing cases unchanged | AC-E203-1..7 | T-E203-02 |
 
 Existing assertions that move: in `test/e394-release-script.test.mjs`, every
 prepare happy-path case through the `workTree` fixture (red until the fixture
@@ -257,7 +289,7 @@ file outside the lane's ownership.
 Tasks:
 - `T-E406-01` [P0] sr-engineer — `scripts/release.mjs` explicit-path staging (all `scripts/release.mjs` rows above) + expected-red manifest | depends_on: none
 - `T-E406-02` [P1] qa-engineer — E406 tests and re-pins in `test/e394-release-script.test.mjs`, `test/release-staging.test.mjs` | depends_on: T-E406-01
-- `T-E203-01` [P0] sr-engineer — `tools/merge-invariants.ts` (c) fix + `dist/tools/merge-invariants.*` rebuild | depends_on: none (spec amended in the cut commit)
+- `T-E203-01` [P0] sr-engineer — `tools/merge-invariants.ts` (c) fix per the re-amended rule + doc block ≤ 7 lines + `dist/tools/merge-invariants.*` rebuild | depends_on: none (spec re-amended in the PM re-entry commit)
 - `T-E203-02` [P1] qa-engineer — E203 tests in `test/e126-merge-invariants.test.mjs` | depends_on: T-E203-01
 
 Release bookkeeping (version, CHANGELOG, backlog done-marks) is not in this
