@@ -1,9 +1,10 @@
 ---
 schema_version: 15
 active_feature: "e196-agc-init-lane-checks"
-status: "In_Progress"
-last_updated: "2026-11-10T03:56:02.427Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-11-10T04:06:07.094Z"
+blocking_reason: "R1 (required): --shipped first run, tracked lane dir — shippedFindingsTarget covered=true disarms planFindingsPreserve's carry check, so primary's own differing .current/<lane>/pending-tickets.md is carried by git mv and silently overwritten (base refuses with e287.preserve-carry-refuse). Reproduced base vs HEAD."
+last_agent: "code-reviewer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "One lane, three integrator-scoped tickets (E196+E206, E225+E353, E205) in bin/agc-init.mjs plus docs/lane-protocol.md §3 line 44 / §6 and two re-pinned AC tests; four serial sr tasks + qa tests/verification, each within the task_size budget. No design arm; architect skipped per fan-out plan."
@@ -14,16 +15,17 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-11-10T03:56:02.427Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-11-10T04:06:07.094Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
-review_rounds_total: 0
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -32,13 +34,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E196-01, T-E196-02, T-E196-03, T-E196-08 ready for code review
-- T-E196-01 (7dd6775): laneIgnoredStateFiles gains a verb param (--shipped text unchanged); planLaneClose first-run tracked branch plans ignoredCopy {src,dst,rel}; executeShippedIgnoredCopy runs after executeLaneClose, before executeFindingsPreserve; copy loop factored out of executeHarvestRefresh into copyLaneIgnoredFiles (e125b.harvest-refresh-line byte-identical); planAbandonCurrentHarvest returns a per-file plan (`files`, identical history copies skipped via sameFileBytes) instead of the AC8 early return when ignored files remain; executeAbandonCurrentHarvest runs it; shippedFindingsTarget/abandonedFindingsTarget covered follow the plan. grep 'laneIgnoredStateFiles(' = definition + 3 calls (AC-E196-4).
-- DEVIATION (T-E196-01, AC-E196-6 --abandoned): abandonedFindingsTarget counts pending-tickets.md as covered only when the per-file plan includes it AND the history destination is absent. Reason: with 'covered = plan includes it' alone, an existing differing/symlinked destination skipped E287's plan-time collision refusal and turned red test/e287-finish-findings.test.mjs AC-E287-3 and non-owned test/e335-symlinked-pending-harvest.test.mjs AC-E335-4 (x2). With the refinement they stay green; AC-E196-6's setup (no prior destination) is covered, no refusal. Side effect: an --abandoned re-run whose lane pending-tickets.md changed since a failed first run's copy gets e287.preserve-differs-refuse (pre-E196 behaviour for this shape) instead of copy-over; other ignored files follow AC-E196-5 copy-over. --shipped first run follows the spec literally (covered when the copy list includes it).
-- T-E196-02 (d36626d + comment reflow f17754f): checkLanePendingTickets in runCheck (linked worktree, lane != _primary, parse with appliedLaneLocalIds from findAppliedProvenance over the worktree's docs/backlog.md or ''), prints e225.lane-check-*, skip line on any error; checkOrphanLanes keeps the two-arg parse, has = live non-target_repo entries OR errors>0, prints e225.orphan-errors-* after the unchanged orphan line; docs/lane-protocol.md §6 gains doc.s6-agc-check directly after heading + blank line (no blank line after it, per 'exactly one line').
-- T-E196-03 (aeaa7a9): start writes `git --no-optional-locks status --porcelain -z --untracked-files=all` bytes (primary) to `git rev-parse --git-path agc-primary-status` resolved against the lane worktree, after the base-sha write; e205.start-snapshot-warn on failure. finish calls warnPrimaryNewPaths right after the target worktree is resolved (before the merge guard): ENOENT snapshot = silent, other failures = e205.finish-check-skip; path-set diff via parsePorcelainZ minus .current/history/*/<lane>/, <dir>/archive/<lane>/, <dir>/abandoned/<lane>/ and the lane path prefix; sorted, escapeSegmentForDisplay. --no-optional-locks is the only addition to the spec'd command (read-only intent; output identical).
-- T-E196-08 (119c9a2): §3 known-gaps line removed (grep -c 已知缺口 = 0, E196 count 0); qa_reports/expected-red_e196-agc-init-lane-checks.txt names AC-E351-3 and AC-E383-7.
-- Verification: npm run build exit 0, dist zero diff; npm audit --audit-level=high exit 0; node --check ok; agc check in lane exit 0, no comment warnings. Targeted suites (agc-feature-lifecycle, agc-feature-finish-history, e213, e180, e217, e287, agc-adapters, e335, e246, e291, e298, lane-ticket-allocation, e290, e351, e383): 308/310 pass, the 2 fails = exactly the expected-red manifest entries. No tools/*.ts or dist/ change.
+- review_report: review_reports/review_T-E196-01.md (covers T-E196-01, T-E196-02, T-E196-03, T-E196-08)
+- R1 required (T-E196-01): keep e287.preserve-carry-refuse armed on --shipped first run tracked shape. Option (a): run the carryAbs check whenever target.carryAbs !== null regardless of covered (spec text stays literal); option (b): covered only when ignoredCopy includes the file AND carryAbs is absent (mirrors the abandoned rule). Add a fixture test (base refuses, HEAD must refuse) or have qa add it in T-E196-04.
+- D1 judged correct: abandonedFindingsTarget's 'covered only onto an absent destination' is required by e287 AC-E287-3 and non-owned e335 AC-E335-4 (AC-L7); it satisfies AC-E196-6's 'only when' wording. Recommended: PM records the pending-tickets.md carve-out from AC-E196-5 copy-over (and the R1 rule chosen) in the spec before QA.
+- C1 recommended: primary's own ignored non-findings files carried by git mv are overwritten by the first-run copy (spec-mandated copy rule); worth one Out of Scope line.
+- E225, E205, T-E196-08, scope, comments: no findings. Targeted suites Node 22: 412/416 pass, 2 fails = expected-red manifest entries.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
