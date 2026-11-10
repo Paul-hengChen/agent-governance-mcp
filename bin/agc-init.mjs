@@ -1668,6 +1668,18 @@ async function runFeatureStart(cwd, argv) {
     );
   }
 
+  // The primary checkout's git status now, so finish can name paths a lane
+  // session wrote there by mistake (warn-only). Same best-effort contract.
+  try {
+    fs.writeFileSync(primaryStatusSnapshotPath(lanePath), primaryStatusBytes(repoRoot));
+  } catch (err) {
+    // Copy / Strings e205.start-snapshot-warn.
+    process.stderr.write(
+      `agc feature start — warning: could not record the primary checkout's git status snapshot ` +
+        `(${gitErrorReason(err)}) — finish will not check the primary checkout for new paths\n`
+    );
+  }
+
   // AC3 — the printed lane id IS resolveCurrentLane over the new worktree.
   const lane = lanePaths.resolveCurrentLane(lanePath);
   if (lane !== ticketId) {
@@ -1693,6 +1705,88 @@ function parsePorcelainZ(out) {
     }
   }
   return paths;
+}
+
+// --- primary side-effect check (E205) ---------------------------------------
+// start saves primary's porcelain status into the lane's per-worktree git dir:
+// outside every working tree, so it is never committed or harvested, and git
+// deletes it with the worktree's admin dir. finish compares path sets only.
+const PRIMARY_STATUS_SNAPSHOT = "agc-primary-status";
+
+function primaryStatusSnapshotPath(lanePath) {
+  return path.resolve(lanePath, git(lanePath, ["rev-parse", "--git-path", PRIMARY_STATUS_SNAPSHOT]).trim());
+}
+
+// Raw bytes; --no-optional-locks keeps this read from refreshing primary's index.
+function primaryStatusBytes(repoRoot) {
+  return execFileSync(
+    "git",
+    ["--no-optional-locks", "status", "--porcelain", "-z", "--untracked-files=all"],
+    { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"], maxBuffer: BLOB_MAX_BUFFER }
+  );
+}
+
+// One line for a message: git's own first stderr line when there is one.
+function gitErrorReason(err) {
+  const first = String(err?.stderr ?? "").trim().split("\n")[0];
+  if (first) return first;
+  return err && err.message ? err.message : String(err);
+}
+
+// Paths finish itself writes into primary (history and evidence harvests, on
+// a re-run after a refused worktree remove) and the lane worktree's own path.
+function isFinishOwnPath(p, ticketId, laneRelPrefix) {
+  const segs = p.split("/");
+  if (segs.length > 4 && segs[0] === ".current" && segs[1] === "history" && segs[3] === ticketId) return true;
+  if (segs.length > 3 && segs[2] === ticketId) {
+    if (segs[1] === "archive" && SHIPPED_EVIDENCE_DIRS.includes(segs[0])) return true;
+    if (segs[1] === "abandoned" && [...ABANDON_EVIDENCE_DIRS, ...ABANDON_HARVEST_DIRS].includes(segs[0])) {
+      return true;
+    }
+  }
+  return laneRelPrefix !== null && p.startsWith(laneRelPrefix);
+}
+
+// Warn-only (never refuses, never changes the exit code): names every path in
+// primary's status that the start snapshot did not have. No snapshot: silent.
+function warnPrimaryNewPaths({ repoRoot, lanePath, ticketId }) {
+  // Copy / Strings e205.finish-check-skip.
+  const skip = (err) =>
+    process.stderr.write(
+      `agc feature finish — warning: primary checkout new-path check skipped (${gitErrorReason(err)})\n`
+    );
+  let before;
+  let after;
+  try {
+    before = fs.readFileSync(primaryStatusSnapshotPath(lanePath));
+  } catch (err) {
+    if (err && err.code === "ENOENT") return;
+    skip(err);
+    return;
+  }
+  try {
+    after = primaryStatusBytes(repoRoot);
+  } catch (err) {
+    skip(err);
+    return;
+  }
+  const laneRel = path.relative(canonicalPath(repoRoot), canonicalPath(lanePath));
+  const laneRelPrefix =
+    laneRel !== "" && !laneRel.startsWith("..") && !path.isAbsolute(laneRel)
+      ? `${laneRel.split(path.sep).join("/")}/`
+      : null;
+  const seen = new Set(parsePorcelainZ(before.toString("utf-8")));
+  const fresh = [...new Set(parsePorcelainZ(after.toString("utf-8")))]
+    .filter((p) => !seen.has(p) && !isFinishOwnPath(p, ticketId, laneRelPrefix))
+    .sort();
+  if (fresh.length === 0) return;
+  // Copy / Strings e205.finish-new-paths-head + e205.finish-new-paths-item.
+  process.stderr.write(
+    `agc feature finish — warning: ${fresh.length} path(s) in the primary checkout's git status are new ` +
+      `since agc feature start (a lane session may have written here by mistake; nothing was changed — ` +
+      `check them by hand):\n` +
+      fresh.map((p) => `  ${escapeSegmentForDisplay(p)}\n`).join("")
+  );
 }
 
 function escapeRegExp(s) {
@@ -3388,6 +3482,9 @@ async function runFeatureFinish(cwd, argv) {
   }
   const lanePath = matches[0].path;
   const branch = matches[0].branch.slice("refs/heads/".length);
+  // Before every check and mutation: it never sees finish's own writes, and
+  // it prints even when finish later refuses.
+  warnPrimaryNewPaths({ repoRoot, lanePath, ticketId });
 
   if (opts.shipped) {
     // AC16 — merge guard, --shipped only.
