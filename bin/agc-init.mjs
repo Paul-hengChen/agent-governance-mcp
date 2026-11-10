@@ -2575,25 +2575,27 @@ function abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, findings
 }
 
 // Plan-time collision check (read-only), the E180 discipline: an existing
-// different file is never overwritten by this copy. Skipped when an existing
-// harvest step writes the destination from the same lane file this run.
+// different file is never overwritten by this copy. The destination check is
+// skipped when an existing harvest step writes it from the same lane file.
 function planFindingsPreserve({ findings, target, verb }) {
   const dstAbs = path.join(target.histAbs, findings.filename);
   const dstRel = path.posix.join(target.histRel, findings.filename);
   const n = findings.entries.length;
+  // Armed even when covered: the first-run copy would overwrite the file
+  // `git mv` carries, so primary's differing bytes would be lost.
+  if (
+    target.carryAbs !== null &&
+    lstatOrNull(target.carryAbs) !== null &&
+    !fileHasBytes(target.carryAbs, findings.bytes)
+  ) {
+    // Copy / Strings e287.preserve-carry-refuse.
+    throw new FeatureError(
+      `agc feature finish --shipped: the primary checkout's untracked ${findings.pendingRel} differs ` +
+        `from the lane's copy (${n} unallocated finding(s)), and the lane close would carry it into ` +
+        `${target.histRel}/ — move it aside first (nothing applied, nothing removed)`
+    );
+  }
   if (!target.covered) {
-    if (
-      target.carryAbs !== null &&
-      lstatOrNull(target.carryAbs) !== null &&
-      !fileHasBytes(target.carryAbs, findings.bytes)
-    ) {
-      // Copy / Strings e287.preserve-carry-refuse.
-      throw new FeatureError(
-        `agc feature finish --shipped: the primary checkout's untracked ${findings.pendingRel} differs ` +
-          `from the lane's copy (${n} unallocated finding(s)), and the lane close would carry it into ` +
-          `${target.histRel}/ — move it aside first (nothing applied, nothing removed)`
-      );
-    }
     if (lstatOrNull(dstAbs) !== null && !fileHasBytes(dstAbs, findings.bytes)) {
       // Copy / Strings e287.preserve-differs-refuse.
       throw new FeatureError(
