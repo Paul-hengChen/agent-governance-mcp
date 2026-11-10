@@ -1,11 +1,9 @@
 // Coded by @qa-engineer
-// E203: merge-invariants condition (c) drops a kept row from the union only when the manifest cannot have
-// counted it (specs/e126-merge-invariants.md (c) paragraph; specs/e406-release-and-merge-scripts.md AC-E203-1..7).
-//
-// WHY: a compaction on one side plus a NEW closed row kept by the merge on the other side must not fail as a
-// loss (false positive), yet a merge that really drops a row must still fail (never a silent pass). The R-1
-// 5-vs-4 case in test/e126-merge-invariants.test.mjs stays the unchanged guard for the pure-union direction
-// (AC-E203-2); the cherry-pick-shaped false negative is an accepted spec-stated limit and is not asserted.
+// E203: merge-invariants (c) drops a kept row from the union only when the manifest cannot have counted it
+// (specs/e126-merge-invariants.md (c); specs/e406-release-and-merge-scripts.md AC-E203-1..7).
+// WHY: a compaction on one side plus a NEW closed row kept by the merge must not fail as a loss, yet a merge
+// that really drops a row must still fail. The R-1 5-vs-4 case in test/e126-merge-invariants.test.mjs stays
+// the unchanged AC-E203-2 guard; the cherry-pick-shaped false negative is an accepted spec-stated limit.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
