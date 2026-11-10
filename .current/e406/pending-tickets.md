@@ -18,6 +18,10 @@ body: |
   apart from a legitimately kept post-base row; closing it needs the compacting side's
   pre-compaction rows under S, which exist only in history between the merge-base and
   that parent. Recorded as an accepted limit in specs/e126-merge-invariants.md (c).
+  Same family (code-reviewer, e406 review round 2): the NON-compacting side moves a base
+  row out of S and adds T-D-01 under S; the merge keeps the moved row in its new section
+  and drops T-D-01 -> PASS with T-D-01 reported COMPACTED. Also pre-existing (same result
+  before E203).
 ```
 
 ## Applied
