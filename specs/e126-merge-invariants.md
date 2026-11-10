@@ -105,8 +105,39 @@ FOUR conditions (a)–(d) hold:
     exit 0). Fix: let `U` = the union of DISTINCT `[x]`/`[-]` `task_id`s
     found under file F / section S, taken across every parent for which
     (a), (b), and (d) already hold for that row in that parent (a `task_id`
-    counted once even if literally present in both parents' copies of
-    F/S). The manifest's `(done, voided)` pair for section S must be `>=`
+    counted once even if literally present in both parents' copies of F/S),
+    minus the kept rows the manifest cannot have counted. Amended (E203): a
+    `task_id` X that the whole-tree identity search (Row identity) does NOT
+    find anywhere at MERGE always stays in `U`; a kept X — one the search
+    finds somewhere at MERGE — stays in `U` only when BOTH (i) X has a row
+    under F/S at the merge-base, AND (ii) no parent whose own copy of F
+    carries a manifest naming S holds X anywhere in its tree; otherwise X
+    leaves `U`. Why: summarization leaves no row of a summarized `task_id`
+    in the compacting side's tree (Summarization, above), so a row that
+    side still holds was not counted (ii), and a row absent from F/S at the
+    merge-base is taken as the other side's post-fork addition, which the
+    manifest never saw (i). A kept row passing both may be one the manifest
+    counted, so it stays: dropping it would free a manifest slot for a row
+    the merge really lost. Worked cases, one side compacting `## Wave`
+    (T-A-01..03) into "3 done" while the other adds `- [x] T-D-01`: the
+    merge keeps T-D-01 → it leaves `U` by (i), `U` = 3, pass; the merge
+    drops T-D-01 → `U` = 4 > 3, fail; the merge keeps T-A-03 and drops
+    T-D-01 → T-A-03 stays by (i)+(ii), `U` = 4 > 3, fail; the compacting
+    side moved a fourth base row out of S before compacting and the merge
+    keeps it there → it leaves `U` by (ii), pass. A kept row in `U` is
+    never itself reported MISSING or COMPACTED. **Known limit (accepted,
+    not detected):** (c) cannot see a row the compacting side added under
+    S after the merge-base and then summarized; the manifest counts it, so
+    it frees one slot that a dropped row of the other side can take
+    (reported COMPACTED, exit 0). A row in neither parent's tree has
+    always been outside `U`, so this predates E203; rule (i) adds one more
+    instance — the same row also added on the other side after the base
+    (e.g. cherry-picked) and kept by the merge leaves `U` by (i). From the
+    four snapshots this check reads (both parents, merge-base, merge) such
+    a row is indistinguishable from the T-D-01 case above; telling them
+    apart needs the compacting side's pre-compaction F/S rows, which exist
+    only in history between the merge-base and that parent. The
+    manifest's `(done, voided)` pair for section S must be `>=`
     `U`'s own `(done, voided)` split. This is REQUIRED, not optional:
     presence of a same-named section in the manifest alone would let a
     manifest that under-counts (or a forged/edited-down marker) mask a real

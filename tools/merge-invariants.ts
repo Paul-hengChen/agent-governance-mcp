@@ -322,20 +322,33 @@ function perParentIneligibility(occ: ParentRowRef, parentSnap: CommitSnapshot, m
 }
 
 /**
- * Condition (c) over the UNION across parents (spec amendment R-1): for each
- * file F / section S, U = distinct closed task_ids under F/S from every parent
- * occurrence passing (a)/(b)/(d) — a (d)-barred parent contributes nothing.
- * A task_id closed as `[x]` in any contributing occurrence counts as done,
- * otherwise voided. Returns the (c) failure reason per failing F/S key.
+ * Condition (c) over the UNION across parents (R-1): U per file F / section S =
+ * distinct closed task_ids from parent occurrences passing (a)/(b)/(d). A
+ * task_id not found at the merge always counts; a kept one counts only when
+ * (i) the merge-base has it under F/S and (ii) no parent whose F names S in
+ * its manifest holds it (specs/e126-merge-invariants.md (c)). `[x]` in any
+ * contributing occurrence counts as done, else voided. Returns the (c)
+ * failure reason per failing F/S key.
  */
 function unionReconciliationFailures(
   occsById: Map<string, Array<{ ref: ParentRowRef; snap: CommitSnapshot }>>,
+  parents: CommitSnapshot[],
+  base: CommitSnapshot,
   merge: CommitSnapshot,
 ): Map<string, string> {
   const union = new Map<string, Map<string, RowState>>(); // F/S key -> task_id -> state
   for (const [taskId, occs] of occsById) {
+    const kept = (merge.rowsById.get(taskId)?.length ?? 0) > 0;
     for (const { ref, snap } of occs) {
       if (ref.section === null || perParentIneligibility(ref, snap, merge) !== null) continue;
+      if (kept) {
+        const section = ref.section;
+        const atBase = (base.rowsById.get(taskId) ?? []).some((r) => r.file === ref.file && r.section === section);
+        const heldByCompactor = parents.some(
+          (p) => p.ledgers.get(ref.file)?.manifest?.has(section) === true && (p.rowsById.get(taskId)?.length ?? 0) > 0,
+        );
+        if (!atBase || heldByCompactor) continue;
+      }
       const key = fileSectionKey(ref.file, ref.section);
       const ids = union.get(key) ?? new Map<string, RowState>();
       if (ids.get(taskId) !== "x") ids.set(taskId, ref.state);
@@ -357,7 +370,8 @@ function unionReconciliationFailures(
       failures.set(
         key,
         `(c) manifest under-reconciles ${file} § ${section}: manifest ${entry.done} done/` +
-          `${entry.voided} voided < union across parents ${done} [x]/${voided} [-] (${ids.size} distinct task_id(s))`,
+          `${entry.voided} voided < closed rows it must cover, union across parents ${done} [x]/${voided} [-] ` +
+          `(${ids.size} distinct task_id(s))`,
       );
     }
   }
@@ -390,7 +404,7 @@ export function evaluateMergeInvariants(
       byId.set(id, list);
     }
   }
-  const unionFailures = unionReconciliationFailures(byId, merge);
+  const unionFailures = unionReconciliationFailures(byId, [p1, p2], base, merge);
   const checkedAtMerge = [...merge.ledgers.keys()].sort();
   const missing: MissingRow[] = [];
   const lostCompletions: LostCompletion[] = [];

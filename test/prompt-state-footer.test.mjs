@@ -590,7 +590,7 @@ test("D1/AC-5: absent workspace_path arg is byte-identical to pre-D1 — still r
 });
 
 // ---------------------------------------------------------------------------
-// AC2 (normalizeWorkspacePath, index.ts): the resolved workspace is absolute and
+// AC2 (normalizeWorkspacePath, prompts/build.ts, re-exported by index.ts): the resolved workspace is absolute and
 // normalized for every source: "~" and "~/x" expand to os.homedir(), a relative
 // path resolves against the server cwd, an absolute one is unchanged. Tilde
 // fixtures point HOME at a temp dir. Each is a fresh workspace, so the footer

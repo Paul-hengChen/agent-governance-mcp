@@ -31,6 +31,11 @@
 - 整合者 SOP 與 coordinator 呼叫的其他 agc 工具，在本 repo 一樣用 repo 相對路徑：`node scripts/mailbox-watch.mjs`、`node scripts/lane-status.mjs`、`node scripts/merge-invariants.mjs`、`node scripts/test-lock.mjs`（全套一律 `node scripts/test-lock.mjs -- npm test`）、`node scripts/feature-rollup.mjs`。
 - 整合者 SOP 的「repo 的 CI 檢查」在本 repo 是 `node scripts/verify-release.mjs --ci-check --sha <sha>`（只在本 repo 能用：它從自己的位置找 repo）。
 - 整合者 5c 的記帳檢查是 `npm run check:bookkeeping`：記帳 commit 前跑、要 exit 0；它也透過測試檔在 `npm test` 裡，PR 的 CI 會再跑一次。
+- 整合者 5a 的 lane 層 CI：本 repo 的 `.github/workflows/ci.yml` 在 push 到 `feat/**`（另有 `main`、`integ/**`、`release/**`）時觸發，所以整合者 push lane branch 就會跑 CI（E298）。
+- 整合者 SOP 的「repo 的全套指令」在本 repo 是 `npm test`，一律包成 `node scripts/test-lock.mjs -- npm test`。
+- 整合者 5a 與 verifier 檢查的「補充規則點名的退役發現檔」是 root 的 `NEW-TICKETS.md`（§4）：lane branch 不得改動它。
+- 整合者 5b-4 的合併後重啟：本 repo 就是 agc 的 MCP server，合併並建置之後重啟 primary 的 MCP server，下一次 `tw_*` 呼叫才會跑合併後的程式。
+- 整合者 flake rule 的負載敏感測試清單（只有清單上的測試在 CI 紅時可以 `gh run rerun --failed` 一次）：`test/e108-eject.test.mjs` 名稱以 `AC7` 開頭的兩個測試、`test/verify-release.test.mjs` 的 `VR-20 (E80)`。E238 處理過的六個站點（五個已去耦，usage-accounting 的 20 s 上限確認不動）不在清單上：再紅代表退化，照一般紅燈送回 lane。
 
 ## §7 中途修 base
 

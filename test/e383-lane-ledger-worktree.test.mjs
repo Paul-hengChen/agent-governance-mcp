@@ -179,12 +179,12 @@ test("AC-E383-5: linked worktree on a non-feat branch (_primary lane) is unchang
   assert.ok(!fs.existsSync(path.join(wt, ".current", "_primary", "tasks.md")));
 });
 
-test("AC-E383-7: lane-protocol §3 holds doc.s3-ledger exactly once, directly after the E196 known-gaps line", () => {
+test("AC-E383-7: lane-protocol §3 holds doc.s3-ledger exactly once, directly after the harvest sub-item", () => {
   const lines = fs.readFileSync(path.join(PROJECT_ROOT, "docs", "lane-protocol.md"), "utf-8").split("\n");
   const head = "  - task 帳本（E383）：`.current/<lane>/` 被 ignore 時，linked worktree 裡的 lane 只要";
   const idx = lines.flatMap((l, i) => (l.startsWith(head) ? [i] : []));
   assert.equal(idx.length, 1, "doc.s3-ledger appears exactly once");
-  assert.match(lines[idx[0] - 1], /^ {2}- 已知缺口：E196/, "directly after the E196 line");
+  assert.match(lines[idx[0] - 1], /^ {2}- 證據不靠 commit 進到 primary/, "directly after the harvest sub-item");
   assert.ok(lines[idx[0]].includes("它若被 ignore，lane 在收工回報前把它移到 `.current/<lane>/tasks.md`。"), "full line tail present");
   assert.ok(lines[idx[0]].includes("`tw_get_next_task` 的 advisory 會點名它"));
 });

@@ -455,6 +455,38 @@ export async function rollbackTaskInFile(
 }
 
 /**
+ * The void refusal text, shared by file and SQLite storage so both return the
+ * same bytes. The caller still decides WHETHER to refuse (row or ledger marks
+ * the task done); this only picks the recovery advice for the state found. A
+ * ledger-only hit cannot be fixed by rollback (the row is already open), so it
+ * names the qa-engineer FAIL write that clears the ledger. (E359)
+ */
+export function voidRefusalMessage(
+  taskId: string,
+  rowCompleted: boolean,
+  ledgerCompleted: boolean,
+): string {
+  const prefix = `Task ${taskId} is already completed and cannot be voided — `;
+  if (ledgerCompleted && !rowCompleted) {
+    return (
+      prefix +
+      `the task list shows it open, but the handoff completed_tasks ledger still records it. ` +
+      `Have qa-engineer remove it first with a FAIL write (tw_update_state) carrying ` +
+      `review_task_ids=[${taskId}]; then void it.`
+    );
+  }
+  if (ledgerCompleted) {
+    return (
+      prefix +
+      `to undo it, roll it back (tw_rollback_task) and have qa-engineer remove it from the ` +
+      `handoff completed_tasks ledger with a FAIL write (tw_update_state) carrying ` +
+      `review_task_ids=[${taskId}]; then void it.`
+    );
+  }
+  return prefix + `roll it back first (tw_rollback_task) if it needs to be undone.`;
+}
+
+/**
  * Void a task with the `- [-] <id>` marker, which the `[ x]` checkbox class
  * cannot match, so the row vanishes from every parseTasksFromFile consumer
  * (E117). A voided id can never be re-cut: evidence is keyed by id alone
@@ -542,11 +574,7 @@ export async function voidTaskInFile(
     const ledgerCompleted = !!handoff && handoff.completed_tasks.some((c) => ledgerRe.test(c));
 
     if (task.completed || ledgerCompleted) {
-      return JSON.stringify({
-        error:
-          `Task ${taskId} is already completed and cannot be voided — ` +
-          `roll it back first (tw_rollback_task) if it needs to be undone.`,
-      });
+      return JSON.stringify({ error: voidRefusalMessage(taskId, task.completed, ledgerCompleted) });
     }
 
     const oldPattern = new RegExp(`- \\[ \\] ${escapeRegExp(taskId)}(\\s.+)$`, "m");

@@ -719,11 +719,11 @@ function checkWorktreeEvidence(cwd) {
 }
 
 // Orphan-lane advisory (E179 AC5): a local branch with no live worktree whose
-// committed `.current/<lane>/pending-tickets.md` still holds an unapplied entry.
-// Every git read is repo-global, so unlike checkWorktreeEvidence this is not
-// gated on isLinkedWorktree. A branch is judged only by its own lane's file
-// (the lane resolveCurrentLane would name); a branch with no lane is skipped.
-// Never reads `.current/history/`. Advisory: never throws or exits.
+// committed `.current/<lane>/pending-tickets.md` still holds an unapplied entry
+// or a malformed block. Every git read is repo-global, so unlike
+// checkWorktreeEvidence this is not gated on isLinkedWorktree. A branch is
+// judged only by its own lane's file (the lane resolveCurrentLane would name);
+// a lane-less one is skipped. Never reads `.current/history/`, throws or exits.
 // Why each rule holds: see specs/e260c-bin-scripts.md.
 async function checkOrphanLanes(cwd) {
   let probe;
@@ -744,6 +744,7 @@ async function checkOrphanLanes(cwd) {
       .filter((r) => r.length > 0);
     const candidates = [];
     const laneOf = new Map(); // branch -> its own lane
+    const errorsOf = new Map(); // branch -> its file's parse errors, when any
     for (const ref of refs) {
       const branch = ref.slice("refs/heads/".length);
       // The branch -> lane mapping resolveCurrentLane applies to a checked-out
@@ -755,21 +756,68 @@ async function checkOrphanLanes(cwd) {
       const text = readBlob(cwd, ref, path.posix.join(".current", lane, filename));
       // Two-argument parse (E124 AC7's contract): no backlog cross-check.
       // target_repo entries are another repo's (E287 D4): never this repo's orphans.
-      const has = text !== null && ta.parsePendingTickets(text, lane).entries.some((e) => e.targetRepo === undefined);
+      // Malformed blocks count too: finish refuses them, so they are stranded as well.
+      const parsed = text === null ? null : ta.parsePendingTickets(text, lane);
+      const has =
+        parsed !== null &&
+        (parsed.entries.some((e) => e.targetRepo === undefined) || parsed.errors.length > 0);
       laneOf.set(branch, lane);
+      if (parsed !== null && parsed.errors.length > 0) errorsOf.set(branch, parsed.errors);
       candidates.push({ branch, hasUnappliedPendingTickets: has });
     }
     for (const branch of ta.detectOrphanLanes(candidates, live).orphans) {
+      const lane = laneOf.get(branch);
       process.stderr.write(
         `agc check — warning: branch ${branch} carries an unapplied pending-tickets file ` +
           `with no live worktree — findings may be stranded; re-attach it ` +
           `(\`git worktree add <dir> ${branch}\`) and run \`agc feature finish --abandoned ` +
-          `${laneOf.get(branch)}\` to apply and retire it, or investigate why the worktree is gone\n`
+          `${lane}\` to apply and retire it, or investigate why the worktree is gone\n`
       );
+      const errors = errorsOf.get(branch);
+      if (errors !== undefined) {
+        // Copy / Strings e225.orphan-errors-head + e225.orphan-errors-item.
+        process.stderr.write(
+          `agc check — warning: branch ${branch}'s .current/${lane}/${filename} has ${errors.length} ` +
+            `malformed pending-ticket block(s) — agc feature finish will refuse it until they are fixed:\n` +
+            errors.map((e) => `  ${e}\n`).join("")
+        );
+      }
     }
   } catch (err) {
     process.stderr.write(
       `agc check — warning: orphan-lane scan skipped (${err && err.message ? err.message : String(err)})\n`
+    );
+  }
+}
+
+// Lane-side pending-tickets advisory: in a linked worktree on a real lane,
+// parses `.current/<lane>/pending-tickets.md` the way finish does
+// (planPendingApply's options, the worktree's backlog standing in for --base)
+// and lists every error finish would refuse, while the lane can still fix
+// them. Silent when the file is absent or clean. Never touches the exit code.
+async function checkLanePendingTickets(cwd) {
+  if (!isLinkedWorktree(cwd)) return;
+  try {
+    const lp = await loadLanePaths();
+    const lane = lp.resolveCurrentLane(cwd);
+    if (lane === lp.PRIMARY_LANE || !lp.isSafeLaneName(lane)) return;
+    const filename = lp.laneFile("pendingTickets").filename;
+    const text = readFileOrNull(path.join(cwd, ".current", lane, filename));
+    if (text === null) return;
+    const ta = await loadTicketAllocation();
+    const prov = ta.findAppliedProvenance(readFileOrNull(path.join(cwd, BACKLOG_REL)) ?? "", lane);
+    const { errors } = ta.parsePendingTickets(text, lane, { appliedLaneLocalIds: new Set(prov.keys()) });
+    if (errors.length === 0) return;
+    // Copy / Strings e225.lane-check-head + e225.lane-check-item.
+    process.stderr.write(
+      `agc check — warning: .current/${lane}/${filename} has ${errors.length} problem(s) that ` +
+        `agc feature finish will refuse — fix them on this branch before the lane report:\n` +
+        errors.map((e) => `  ${e}\n`).join("")
+    );
+  } catch (err) {
+    // Copy / Strings e225.lane-check-skip.
+    process.stderr.write(
+      `agc check — warning: pending-tickets check skipped (${err && err.message ? err.message : String(err)})\n`
     );
   }
 }
@@ -892,6 +940,7 @@ async function checkComments(cwd) {
 async function runCheck(cwd) {
   checkResearchBinaries(cwd); // advisory; never affects exit code
   checkWorktreeEvidence(cwd); // advisory; never affects exit code
+  await checkLanePendingTickets(cwd); // advisory; never affects exit code
   await checkOrphanLanes(cwd); // advisory; never affects exit code
   checkArtifactsDrift(cwd); // advisory; never affects exit code
   await checkHygiene(cwd); // advisory; never affects exit code
@@ -1618,6 +1667,18 @@ async function runFeatureStart(cwd, argv) {
     );
   }
 
+  // The primary checkout's git status now, so finish can name paths a lane
+  // session wrote there by mistake (warn-only). Same best-effort contract.
+  try {
+    fs.writeFileSync(primaryStatusSnapshotPath(lanePath), primaryStatusBytes(repoRoot));
+  } catch (err) {
+    // Copy / Strings e205.start-snapshot-warn.
+    process.stderr.write(
+      `agc feature start — warning: could not record the primary checkout's git status snapshot ` +
+        `(${gitErrorReason(err)}) — finish will not check the primary checkout for new paths\n`
+    );
+  }
+
   // AC3 — the printed lane id IS resolveCurrentLane over the new worktree.
   const lane = lanePaths.resolveCurrentLane(lanePath);
   if (lane !== ticketId) {
@@ -1643,6 +1704,88 @@ function parsePorcelainZ(out) {
     }
   }
   return paths;
+}
+
+// --- primary side-effect check (E205) ---------------------------------------
+// start saves primary's porcelain status into the lane's per-worktree git dir:
+// outside every working tree, so it is never committed or harvested, and git
+// deletes it with the worktree's admin dir. finish compares path sets only.
+const PRIMARY_STATUS_SNAPSHOT = "agc-primary-status";
+
+function primaryStatusSnapshotPath(lanePath) {
+  return path.resolve(lanePath, git(lanePath, ["rev-parse", "--git-path", PRIMARY_STATUS_SNAPSHOT]).trim());
+}
+
+// Raw bytes; --no-optional-locks keeps this read from refreshing primary's index.
+function primaryStatusBytes(repoRoot) {
+  return execFileSync(
+    "git",
+    ["--no-optional-locks", "status", "--porcelain", "-z", "--untracked-files=all"],
+    { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"], maxBuffer: BLOB_MAX_BUFFER }
+  );
+}
+
+// One line for a message: git's own first stderr line when there is one.
+function gitErrorReason(err) {
+  const first = String(err?.stderr ?? "").trim().split("\n")[0];
+  if (first) return first;
+  return err && err.message ? err.message : String(err);
+}
+
+// Paths finish itself writes into primary (history and evidence harvests, on
+// a re-run after a refused worktree remove) and the lane worktree's own path.
+function isFinishOwnPath(p, ticketId, laneRelPrefix) {
+  const segs = p.split("/");
+  if (segs.length > 4 && segs[0] === ".current" && segs[1] === "history" && segs[3] === ticketId) return true;
+  if (segs.length > 3 && segs[2] === ticketId) {
+    if (segs[1] === "archive" && SHIPPED_EVIDENCE_DIRS.includes(segs[0])) return true;
+    if (segs[1] === "abandoned" && [...ABANDON_EVIDENCE_DIRS, ...ABANDON_HARVEST_DIRS].includes(segs[0])) {
+      return true;
+    }
+  }
+  return laneRelPrefix !== null && p.startsWith(laneRelPrefix);
+}
+
+// Warn-only (never refuses, never changes the exit code): names every path in
+// primary's status that the start snapshot did not have. No snapshot: silent.
+function warnPrimaryNewPaths({ repoRoot, lanePath, ticketId }) {
+  // Copy / Strings e205.finish-check-skip.
+  const skip = (err) =>
+    process.stderr.write(
+      `agc feature finish — warning: primary checkout new-path check skipped (${gitErrorReason(err)})\n`
+    );
+  let before;
+  let after;
+  try {
+    before = fs.readFileSync(primaryStatusSnapshotPath(lanePath));
+  } catch (err) {
+    if (err && err.code === "ENOENT") return;
+    skip(err);
+    return;
+  }
+  try {
+    after = primaryStatusBytes(repoRoot);
+  } catch (err) {
+    skip(err);
+    return;
+  }
+  const laneRel = path.relative(canonicalPath(repoRoot), canonicalPath(lanePath));
+  const laneRelPrefix =
+    laneRel !== "" && !laneRel.startsWith("..") && !path.isAbsolute(laneRel)
+      ? `${laneRel.split(path.sep).join("/")}/`
+      : null;
+  const seen = new Set(parsePorcelainZ(before.toString("utf-8")));
+  const fresh = [...new Set(parsePorcelainZ(after.toString("utf-8")))]
+    .filter((p) => !seen.has(p) && !isFinishOwnPath(p, ticketId, laneRelPrefix))
+    .sort();
+  if (fresh.length === 0) return;
+  // Copy / Strings e205.finish-new-paths-head + e205.finish-new-paths-item.
+  process.stderr.write(
+    `agc feature finish — warning: ${fresh.length} path(s) in the primary checkout's git status are new ` +
+      `since agc feature start (a lane session may have written here by mistake; nothing was changed — ` +
+      `check them by hand):\n` +
+      fresh.map((p) => `  ${escapeSegmentForDisplay(p)}\n`).join("")
+  );
 }
 
 function escapeRegExp(s) {
@@ -1836,8 +1979,9 @@ function applyAbandonEvidence(lanePath, ticketId, moves) {
 // if the lane never tracked it, it is the only governance record, and
 // `git worktree remove` deletes the ignored part. Read-only, before any
 // --abandoned mutation: null with nothing to harvest (absent, AC11; linked
-// outside; any tracked content, AC8), a refusal if the primary history path
-// is a non-directory (AC9), else the copy to make.
+// outside; tracked content with no git-ignored file left to copy, AC8), a
+// refusal if the primary history path is a non-directory (AC9), else the copy
+// to make — the whole dir, or `files` per file when the dir has tracked content.
 function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now }) {
   const laneRel = path.posix.join(".current", ticketId);
   const laneAbs = path.join(lanePath, ".current", ticketId);
@@ -1849,7 +1993,12 @@ function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now 
   }
   if (!st.isDirectory()) return null;
   if (isSafelyLinkedOutside(lanePath, laneAbs)) return null; // survives the removal on its own
-  if (hasTrackedContent(lanePath, laneRel)) return null; // AC8 — durable via the kept branch
+  // Tracked content is durable via the kept branch (AC8); only the git-ignored
+  // files the worktree removal deletes are copied.
+  const ignored = hasTrackedContent(lanePath, laneRel)
+    ? laneIgnoredStateFiles(lanePaths, lanePath, laneRel, "--abandoned")
+    : null;
+  if (ignored !== null && ignored.length === 0) return null;
   const repoRoot = listWorktrees(lanePath)[0]?.path;
   if (!repoRoot) {
     throw new FeatureError(
@@ -1865,6 +2014,17 @@ function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now 
       `agc feature finish --abandoned: .current/history/${bucket}/${ticketId}/ already exists in the ` +
         `primary checkout and is not a directory — move it aside first (nothing moved, worktree left in place)`
     );
+  }
+  if (ignored !== null) {
+    // Copy-over; identical history copies are skipped, as planLaneClose's refresh does.
+    const files = ignored
+      .map((p) => ({
+        src: path.join(lanePath, p),
+        dst: path.join(histAbs, path.posix.relative(laneRel, p)),
+        rel: p,
+      }))
+      .filter((f) => !sameFileBytes(f.src, f.dst));
+    return files.length === 0 ? null : { ticketId, branch, bucket, histAbs, files };
   }
   return {
     ticketId,
@@ -1908,6 +2068,19 @@ function setAsideCollidingHistoryLinks(srcDir, histDir, asides) {
 // aside first and restored on failure. Rationale: E335 T-E335-03/04 commits.
 function executeAbandonCurrentHarvest(harvest, preserve) {
   const { ticketId, branch, bucket, histAbs, srcAbs, sourceIgnored } = harvest;
+  if (harvest.files !== undefined) {
+    const histRel = path.posix.join(".current", "history", bucket, ticketId);
+    copyLaneIgnoredFiles({
+      files: harvest.files,
+      preserve,
+      fail: ignoredCopyFail("--abandoned", ticketId, histRel),
+      // Copy / Strings e196.abandoned-copy-line.
+      head:
+        `agc feature finish — copied ${harvest.files.length} git-ignored file(s) under .current/${ticketId}/ ` +
+        `into ${histRel}/ (fs copy, not committed — the tracked rest of .current/${ticketId}/ stays on ${branch}):\n`,
+    });
+    return;
+  }
   const derefPending =
     preserve?.covered === true &&
     lstatOrNull(path.join(srcAbs, preserve.filename))?.isSymbolicLink() === true;
@@ -2337,8 +2510,9 @@ async function readUnallocatedFindings({ lanePaths, repoRoot, lanePath, lane, re
 }
 
 // --shipped destination. First run: the lane-close dir, covered when the
-// untracked-dir harvest copies the lane's .current/<lane>/; a tracked lane dir
-// is `git mv`'d, which carries primary's own untracked copy (`carryAbs`).
+// untracked-dir harvest copies the lane's .current/<lane>/ or the tracked
+// shape's ignored-file copy includes the file; a tracked lane dir is
+// `git mv`'d, which carries primary's own untracked copy (`carryAbs`).
 // Re-run: the pointer's dir, covered when the refresh re-copies the file.
 function shippedFindingsTarget({ close, findings, repoRoot }) {
   if (close.alreadyClosed) {
@@ -2362,19 +2536,24 @@ function shippedFindingsTarget({ close, findings, repoRoot }) {
   return {
     histAbs: close.histAbs,
     histRel: close.histRel,
-    covered: close.harvestSrc !== null,
+    covered: close.harvestSrc !== null || close.ignoredCopy.some((f) => f.rel === findings.pendingRel),
     carryAbs: close.tracked ? path.join(repoRoot, findings.pendingRel) : null,
   };
 }
 
 // --abandoned destination. `now` is the SAME Date planAbandonCurrentHarvest
-// got, so both land in one bucket. Covered when that harvest runs.
-function abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, ticketId, now }) {
+// got, so both land in one bucket. Covered when that harvest copies the file:
+// always for the whole-dir copy; for the tracked shape's `files`, only onto an
+// absent destination, so an existing one keeps the plan-time collision check.
+function abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, findings, ticketId, now }) {
   if (currentHarvest !== null) {
     return {
       histAbs: currentHarvest.histAbs,
       histRel: path.posix.join(".current", "history", currentHarvest.bucket, ticketId),
-      covered: true,
+      covered:
+        currentHarvest.files === undefined ||
+        (currentHarvest.files.some((f) => f.rel === findings.pendingRel) &&
+          lstatOrNull(path.join(currentHarvest.histAbs, findings.filename)) === null),
       carryAbs: null,
     };
   }
@@ -2396,25 +2575,27 @@ function abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, ticketId
 }
 
 // Plan-time collision check (read-only), the E180 discipline: an existing
-// different file is never overwritten by this copy. Skipped when an existing
-// harvest step writes the destination from the same lane file this run.
+// different file is never overwritten by this copy. The destination check is
+// skipped when an existing harvest step writes it from the same lane file.
 function planFindingsPreserve({ findings, target, verb }) {
   const dstAbs = path.join(target.histAbs, findings.filename);
   const dstRel = path.posix.join(target.histRel, findings.filename);
   const n = findings.entries.length;
+  // Armed even when covered: the first-run copy would overwrite the file
+  // `git mv` carries, so primary's differing bytes would be lost.
+  if (
+    target.carryAbs !== null &&
+    lstatOrNull(target.carryAbs) !== null &&
+    !fileHasBytes(target.carryAbs, findings.bytes)
+  ) {
+    // Copy / Strings e287.preserve-carry-refuse.
+    throw new FeatureError(
+      `agc feature finish --shipped: the primary checkout's untracked ${findings.pendingRel} differs ` +
+        `from the lane's copy (${n} unallocated finding(s)), and the lane close would carry it into ` +
+        `${target.histRel}/ — move it aside first (nothing applied, nothing removed)`
+    );
+  }
   if (!target.covered) {
-    if (
-      target.carryAbs !== null &&
-      lstatOrNull(target.carryAbs) !== null &&
-      !fileHasBytes(target.carryAbs, findings.bytes)
-    ) {
-      // Copy / Strings e287.preserve-carry-refuse.
-      throw new FeatureError(
-        `agc feature finish --shipped: the primary checkout's untracked ${findings.pendingRel} differs ` +
-          `from the lane's copy (${n} unallocated finding(s)), and the lane close would carry it into ` +
-          `${target.histRel}/ — move it aside first (nothing applied, nothing removed)`
-      );
-    }
     if (lstatOrNull(dstAbs) !== null && !fileHasBytes(dstAbs, findings.bytes)) {
       // Copy / Strings e287.preserve-differs-refuse.
       throw new FeatureError(
@@ -2621,14 +2802,14 @@ function closedLanePointerHistory(lanePaths, repoRoot, text, ticketId, branch) {
 // (never --force) deletes WITHOUT refusing: the git-ignored ones. Tracked edits
 // and non-ignored untracked files make git refuse, so they are never at risk.
 // `base-sha` is left out — its content is durable in the pointer's base_sha=.
-function laneIgnoredStateFiles(lanePaths, lanePath, laneRel) {
+function laneIgnoredStateFiles(lanePaths, lanePath, laneRel, verb = "--shipped") {
   const baseShaRel = path.posix.join(laneRel, lanePaths.laneFile("baseSha").filename);
   const r = gitTry(lanePath, ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", laneRel]);
   if (r.status !== 0) {
     process.stderr.write(r.stderr);
     // Fail closed: without the listing nothing proves the removal is lossless.
     throw new FeatureError(
-      `agc feature finish --shipped: could not list git-ignored files under ${laneRel}/ in ${lanePath} (nothing removed)`
+      `agc feature finish ${verb}: could not list git-ignored files under ${laneRel}/ in ${lanePath} (nothing removed)`
     );
   }
   return r.stdout
@@ -2699,6 +2880,13 @@ function planLaneClose({ lanePaths, repoRoot, lanePath, ticketId, branch, pr, no
   }
   const tracked = hasTrackedContent(repoRoot, laneRel);
   const harvestSrc = path.join(lanePath, ".current", ticketId);
+  // `git mv` carries tracked files only; the lane's git-ignored ones are
+  // copied after the close commit (executeShippedIgnoredCopy).
+  const ignoredCopy = (tracked ? laneIgnoredStateFiles(lanePaths, lanePath, laneRel) : []).map((p) => ({
+    src: path.join(lanePath, p),
+    dst: path.join(histAbs, path.posix.relative(laneRel, p)),
+    rel: p,
+  }));
   const line = closedLanePointerLine({
     ticketId,
     branch,
@@ -2712,6 +2900,7 @@ function planLaneClose({ lanePaths, repoRoot, lanePath, ticketId, branch, pr, no
     ticketId,
     tracked,
     harvestSrc: !tracked && isDirectoryPath(harvestSrc) ? harvestSrc : null,
+    ignoredCopy,
     // Picks the harvest advisory's reason clause: the spec's ignored-`.current/`
     // shape vs a lane that simply never committed `.current/<lane>/`.
     sourceIgnored: gitTry(repoRoot, ["check-ignore", "-q", "--", laneRel]).status === 0,
@@ -2883,8 +3072,26 @@ function executeLaneClose({ repoRoot, base, close }) {
 // copied as a link (E335 D7): cpSync refuses a link over the history link
 // a failed earlier run left ("src and dest cannot be the same").
 function executeHarvestRefresh({ ticketId, refresh, preserve }) {
+  copyLaneIgnoredFiles({
+    files: refresh.files,
+    preserve,
+    fail: (reason) =>
+      `agc feature finish --shipped: re-harvest of .current/${ticketId}/ into ${refresh.histRel}/ failed ` +
+      `(${reason}) — worktree and branch left in place (re-running finish is safe)`,
+    // Copy / Strings e125b.harvest-refresh-line.
+    head:
+      `agc feature finish — lane ${ticketId} was already closed, but ${refresh.files.length} git-ignored ` +
+      `file(s) under .current/${ticketId}/ changed since its history copy; re-harvested into ` +
+      `${refresh.histRel}/ before removing the worktree:\n`,
+  });
+}
+
+// The one per-file copy of git-ignored lane state: each { src, dst, rel } of
+// laneIgnoredStateFiles over its history copy, then `head` plus one line per
+// file on stdout. A failure throws FeatureError(fail(reason)).
+function copyLaneIgnoredFiles({ files, preserve, fail, head }) {
   try {
-    for (const f of refresh.files) {
+    for (const f of files) {
       fs.mkdirSync(path.dirname(f.dst), { recursive: true });
       if (preserve && f.rel === preserve.pendingRel && lstatOrNull(f.src)?.isSymbolicLink()) {
         materializeFindingsCopy(f.dst, preserve.bytes);
@@ -2893,18 +3100,32 @@ function executeHarvestRefresh({ ticketId, refresh, preserve }) {
       }
     }
   } catch (err) {
-    throw new FeatureError(
-      `agc feature finish --shipped: re-harvest of .current/${ticketId}/ into ${refresh.histRel}/ failed ` +
-        `(${err && err.message ? err.message : String(err)}) — worktree and branch left in place (re-running finish is safe)`
-    );
+    throw new FeatureError(fail(err && err.message ? err.message : String(err)));
   }
-  // Copy / Strings e125b.harvest-refresh-line.
-  process.stdout.write(
-    `agc feature finish — lane ${ticketId} was already closed, but ${refresh.files.length} git-ignored ` +
-      `file(s) under .current/${ticketId}/ changed since its history copy; re-harvested into ` +
-      `${refresh.histRel}/ before removing the worktree:\n` +
-      refresh.files.map((f) => `  ${f.rel}\n`).join("")
-  );
+  process.stdout.write(head + files.map((f) => `  ${f.rel}\n`).join(""));
+}
+
+// Copy / Strings e196.copy-fail.
+function ignoredCopyFail(verb, ticketId, histRel) {
+  return (reason) =>
+    `agc feature finish ${verb}: copy of git-ignored .current/${ticketId}/ files into ${histRel}/ failed ` +
+    `(${reason}) — worktree and branch left in place (re-running finish is safe)`;
+}
+
+// First-run --shipped with a tracked lane dir. Runs only after the close
+// commit landed, so a failed copy is finished by the alreadyClosed re-run.
+function executeShippedIgnoredCopy({ close, preserve }) {
+  const { ticketId, histRel, ignoredCopy } = close;
+  if (ignoredCopy.length === 0) return;
+  copyLaneIgnoredFiles({
+    files: ignoredCopy,
+    preserve,
+    fail: ignoredCopyFail("--shipped", ticketId, histRel),
+    // Copy / Strings e196.shipped-copy-line.
+    head:
+      `agc feature finish — copied ${ignoredCopy.length} git-ignored file(s) under .current/${ticketId}/ ` +
+      `into ${histRel}/ (fs copy, not committed — git mv carries tracked files only):\n`,
+  });
 }
 
 // --- finish ignored-evidence harvest (E214 --shipped, E217 --abandoned specs/) ---
@@ -3262,6 +3483,9 @@ async function runFeatureFinish(cwd, argv) {
   }
   const lanePath = matches[0].path;
   const branch = matches[0].branch.slice("refs/heads/".length);
+  // Before every check and mutation: it never sees finish's own writes, and
+  // it prints even when finish later refuses.
+  warnPrimaryNewPaths({ repoRoot, lanePath, ticketId });
 
   if (opts.shipped) {
     // AC16 — merge guard, --shipped only.
@@ -3332,6 +3556,7 @@ async function runFeatureFinish(cwd, argv) {
       if (close.refresh !== null) executeHarvestRefresh({ ticketId, refresh: close.refresh, preserve });
     } else {
       executeLaneClose({ repoRoot, base, close });
+      executeShippedIgnoredCopy({ close, preserve });
     }
     if (preserve) executeFindingsPreserve(preserve);
     applyIgnoredEvidenceHarvest(evidenceHarvest);
@@ -3379,7 +3604,7 @@ async function runFeatureFinish(cwd, argv) {
     findings &&
     planFindingsPreserve({
       findings,
-      target: abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, ticketId, now }),
+      target: abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, findings, ticketId, now }),
       verb: "--abandoned",
     });
   const plannedMoves = await applyPendingOnAbandoned({

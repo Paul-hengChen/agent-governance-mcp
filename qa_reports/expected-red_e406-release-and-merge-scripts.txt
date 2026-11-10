@@ -1,0 +1,38 @@
+# T-E406-01 (sr-engineer): step 8a-1 no longer sweeps untracked files into the release commit.
+# The e394 fixture's workTree leaves content/foo.md untracked while the CHANGELOG entry cites it,
+# so every prepare that reaches 8a-2 now stops at exit 31 CHANGELOG_CITATION (correct new behaviour).
+# Re-pin owned by T-E406-02 (qa): buildTemplate commits content/foo.md, workTree edits it.
+test/e394-release-script.test.mjs | AC-R10 one exit code per manual-phase failure class (AC-S2)
+test/e394-release-script.test.mjs | AC-S2 --help and a good run exit 0 and print no stop record
+test/e394-release-script.test.mjs | AC-S2 VERSION_INCOHERENT stops a stale README pin, not a correct bump whose version extends the old one (R3)
+test/e394-release-script.test.mjs | AC-S1 dry-run mutates nothing, per phase
+test/e394-release-script.test.mjs | AC-S1 a real run changes what the dry-run said it would (prepare)
+test/e394-release-script.test.mjs | AC-S5 drift baseline, done-mark, adapter stamps
+test/e394-release-script.test.mjs | AC-S6 commit, push, PR
+test/e394-release-script.test.mjs | AC-S6 REQUIRE remedy is stage-and-re-run, UNCLASSIFIABLE is the base string, and neither leaves a commit
+test/e394-release-script.test.mjs | AC-S6 a Multi-feature release note in --state makes the named feature's spec mandatory
+test/e394-release-script.test.mjs | AC-S7 publish order and stops
+test/e394-release-script.test.mjs | AC-S7 TAG_EXISTS stops before any merge, locally or on origin
+test/e394-release-script.test.mjs | AC-S7 only CI-CHECK PASSED continues; a red or silent gate stops before the merge
+test/e394-release-script.test.mjs | AC-S7 a PR that cannot merge is its own class: conflicting, behind, red check, closed
+test/e394-release-script.test.mjs | AC-S7 a rejected tag push is PUSH_REJECTED and a re-run resumes without re-merging or re-tagging
+test/e394-release-script.test.mjs | AC-S9 absorbed checks are delegated
+test/e394-release-script.test.mjs | L:E9 SELF_CHECK_FAILED on verify-release non-zero, after the release exists
+test/e394-release-script.test.mjs | L:E14 L:E78 L:E80 CI ground truth is delegated to verify-release.mjs
+test/e394-release-script.test.mjs | L:E163 publish gate is --ci-check --strict
+test/e394-release-script.test.mjs | L:E297 no push to main; PR merge is --auto --merge
+test/e394-release-script.test.mjs | L:E125c write set stays inside the Artifact allowlist
+test/e394-release-script.test.mjs | L:E65 prepare runs 7a, 7b, 7c, 7d before the commit
+test/e394-release-script.test.mjs | L:E71b L:E76 array argv, no shell child, one process for 7a (globs and spaces in names)
+test/e394-release-script.test.mjs | L:E45 L:E46 committed-in-range evidence is archived
+test/e394-release-script.test.mjs | L:E49 codes come from files new since the previous tag, never from prose, history or archives
+test/e394-release-script.test.mjs | L:E50 the same basename in both trees and an occupied destination: no overwrite, <CODES> logged even when empty
+
+# T-E406-01: the AC-S3 ALLOW regex list lacks the new 8a-1 shape `git add --update -- <members>`
+# (plus the citation stop above). Re-pin owned by T-E406-02: ALLOW gains /^git add --update -- \S/.
+test/e394-release-script.test.mjs | AC-S3 verb allow-list and array argv
+
+# T-E406-01: this case adds an UNTRACKED docs/ file no plan entry names and expects it in the release
+# commit; per AC-E406-1 it is now warned and left out, so the case stays red after the workTree re-pin.
+# Re-pin owned by T-E406-02: make the spaced path a tracked change (commit it, then edit it) or plan-name it.
+test/e394-release-script.test.mjs | L:E71b a status path with spaces survives (NUL-separated, never word-split)

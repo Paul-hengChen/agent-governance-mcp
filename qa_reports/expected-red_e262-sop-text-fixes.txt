@@ -1,0 +1,31 @@
+# e262-sop-text-fixes — intentional reds left by sr-engineer (T-E262-01, T-E355-01, T-E360-01, T-E340-01).
+# Each pin asserts the pre-W1..W11 wording; qa moves them (spec § Pins that move).
+
+# W1 (E262) removes "Both must converge before the lane presents to the human." — T-E262-02
+test/e178a-integrator-role.test.mjs | AC10: SOP execution stage — mailbox + cut pre-review formalized
+
+# W3-W9 (E355) replace repo facts in the integrator SOP and add five addendum §5 bullets — T-E355-02
+test/e178a-integrator-role.test.mjs | AC13: SOP verification stage — E192 generic read-only verifier (D10), structured result, five constraints named
+test/e226-integrator-sop-portable.test.mjs | AC-E226-4: 5a evidence and new-findings rows carry the artifacts-local reading and keep `send back`; Stage 6 findings bullet kept
+test/e295-hop-cap-and-sop-halves.test.mjs | AC9: CI fallback Decisions row wording and the E238/E254/E278 flake rule
+test/e349-integrator-repo-facts.test.mjs | AC-E349-1: the SOP states none of this repo's facts, and carries the generic replacements verbatim
+test/e349-integrator-repo-facts.test.mjs | AC-E349-2: addendum heading list unchanged; the three §5 bullets follow the fanout line in order; §7 unchanged; every called tool has its repo-relative call
+
+# W11 (E340) const-05 line 17 exception — pin regex and the two exceeded budget caps — T-E340-02
+test/e130-lane-default.test.mjs | AC9: const-05's task-list hand-edit rule no longer carries the stale PM-bootstrapping exemption clause
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 5723 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8501 ~tok)
+
+# W11 (E340) moves const-05 line 17 in the 11 compose goldens (spec § Golden change list); red until qa runs
+# `node scripts/capture-constitution-golden.mjs` (T-E340-02). The spec's 9-red trial count was taken after recapture.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
