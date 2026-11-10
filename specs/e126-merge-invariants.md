@@ -104,9 +104,17 @@ FOUR conditions (a)–(d) hold:
     side's rows pass its own per-parent count on its own, wrongly COMPACTED,
     exit 0). Fix: let `U` = the union of DISTINCT `[x]`/`[-]` `task_id`s
     found under file F / section S, taken across every parent for which
-    (a), (b), and (d) already hold for that row in that parent (a `task_id`
-    counted once even if literally present in both parents' copies of
-    F/S). The manifest's `(done, voided)` pair for section S must be `>=`
+    (a), (b), and (d) already hold for that row in that parent, and which
+    the whole-tree identity search (Row identity) does NOT find anywhere at
+    MERGE (a `task_id` counted once even if literally present in both
+    parents' copies of F/S). Amended (E203): a closed row the merge still
+    holds is already proven present by its `task_id`, so counting it in `U`
+    adds no detection, only a false MISSING — e.g. one side compacts S into
+    "3 done" while the other adds a new `[x]` row under S that the merge
+    keeps: counting that kept row makes `U` 4 > 3 and reports the 3
+    compacted rows MISSING although nothing was lost. If the merge drops
+    that row instead, it is not found, joins `U`, and (c) still fails. The
+    manifest's `(done, voided)` pair for section S must be `>=`
     `U`'s own `(done, voided)` split. This is REQUIRED, not optional:
     presence of a same-named section in the manifest alone would let a
     manifest that under-counts (or a forged/edited-down marker) mask a real
