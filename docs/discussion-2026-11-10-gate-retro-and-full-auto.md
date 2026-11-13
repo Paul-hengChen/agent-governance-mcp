@@ -111,8 +111,8 @@ constitution 15 片段合計約 44KB，coordinator SOP 7 片段約 46KB；粗估
 
 | 票 | 優先 | 相依 | 內容 |
 |---|---|---|---|
-| E418 | P2 | 無 | 第一波：§3.1 六段、Escalation Routes、watermark 段落縮成 WHEN/DO/ELSE 加錯誤碼；gate、欄位、schema 不動；前提是每個碼的 server hint 足以讓角色自我修正 |
-| E419 | P3 | E418 | 第二波：移除 bookkeeping_write、stamp-provenance、manifest-tier、token budget brake；registry 36 變 34；usage hook 留作成本 sidecar |
+| E418 | P2 | 無 | 第一波：§3.1 六段、Escalation Routes、watermark 段落縮成 WHEN/DO/ELSE 加錯誤碼；gate、欄位、schema 不動；前提是每個碼的 server hint 足以讓角色自我修正。2026-11-13 起另含 manifest-tier 與 token brake 的文字縮減 |
+| E419 | P3 | E418 | 第二波：移除 bookkeeping_write、stamp-provenance；registry 36 變 34。原本還含 manifest-tier、token budget brake，2026-11-13 裁定抽出（見第 10 節） |
 | E420 | P3 | E419 | 第三波：視覺系列 10 個碼合併成 3 個，predicate 全留；等 adopter B 再結一個 design-armed feature 才切 |
 
 三波共用 golden 與 context-budget cap，序列做，不開平行 lane。
@@ -137,7 +137,7 @@ constitution 15 片段合計約 44KB，coordinator SOP 7 片段約 46KB；粗估
 
 **與 E419 的衝突**：Manifest-tier 本質上就是「人類先批准一份清單，lane 之後不再過人手」，
 沒被用過是因為條件太重，不是想法錯。建議 E419 第 (3) 項改成「用預先核准的票取代
-manifest-tier」而非單純刪除。票未改，待裁。
+manifest-tier」而非單純刪除。2026-11-13 已裁，見第 10 節。
 
 **第一階段（人類與 AI 共同切票）缺什麼**
 
@@ -168,10 +168,10 @@ integrator 信箱與 lane 回報機制已經是為這個形狀設計的。
 
 ## 8. 待人類決定
 
-1. E419 第 (3) 項：刪 manifest-tier，還是改成「預先核准的票」tier。
-2. E419 第 (4) 項：全自動需要成本煞車，token brake 要不要留或換形式。
+1. E419 第 (3) 項：刪 manifest-tier，還是改成「預先核准的票」tier。**已裁 2026-11-13：從 E419 抽出，保留。**
+2. E419 第 (4) 項：全自動需要成本煞車，token brake 要不要留或換形式。**已裁 2026-11-13：從 E419 抽出，保留；形式待後續票決定。**
 3. 是否開第 7.1 節的三張功能票（BDD 格式、票來源抽象層、停票續跑政策）。
-4. E417、e108 負載敏感問題的處理順序。
+4. E417、e108 負載敏感問題的處理順序。**e108 部分已結：E421 擴大清單、測試不動（PR #114）；E417 順序仍待裁。**
 5. 是否先在 adopter A 設 `cutApprovalAutoTier`。
 
 ## 9. 重現方法
@@ -188,3 +188,18 @@ grep -rl 'lease_override' <workspace>/.current --include=handoff.md | wc -l
 ```
 
 注意：`tw_gate_stats` 不讀同 repo 其他 worktree 的 `.current/`，要逐一跑。
+
+## 10. 後續裁定（2026-11-13）
+
+**人類裁定：E419 抽掉第 (3)、(4) 項。**
+
+- manifest-tier 保留：它是目前唯一的「預先核准」機制，等票級的預先核准 tier 落地再替換，
+  不先刪以免出現空窗。
+- token budget brake 保留：全自動執行時它是唯一的成本側煞車；之後可能改成每票上限。
+- 兩者的說明文字縮減併入 E418，config key、Escalation Routes 列、script 都不動。
+- E419 剩 bookkeeping_write 與 stamp-provenance 兩項，檔案數約 14 降為約 9；
+  registry 仍是 36 變 34（抽出的兩項本來就不佔錯誤碼），E420 的 34→27 不受影響。
+- 第 4 節「整個拿掉」一列的 Manifest-tier 與 Token Budget Brake 因此改列「prose 縮減、程式保留」；
+  約兩成的節省估計會略降，未實測。
+
+仍待裁：第 8 節第 3 項（三張功能票）、第 4 項的 E417 順序、第 5 項（adopter A 的 `cutApprovalAutoTier`）。
