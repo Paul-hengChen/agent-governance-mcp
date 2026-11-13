@@ -1540,11 +1540,9 @@ function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
   // Workspace config: with local artifacts `.current/` is excluded from git,
   // so the checkout has no config and every opt-in setting would silently
   // fall back to its default in the lane. Copy primary's file as a one-time
-  // snapshot. A config the checkout produced (artifacts tracked in the repo)
-  // is the normal case, left as is with no output. Copy only when git ignores
-  // the lane path (the shared `/.current/` rule): an untracked, unignored
-  // copy would dirty the lane's `git status` and make `finish` refuse to
-  // remove the worktree without --force.
+  // snapshot, only when git ignores the lane path (the shared `/.current/`
+  // rule): an untracked, unignored copy would dirty the lane's `git status`
+  // and make `finish` refuse to remove the worktree without --force.
   const configRel = path.join(".current", ".config.json");
   const primaryConfig = path.join(repoRoot, configRel);
   const laneConfig = path.join(lanePath, configRel);
