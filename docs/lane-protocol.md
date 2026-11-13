@@ -16,6 +16,7 @@
    ```
    `agc` 不在 PATH 上時，改用 agc 安裝位置下的 `bin/agc-init.mjs`，即 `node <agc 安裝位置>/bin/agc-init.mjs`，後面接同樣的子指令與參數；補充規則可指定本 repo 的呼叫方式。worktree 建好之後要先跑的建置指令（若有）見補充規則；建置指令在 worktree 裡跑。
    `feature start` 會建 worktree、把 `node_modules` 連回 primary、複製 `.env`、寫好 exclude 規則。
+   - **lane 的設定檔是開 lane 當下的快照**：checkout 之後 worktree 裡沒有 `.current/.config.json`、而且 git 會忽略這個路徑時（artifacts 不進 git 的 repo 就是這樣），`feature start` 會把 primary 的那份複製進來；checkout 已經帶著這個檔（artifacts 進 git 的 repo）就不動它。之後在 primary 改設定，**不會**自動傳到已經開著的 lane；要讓 lane 跟上，手動再複製一次：`cp <primary>/.current/.config.json <worktree>/.current/.config.json`。
    - **不要在 lane 裡跑會重建 `node_modules` 的安裝指令**（例如 `npm ci`）：`node_modules` 是連回 primary 的 symlink，這類指令會先刪掉整個目錄，連 primary 的一起刪。要改相依套件，先只刪掉 symlink 本身，再安裝（指令見補充規則）。
    - 派工 prompt 裡的 `<worktree>` 一定是絕對路徑（`render` 會把清單裡「相對於 primary」的 worktree 欄解析成絕對路徑）；它只用來 `cd` 與 `EnterWorktree` 的 `path`，**不要**把它寫進任何 tracked 檔（handoff、spec、報告、測試）。tracked 檔提到 worktree 時，用 `../<lanes-dir>/<lane>` 這種相對形式或類別描述。
    - **切進 worktree**：`feature start` 成功之後、其他任何步驟之前，lane 以 `EnterWorktree` 工具（參數 `path` 設為自己的 worktree 絕對路徑）讓 session 改在 worktree 裡執行；切換成功後，harness 每次重置 cwd 都回到 worktree 而不是 primary，所以指令前面不必再逐條加 `cd`。

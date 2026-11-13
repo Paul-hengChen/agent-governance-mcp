@@ -994,6 +994,9 @@ const STR_USAGE_FEATURE =
   "          (default <parent>/<repo>-lanes/<ticket-id>), node_modules\n" +
   "          symlinked to primary's (root, or the directories listed in\n" +
   "          .current/.config.json nodeModulesLinks), .env byte-copied.\n" +
+  "          Primary's .current/.config.json is copied in when the checkout\n" +
+  "          has none and git ignores it there (a snapshot: later edits in\n" +
+  "          primary do not reach the lane).\n" +
   "  feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>] [--pr <n>]\n" +
   "          Tear a lane down from the primary checkout. --shipped requires\n" +
   "          the branch merged into --base (default main), moves the lane's\n" +
@@ -1530,6 +1533,42 @@ function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
         );
       } else {
         throw err;
+      }
+    }
+  }
+
+  // Workspace config: with local artifacts `.current/` is excluded from git,
+  // so the checkout has no config and every opt-in setting would silently
+  // fall back to its default in the lane. Copy primary's file as a one-time
+  // snapshot. A config the checkout produced (artifacts tracked in the repo)
+  // is the normal case, left as is with no output. Copy only when git ignores
+  // the lane path (the shared `/.current/` rule): an untracked, unignored
+  // copy would dirty the lane's `git status` and make `finish` refuse to
+  // remove the worktree without --force.
+  const configRel = path.join(".current", ".config.json");
+  const primaryConfig = path.join(repoRoot, configRel);
+  const laneConfig = path.join(lanePath, configRel);
+  if (
+    fs.existsSync(primaryConfig) &&
+    !lstatOrNull(laneConfig) &&
+    gitTry(lanePath, ["check-ignore", "-q", "--", ".current/.config.json"]).status === 0
+  ) {
+    try {
+      fs.mkdirSync(path.dirname(laneConfig), { recursive: true });
+      fs.copyFileSync(primaryConfig, laneConfig, fs.constants.COPYFILE_EXCL);
+      out.push(
+        "agc feature start — copied .current/.config.json from the primary checkout " +
+          "(a snapshot; later changes there do not reach this lane)"
+      );
+    } catch (err) {
+      if (!err || err.code !== "EEXIST") {
+        // The lane already exists; a failed copy only leaves it on defaults,
+        // so say so instead of aborting the rest of the bootstrap.
+        warn.push(
+          `agc feature start — warning: could not copy .current/.config.json into the lane ` +
+            `(${err && err.message ? err.message : String(err)}) — the lane uses default settings ` +
+            `until it is copied by hand`
+        );
       }
     }
   }
