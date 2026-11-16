@@ -1,0 +1,11 @@
+{"ts":"2026-11-16T06:09:29.309Z","feature":"e417-merge-invariants-lost-row","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":null}
+{"ts":"2026-11-16T06:23:39.962Z","feature":"e417-merge-invariants-lost-row","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T06:37:59.564Z","feature":"e417-merge-invariants-lost-row","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T06:38:44.485Z","feature":"e417-merge-invariants-lost-row","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T06:48:23.984Z","feature":"e417-merge-invariants-lost-row","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T06:52:21.964Z","feature":"e417-merge-invariants-lost-row","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":null}
+{"ts":"2026-11-16T07:04:44.165Z","feature":"e417-merge-invariants-lost-row","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T07:18:21.446Z","feature":"e417-merge-invariants-lost-row","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T07:19:03.472Z","feature":"e417-merge-invariants-lost-row","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T07:30:15.387Z","feature":"e417-merge-invariants-lost-row","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T07:50:43.627Z","feature":"e417-merge-invariants-lost-row","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
