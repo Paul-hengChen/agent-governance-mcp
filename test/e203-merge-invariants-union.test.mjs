@@ -124,6 +124,13 @@ const assertE417Fail = (result, expectedMissing) => {
   assert.ok(!ids(result.findings.compacted).includes("T-A-04"), "T-A-04 is never COMPACTED");
 };
 
+// Accepted-limit pins (spec step 9): ambiguous by construction, so they keep the snapshot-only PASS.
+const assertE417Pass = (result) => {
+  assert.equal(result.code, "PASS", `report:\n${result.report}`);
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(ids(result.findings.missing), []);
+};
+
 test("E417 R1: a row the compacting side added after the merge-base and summarized does not free a slot for a dropped row (case 1)", () => {
   const root = mkRepo();
   const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
@@ -141,17 +148,17 @@ test("E417 R1: a row the compacting side added after the merge-base and summariz
   }
 });
 
-test("E417 R2: the non-compacting side moving a base row out of the section does not free a slot for a dropped row (case 2)", () => {
+test("E417 R2: case 2 (the non-compacting side moved a base row out of the section) stays an accepted limit and passes", () => {
   const root = mkRepo();
   const base = commitTree(root, { "tasks.md": ROWS3 + A04 }, [], "base");
   const p2 = commitTree(root, { "tasks.md": MANIFEST(4) }, [base], "parent2: compact");
   const p1 = commitTree(root, { "tasks.md": `${ROWS3}${NEW_ROW}## Other\n${A04}` }, [base], "parent1: move T-A-04, add T-D-01");
   const merge = commitTree(root, { "tasks.md": `${MANIFEST(4)}## Other\n${A04}` }, [p1, p2], "merge");
   const result = runMergeInvariants(merge, root);
-  assertE417Fail(result, ["T-A-01", "T-A-02", "T-A-03", "T-D-01"]);
+  assertE417Pass(result);
 });
 
-test("E417 R3: a row added on both sides after the merge-base and summarized by one does not free a slot for a dropped row", () => {
+test("E417 R3: the cherry-pick shape (the summarized row is also in the other side's tip) stays an accepted limit and passes", () => {
   const root = mkRepo();
   const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
   const c1 = commitTree(root, { "tasks.md": ROWS3 + A04 }, [base], "parent2: add T-A-04");
@@ -159,7 +166,7 @@ test("E417 R3: a row added on both sides after the merge-base and summarized by 
   const p1 = commitTree(root, { "tasks.md": ROWS3 + A04 + NEW_ROW }, [base], "parent1: add T-A-04 and T-D-01");
   const merge = commitTree(root, { "tasks.md": `${MANIFEST(4)}## Wave\n${A04}` }, [p1, p2], "merge");
   const result = runMergeInvariants(merge, root);
-  assertE417Fail(result, ["T-A-01", "T-A-02", "T-A-03", "T-D-01"]);
+  assertE417Pass(result);
 });
 
 test("E417 R4: a section compacted twice on the compacting side's path does not free a slot for a dropped row", () => {
@@ -186,4 +193,42 @@ test("E417 R5: a compaction reached through a merge commit on the compacting sid
   const merge = commitTree(root, { "tasks.md": MANIFEST(4), "unrelated.txt": "x\n" }, [p1, p2], "merge");
   const result = runMergeInvariants(merge, root);
   assertE417Fail(result, ["T-A-01", "T-A-02", "T-A-03", "T-D-01"]);
+});
+
+const MANIFEST_DV = (d, v) =>
+  `## Compacted History\n<!-- compacted: e203-fixture 2026-11-10 — 1 sections, ${d} [x] rows, ${v} [-] rows summarized below -->\n- Wave: ${d} done, ${v} voided\n`;
+
+test("E417 R6: a voided row the compacting side added after the merge-base and summarized does not free a voided slot for a dropped voided row", () => {
+  const root = mkRepo();
+  const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
+  const c1 = commitTree(root, { "tasks.md": `${ROWS3}- [-] T-A-04 d\n` }, [base], "parent2: add voided T-A-04");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST_DV(3, 1) }, [c1], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": `${ROWS3}- [-] T-D-01 added by main\n` }, [base], "parent1: add voided T-D-01");
+  const merge = commitTree(root, { "tasks.md": MANIFEST_DV(3, 1) }, [p1, p2], "merge");
+  const result = runMergeInvariants(merge, root);
+  assertE417Fail(result, ["T-A-01", "T-A-02", "T-A-03", "T-D-01"]);
+});
+
+test("E417 R7: a completion on the other side is not hidden in the voided count when the compacting side also summarized a post-base row", () => {
+  const root = mkRepo();
+  const baseRows = "## Wave\n- [x] T-A-01 a\n- [x] T-A-02 b\n- [-] T-A-03 c\n";
+  const base = commitTree(root, { "tasks.md": baseRows }, [], "base");
+  const c1 = commitTree(root, { "tasks.md": baseRows + A04 }, [base], "parent2: add T-A-04");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST_DV(3, 1) }, [c1], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": ROWS3 }, [base], "parent1: complete T-A-03");
+  const merge = commitTree(root, { "tasks.md": MANIFEST_DV(3, 1) }, [p1, p2], "merge");
+  const result = runMergeInvariants(merge, root);
+  assertE417Fail(result, ["T-A-01", "T-A-02", "T-A-03"]);
+});
+
+test("E417 R8: a merge that lowers the count for a reopened row still fails when a post-base summarized row and a dropped row both need slots", () => {
+  const root = mkRepo();
+  const reopened = "## Wave\n- [x] T-A-01 a\n- [x] T-A-02 b\n- [ ] T-A-03 c\n";
+  const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
+  const c1 = commitTree(root, { "tasks.md": ROWS3 + A04 }, [base], "parent2: add T-A-04");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST(4) }, [c1], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": reopened + NEW_ROW }, [base], "parent1: reopen T-A-03, add T-D-01");
+  const merge = commitTree(root, { "tasks.md": `${MANIFEST(3)}## Wave\n- [ ] T-A-03 c\n` }, [p1, p2], "merge");
+  const result = runMergeInvariants(merge, root);
+  assertE417Fail(result, ["T-A-01", "T-A-02", "T-D-01"]);
 });
