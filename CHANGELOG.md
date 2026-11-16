@@ -16,6 +16,67 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+MINOR release. It ships four backlog tickets since v4.20.0, each landed on `main` by its own pull
+request: E429 (lane `e429`), E418 (lane `e418`), E417 (lane `e417`, with a spec-text follow-up in
+lane `e417b`) and E421 (a contributor-facing list change). Release gate
+`specs/release-cd-v4.21.0.md`. Semver: MINOR, because `agc feature start` gains a behaviour (it
+copies the workspace config into a new lane) and the merge-invariants check becomes stricter; no
+gate, error code, schema version, tool, prompt, transition table or dependency changes.
+
+### Added
+
+- **A new lane gets the workspace config when tool artifacts are kept local (E429).** In a
+  repository whose `.current/` directory is not tracked by git (the default for `agc init`),
+  `agc feature start` now copies the primary checkout's workspace config file into the new lane
+  when the lane has none, and prints one line saying so (`bin/agc-init.mjs`). Before, every opt-in
+  setting in that file (for example the cut-approval auto-tier or the per-feature token budget)
+  was silently off inside a lane. The copy is a snapshot: a later change in the primary checkout
+  does not reach a lane that is already open, and `docs/lane-protocol.md` names the manual copy. A
+  repository that tracks its artifacts is unaffected, and a file the checkout already has is never
+  overwritten. If the copy fails, the command warns and the lane runs on default settings.
+
+### Changed
+
+- **The served prompt text is shorter; gate behaviour is unchanged (E418).** The gate bullets of
+  constitution section 3.1 (`content/const-08-chain-31-mid.md`: scope decision, cut approval with
+  its auto and manifest tiers, lease override, QA completion evidence, non-QA completed tasks,
+  amend-resume), the coordinator's Escalation Routes table (`content/coord-03-core-fallback.md`),
+  the subagent watermark check (`content/coord-04-host-watermark.md`) and the token observability
+  and token budget brake sections (`content/coord-06-host-token.md`) now state each rule as
+  WHEN / DO / ELSE plus its error code. History and rationale moved to
+  `content/constitution-rationale.md`. No gate, error code, server hint, schema, script or `dist/`
+  file changed: agents get the same rejections with the same hints. Approximate context size
+  (characters / 4): full coordinator bundle 21592 to 19225 tokens, design-armed constitution 10517
+  to 9533, non-design constitution 8518 to 7533; the lean bundle (5731) is unchanged. What you may
+  notice: the wording of these sections changed, so a local check or fork that quotes the old
+  sentences needs updating; and the hop-cap row no longer lists the same-lane continuation
+  conditions in the prompt, it points to section 3 of agc's `docs/lane-protocol.md` instead.
+
+### Fixed
+
+- **The merge-invariants check catches a dropped task row hidden by a compaction (E417).**
+  Condition (c) of the post-merge task-list check (`tools/merge-invariants.ts`, rule in
+  `specs/e126-merge-invariants.md`) used to pass silently, reporting a lost row as compacted, when
+  one side added a closed row after the merge-base and then summarized that section into a count,
+  and the merge dropped a row the other side had added. The snapshot check now runs unchanged and,
+  only when it passes, a second check reads the compacting side's history after the merge-base to
+  recover the rows it summarized. When that history cannot be used (shallow or partial clone,
+  unreadable or too long a history, or counts that do not reconcile), the section falls back to
+  the previous rule and the report prints one `WARN (c) history fallback` line; a fallback never
+  changes the exit code. What you may notice: a merge that passed before can now fail. Besides the
+  provable losses, one family is intended strictness: a merge that keeps a row the compacting side
+  summarized, while a row known only from history also needs a slot in the count, now fails.
+  Accepted limits, unchanged: when the non-compacting side moves a base row out of the section, a
+  legitimate merge and a real drop look the same and the check still passes, as does the
+  cherry-pick shape. New `test/e417-merge-invariants-history.test.mjs`; more cases in
+  `test/e203-merge-invariants-union.test.mjs`.
+
+### Notes
+
+- For contributors to this repository: the integrator's load-sensitive test list in `docs/lane-protocol-addendum.md` names six tests of `test/e108-eject.test.mjs` (context, not changed) instead of two (E421); its pins in `test/e349-integrator-repo-facts.test.mjs` and `test/e355-integrator-generic-wording.test.mjs` follow.
+- Goldens and budgets: 7 compose goldens re-captured for the E418 trim (the 5 lite goldens are unchanged); three caps in `test/context-budget.test.mjs` lowered to 19225, 9533 and 7533 tokens.
+- No schema version, dependency, template, gate, transition table or CI workflow changed; `.github/workflows/release.yml` (context, not changed) is untouched.
+
 ## [4.20.0] - 2026-11-10
 
 MINOR release. It ships two backlog waves since v4.19.4: wave A (lanes `e230`, `e381`, `e238`,

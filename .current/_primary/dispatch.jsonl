@@ -213,3 +213,7 @@
 {"ts":"2026-11-10T08:52:52.934Z","feature":"e421-e108-load-sensitive-list","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T08:54:05.760Z","feature":"e421-e108-load-sensitive-list","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-10T09:15:09.587Z","feature":"e421-e108-load-sensitive-list","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-16T09:17:00.683Z","feature":"release-cd-v4.21.0","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T09:55:29.869Z","feature":"release-cd-v4.21.0","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":null}
+{"ts":"2026-11-16T09:55:34.800Z","feature":"release-cd-v4.21.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-16T10:04:51.628Z","feature":"release-cd-v4.21.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
