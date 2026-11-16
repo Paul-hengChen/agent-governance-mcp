@@ -221,7 +221,7 @@ test("E417 S1: a kept row the compacting side summarized does not free a slot fo
 });
 
 test("E417 N03: S1 family, a modify/delete conflict resolved by keeping the edited row and lowering the count, FAILs", () => {
-  // Review round 2: parent1 edits T-A-03's text and adds T-D-01; the merge keeps both and writes the higher count M(3).
+  // Review round 2: parent1 edits T-A-03's text and adds T-D-01; the merge keeps both and writes the lower count M(3) (P2's M(4) minus the kept row).
   // The edited row is still the same task_id, so it holds its slot; T-A-04 (post-base, summarized) then has none.
   const root = mkRepo();
   const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
