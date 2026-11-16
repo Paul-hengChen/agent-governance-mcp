@@ -12,7 +12,7 @@ code-level contracts sr-engineer implements them with.
   Doc blocks stay at most 7 body lines each (the spec carries the rationale),
   so `agc check` raises no comment-length warning.
 - `dist/tools/merge-invariants.*` (`.js`, `.d.ts` and their maps) — rebuilt with `npm run build`.
-- `test/e203-merge-invariants-union.test.mjs` — sr-owned: AC12 (repro R1, R4–R8; accepted-limit pins R2, R3; review guards FP1–FP5, FN3c).
+- `test/e203-merge-invariants-union.test.mjs` — sr-owned: AC12 repro R1, R4–R8 and accepted-limit pins R2, R3; qa-owned: the seven AC12 review guards FP1, FP2, FP3, FP3b, FP4, FP5, FN3c (regression tests are QA-owned).
 - `qa_reports/expected-red_e417-merge-invariants-lost-row.txt` — sr-owned: R1, R4, R5, R6, R7, R8 listed (R2, R3 lines removed).
 - `test/e417-merge-invariants-history.test.mjs` — qa-owned: AC13 (G1–G8, S1, K1–K2, F1–F7, N1).
 - `scripts/merge-invariants.mjs` — unchanged (it already prints `result.report` on stdout).
@@ -110,7 +110,7 @@ sequenceDiagram
 |---|---|---|
 | Case 1 needs rows that are in neither parent's tip | Read P_c's history between the merge-base and P_c, only for F/S where a verdict depends on it (t1–t3) | Zero cost in ordinary merges; a fresh one-sided compaction costs at most one listing + bounded blob reads per (P_c, F) |
 | Which history rows count as "summarized" | Only rows that left F/S in a commit whose count rose by exactly that many, absent from P_c's tip, and H within P_c's own count | Anything else falls back to the snapshot-only rule |
-| How history enters (c) (re-derived after review round 1) | A second check next to the unchanged snapshot check: `U_hist = (U_snap − K_out) ∪ H_add`; FAIL iff either fails | No FAIL→PASS by construction; with `H_add` empty the verdict is exactly today's, so the round-1 false positives (FP1–FP5) and FN3c are gone; the only non-proof PASS→FAIL is S1 (intended strictness, AC-E203-6 premise) |
+| How history enters (c) (re-derived after review round 1) | A second check next to the unchanged snapshot check: `U_hist = (U_snap − K_out) ∪ H_add`; FAIL iff either fails | No FAIL→PASS by construction; with `H_add` empty the verdict is exactly today's, so the round-1 false positives (FP1–FP5) and FN3c are gone; the only non-proof PASS→FAIL is the S1 family (intended strictness, AC-E203-6 premise) |
 | Reviewer suggestion (a): history only when merge count ≥ P_c's | Not adopted | Not needed for safety (the FPs had empty `H_add`); it would pass R8, a provable loss |
 | Reviewer suggestion (b): keep parent-occurrence states | Adopted, stronger: every `U_snap` id keeps its snapshot state; H's state only for `H_add` ids | Fixes FN3c; `H_add` ids have no other record |
 | `H_add` limited to rows absent from the merge, the merge-base and P_o's tip | Rows any legitimate merge must count | Case 2, the cherry-pick shape and a base row deleted by P_o stay accepted limits: each is indistinguishable from a legitimate merge that un-summarized a kept row |
@@ -150,6 +150,6 @@ None.
    every request.
 4. Replace `firstStderrLine` with exported `historyErrorDetail` (never empty);
    export `gitVersionAllowsNoLazyFetch`.
-5. Tests (sr): rename and flip R2, R3 to PASS pins; add R6, R7, R8 (red first)
-   and the guards FP1, FP2, FP3, FP3b, FP4, FP5, FN3c; update the expected-red
-   manifest (remove R2, R3; add R6, R7, R8). Rebuild `dist/`.
+5. Tests (sr): rename and flip R2, R3 to PASS pins; add R6, R7, R8 (red first);
+   update the expected-red manifest (remove R2, R3; add R6, R7, R8). Rebuild
+   `dist/`. The guards FP1, FP2, FP3, FP3b, FP4, FP5, FN3c are written by QA.
