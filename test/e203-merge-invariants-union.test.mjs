@@ -2,8 +2,8 @@
 // E203: merge-invariants (c) drops a kept row from the union only when the manifest cannot have counted it
 // (specs/e126-merge-invariants.md (c); specs/e406-release-and-merge-scripts.md AC-E203-1..7).
 // WHY: a compaction on one side plus a NEW closed row kept by the merge must not fail as a loss, yet a merge
-// that really drops a row must still fail. The R-1 5-vs-4 case in test/e126-merge-invariants.test.mjs stays
-// the unchanged AC-E203-2 guard; the cherry-pick-shaped false negative is an accepted spec-stated limit.
+// that really drops a row must still fail. E417 (AC12) adds the history check: R1, R4-R8 must FAIL; R2 and R3
+// stay accepted limits that PASS (spec step 9); the FP/FN guards pin that no post-base summarized row = old verdict.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -231,4 +231,75 @@ test("E417 R8: a merge that lowers the count for a reopened row still fails when
   const merge = commitTree(root, { "tasks.md": `${MANIFEST(3)}## Wave\n- [ ] T-A-03 c\n` }, [p1, p2], "merge");
   const result = runMergeInvariants(merge, root);
   assertE417Fail(result, ["T-A-01", "T-A-02", "T-D-01"]);
+});
+
+// E417 AC12 review-round-1 guards (spec step 7 "must keep today's verdict"). Each fixture has no post-base row the
+// compacting side summarized, so the history check adds nothing and the verdict must equal the pre-E417 one.
+const ROWS_VOIDED3 = "## Wave\n- [x] T-A-01 a\n- [x] T-A-02 b\n- [-] T-A-03 c\n";
+const A03_OPEN = "- [ ] T-A-03 c\n";
+const ROWS2 = "## Wave\n- [x] T-A-01 a\n- [x] T-A-02 b\n";
+
+test("E417 FP1: the other side reopens a base row and the merge lowers the count; PASS", () => {
+  const root = mkRepo();
+  const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST(3) }, [base], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": ROWS2 + A03_OPEN }, [base], "parent1: reopen T-A-03");
+  const merge = commitTree(root, { "tasks.md": `${MANIFEST(2)}## Wave\n${A03_OPEN}` }, [p1, p2], "merge");
+  assertE417Pass(runMergeInvariants(merge, root));
+});
+
+test("E417 FP2: case-2 shape with the merge keeping both rows and lowering the count; PASS", () => {
+  const root = mkRepo();
+  const base = commitTree(root, { "tasks.md": ROWS3 + A04 }, [], "base");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST(4) }, [base], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": `${ROWS3}${NEW_ROW}## Other\n${A04}` }, [base], "parent1: move T-A-04, add T-D-01");
+  const merge = commitTree(root, { "tasks.md": `${MANIFEST(3)}## Wave\n${NEW_ROW}## Other\n${A04}` }, [p1, p2], "merge");
+  assertE417Pass(runMergeInvariants(merge, root));
+});
+
+test("E417 FP3: the other side un-voids a base row and the merge counts it done; PASS", () => {
+  const root = mkRepo();
+  const base = commitTree(root, { "tasks.md": ROWS_VOIDED3 }, [], "base");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST_DV(2, 1) }, [base], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": ROWS3 }, [base], "parent1: un-void T-A-03");
+  const merge = commitTree(root, { "tasks.md": MANIFEST_DV(3, 0) }, [p1, p2], "merge");
+  assertE417Pass(runMergeInvariants(merge, root));
+});
+
+test("E417 FP3b: the other side voids a base row and the merge counts it voided; PASS", () => {
+  const root = mkRepo();
+  const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST(3) }, [base], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": ROWS_VOIDED3 }, [base], "parent1: void T-A-03");
+  const merge = commitTree(root, { "tasks.md": MANIFEST_DV(2, 1) }, [p1, p2], "merge");
+  assertE417Pass(runMergeInvariants(merge, root));
+});
+
+test("E417 FP4: reopened base row plus a new row, merge keeps the compacting side's count; PASS", () => {
+  const root = mkRepo();
+  const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST(3) }, [base], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": ROWS2 + A03_OPEN + NEW_ROW }, [base], "parent1: reopen T-A-03, add T-D-01");
+  const merge = commitTree(root, { "tasks.md": `${MANIFEST(3)}## Wave\n${A03_OPEN}` }, [p1, p2], "merge");
+  assertE417Pass(runMergeInvariants(merge, root));
+});
+
+test("E417 FP5: the other side moves a base row to a lane ledger and the merge lowers the root count; PASS", () => {
+  const root = mkRepo();
+  const lane = ".current/lane-a/tasks.md";
+  const base = commitTree(root, { "tasks.md": ROWS3 }, [], "base");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST(3) }, [base], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": ROWS2, [lane]: "## Wave\n- [x] T-A-03 c\n" }, [base], "parent1: move T-A-03 to the lane ledger");
+  const merge = commitTree(root, { "tasks.md": MANIFEST(2), [lane]: "## Wave\n- [x] T-A-03 c\n" }, [p1, p2], "merge");
+  assertE417Pass(runMergeInvariants(merge, root));
+});
+
+test("E417 FN3c: a completion folded into the compacting side's voided count still FAILs", () => {
+  // WHY: the other side's [x] for T-A-03 keeps its snapshot state; history must never re-label it voided and hide the loss.
+  const root = mkRepo();
+  const base = commitTree(root, { "tasks.md": ROWS_VOIDED3 }, [], "base");
+  const p2 = commitTree(root, { "tasks.md": MANIFEST_DV(2, 1) }, [base], "parent2: compact");
+  const p1 = commitTree(root, { "tasks.md": ROWS3 }, [base], "parent1: complete T-A-03");
+  const merge = commitTree(root, { "tasks.md": MANIFEST_DV(2, 1) }, [p1, p2], "merge");
+  assertE417Fail(runMergeInvariants(merge, root), ["T-A-01", "T-A-02", "T-A-03"]);
 });
