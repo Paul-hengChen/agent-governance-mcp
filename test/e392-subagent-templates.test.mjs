@@ -196,13 +196,18 @@ test("AC8 [E404 re-pin]: release-engineer template has no example reply suffix a
   assert.ok(lines[12].trim() !== "", "no trailing blank line");
 });
 
-test("AC9: @release-engineer is absent from the coord-04 haiku list and from the claude-code composition", () => {
-  const line5 = readContent("coord-04-host-watermark.md").split("\n")[4];
-  assert.ok(line5.includes("Haiku-tier subagents (`@lite`, `@doc-writer`)"), "line 5 carries the two-role haiku list");
-  assert.ok(!/Haiku-tier subagents \([^)]*@release-engineer/.test(line5), "release-engineer must not be in the haiku list");
+test("AC9 [E418 re-pin]: no haiku-tier list names @release-engineer in coord-04 or the claude-code composition; the tier comes from dispatch_pins/model frontmatter", () => {
+  // E418 trimmed coord-04 to a three-line rule and dropped the enumerated haiku list; the
+  // surviving invariant is that release-engineer is never described as haiku-tier, and that
+  // coord-04 resolves the expected tier from the pin / frontmatter instead of a role list.
+  const coord04 = readContent("coord-04-host-watermark.md");
   const composed = expectedSop("claude-code");
-  assert.ok(composed.includes("Haiku-tier subagents (`@lite`, `@doc-writer`)"));
-  assert.ok(!/Haiku-tier subagents \([^)]*@release-engineer/.test(composed));
+  const haikuWithRelease = /haiku[^\n]*@release-engineer|@release-engineer[^\n]*haiku/i;
+  assert.ok(!haikuWithRelease.test(coord04), "coord-04 must not pair release-engineer with haiku");
+  assert.ok(!haikuWithRelease.test(composed), "composition must not pair release-engineer with haiku");
+  assert.ok(!coord04.includes("Haiku-tier subagents"), "the enumerated haiku list is gone from coord-04");
+  assert.ok(coord04.includes("`dispatch_pins` entry, else its `model` frontmatter"), "coord-04 states the tier rule that replaced the list");
+  assert.ok(composed.includes("`dispatch_pins` entry, else its `model` frontmatter"), "composition carries the tier rule");
 });
 
 // ---------------------------------------------------------------------------

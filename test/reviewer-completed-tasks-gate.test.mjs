@@ -84,6 +84,9 @@ test("FM1: code-reviewer CHANGES_REQUESTED-shaped write carrying non-empty compl
     result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
     `expected REVIEWER_COMPLETED_TASKS_REJECTED; got: ${result.content[0].text}`,
   );
+  // E418 hint sufficiency: the rejection must say where the review scope goes instead, and what to omit.
+  assert.match(result.content[0].text, /review_task_ids/, "hint redirects the review scope to review_task_ids");
+  assert.match(result.content[0].text, /Omit\s+completed_tasks/i, "hint tells the writer to omit completed_tasks");
 });
 
 // ---------------------------------------------------------------------------
@@ -246,6 +249,10 @@ for (const [role, label] of NON_QA_SELF_LOOP_IDENTITIES) {
       !result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
       "a non-code-reviewer, non-qa-engineer identity must get the NEW code, not the pre-existing c16 code",
     );
+    // E418 hint sufficiency: const-08 no longer spells the predicate; the hint must name who may write
+    // completed_tasks and what to do.
+    assert.match(result.content[0].text, /only agent_id=qa-engineer may grow completed_tasks/, "hint names the sole permitted writer");
+    assert.match(result.content[0].text, /Omit\s+completed_tasks/i, "hint tells the writer to omit completed_tasks");
     assert.deepEqual(
       parseHandoff(ws).completed_tasks,
       [],

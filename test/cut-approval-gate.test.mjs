@@ -1032,3 +1032,23 @@ test("XC1: EXTERNAL_REFS_UNRESOLVED error code present verbatim in dist/tools/ha
     "compiled orchestrator must contain the verbatim error code EXTERNAL_REFS_UNRESOLVED",
   );
 });
+
+test("E418: the PM-only CUT_APPROVAL_REQUIRED hint is complemented by served prose naming the coordinator-attested writer", () => {
+  // WHY: the gate's rejection hint names only the PM path ("PM must present ... Set cut_approved: true on
+  // the pm:In_Progress write"). Under subagent dispatch the PM ends its turn after presenting the draft,
+  // so the writer that can clear the gate is the coordinator. E418 shortened the served prose; this pins
+  // that the two places that tell a role about the coordinator path survived the trim.
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const const08 = fs.readFileSync(path.join(root, "content", "const-08-chain-31-mid.md"), "utf-8");
+  const coord03 = fs.readFileSync(path.join(root, "content", "coord-03-core-fallback.md"), "utf-8");
+  assert.ok(const08.includes("under subagent dispatch"), "const-08 names the subagent-dispatch case");
+  assert.ok(
+    const08.includes('it is the coordinator, via `tw_update_state(agent_id="pm", cut_approved: true'),
+    "const-08 names the coordinator as the sanctioned writer and the attestation call shape",
+  );
+  assert.ok(const08.includes("CUT_APPROVAL_REQUIRED"));
+  assert.ok(
+    coord03.includes("YOU are the sanctioned writer") && coord03.includes('tw_update_state(agent_id="pm", cut_approved: true'),
+    "coord-03 writer obligation tells the coordinator to write the attestation",
+  );
+});
