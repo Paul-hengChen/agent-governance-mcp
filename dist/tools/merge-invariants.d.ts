@@ -105,6 +105,15 @@ export interface HistoryFallback {
 export declare function compactionHistoryRequests(p1: CommitSnapshot, p2: CommitSnapshot, _base: CommitSnapshot, merge: CommitSnapshot): HistoryRequest[];
 /** Every requested section of one walk falls back with the same reason. */
 export declare function historyFallbackAll(req: HistoryRequest, reason: HistoryFallbackReason, detail: string): SectionHistory[];
+/** WARN detail for a failed git call: first non-empty stderr line, else message line, else a fixed text; never empty. */
+export declare function historyErrorDetail(err: unknown, subcommand: string): string;
+/** True iff `git version` output names 2.44 or later (the first release honouring GIT_NO_LAZY_FETCH). */
+export declare function gitVersionAllowsNoLazyFetch(versionText: string): boolean;
+/** Run probes p1-p3 (spec step 2): shallow, or an unreadable detail, or null when walks may read. */
+export declare function probeHistoryReadable(repoRoot: string): {
+    reason: "shallow" | "unreadable";
+    detail: string;
+} | null;
 /**
  * One walk over P_c's history between the merge-base and P_c for ledger F,
  * one entry per requested section. Never throws: shallow, unreadable and
