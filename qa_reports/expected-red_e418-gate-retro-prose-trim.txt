@@ -14,7 +14,7 @@ test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("s
 # Hop-cap continuation conditions (a)-(f) moved out of the coord-03 HOP_CAP_EXCEEDED row to docs/lane-protocol.md §3 (pointer left in the row).
 test/e295-hop-cap-and-sop-halves.test.mjs | AC4: coord-03 HOP_CAP_EXCEEDED row names the same-lane continuation conditions
 
-# coord-04 is now a short pointer; its line 5 (the haiku-tier rationale list) no longer exists.
+# coord-04 is now a short three-line rule; its line 5 no longer carries the haiku-tier rationale list.
 test/e392-subagent-templates.test.mjs | AC9: @release-engineer is absent from the coord-04 haiku list and from the claude-code composition
 
 # const-08 Lease-Override no longer cites the repo-only source file gates/feature-lease.ts (content/** ships to adopters); the predicate is stated in words.

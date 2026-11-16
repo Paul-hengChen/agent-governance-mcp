@@ -28,7 +28,7 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 | the `next_role` field is absent with no escalation prose | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
 | `hop_count` from `tw_get_state` ≥ the `hop` cap for the active feature, or a write was rejected with `HOP_CAP_EXCEEDED` (server-enforced) | — | surface the hop cap (`hop_count={n}`) — autonomous dispatch is frozen at PM until a human re-scopes into a new feature or overrides. The human's only shortcut is a same-lane continuation, allowed only under the conditions in agc's `docs/lane-protocol.md` §3 | human |
 | **Token budget brake** — `.current/.config.json` sets `tokenBudgetPerFeature` AND the feature's running total (§Token Budget Brake) ≥ 80% of it | — | `token budget: {running_total} / {tokenBudgetPerFeature} ({pct}%) — handing to human` | human |
-| **Crash detection** — a dispatched subagent call returns a tool-error or an empty/truncated reply, or is reported killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed | — | run the Crash-Resume Protocol before any resume or re-dispatch (fresh-session counterpart: the next row) | (role being resumed) |
+| **Crash detection** — a dispatched subagent call returns a tool-error or an empty/truncated reply, or is reported killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | run the Crash-Resume Protocol before any resume or re-dispatch (fresh-session counterpart: the next row) | (role being resumed) |
 | **Stale-dispatch detection** — `tw_get_state` returns a `stale_dispatch` advisory (`dispatched_at` over 15 min old with no later write; read from persisted state, so a fresh session sees it too) | — | run the Crash-Resume Protocol before any resume or re-dispatch | (role named by `stale_dispatch.role`) |
 | **Claim-vs-state mismatch**<!-- origin:start --> (v3.103.0, E72)<!-- origin:end --> — after EVERY handoff, `tw_get_state` and diff the finished role's claims (`completed_tasks`, `pending_notes`, the evidence file it names) against what landed; no gate catches this class | — | do not route on the reply — ground-truth first (Crash-Resume class), then re-dispatch with the mismatch stated in the brief | (role being re-dispatched) |
 | **Cut-approval gate** — `next_role` is `architect` or `sr-engineer` but `cut_approved` is unset (`CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — no auto-hop to build; writer obligation below (sole exception: a cut qualifying for the Constitution §3.1 Cut-Approval Auto-Tier — writer actions below, no halt) | human |
@@ -99,6 +99,6 @@ that is how a dispatch-time `model` pin gets silently dropped from the resume ca
    not in your context (do NOT grep `pending_notes` — legacy `dispatch_pins:` note lines are inert).
    Passing the override is all the coordinator can do here — it has no channel to confirm which model
    actually served the resumed turn. After the resumed role replies, run Subagent Reply Watermark
-   Validation as usual, checking the tier against the pin per the Pinned-tier expectation below, not
+   Validation as usual, checking the tier against the pin as that section's `dispatch_pins` rule requires, not
    the frontmatter default.
 
