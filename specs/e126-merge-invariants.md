@@ -240,7 +240,9 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
      with detail `partial clone and git older than 2.44 (or version not
      recognised); history is not read to avoid a fetch`. Chosen over
      "require git 2.44": the check keeps working on any git, and only the
-     one configuration that could fetch loses the history read.
+     one configuration that could fetch loses the history read. When
+     `git version` itself fails, the class is the same but the detail is
+     the git error text (step 5's `<detail>` rule), not the fixed wording.
 
    Every walk read runs with `GIT_NO_LAZY_FETCH=1` in its environment, so on
    git 2.44+ a partial clone's missing object becomes an unreadable-history
@@ -400,12 +402,27 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    |---|---|---|---|---|
    | S1 kept summarized row plus a post-base summarized row | P2 adds A04, compacts M(4); P1 = base; merge keeps A03 `[x]` literally and writes M(3) | H A01..04; `H_add` A04; A03 in H so not in `K_out` | 3 ≤ 3 / 4 > 3 | PASS → **FAIL**, MISSING A01, A02 |
 
-   S1's snapshots and history are identical to a merge that kept A03 AND
-   its count and erased A04's. FAIL is chosen for the same reason
-   AC-E203-6 already FAILs its twin (kept A03, dropped D01): a kept row
-   the compacting side summarized never frees a manifest slot. It needs a
-   hand-edited count and a hand-kept summarized row; the alternative reading
-   loses a completed row silently.
+   S1 is one member of a family. A kept row holds a slot in both checks
+   when it is a closed base row of S that P_c summarized and P_o still has
+   closed under S, wherever the merge keeps it (another section included)
+   and whatever its text; a kept row P_o reopened holds none (`E417 G7`).
+   So a merge FAILs whenever it keeps such a row while a history-only row
+   (an `H_add` id) also needs a slot, and its count leaves no slot for both.
+   The realistic way in is a modify/delete conflict (review round 2, N03):
+   P1 edits A03's text and adds D01; the merge keeps the edited A03 and D01
+   and writes M(3), P2's count minus A03 → FAIL, MISSING A01, A02. The
+   variant N04 keeps A03 under `## Other` with M(3) and FAILs the same way.
+   FAIL is chosen because, in counts, snapshots and history, these merges
+   are identical to one that kept A03 AND its count and erased A04's. It
+   extends an existing rule rather than adding one: the same shape without
+   the post-base row (N02: P2 M(3); merge keeps the edited A03 and D01,
+   M(2)) already FAILs before E417, on AC-E203-6's premise that a kept row
+   the compacting side summarized never frees a manifest slot. The
+   alternative reading loses a completed row silently. A merge that hits
+   this passes by keeping P2's count, M(4), alongside the kept row. Pinned
+   by `E417 S1`, `E417 N03` and `E417 N02` in
+   `test/e417-merge-invariants-history.test.mjs`; N04 was run in review
+   round 2 and has no test of its own.
 
    *Must keep today's verdict — review round 1 cases and companions:*
 
@@ -451,8 +468,8 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    nothing that fails today passes; the history check can fail only when
    `H_add` is non-empty, and then only by counting rows a legitimate merge
    must count, plus kept rows the compacting side summarized — the premise
-   the E203 rule already applies (S1 is the one shape where that premise
-   turns a PASS into a FAIL, listed as intended strictness). Whenever P_c's
+   the E203 rule already applies (the S1 family is the one shape where that
+   premise turns a PASS into a FAIL, listed as intended strictness). Whenever P_c's
    history breaks step 3's premises the rule falls back to the snapshot
    check alone — never to a stricter one — with a WARN line.
 
@@ -634,7 +651,8 @@ never the working directory) — reimplement the same dedup algorithm against
   MISSING when dropped, exit 1 (R1 counter-example)", "AC11: a merge that
   compacts S while both parents added different closed rows exceeding the
   manifest count reports every row MISSING, exit 1 (R-1 5-vs-4 fixture)"
-- **AC12** (E417, condition (c) history rule — sr-engineer, in
+- **AC12** (E417, condition (c) history rule — sr-engineer for the repro
+  and accepted-limit groups, qa-engineer for the review round 1 guards, in
   `test/e203-merge-invariants-union.test.mjs`). Fixtures build multi-commit
   parent paths with `commitTree`, literals as in that file (`ROWS3`,
   `MANIFEST(n)`, `NEW_ROW`); shapes exactly as the step-7 rows of the
@@ -659,7 +677,8 @@ never the working directory) — reimplement the same dedup algorithm against
     - **R2** → "E417 R2: case 2 (the non-compacting side moved a base row out of the section) stays an accepted limit and passes" — PASS, exit 0, no MISSING.
     - **R3** → "E417 R3: the cherry-pick shape (the summarized row is also in the other side's tip) stays an accepted limit and passes" — PASS, exit 0, no MISSING.
   - **Review round 1 guards (green before and after; NOT in the
-    manifest)** — step-7 rows of the same id, each run once:
+    manifest; written by qa-engineer, since regression tests are
+    QA-owned)** — step-7 rows of the same id, each run once:
     - "E417 FP1: the other side reopens a base row and the merge lowers the count; PASS" — PASS, no MISSING.
     - "E417 FP2: case-2 shape with the merge keeping both rows and lowering the count; PASS" — PASS.
     - "E417 FP3: the other side un-voids a base row and the merge counts it done; PASS" — PASS.
@@ -746,7 +765,7 @@ appear to conflict or under-state scope.
 | T-E126-06 (qa) | AC10 | mirrors VR-39/VR-40 for `tasks.md` |
 | T-E417-01 (architect) | AC12, AC13 (spec only) | the *Condition (c) history rule (E417)* block and AC12/AC13 |
 | T-E417-02 (sr) | AC12 (repro first, expected-red manifest), then the rule | `tools/merge-invariants.ts` + `dist/tools/merge-invariants.*`; contracts in `specs/e417-merge-invariants-lost-row-architecture.md` |
-| T-E417-03 (qa) | AC12 green, AC13 | new `test/e417-merge-invariants-history.test.mjs`; review O-2 is moot after the re-derivation (the cherry-pick shape stays an accepted limit, now alongside case 2), so the header comment of `test/e203-merge-invariants-union.test.mjs` only needs case 2 added if sr has not done it |
+| T-E417-03 (qa) | AC12 green and its seven review round 1 guards, AC13 | new `test/e417-merge-invariants-history.test.mjs`; review O-2 is moot after the re-derivation (the cherry-pick shape stays an accepted limit, now alongside case 2), so the header comment of `test/e203-merge-invariants-union.test.mjs` only needs case 2 added if sr has not done it |
 
 Decision on how to carry this (integrator's "your call, state which"): kept
 the six existing task rows as-is and added this table rather than
