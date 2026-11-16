@@ -1,0 +1,10 @@
+{"ts":"2026-11-13T10:39:14.396Z","feature":"e429-lane-config-copy","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-11-13T10:49:32.170Z","feature":"e429-lane-config-copy","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-13T10:56:59.202Z","feature":"e429-lane-config-copy","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-13T10:57:38.006Z","feature":"e429-lane-config-copy","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-13T11:00:31.110Z","feature":"e429-lane-config-copy","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-13T11:02:16.564Z","feature":"e429-lane-config-copy","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-13T11:02:46.562Z","feature":"e429-lane-config-copy","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-13T11:03:56.011Z","feature":"e429-lane-config-copy","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-13T11:04:32.178Z","feature":"e429-lane-config-copy","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-13T11:12:34.774Z","feature":"e429-lane-config-copy","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
