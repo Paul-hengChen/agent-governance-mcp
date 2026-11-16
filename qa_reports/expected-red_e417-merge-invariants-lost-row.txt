@@ -1,0 +1,8 @@
+# E417 repro (bugfix mode, AC12): red against the pre-E417 condition (c) — the dropped row is reported COMPACTED, exit 0.
+# Green once the condition (c) history check lands in tools/merge-invariants.ts.
+test/e203-merge-invariants-union.test.mjs | E417 R1: a row the compacting side added after the merge-base and summarized does not free a slot for a dropped row (case 1)
+test/e203-merge-invariants-union.test.mjs | E417 R4: a section compacted twice on the compacting side's path does not free a slot for a dropped row
+test/e203-merge-invariants-union.test.mjs | E417 R5: a compaction reached through a merge commit on the compacting side's path still counts against a dropped row
+test/e203-merge-invariants-union.test.mjs | E417 R6: a voided row the compacting side added after the merge-base and summarized does not free a voided slot for a dropped voided row
+test/e203-merge-invariants-union.test.mjs | E417 R7: a completion on the other side is not hidden in the voided count when the compacting side also summarized a post-base row
+test/e203-merge-invariants-union.test.mjs | E417 R8: a merge that lowers the count for a reopened row still fails when a post-base summarized row and a dropped row both need slots
