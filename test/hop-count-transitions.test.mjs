@@ -204,6 +204,11 @@ test("t-gate-fires-at-cap: hop_count >= HOP_CAP on a role transition rejects wit
   assert.equal(r.error, "HOP_CAP_EXCEEDED");
   assert.deepEqual(r.allowed, [{ new_agent: "pm", new_status: "In_Progress" }]);
   assert.match(r.hint, /hop_count=14/);
+  // E418 hint sufficiency: the served Escalation row is now one line plus a pointer; the hint must state
+  // the only legal landing and the reset rule on its own.
+  assert.match(r.hint, /Only the \(pm, In_Progress\) landing is allowed/);
+  assert.match(r.hint, /resets only on active_feature change/);
+  assert.match(r.hint, /human must re-scope or override/);
 });
 
 test("t-gate-fires-above-cap: hop_count > HOP_CAP (migration/hand-edit case) still rejects (>= predicate, not ===)", () => {

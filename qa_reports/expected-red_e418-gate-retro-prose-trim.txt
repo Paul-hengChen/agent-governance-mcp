@@ -1,0 +1,21 @@
+# E418 prose trim (sr-engineer, T-E418-01..03). Every entry below is red only because served
+# prose in content/const-08, coord-03, coord-04 or coord-06 was shortened; T-E418-04 (qa) re-captures
+# or re-pins them. No gate, schema, error code, script or dist behaviour changed.
+
+# Compose goldens: byte-identity fixtures embed the trimmed const-08 / coord-03 / coord-04 / coord-06 text.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# Hop-cap continuation conditions (a)-(f) moved out of the coord-03 HOP_CAP_EXCEEDED row to docs/lane-protocol.md §3 (pointer left in the row).
+test/e295-hop-cap-and-sop-halves.test.mjs | AC4: coord-03 HOP_CAP_EXCEEDED row names the same-lane continuation conditions
+
+# coord-04 is now a short three-line rule; its line 5 no longer carries the haiku-tier rationale list.
+test/e392-subagent-templates.test.mjs | AC9: @release-engineer is absent from the coord-04 haiku list and from the claude-code composition
+
+# const-08 Lease-Override no longer cites the repo-only source file gates/feature-lease.ts (content/** ships to adopters); the predicate is stated in words.
+test/feature-lease.test.mjs | E10-AC8a: content/const-08-chain-31-mid.md carries the Lease-Override bullet — sanctioned-writer rule, any-edge scope, stricter audit requirement, transient/write-scoped, file-mode only (spec AC8a)

@@ -149,6 +149,13 @@ test("R4: verdict + completed_tasks growth + ZERO review evidence anywhere is RE
   // MISSING_REVIEW_EVIDENCE) — this is the error the writer actually sees.
   assert.match(result.content[0].text, /QA_COMPLETION_EVIDENCE_MISSING/);
   assert.deepEqual(parseHandoff(ws).completed_tasks, []);
+  // E418 hint sufficiency: const-08 keeps the rule short; the hint must carry the evidence locations
+  // and both repair routes (record evidence, or move scope to review_task_ids on the APPROVED handoff).
+  const hintText = result.content[0].text;
+  assert.match(hintText, /qa_reports\/review_<id>\.md/, "hint names the per-id evidence file");
+  assert.match(hintText, /covers:/, "hint names the covers: batch form");
+  assert.match(hintText, /review_task_ids/, "hint names the review_task_ids route");
+  assert.match(hintText, /code-reviewer APPROVED handoff/, "hint addresses the reviewer APPROVED handoff case");
 });
 
 // ===========================================================================

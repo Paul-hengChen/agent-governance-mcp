@@ -1039,6 +1039,10 @@ test("E10-AC2a: lease_override:true with EMPTY pending_notes is rejected LEASE_O
     "must NOT silently fall through to the plain FEATURE_LEASE_HELD envelope — LEASE_OVERRIDE_AUDIT_MISSING is a distinct code, not a relabeling",
   );
   assert.equal(parseHandoff(ws).active_feature, "flease-a", "the incumbent must remain untouched after the rejected write");
+  // E418 hint sufficiency: const-08 states the rule in one line; the rejection hint alone must tell the
+  // writer how to repair (which field slot, which prefix, that a reason is required).
+  assert.match(result.content[0].text, /pending_notes\[0\]/, "hint names the audit-note slot");
+  assert.match(result.content[0].text, /lease-override: <reason>/, "hint names the required note prefix and reason");
 });
 
 test("E10-AC2b: lease_override:true with a MISMATCHED pending_notes[0] (does not match /^lease-override:/) is likewise rejected LEASE_OVERRIDE_AUDIT_MISSING (spec AC2)", async () => {
@@ -1426,7 +1430,10 @@ test("E10-AC8a: content/const-08-chain-31-mid.md carries the Lease-Override bull
   );
   assert.ok(const08.includes("`LEASE_OVERRIDE_AUDIT_MISSING`"), "must backtick-quote the audit-gate error code");
   assert.ok(const08.includes("transient"), "must state the transient/write-scoped lifetime");
-  assert.ok(const08.includes("gates/feature-lease.ts"), "must cross-reference the predicate's E1/E1A/E13 header lineage rather than restating it");
+  // E418 re-pin: the predicate is stated in words (content/** ships to adopters, so it must not cite
+  // the repo-only source path gates/feature-lease.ts); pin the stated predicate and the path's absence.
+  assert.ok(const08.includes("incumbent feature non-terminal and fresh"), "must state the lease predicate in words");
+  assert.ok(!const08.includes("gates/feature-lease.ts"), "must not cite a repo-only source path from adopter-served content");
 });
 
 test("E10-AC8b: content/const-08-chain-31-mid.md carries the Bookkeeping-Write bullet — timestamp-preservation semantics, same-active_feature restriction, migration heal-write hard-wired equivalent (spec AC8b)", () => {

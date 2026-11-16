@@ -53,16 +53,23 @@ test("AC3: d2 specs end with the E295 amendment section (the base body is pinned
   }
 });
 
-test("AC4: coord-03 HOP_CAP_EXCEEDED row names the same-lane continuation conditions", () => {
-  const rows = COORD03.split("\n").filter((l) => l.includes("HOP_CAP_EXCEEDED") && l.includes("-r<n>-fix"));
-  assert.equal(rows.length, 1, "exactly one table row carries HOP_CAP_EXCEEDED and the -r<n>-fix continuation");
+test("AC4 [E418 re-pin]: coord-03 HOP_CAP_EXCEEDED row freezes dispatch, defers to a human and points at lane-protocol §3, which carries the continuation conditions", () => {
+  const rows = COORD03.split("\n").filter((l) => l.includes("HOP_CAP_EXCEEDED") && l.includes("lane-protocol"));
+  assert.equal(rows.length, 1, "exactly one table row carries HOP_CAP_EXCEEDED and the lane-protocol pointer");
   const row = rows[0];
   assert.ok(row.startsWith("|"), "still a table row");
   assert.ok(row.includes("`HOP_CAP_EXCEEDED`"), "backtick-quoted (error-code-contract mapping)");
-  assert.ok(row.includes("lease-override: hop-cap continuation of <feature>"));
-  assert.match(row, /one continuation|once per feature/i);
-  assert.ok(row.includes("lease_override: true"));
-  assert.match(row, /human/);
+  assert.match(row, /same-lane continuation/);
+  assert.ok(row.includes("`docs/lane-protocol.md` §3"), "names the section that holds the conditions");
+  assert.match(row, /\| human \|$/, "next_role is human");
+  // E418 moved conditions (a)-(f) out of the served row; pin them at their new home.
+  const bullet = LANE.split("\n").find((l) => l.includes("HOP_CAP_EXCEEDED"));
+  assert.ok(bullet, "lane-protocol §3 carries the HOP_CAP_EXCEEDED bullet");
+  assert.ok(bullet.includes("lease-override: hop-cap continuation of <feature>"));
+  assert.ok(bullet.includes("lease_override: true"));
+  assert.ok(bullet.includes("-r<n>-fix"));
+  assert.match(bullet, /每個 feature 只能接續一次/);
+  assert.match(bullet, /人類/);
 });
 
 test("AC5: lane-protocol carries the hop rule, 7/14 example, and keeps the no-push line", () => {

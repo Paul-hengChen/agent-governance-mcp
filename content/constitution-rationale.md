@@ -99,6 +99,28 @@ re-blocked — the gate fires once, at the moment scope should have been decided
 nags afterward. It is independent of the visual evidence gate (different edge, different
 artifacts) and silent for non-design workspaces.
 
+**Cut-approval gates (v3.46.0, v3.85.0).** A human approves the ticket cut before any build
+role receives the handoff, visual feature or not: cut review is the highest-leverage human
+checkpoint in the chain. That is why the Auto-Tier is opt-in per workspace — removing the
+checkpoint is an explicit decision, never a default — and why its omitted fields default to
+the most conservative values.
+
+**Lease-Override audit (v3.80.0).** Unlike `cut_approved`, a lease bypass must carry its
+reason in `pending_notes[0]`: an unaudited bypass of the clobber guard is never silently
+accepted.
+
+**Completion-evidence gates (v3.86.0, v3.100.0).** Identity on a write is attestation-based
+by design, so the server verifies what it can: a completion claim must be backed by on-disk
+evidence regardless of who stamps it. The QA Completion-Evidence gate diffs an incoming
+`qa-engineer` write against the on-disk set, so ids a non-qa role persisted earlier would
+contribute no difference and slip past it — the Non-QA Completed-Tasks gate closes that
+prefill door upstream. Its predicate is strict (any non-empty list, not a set-difference)
+because a set-difference is exactly the shape of that bypass, and it has no exemptions
+because an exemption on this class of check is the hole that reopened once already (E32).
+
+**Amend-Resume edge (v3.46.0).** Letting PM hand back straight to the stranded judge avoids
+a manufactured detour through sr-engineer when the fix is spec-only.
+
 ---
 
 ## §3.2 — Visual-verdict authority and separation of duties: the false-PASS war-story
