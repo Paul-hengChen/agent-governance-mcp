@@ -128,10 +128,11 @@ FOUR conditions (a)–(d) hold:
     never itself reported MISSING or COMPACTED. This kept-row rule is the
     **snapshot-only rule**. Amended (E417): when exactly one parent's own
     copy of F names S, the four snapshots are supplemented by that
-    parent's history between the merge-base and itself, and for that F/S
-    the kept-row rule above is replaced — see *Condition (c) history rule
-    (E417)* below, which also states the limits that remain (it replaces
-    the earlier "known limit" note). The
+    parent's history between the merge-base and itself: this snapshot-only
+    check stays exactly as stated here and a second, history check is
+    added next to it — see *Condition (c) history rule (E417)* below, which
+    also states the limits that remain (it replaces the earlier "known
+    limit" note). The
     manifest's `(done, voided)` pair for section S must be `>=`
     `U`'s own `(done, voided)` split. This is REQUIRED, not optional:
     presence of a same-named section in the manifest alone would let a
@@ -169,12 +170,17 @@ FOUR conditions (a)–(d) hold:
 false negative: a row a compacting side added under S after the merge-base
 and then summarized is in neither parent's tree, so it never enters `U`,
 yet the manifest counts it — that slot is then taken by a row of the other
-side the merge really dropped (reported COMPACTED, exit 0). The same
-happens when the NON-compacting side moves a base row out of S (the
-manifest counted it, but the other side's tip no longer has it under S). The
+side the merge really dropped (reported COMPACTED, exit 0). The
 compacting side's pre-compaction rows exist only in history between the
 merge-base and that parent; this rule reads exactly that history, only
-when a verdict depends on it.
+when a verdict depends on it, and uses it only to ADD a second, history
+check next to the unchanged snapshot-only check (step 4). Re-derived after
+code-review round 1 of E417 (the first version of step 4 replaced the
+snapshot-only `U` and produced new false positives when the merge's count
+for S was below P_c's, and one new false negative; the cases are rows of
+the step-7 table). The second shape first filed with E417 — the
+NON-compacting side moves a base row out of S — is NOT closed: it is
+ambiguous by construction (step 9).
 
 *Terms.* For a ledger file F and a section S: `entry_C(S)` is the
 `(done, voided)` pair `parseLedger` reports for S in F's manifest at commit
@@ -210,12 +216,36 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    P_c's path is seen). Then, for each listed commit C and each of C's real
    parents, F's content at that commit (a path absent from that commit's
    tree is an empty ledger, not an error), read through the run's shared
-   blob cache and parsed with `parseLedger`. Once per run, and only when at
-   least one walk is requested, `git rev-parse --is-shallow-repository`.
-   Every walk read runs with `GIT_NO_LAZY_FETCH=1` in its environment, so a
-   partial clone's missing object becomes an unreadable-history fallback,
-   never a network fetch (the tool writes nothing, object store included).
-   `<cap>` is `HISTORY_COMMIT_CAP` = 256.
+   blob cache and parsed with `parseLedger`. `<cap>` is
+   `HISTORY_COMMIT_CAP` = 256.
+
+   **Run probes** — once per run, only when at least one walk is requested,
+   before any walk read, in this order; a probe that decides "unreadable"
+   applies to every requested walk:
+   - (p1) `git rev-parse --is-shallow-repository`: `true` → class
+     `shallow repository`; any failure of the probe itself (non-zero exit,
+     unexpected output) → class `history unreadable` (recorded decision
+     from code-review round 1: a failed shallow probe counts as unreadable
+     history).
+   - (p2) partial-clone probe:
+     `git config --get-regexp ^(extensions\.partialclone|remote\..+\.promisor)$`.
+     Exit 1 with no output = no promisor remote, so nothing can be
+     lazily fetched and no git-version check is needed. Any printed line —
+     other than a `remote.<name>.promisor` whose value is `false`, `no`,
+     `off` or `0` — means a partial clone. Any other non-zero exit →
+     `history unreadable`.
+   - (p3) only for a partial clone: `git version`, parsed with
+     `/^git version (\d+)\.(\d+)/`. `GIT_NO_LAZY_FETCH` is honoured from
+     git 2.44 on; older, or unparsable output → class `history unreadable`
+     with detail `partial clone and git older than 2.44 (or version not
+     recognised); history is not read to avoid a fetch`. Chosen over
+     "require git 2.44": the check keeps working on any git, and only the
+     one configuration that could fetch loses the history read.
+
+   Every walk read runs with `GIT_NO_LAZY_FETCH=1` in its environment, so on
+   git 2.44+ a partial clone's missing object becomes an unreadable-history
+   fallback, never a network fetch (the tool writes nothing, object store
+   included); p2/p3 cover older git.
 
 3. **Transitions and the recovered set H.** Process the listed commits in
    listed order (ancestors before descendants), H starting empty, per
@@ -241,22 +271,59 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    snapshot-only rule silently, no WARN: S was compacted at or before the
    merge-base, so no post-base summarized row exists to recover.
 
-4. **`U` in history mode** (the walk completed, at least one transition,
-   nothing unreconciled): `U(F, S)` = { `task_id`s not found at the merge
-   that have a parent occurrence under F/S passing (a), (b), (d) } ∪ H. A
-   kept `task_id` enters `U` only through H; rules (i)/(ii) of the
-   snapshot-only kept-row rule are not applied for this F/S. State per id:
-   an id in H takes H's state (what P_c's manifest counted); any other id
-   keeps the existing "`[x]` in any contributing occurrence counts as done"
-   rule. Reconciliation (`manifest >= U` per component) and the R2
-   disposition are unchanged: when it fails, every `task_id` of `U` that is
-   not found at the merge AND has a parent occurrence is reported MISSING
-   individually; an id that is in `U` only through H (no parent occurrence
-   under F/S, e.g. the summarized T-A-04 below) is counted but never itself
-   reported — AC1 reports rows present at a parent. The (c) reason text
-   keeps its existing wording and, when `h > 0`, appends
-   ` — includes <h> row(s) read from <parent label> history after the merge-base`,
-   where h = the number of ids in `U` only through H.
+4. **Two checks in history mode** (the walk completed, at least one
+   transition, nothing unreconciled). (c) for F/S fails iff EITHER check
+   fails; otherwise it holds.
+   - **Snapshot check** — `U_snap` is exactly the snapshot-only `U` above
+     (rules (i)/(ii) for kept rows, "`[x]` in any contributing occurrence
+     counts as done"), unchanged by history. Fails iff the manifest's pair
+     is below `U_snap`'s split in either component; reason text exactly as
+     today, no suffix.
+   - **History check** (evaluated only when the snapshot check holds) —
+     `U_hist = (U_snap − K_out) ∪ H_add`, where
+     - `K_out` = ids of `U_snap` that are kept at the merge (found anywhere
+       there) and are NOT in H: P_c's manifest provably never counted them
+       (a base row P_c deleted outright, e.g.), so in this check they hold
+       no slot;
+     - `H_add` = ids of H that are (h1) not in `U_snap`, (h2) not found
+       anywhere at the merge, (h3) absent from the merge-base tree, and (h4)
+       absent from P_o's tip tree — i.e. rows that existed only on P_c's side
+       after the merge-base and were summarized there (case 1's T-A-04).
+     States: every id of `U_snap` keeps its snapshot state (fixes the review
+     round 1 FN3c, where H's state overrode the other parent's `[x]`); an
+     `H_add` id takes H's state (what P_c's manifest counted; no other
+     record of it exists). Fails iff the manifest's pair is below
+     `U_hist`'s split in either component; reason = the existing text built
+     from `U_hist`'s numbers plus
+     ` — includes <h> row(s) read from <parent label> history after the merge-base`,
+     h = |`H_add`|, appended only when h > 0.
+
+   R2 disposition unchanged: when (c) fails for F/S, every `task_id` not
+   found at the merge with a parent occurrence under F/S is reported
+   MISSING individually with that reason; `H_add` ids are counted but
+   never reported themselves (AC1 reports rows present at a parent).
+
+   *Why two checks rather than one replaced `U`.* (1) **No FAIL→PASS**: the
+   snapshot check is today's (c) with today's states, so a failure today is
+   a failure now. (2) **PASS→FAIL only where history proves the count
+   short**: when `H_add` is empty, `U_hist ⊆ U_snap` with the same states,
+   so the history check can only fail if the snapshot check already did —
+   every case without a post-base summarized row on P_c's side keeps
+   today's verdict exactly, whatever the merge did to the count (the
+   review round 1 cases FP1, FP2, FP3, FP3b, FP5, FN3c, FP4 all have empty
+   `H_add`). When `H_add` is non-empty, `U_hist` holds: rows not found at
+   the merge that a parent had (any legitimate merge counts them), kept
+   rows P_c summarized (the E203 / AC-E203-6 premise: a kept row that the
+   compacting side summarized never frees a slot), and `H_add` rows (no row
+   of them exists anywhere at the merge, so a merge that does not count one
+   has erased it). Hence the reviewer's suggestion (a) — history only when
+   the merge's count is at least P_c's — is not adopted: it is not needed
+   for safety (FP1/FP2/FP5 return to PASS because `H_add` is empty, not
+   because of the count), and it would lose true positives (step 7 row
+   "case 1 + reopened row, count lowered, D01 dropped").
+   Suggestion (b) is adopted in a stronger form (all snapshot ids keep
+   their snapshot state, not only ids with an occurrence on the other
+   parent).
 
 5. **Fallback (human ruling 2026-11-16).** When a walk cannot complete, each
    of its requested sections keeps the snapshot-only rule and gets one WARN
@@ -264,11 +331,14 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    no walk had been requested. A walk error never throws out of the walk,
    so it never reaches the outer USAGE_ERROR path. Classes, checked in this
    order:
-   - `shallow repository` — `--is-shallow-repository` printed `true`
-     (checked before any walk read; applies to every requested walk);
-   - `history unreadable: <first line of git's stderr, at most 200 chars>` —
-     any non-zero git exit, a listed commit or real parent whose object is
-     missing, or a blob that cannot be read;
+   - `shallow repository` — probe p1 printed `true` (no detail, no colon);
+   - `history unreadable: <detail>` — a failed probe p1/p2, probe p3's old
+     or unrecognised git (detail as in step 2), any non-zero git exit, a
+     listed commit or real parent whose object is missing, or a blob that
+     cannot be read. `<detail>` = the first non-empty line of git's stderr,
+     else the first non-empty line of the error message, else
+     `git <subcommand> failed`; at most 200 chars. The detail is never
+     empty, so the line never renders as `history unreadable: ;`;
    - `history over cap: more than <cap> commits touch <F> between the merge-base and <parent label>` —
      the listing returned `cap + 1` lines (no blob is read for that walk);
    - `history unreconciled: <detail>` — step 3, with detail one of
@@ -284,7 +354,8 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    output stays deterministic: the same repository objects give the same
    listing order, the same H and the same WARN lines.
 
-6. **Cost bound.** Skipped walks cost nothing (not even the shallow check).
+6. **Cost bound.** Skipped walks cost nothing (not even the probes; at most
+   3 probe calls per run otherwise, `git version` only for a partial clone).
    Walks per run ≤ 2 × L, L = ledger files whose merge copy carries a
    manifest (≤ 4 with the current root + `.current/_primary/` layout; both
    already carry the e125c manifest on every parent, so (t2) only holds
@@ -292,7 +363,7 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    257 lines; F's blob at ≤ 256 listed commits and their real parents, ≤
    256 × 3 = 768 blob lookups (a merge commit has two parents), typically
    listed + 1 on a linear path; every distinct blob read at most once per
-   run through the shared cache. Worst case per run: 1 shallow check + 4
+   run through the shared cache. Worst case per run: 3 probes + 4
    listings + ≤ 3,072 blob lookups. Resolving `<sha>:<F>` to blob ids is
    best done with one `git cat-file --batch-check` process per walk (feed
    `<sha>` lines too, to confirm each commit object exists, since a
@@ -300,67 +371,111 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    absent commit); per-blob `cat-file blob` through the existing cache is
    acceptable — the bound is stated in objects, not processes.
 
-7. **Worked cases** (one fixture per row; base, parent1, parent2 and merge
-   as in the E203 fixtures unless stated; "Wave" = S, "M(n)" = merge-side
-   manifest "Wave: n done, 0 voided"):
+7. **Worked cases** — every row below was built as a scratch git repo
+   (`commitTree` fixtures, as in the E203 tests) and run against three
+   builds: the pre-E417 tool, the first E417 implementation (step 4 as it
+   first stood) and a prototype of this step 4. "before" = pre-E417,
+   "after" = this rule. Base is Wave T-A-01..03 `[x]` unless stated (ids
+   shortened: A01 = T-A-01); M(d) / M(d,v) = manifest "Wave: d done, v
+   voided"; P2 is the compacting side unless stated. `H_add` and `K_out`
+   per step 4; "snap" / "hist" = the two checks.
 
-   | case | shape | walk / H | `U` vs manifest | verdict before → after |
+   *E417 repro — PASS → FAIL, each a provable loss:*
+
+   | id | shape | H, `H_add`, `K_out` | snap / hist | before → after |
    |---|---|---|---|---|
-   | E417 case 1, drop | base Wave A01..03; parent2 adds A04 then compacts M(4); parent1 adds D01; merge M(4), no D01 | transition at the compaction commit, removed A01..04 = inc 4; H = A01..04 | {A01..03, D01} ∪ H = 5 > 4 | PASS → **FAIL**: MISSING A01, A02, A03, D01 (reason h = 1) |
-   | E417 case 1, keep | same, merge keeps D01 under Wave | H = A01..04 | D01 kept, not in H → out; 4 ≤ 4 | PASS → PASS, COMPACTED A01..03 |
-   | E417 case 2, drop | base Wave A01..04; parent2 compacts M(4); parent1 moves A04 to `## Other`, adds D01; merge M(4) + Other A04, no D01 | removed A01..04 = 4; H = A01..04 | {A01..03, D01} ∪ H = 5 > 4 | PASS → **FAIL**: MISSING A01..03, D01 |
-   | E417 case 2, keep | same, merge keeps D01 under Wave | H = A01..04 | 4 ≤ 4 | PASS → PASS |
-   | cherry-pick, drop | as case 1, but parent1 also adds A04 under Wave; merge keeps A04, drops D01 | H = A01..04 | kept A04 in H → in; {A01..04, D01} = 5 > 4 | PASS → **FAIL** (the old note's rule-(i) instance) |
-   | cherry-pick, keep | merge keeps A04 and D01 | H = A01..04 | 4 ≤ 4 | PASS → PASS |
-   | AC-E203-1 (kept post-base row) | parent2 compacts M(3) in one commit; parent1 adds D01; merge keeps D01 | removed A01..03 = 3; H = A01..03 | D01 out; 3 ≤ 3 | PASS → PASS |
-   | AC-E203-3 | merge drops D01 | H = A01..03 | 4 > 3 | FAIL → FAIL, same ids |
-   | AC-E203-4 (under-count) | parent2's own manifest says 2 for 3 rows | inc 2 ≠ removed 3 → unreconciled, WARN | snapshot-only | FAIL → FAIL, same ids, plus one WARN line |
-   | AC-E203-6 | merge keeps A03, drops D01 | H = A01..03 | A03 in H → stays; 4 > 3 | FAIL → FAIL, same ids |
-   | AC-E203-7 (compactor moved a row) | base A01..04; parent2 M(3) + Other A04 | A04 excluded by (r1); H = A01..03 | A04 kept, not in H → out; 3 ≤ 3 | PASS → PASS |
-   | re-compacted on the path | base Wave A01..02; parent2: compact M(2), add A03, re-compact M(3); parent1 adds D01; merge drops D01 | two transitions; H = A01..03 | {A01, A02, D01} ∪ H = 4 > 3 | PASS → **FAIL**; keeping D01: PASS → PASS |
-   | merge commit on P_c's path | parent2 = merge of its own line (no ledger change) with a side branch that adds A04 then compacts M(4); parent1 adds D01; merge drops D01 | transition on the side commit; the merge commit has inc 0; H = A01..04 | 5 > 4 | PASS → **FAIL**; keeping D01: PASS → PASS |
-   | compactor deleted a base row outright | base A01..03; parent2 deletes A03, adds A04, compacts M(3); parent1 keeps A01..03 | H = A01, A02, A04 | merge keeps A03: out, 3 ≤ 3 PASS → PASS; merge drops A03: {A01..03} ∪ H = 4 > 3 | drop: PASS → **FAIL** (no manifest counted A03; same as AC1 for a row one side deleted with no manifest anywhere) |
-   | both sides compacting | both parents' F name Wave | skipped (t2) | snapshot-only | unchanged |
-   | merge compacts S itself (AC11 clean, (i), (ii), (iv), Q-1) | no parent's F names S | skipped (t2) | snapshot-only | unchanged |
-   | recycled section (AC11 (iii)) | parent1's F names Active; parent2 has no row under Active | skipped (t3) | snapshot-only | unchanged (FAIL by (d)) |
-   | section renamed on P_c's path | rename heading, then compact under the new name | H keyed by the new name (the text the manifest names) | parent1 rows under the old name are judged by (b) exactly as today | unchanged for the old name |
-   | ledger moved after compaction (e.g. root → `.current/_primary/`) | the walk on the new path sees the count appear at the move commit with no rows under S at its parent | unreconciled, WARN | snapshot-only | unchanged |
-   | shallow / missing object / over cap | — | WARN | snapshot-only | unchanged |
+   | R1 case 1 | P2 adds A04 then compacts M(4); P1 adds D01; merge M(4), no D01 | H A01..04; `H_add` A04 | 4 ≤ 4 / 5 > 4 | PASS → **FAIL**, MISSING A01..03, D01, reason h = 1 |
+   | R4 compacted twice | base A01..02; P2: M(2), add A03, M(3); P1 adds D01; merge M(3) | two transitions, H A01..03; `H_add` A03 | 3 ≤ 3 / 4 > 3 | PASS → **FAIL**, MISSING A01, A02, D01 |
+   | R5 merge commit on P2's path | P2 = merge of its own line (no ledger change) with a side branch that adds A04 and compacts M(4); P1 adds D01; merge M(4) | side commit is the transition, the merge commit has inc 0; `H_add` A04 | 4 ≤ 4 / 5 > 4 | PASS → **FAIL**, MISSING A01..03, D01 |
+   | R6 voided rows | P2 adds `[-]` A04, compacts M(3,1); P1 adds `[-]` D01; merge M(3,1) | `H_add` A04 (`-`) | (3,1) ok / voided 2 > 1 | PASS → **FAIL**, MISSING A01..03, D01 |
+   | R7 completion folded into a voided count | base A03 `[-]`; P2 adds A04, compacts M(3,1); P1 completes A03; merge M(3,1), no A03 | `H_add` A04 (`x`); A03 keeps P1's `[x]` | 3 done ≤ 3 / 4 done > 3 | PASS → **FAIL**, MISSING A01..03 |
+   | R8 count lowered | P2 adds A04, compacts M(4); P1 reopens A03 and adds D01; merge keeps A03 open, M(3), no D01 | `H_add` A04 | 3 ≤ 3 / 4 > 3 | PASS → **FAIL**, MISSING A01, A02, D01 (suggestion (a) would have passed it) |
+   | compactor deleted a base row, merge drops it | P2 deletes A03, adds A04, compacts M(3); P1 = base; merge M(3) | H A01, A02, A04; `H_add` A04 | 3 ≤ 3 / 4 > 3 | PASS → **FAIL**, MISSING A01..03 (A03 is gone with no count, as AC1 for any deleted row) |
+   | R1 in a lane ledger | R1 with `.current/lane-a/tasks.md` as F | `H_add` A04 | 4 ≤ 4 / 5 > 4 | PASS → **FAIL** |
+   | R1 with parent1 compacting | R1 mirrored | `H_add` A04 | 4 ≤ 4 / 5 > 4 | PASS → **FAIL** |
 
-8. **Why no false positive.** No existing PASS case in
-   `test/e126-merge-invariants.test.mjs` or
-   `test/e203-merge-invariants-union.test.mjs` flips: every e126 case either
-   has no manifest on any commit, or has the manifest only at the merge
-   (skipped by t2), or is AC11 (iii) (skipped by t3); the five E203 cases
-   are the AC-E203 rows above, with verdicts and id lists unchanged. In
-   general, history mode only (1) adds to `U` rows that a compaction on
-   P_c's own path provably counted — its count rose by exactly the number
-   of closed rows that left F/S in that commit, those rows are nowhere in
-   P_c's tip, and H never exceeds P_c's own count — and (2) takes out of
-   `U` kept rows that no on-path compaction counted. So if every row not
-   found at the merge was summarized (by P_c or by the merge itself) and
-   the merge's count for S is at least P_c's plus what the merge itself
-   summarized, `U` stays within the manifest. Whenever P_c's history breaks
-   those premises (count fell, rose by a different number, rows removed in
-   another commit than the count change, more recovered than counted) the
-   rule falls back to the snapshot-only rule — never to a stricter one —
-   and says so in a WARN line. The new FAILs are exactly the rows above
-   marked **FAIL**: each is a row the merge dropped that no manifest counted.
+   *Intended strictness — PASS → FAIL, ambiguous by construction:*
 
-9. **Limits that remain (accepted, not detected).** All are false negatives
-   of the snapshot-only rule that history mode cannot reach; none is a new
-   false positive. Human ruling 2026-11-16: no new ticket for them.
-   - Every fallback in step 5 (shallow clone, missing objects, git error,
-     more than 256 commits, unreconciled history): E417 cases 1 and 2 pass
-     silently except for the WARN line, as before E417.
+   | id | shape | H, `H_add`, `K_out` | snap / hist | before → after |
+   |---|---|---|---|---|
+   | S1 kept summarized row plus a post-base summarized row | P2 adds A04, compacts M(4); P1 = base; merge keeps A03 `[x]` literally and writes M(3) | H A01..04; `H_add` A04; A03 in H so not in `K_out` | 3 ≤ 3 / 4 > 3 | PASS → **FAIL**, MISSING A01, A02 |
+
+   S1's snapshots and history are identical to a merge that kept A03 AND
+   its count and erased A04's. FAIL is chosen for the same reason
+   AC-E203-6 already FAILs its twin (kept A03, dropped D01): a kept row
+   the compacting side summarized never frees a manifest slot. It needs a
+   hand-edited count and a hand-kept summarized row; the alternative reading
+   loses a completed row silently.
+
+   *Must keep today's verdict — review round 1 cases and companions:*
+
+   | id | shape | why unchanged | before → after |
+   |---|---|---|---|
+   | FP1 | P2 M(3); P1 reopens A03; merge keeps A03 open, M(2) | `H_add` empty | PASS → PASS |
+   | FP1k | FP1 with merge M(3) | `H_add` empty | PASS → PASS |
+   | FP2 | base A01..04; P2 M(4); P1 moves A04 to `## Other`, adds D01; merge keeps both, M(3) | `H_add` empty | PASS → PASS |
+   | FP3 | base A03 `[-]`; P2 M(2,1); P1 un-voids A03; merge M(3,0) | `H_add` empty; snapshot states | PASS → PASS |
+   | FP3b | P2 M(3); P1 voids A03; merge M(2,1) | `H_add` empty | PASS → PASS |
+   | FP4 | FP1 plus P1 adds D01; merge keeps A03 open, M(3) | `H_add` empty | PASS → PASS (no strictness decision needed) |
+   | FP5 | P2 M(3); P1 moves A03 to `.current/lane-a/tasks.md`; merge keeps it there, root M(2) | `H_add` empty | PASS → PASS |
+   | FN3c | base A03 `[-]`; P2 M(2,1); P1 completes A03; merge M(2,1), no A03 | snapshot check fails (A03 keeps `[x]`) | FAIL → FAIL, MISSING A01..03 |
+   | G1–G5 | R1, case-2 shape, cherry-pick shape, R4, R5 with the merge keeping D01 (cherry-pick: A04 and D01) | hist within count | PASS → PASS |
+   | R6 / R7 / R8 companions | merge keeps D01 (R6, R8) or counts A03 done, M(4,0) (R7) | hist within count | PASS → PASS |
+   | merge also summarizes D01 | R1 with merge M(5) | 5 ≤ 5 | PASS → PASS |
+   | compactor deleted a base row, merge keeps it | as above, merge keeps A03, M(3) | A03 in `K_out`; hist A01, A02, A04 = 3 | PASS → PASS (the case that rules out a plain `U_snap ∪ H_add`) |
+   | compactor deleted A03, M(2); merge keeps A03, writes M(3), drops D01 | — | snapshot check fails as today | FAIL → FAIL |
+   | voided post-base row, D01 `[x]` dropped | P2 adds `[-]` A04, M(3,1); P1 adds `[x]` D01; merge M(3,1) | snapshot check fails as today | FAIL → FAIL |
+   | unrelated kept row | R1 keep plus P1 adds E01, merge keeps it | hist 4 ≤ 4 | PASS → PASS |
+   | review round 1 G-set | compaction commit also adds a kept row; also moves a row to a lane ledger; duplicate id in two sections (WARN); split compaction (WARN); criss-cross keep / drop; renamed section (FAIL both); discarded side compaction keep / drop (WARN); compact–revert–recompact (WARN); zero-count manifest; P1 deletes a base row and keeps D01; two sections compacted, one requested | unchanged | as before, same ids |
+   | AC-E203-1, -3, -4, -6, -7 | the E203 fixtures | `H_add` empty (all H rows are base rows) | PASS / FAIL / FAIL + WARN / FAIL / PASS, unchanged |
+   | every e126 case | — | skipped by t1/t2 (no manifest on a parent) or t3 (AC11 (iii)) | unchanged |
+   | shallow / missing object / over cap / failed probe / partial clone on old git | — | WARN, snapshot-only | unchanged |
+
+   *Accepted limits — PASS → PASS although the merge may have dropped a row (step 9):*
+
+   | id | shape | why history cannot decide | before → after |
+   |---|---|---|---|
+   | case 2 | base A01..04; P2 M(4); P1 moves A04 to `## Other`, adds D01; merge M(4) + Other A04, no D01 | A04 is a base row (h3) | PASS → PASS |
+   | cherry-pick | P2 adds A04, compacts M(4); P1 adds A04 and D01; merge M(4) + Wave A04, no D01 | A04 is in P1's tip (h4) | PASS → PASS |
+   | other side deleted a base row | P2 adds A04, compacts M(4); P1 deletes A03, adds D01; merge M(4), no D01 | `H_add` A04, but A03 is not in `U_snap` either; hist {A01, A02, D01, A04} = 4 ≤ 4 | PASS → PASS |
+
+   Scratch-run totals: 51 fixtures; zero FAIL → PASS; PASS → FAIL only in
+   the 9 repro rows and the 1 intended-strictness row above. Running
+   `test/e126-merge-invariants.test.mjs` and
+   `test/e203-merge-invariants-union.test.mjs` (with R1–R5 as committed in
+   1368ea4) against the prototype: 24 of 26 pass; the 2 failures are R2 and
+   R3, whose expectation this amendment flips to PASS (accepted limits).
+
+8. **No new false positive, no new false negative.** By step 4's two-check
+   construction: the snapshot check is today's (c) with today's states, so
+   nothing that fails today passes; the history check can fail only when
+   `H_add` is non-empty, and then only by counting rows a legitimate merge
+   must count, plus kept rows the compacting side summarized — the premise
+   the E203 rule already applies (S1 is the one shape where that premise
+   turns a PASS into a FAIL, listed as intended strictness). Whenever P_c's
+   history breaks step 3's premises the rule falls back to the snapshot
+   check alone — never to a stricter one — with a WARN line.
+
+9. **Limits that remain (accepted, not detected).** Human ruling 2026-11-16:
+   no second mechanism, no new ticket.
+   - **Case 2** (the non-compacting side moves a base row out of S, the
+     merge drops a new row): not closed. A merge may legitimately keep the
+     moved row literally, take it out of the count and summarize the new
+     row instead — same count, same snapshots, same history as the drop.
+     Closing case 2 would make that merge FAIL (the review round 1 FP2
+     family) and telling the two apart would need information neither the
+     snapshots nor the history carry. The same holds for the cherry-pick
+     shape (the row is in the other side's tip) and for a base row the
+     other side deleted. These are the rows of the "Accepted limits" table.
+   - Every fallback in step 5 (shallow clone, failed probe, partial clone
+     on git older than 2.44, missing objects, git error, more than 256
+     commits, unreconciled history): case 1 passes as before, with a WARN.
    - A compaction that removed its rows in a different commit from the one
      that raised the count, or a ledger relocated between the compaction
-     and P_c's tip: unreconciled, so the snapshot-only rule applies.
+     and P_c's tip: unreconciled, snapshot check only.
    - Both parents compacting S: (d) bars every parent row, the walk is
      skipped, and a merge that resolves two different counts for S into
      the smaller one is not detected (unchanged).
-   - Case 2 is closed only through the compacting side's history: when
-     that history falls back, the moved row is again invisible under S.
 
 Report every COMPACTED row as an explicit informational count in the output
 (e.g. "917 rows compacted (informational) — see file:section breakdown"),
@@ -519,83 +634,99 @@ never the working directory) — reimplement the same dedup algorithm against
   MISSING when dropped, exit 1 (R1 counter-example)", "AC11: a merge that
   compacts S while both parents added different closed rows exceeding the
   manifest count reports every row MISSING, exit 1 (R-1 5-vs-4 fixture)"
-- **AC12** (E417 repro, condition (c) history rule) — sr-engineer writes these
-  first (bugfix mode), confirms each RED against the unfixed code, and lists
-  them in `qa_reports/expected-red_e417-merge-invariants-lost-row.txt`
-  (`<test file> | <exact test name>`). Fixtures build multi-commit parent
-  paths with `commitTree` (the E203 file's `mkMergeFixture` gives each
-  parent one commit only). Fixture literals as in the E203 file (`ROWS3`,
-  `MANIFEST(n)`, `NEW_ROW`). Each must FAIL with exit 1, the listed ids
-  MISSING, each carrying the `(c) manifest under-reconciles` reason, and
-  T-A-04 neither MISSING nor COMPACTED (it is in no parent's tip).
-  - **R1** (case 1) — Given base `ROWS3`; parent2 = commit c1 (`ROWS3` +
-    `- [x] T-A-04 d`) then a commit with `MANIFEST(4)` on c1; parent1 =
-    `ROWS3` + `NEW_ROW` on base; when the merge holds `MANIFEST(4)` only,
-    then FAIL, MISSING = T-A-01, T-A-02, T-A-03, T-D-01, and the reason
-    matches `/includes 1 row\(s\) read from parent2 history after the merge-base/`.
-    proof: `test/e203-merge-invariants-union.test.mjs` — "E417 R1: a row the compacting side added after the merge-base and summarized does not free a slot for a dropped row (case 1)"
-  - **R2** (case 2) — Given base `ROWS3` + `- [x] T-A-04 d` under Wave;
-    parent2 = `MANIFEST(4)`; parent1 = Wave T-A-01..03 + `NEW_ROW`, then
-    `## Other` with `- [x] T-A-04 d`; when the merge holds `MANIFEST(4)` +
-    `## Other` T-A-04 and no T-D-01, then FAIL, MISSING = T-A-01..03,
-    T-D-01; T-A-04 present.
-    proof: `test/e203-merge-invariants-union.test.mjs` — "E417 R2: the non-compacting side moving a base row out of the section does not free a slot for a dropped row (case 2)"
-  - **R3** (same row added on both sides) — Given R1's base and parent2;
-    parent1 = `ROWS3` + `- [x] T-A-04 d` + `NEW_ROW`; when the merge holds
-    `MANIFEST(4)` + `## Wave` T-A-04 and no T-D-01, then FAIL, MISSING =
-    T-A-01..03, T-D-01; T-A-04 present.
-    proof: `test/e203-merge-invariants-union.test.mjs` — "E417 R3: a row added on both sides after the merge-base and summarized by one does not free a slot for a dropped row"
-  - **R4** (re-compacted on the path) — Given base Wave T-A-01..02;
-    parent2 = `MANIFEST(2)` (c1), then c1's text + `## Wave` `- [x] T-A-03 c`
-    (c2), then `MANIFEST(3)` (c3, the bullet replaced); parent1 = base +
-    `NEW_ROW`; when the merge holds `MANIFEST(3)` only, then FAIL, MISSING
-    = T-A-01, T-A-02, T-D-01.
-    proof: `test/e203-merge-invariants-union.test.mjs` — "E417 R4: a section compacted twice on the compacting side's path does not free a slot for a dropped row"
-  - **R5** (merge commit on P_c's path) — Given base `ROWS3`; side s1 =
-    `ROWS3` + T-A-04, s2 = `MANIFEST(4)` on s1; line l1 = `ROWS3` +
-    `unrelated.txt` on base; parent2 = `MANIFEST(4)` + `unrelated.txt` with
-    parents l1, s2; parent1 = `ROWS3` + `NEW_ROW`; when the merge holds
-    `MANIFEST(4)` + `unrelated.txt` and no T-D-01, then FAIL, MISSING =
-    T-A-01..03, T-D-01.
-    proof: `test/e203-merge-invariants-union.test.mjs` — "E417 R5: a compaction reached through a merge commit on the compacting side's path still counts against a dropped row"
-- **AC13** (E417 no-regression + fallback, qa-engineer) — all in a new file
+- **AC12** (E417, condition (c) history rule — sr-engineer, in
+  `test/e203-merge-invariants-union.test.mjs`). Fixtures build multi-commit
+  parent paths with `commitTree`, literals as in that file (`ROWS3`,
+  `MANIFEST(n)`, `NEW_ROW`); shapes exactly as the step-7 rows of the
+  same id. Three groups:
+  - **Repro (red before, green after; listed in
+    `qa_reports/expected-red_e417-merge-invariants-lost-row.txt` as
+    `<test file> | <exact test name>`)** — each must FAIL, exit 1, with the
+    listed ids MISSING, each carrying the `(c) manifest under-reconciles`
+    reason, and the history-only id (T-A-04) neither MISSING nor COMPACTED:
+    - R1, R4, R5 — kept exactly as committed in 1368ea4 (names unchanged;
+      R1 still asserts the `includes 1 row(s) read from parent2 history
+      after the merge-base` suffix).
+    - **R6** — step-7 row R6; MISSING T-A-01..03, T-D-01.
+      proof: "E417 R6: a voided row the compacting side added after the merge-base and summarized does not free a voided slot for a dropped voided row"
+    - **R7** — step-7 row R7; MISSING T-A-01..03.
+      proof: "E417 R7: a completion on the other side is not hidden in the voided count when the compacting side also summarized a post-base row"
+    - **R8** — step-7 row R8; MISSING T-A-01, T-A-02, T-D-01.
+      proof: "E417 R8: a merge that lowers the count for a reopened row still fails when a post-base summarized row and a dropped row both need slots"
+  - **Accepted-limit pins (green before and after; NOT in the manifest)** —
+    the committed R2 and R3 are rewritten (renamed, expectation flipped)
+    and their two lines removed from the manifest:
+    - **R2** → "E417 R2: case 2 (the non-compacting side moved a base row out of the section) stays an accepted limit and passes" — PASS, exit 0, no MISSING.
+    - **R3** → "E417 R3: the cherry-pick shape (the summarized row is also in the other side's tip) stays an accepted limit and passes" — PASS, exit 0, no MISSING.
+  - **Review round 1 guards (green before and after; NOT in the
+    manifest)** — step-7 rows of the same id, each run once:
+    - "E417 FP1: the other side reopens a base row and the merge lowers the count; PASS" — PASS, no MISSING.
+    - "E417 FP2: case-2 shape with the merge keeping both rows and lowering the count; PASS" — PASS.
+    - "E417 FP3: the other side un-voids a base row and the merge counts it done; PASS" — PASS.
+    - "E417 FP3b: the other side voids a base row and the merge counts it voided; PASS" — PASS.
+    - "E417 FP4: reopened base row plus a new row, merge keeps the compacting side's count; PASS" — PASS.
+    - "E417 FP5: the other side moves a base row to a lane ledger and the merge lowers the root count; PASS" — PASS.
+    - "E417 FN3c: a completion folded into the compacting side's voided count still FAILs" — FAIL, MISSING T-A-01..03.
+- **AC13** (E417 companions + fallback, qa-engineer) — new file
   `test/e417-merge-invariants-history.test.mjs`, names prefixed `E417`.
-  - **G1–G5** (companions, green before and after) — Given the R1–R5
-    fixtures, when the merge keeps T-D-01 (R1, R2, R4, R5: under `## Wave`;
-    R3: T-A-04 and T-D-01 under `## Wave`), then PASS, exit 0, no MISSING,
-    COMPACTED = the summarized ids found at a parent (R1/R2/R3/R5: T-A-01..03;
-    R4: T-A-01, T-A-02), and no `WARN (c)` line.
-    proof: `test/e417-merge-invariants-history.test.mjs` — "E417 G1".."E417 G5"
-  - **F1 shallow** — Given the R1 fixture with the merge-base sha written to
-    `.git/shallow`, when run, then PASS (the snapshot-only verdict), exit 0,
-    exactly one line matching
-    `/^WARN \(c\) history fallback: parent2 \([0-9a-f]{7}\) tasks\.md § Wave — shallow repository; snapshot-only \(c\) used for this section$/m`,
-    placed before the `[AC1]` line, `findings.historyFallbacks` = one entry
-    `{ parent: "parent2", file: "tasks.md", section: "Wave", reason: "shallow" }`,
-    and a second run yields a byte-identical report.
-    proof: `test/e417-merge-invariants-history.test.mjs` — "E417 F1: a shallow repository falls back to the snapshot-only rule with one WARN line, exit code unchanged"
-  - **F2 missing object** — Given the R1 fixture with the loose object of
-    `<c1>:tasks.md` deleted (c1 = the T-A-04 commit; its blob is unique to
-    c1), when run, then PASS, exit 0, one WARN line whose class starts
-    `history unreadable: `, reason `"unreadable"`.
-    proof: `test/e417-merge-invariants-history.test.mjs` — "E417 F2: an unreadable history object falls back with a WARN line, exit code unchanged"
-  - **F3 over cap** — Given the R1 fixture, when run as
-    `runMergeInvariants(merge, root, { historyCommitCap: 1 })` (two commits
-    touch `tasks.md` on parent2's path), then PASS, exit 0, one WARN line
-    with class `history over cap: more than 1 commits touch tasks.md between the merge-base and parent2`.
-    proof: `test/e417-merge-invariants-history.test.mjs` — "E417 F3: history over the commit cap falls back with a WARN line"
-  - **F4 unreconciled** — Given the AC-E203-4 fixture, when run, then FAIL,
-    exit 1, MISSING = T-A-01..03 exactly as today, plus one WARN line with
-    class `history unreconciled: count rose by 2 done/0 voided at <short sha> but 3 [x]/0 [-] row(s) left the section`.
-    proof: `test/e417-merge-invariants-history.test.mjs` — "E417 F4: an unreconciled compaction keeps today's verdict and adds a WARN line"
-  - **F5 skip** — Given the AC11 (iii) fixture and the AC11 clean
-    compaction fixture, each with `.git/shallow` written, when run, then
-    the verdicts equal today's and no `WARN (c)` line appears (the walk and
-    the shallow check run only when t1–t3 hold).
-    proof: `test/e417-merge-invariants-history.test.mjs` — "E417 F5: no history is read when no verdict depends on it"
-  - **N1** — Every existing case in `test/e126-merge-invariants.test.mjs`
-    and `test/e203-merge-invariants-union.test.mjs` passes unmodified.
-    proof: `node --test test/e126-merge-invariants.test.mjs test/e203-merge-invariants-union.test.mjs`
+  - **G1–G5** — R1, case-2 shape, cherry-pick shape, R4, R5 with the merge
+    keeping T-D-01 (cherry-pick: T-A-04 and T-D-01 under `## Wave`): PASS,
+    exit 0, no MISSING, COMPACTED = the summarized ids found at a parent
+    (T-A-01..03; R4: T-A-01, T-A-02), no `WARN (c)` line.
+    proof: "E417 G1".."E417 G5"
+  - **G6–G8** — the R6 / R8 companions (merge keeps T-D-01) and the R7
+    companion (merge writes M(4,0)): PASS, no MISSING.
+    proof: "E417 G6".."E417 G8"
+  - **S1 intended strictness** — step-7 row S1: FAIL, exit 1, MISSING
+    T-A-01, T-A-02, reason with the `includes 1 row(s) read from parent2
+    history` suffix. The test comment cites step 7's S1 paragraph.
+    proof: "E417 S1: a kept row the compacting side summarized does not free a slot for its post-base summarized row (intended strictness)"
+  - **K1 / K2** — compactor deleted a base row: merge keeps it → PASS
+    (`K_out`); merge drops it → FAIL, MISSING T-A-01..03.
+    proof: "E417 K1: a kept base row the compacting side deleted holds no slot in the history check", "E417 K2: a base row the compacting side deleted and the merge dropped is MISSING"
+  - **F1 shallow** — R1 fixture with the merge-base sha written to
+    `.git/shallow`: PASS (snapshot verdict), exit 0, exactly one line
+    matching
+    `/^WARN \(c\) history fallback: parent2 \([0-9a-f]{7}\) tasks\.md § Wave — shallow repository; snapshot-only \(c\) used for this section$/m`
+    before the `[AC1]` line; `findings.historyFallbacks` = one entry with
+    `reason: "shallow"`; a second run gives a byte-identical report.
+    proof: "E417 F1: a shallow repository falls back to the snapshot-only rule with one WARN line, exit code unchanged"
+  - **F2 missing object** — R1 fixture with the loose object of
+    `<c1>:tasks.md` deleted (c1 = the T-A-04 commit): PASS, exit 0, one WARN
+    whose class starts `history unreadable: ` followed by a non-empty detail.
+    proof: "E417 F2: an unreadable history object falls back with a WARN line, exit code unchanged"
+  - **F3 over cap** — R1 fixture via
+    `runMergeInvariants(merge, root, { historyCommitCap: 1 })`: PASS, one
+    WARN with class `history over cap: more than 1 commits touch tasks.md between the merge-base and parent2`.
+    proof: "E417 F3: history over the commit cap falls back with a WARN line"
+  - **F4 unreconciled** — AC-E203-4 fixture: FAIL, exit 1, MISSING
+    T-A-01..03 as today, one WARN with class
+    `history unreconciled: count rose by 2 done/0 voided at <short sha> but 3 [x]/0 [-] row(s) left the section`.
+    proof: "E417 F4: an unreconciled compaction keeps today's verdict and adds a WARN line"
+  - **F5 skip** — AC11 (iii) and AC11 clean-compaction fixtures, each with
+    `.git/shallow` written: verdicts as today, no `WARN (c)` line.
+    proof: "E417 F5: no history is read when no verdict depends on it"
+  - **F6 partial clone** — point a branch at the R1 merge
+    (`git update-ref refs/heads/main <merge>`; the fixtures make bare
+    commit objects), clone it with
+    `git clone --filter=blob:none --no-local file://<fixture>`: on the
+    running git (2.44+) the walk reaches c1's missing blob (the four
+    snapshot reads may still fetch their own blobs lazily — pre-existing,
+    out of E417's scope),
+    the run gives PASS + one `history unreadable:` WARN, and c1's blob is
+    still absent afterwards (`git cat-file -e` fails), i.e. no fetch.
+    Skip with a reason when `git version` < 2.44.
+    proof: "E417 F6: a partial clone never fetches during the history read"
+  - **F7 probe helpers** (pure, exported per the architecture file):
+    `gitVersionAllowsNoLazyFetch` → false for `git version 2.43.0` and for
+    unparsable text, true for `git version 2.44.0` and
+    `git version 2.50.1 (Apple Git-155)`; `historyErrorDetail` → the first
+    non-empty stderr line, else the first non-empty message line, else
+    `git <subcommand> failed` (never empty).
+    proof: "E417 F7: the git-version gate and the WARN detail are never empty"
+  - **N1** — every existing case in `test/e126-merge-invariants.test.mjs`
+    and the AC-E203 cases pass unmodified.
+    proof: `node --test test/e126-merge-invariants.test.mjs test/e203-merge-invariants-union.test.mjs test/e417-merge-invariants-history.test.mjs`
 
 ## Task → AC Coverage
 
@@ -615,7 +746,7 @@ appear to conflict or under-state scope.
 | T-E126-06 (qa) | AC10 | mirrors VR-39/VR-40 for `tasks.md` |
 | T-E417-01 (architect) | AC12, AC13 (spec only) | the *Condition (c) history rule (E417)* block and AC12/AC13 |
 | T-E417-02 (sr) | AC12 (repro first, expected-red manifest), then the rule | `tools/merge-invariants.ts` + `dist/tools/merge-invariants.*`; contracts in `specs/e417-merge-invariants-lost-row-architecture.md` |
-| T-E417-03 (qa) | AC12 green, AC13 | new `test/e417-merge-invariants-history.test.mjs` |
+| T-E417-03 (qa) | AC12 green, AC13 | new `test/e417-merge-invariants-history.test.mjs`; review O-2 is moot after the re-derivation (the cherry-pick shape stays an accepted limit, now alongside case 2), so the header comment of `test/e203-merge-invariants-union.test.mjs` only needs case 2 added if sr has not done it |
 
 Decision on how to carry this (integrator's "your call, state which"): kept
 the six existing task rows as-is and added this table rather than
@@ -630,7 +761,7 @@ authoritative for AC ownership; the ledger rows stay the stable work-log.
 |---|---|---|
 | N/A | — | — |
 | merge.c.history-warn (E417) | `WARN (c) history fallback: <parent label> (<short sha>) <F> § <S> — <class>; snapshot-only (c) used for this section` — classes per *Condition (c) history rule (E417)* step 5 | authored-here |
-| merge.c.history-suffix (E417) | ` — includes <h> row(s) read from <parent label> history after the merge-base` appended to the (c) reason when h > 0 | authored-here |
+| merge.c.history-suffix (E417) | ` — includes <h> row(s) read from <parent label> history after the merge-base` appended to the history-check (c) reason when h > 0 (step 4) | authored-here |
 
 (This is a CLI/tooling feature; its console output is diagnostic text, not
 user-facing product copy with a canonical source. Exact wording is at
