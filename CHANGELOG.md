@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.21.0] - 2026-11-16
+
 MINOR release. It ships four backlog tickets since v4.20.0, each landed on `main` by its own pull
 request: E429 (lane `e429`), E418 (lane `e418`), E417 (lane `e417`, with a spec-text follow-up in
 lane `e417b`) and E421 (a contributor-facing list change). Release gate
