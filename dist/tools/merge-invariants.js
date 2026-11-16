@@ -32,6 +32,15 @@ function git(repoRoot, args) {
         stdio: ["ignore", "pipe", "pipe"],
     });
 }
+/** History-walk reads: a partial clone's missing object fails instead of triggering a network fetch. */
+function gitWalk(repoRoot, args) {
+    return execFileSync("git", args, {
+        cwd: repoRoot,
+        maxBuffer: GIT_MAX_BUFFER,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, GIT_NO_LAZY_FETCH: "1" },
+    });
+}
 /** Ledger path shape per spec Definitions → Row identity; null = not a ledger. */
 export function isLedgerPath(p) {
     if (p === "tasks.md")
@@ -206,6 +215,190 @@ function dedupSidecars(files) {
     }
     return out;
 }
+// =============================================================================
+// condition (c) history: rows a one-sided compaction summarized after the base
+// =============================================================================
+export const HISTORY_COMMIT_CAP = 256;
+const ZERO_ENTRY = { done: 0, voided: 0 };
+const entryOf = (ledger, section) => ledger?.manifest?.get(section) ?? ZERO_ENTRY;
+const isKeptAt = (snap, taskId) => (snap.rowsById.get(taskId)?.length ?? 0) > 0;
+const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+function splitOf(states) {
+    let done = 0;
+    let voided = 0;
+    for (const s of states.values()) {
+        if (s === "x")
+            done++;
+        else
+            voided++;
+    }
+    return { done, voided };
+}
+/**
+ * Sections whose (c) verdict depends on history: the merge's F names S (t1),
+ * exactly one parent's F names S (t2, that parent is P_c), and the other
+ * parent has a closed row under F/S that is nowhere at the merge (t3).
+ * Grouped per (P_c, F); empty means no extra git call at all.
+ */
+export function compactionHistoryRequests(p1, p2, _base, merge) {
+    const byParentFile = new Map();
+    for (const [file, mergeLedger] of merge.ledgers) {
+        if (!mergeLedger.manifest)
+            continue;
+        for (const section of mergeLedger.manifest.keys()) {
+            const namers = [p1, p2].filter((p) => p.ledgers.get(file)?.manifest?.has(section) === true);
+            if (namers.length !== 1)
+                continue;
+            const compactor = namers[0];
+            const other = compactor === p1 ? p2 : p1;
+            const droppable = (other.ledgers.get(file)?.rows ?? []).some((r) => r.section === section && r.state !== " " && !isKeptAt(merge, r.taskId));
+            if (!droppable)
+                continue;
+            const key = `${compactor.label}\0${file}`;
+            const req = byParentFile.get(key) ?? { parent: compactor, file, sections: [] };
+            req.sections.push(section);
+            byParentFile.set(key, req);
+        }
+    }
+    return [...byParentFile]
+        .sort(([a], [b]) => cmp(a, b))
+        .map(([, r]) => ({ ...r, sections: [...r.sections].sort(cmp) }));
+}
+/** Every requested section of one walk falls back with the same reason. */
+export function historyFallbackAll(req, reason, detail) {
+    return req.sections.map((section) => ({
+        parent: req.parent.label,
+        parentSha: req.parent.sha,
+        file: req.file,
+        section,
+        summarized: null,
+        fallback: { reason, detail },
+    }));
+}
+function firstStderrLine(err) {
+    return (gitErr(err).split("\n")[0] ?? "").trim().slice(0, 200);
+}
+/** F's ledger at one commit (absent path = empty ledger); throws on any unreadable object. */
+function readLedgerAt(repoRoot, sha, file, blobCache, taskRegex) {
+    for (const rec of gitWalk(repoRoot, ["ls-tree", "--full-tree", "-z", sha, "--", file]).toString("utf8").split("\0")) {
+        const tab = rec.indexOf("\t");
+        if (tab < 0 || rec.slice(tab + 1) !== file)
+            continue;
+        const [mode, type, blob] = rec.slice(0, tab).split(" ");
+        if (type !== "blob" || !mode.startsWith("100"))
+            break; // same regular-file rule as readCommitSnapshot
+        let buf = blobCache.get(blob);
+        if (!buf) {
+            buf = gitWalk(repoRoot, ["cat-file", "blob", blob]);
+            blobCache.set(blob, buf);
+        }
+        return parseLedger(file, buf.toString("utf8"), taskRegex);
+    }
+    return parseLedger(file, "", taskRegex);
+}
+/**
+ * Recover H for one section: at each commit whose count for S rises over the
+ * max of its real parents, the closed rows that left F/S (not kept in F at
+ * that commit, not anywhere at P_c's tip, not already in H) must match the
+ * rise exactly, and H must stay within P_c's own count; else unreconciled.
+ */
+function sectionHistory(req, section, commits, ledgers) {
+    const result = (summarized, unreconciled) => ({
+        parent: req.parent.label,
+        parentSha: req.parent.sha,
+        file: req.file,
+        section,
+        summarized,
+        fallback: unreconciled === null ? null : { reason: "unreconciled", detail: unreconciled },
+    });
+    const recovered = new Map();
+    let transitions = 0;
+    for (const c of commits) {
+        const parentLedgers = c.parents.map((p) => ledgers.get(p)).filter((l) => l !== undefined);
+        const max = parentLedgers.reduce((m, l) => {
+            const e = entryOf(l, section);
+            return { done: Math.max(m.done, e.done), voided: Math.max(m.voided, e.voided) };
+        }, ZERO_ENTRY);
+        const atC = ledgers.get(c.sha);
+        const cur = entryOf(atC, section);
+        const inc = { done: cur.done - max.done, voided: cur.voided - max.voided };
+        if (inc.done < 0 || inc.voided < 0)
+            return result(null, `count fell at ${short(c.sha)}`);
+        if (inc.done === 0 && inc.voided === 0)
+            continue;
+        transitions++;
+        const inFileAtC = new Set((atC?.rows ?? []).map((r) => r.taskId));
+        const removed = new Map();
+        for (const l of parentLedgers) {
+            for (const r of l.rows) {
+                if (r.section !== section || r.state === " ")
+                    continue;
+                if (inFileAtC.has(r.taskId) || isKeptAt(req.parent, r.taskId) || recovered.has(r.taskId))
+                    continue;
+                if (removed.get(r.taskId) !== "x")
+                    removed.set(r.taskId, r.state);
+            }
+        }
+        const left = splitOf(removed);
+        if (left.done !== inc.done || left.voided !== inc.voided) {
+            return result(null, `count rose by ${inc.done} done/${inc.voided} voided at ${short(c.sha)} but ` +
+                `${left.done} [x]/${left.voided} [-] row(s) left the section`);
+        }
+        for (const [id, s] of removed)
+            recovered.set(id, s);
+    }
+    if (transitions === 0)
+        return result(null, null); // compacted at or before the merge-base: silent
+    const own = entryOf(req.parent.ledgers.get(req.file), section);
+    const h = splitOf(recovered);
+    if (h.done > own.done || h.voided > own.voided) {
+        return result(null, `${h.done} [x]/${h.voided} [-] recovered row(s) exceed the parent's manifest ${own.done} done/${own.voided} voided`);
+    }
+    return result(recovered, null);
+}
+/**
+ * One walk over P_c's history between the merge-base and P_c for ledger F,
+ * one entry per requested section. Never throws: shallow, unreadable and
+ * over-cap history map to a fallback (snapshot-only rule + WARN line).
+ */
+export function readCompactionHistory(repoRoot, baseSha, req, blobCache, opts) {
+    if (opts.shallow)
+        return historyFallbackAll(req, "shallow", "");
+    try {
+        let listing;
+        try {
+            listing = gitWalk(repoRoot, [
+                "log", "--full-history", "--topo-order", "--reverse", `--max-count=${opts.cap + 1}`,
+                "--format=%H %P", `${baseSha}..${req.parent.sha}`, "--", `:(top,literal)${req.file}`,
+            ]).toString("utf8");
+        }
+        catch (err) {
+            return historyFallbackAll(req, "unreadable", firstStderrLine(err));
+        }
+        const commits = listing
+            .split("\n")
+            .map((l) => l.trim())
+            .filter((l) => l !== "")
+            .map((l) => {
+            const [sha, ...parents] = l.split(/\s+/);
+            return { sha, parents };
+        });
+        if (commits.length > opts.cap) {
+            return historyFallbackAll(req, "cap", `more than ${opts.cap} commits touch ${req.file} between the merge-base and ${req.parent.label}`);
+        }
+        const ledgers = new Map();
+        for (const c of commits) {
+            for (const sha of [c.sha, ...c.parents]) {
+                if (!ledgers.has(sha))
+                    ledgers.set(sha, readLedgerAt(repoRoot, sha, req.file, blobCache, opts.taskRegex));
+            }
+        }
+        return req.sections.map((section) => sectionHistory(req, section, commits, ledgers));
+    }
+    catch (err) {
+        return historyFallbackAll(req, "unreadable", firstStderrLine(err));
+    }
+}
 const fileSectionKey = (file, section) => `${file}\0${section}`;
 /** Compaction exemption (a), (b), (d) for one parent occurrence (all per-parent); null = passes them. */
 function perParentIneligibility(occ, parentSnap, merge) {
@@ -227,11 +420,11 @@ function perParentIneligibility(occ, parentSnap, merge) {
  * distinct closed task_ids from parent occurrences passing (a)/(b)/(d). A
  * task_id not found at the merge always counts; a kept one counts only when
  * (i) the merge-base has it under F/S and (ii) no parent whose F names S in
- * its manifest holds it (specs/e126-merge-invariants.md (c)). `[x]` in any
- * contributing occurrence counts as done, else voided. Returns the (c)
- * failure reason per failing F/S key.
+ * its manifest holds it (specs/e126-merge-invariants.md (c)). With a
+ * recovered history set H for F/S, kept ids enter U only through H and H ids
+ * take H's state. Else `[x]` in any contributing occurrence counts as done.
  */
-function unionReconciliationFailures(occsById, parents, base, merge) {
+function unionReconciliationFailures(occsById, parents, base, merge, historyByKey) {
     const union = new Map(); // F/S key -> task_id -> state
     for (const [taskId, occs] of occsById) {
         const kept = (merge.rowsById.get(taskId)?.length ?? 0) > 0;
@@ -239,6 +432,8 @@ function unionReconciliationFailures(occsById, parents, base, merge) {
             if (ref.section === null || perParentIneligibility(ref, snap, merge) !== null)
                 continue;
             if (kept) {
+                if (historyByKey.has(fileSectionKey(ref.file, ref.section)))
+                    continue;
                 const section = ref.section;
                 const atBase = (base.rowsById.get(taskId) ?? []).some((r) => r.file === ref.file && r.section === section);
                 const heldByCompactor = parents.some((p) => p.ledgers.get(ref.file)?.manifest?.has(section) === true && (p.rowsById.get(taskId)?.length ?? 0) > 0);
@@ -252,24 +447,34 @@ function unionReconciliationFailures(occsById, parents, base, merge) {
             union.set(key, ids);
         }
     }
+    const viaHistory = new Map(); // F/S key -> ids in U only through H
+    for (const [key, sh] of historyByKey) {
+        if (!sh.summarized)
+            continue;
+        const ids = union.get(key) ?? new Map();
+        let onlyThroughH = 0;
+        for (const [id, state] of sh.summarized) {
+            if (!ids.has(id))
+                onlyThroughH++;
+            ids.set(id, state);
+        }
+        union.set(key, ids);
+        viaHistory.set(key, onlyThroughH);
+    }
     const failures = new Map();
     for (const [key, ids] of union) {
         const [file, section] = key.split("\0");
         const entry = merge.ledgers.get(file)?.manifest?.get(section);
         if (!entry)
             continue; // unreachable: (b) held for every contributor
-        let done = 0;
-        let voided = 0;
-        for (const s of ids.values()) {
-            if (s === "x")
-                done++;
-            else
-                voided++;
-        }
+        const { done, voided } = splitOf(ids);
         if (entry.done < done || entry.voided < voided) {
+            const h = viaHistory.get(key) ?? 0;
+            const hist = historyByKey.get(key);
             failures.set(key, `(c) manifest under-reconciles ${file} § ${section}: manifest ${entry.done} done/` +
                 `${entry.voided} voided < closed rows it must cover, union across parents ${done} [x]/${voided} [-] ` +
-                `(${ids.size} distinct task_id(s))`);
+                `(${ids.size} distinct task_id(s))` +
+                (h > 0 && hist ? ` — includes ${h} row(s) read from ${hist.parent} history after the merge-base` : ""));
         }
     }
     return failures;
@@ -281,7 +486,8 @@ function compactionIneligibility(occ, parentSnap, merge, unionFailures) {
         return perParent;
     return unionFailures.get(fileSectionKey(occ.file, occ.section)) ?? null;
 }
-export function evaluateMergeInvariants(p1, p2, base, merge) {
+/** Pure. `history` = walk outcomes; [] (or only null-`summarized` entries) is the snapshot-only rule. */
+export function evaluateMergeInvariants(p1, p2, base, merge, history = []) {
     const byId = new Map();
     for (const snap of [p1, p2]) {
         for (const [id, rows] of snap.rowsById) {
@@ -291,7 +497,18 @@ export function evaluateMergeInvariants(p1, p2, base, merge) {
             byId.set(id, list);
         }
     }
-    const unionFailures = unionReconciliationFailures(byId, [p1, p2], base, merge);
+    const historyByKey = new Map();
+    const historyFallbacks = [];
+    for (const h of history) {
+        if (h.summarized)
+            historyByKey.set(fileSectionKey(h.file, h.section), h);
+        if (h.fallback) {
+            const { parent, parentSha, file, section } = h;
+            historyFallbacks.push({ parent, parentSha, file, section, reason: h.fallback.reason, detail: h.fallback.detail });
+        }
+    }
+    historyFallbacks.sort((a, b) => cmp(a.parent, b.parent) || cmp(a.file, b.file) || cmp(a.section, b.section));
+    const unionFailures = unionReconciliationFailures(byId, [p1, p2], base, merge, historyByKey);
     const checkedAtMerge = [...merge.ledgers.keys()].sort();
     const missing = [];
     const lostCompletions = [];
@@ -346,14 +563,25 @@ export function evaluateMergeInvariants(p1, p2, base, merge) {
         compacted,
         sidecarsChecked: sidecarKeys.size,
         sidecarShortfalls,
+        historyFallbacks,
     };
 }
 const short = (sha) => sha.slice(0, 7);
 const fmtRef = (r) => `${r.parent} (${short(r.parentSha)}) ${r.file} § ${r.section ?? "(no section)"} [${r.state}]`;
+const FALLBACK_CLASS = {
+    shallow: "shallow repository",
+    unreadable: "history unreadable: ",
+    cap: "history over cap: ",
+    unreconciled: "history unreconciled: ",
+};
+const fmtFallback = (w) => `WARN (c) history fallback: ${w.parent} (${short(w.parentSha)}) ${w.file} § ${w.section} — ` +
+    `${FALLBACK_CLASS[w.reason]}${w.detail}; snapshot-only (c) used for this section`;
 export function renderMergeInvariantsReport(shas, f) {
     const out = [
         `merge-invariants: merge ${short(shas.merge)} (parent1 ${short(shas.parent1)}, parent2 ${short(shas.parent2)}, merge-base ${short(shas.base)})`,
     ];
+    for (const w of f.historyFallbacks)
+        out.push(fmtFallback(w));
     out.push(`[AC1] row presence: ${f.rowsChecked} task_id(s) at parents — ` +
         `${f.rowsChecked - f.missing.length - f.compacted.length} present, ${f.compacted.length} COMPACTED, ${f.missing.length} MISSING`);
     for (const m of f.missing) {
@@ -399,8 +627,11 @@ function gitErr(err) {
     const s = e.stderr ? e.stderr.toString().trim() : "";
     return s || e.message || String(err);
 }
-/** Exported entrypoint: never throws; every outcome maps to an exit code. */
-export function runMergeInvariants(ref = "HEAD", repoRoot = process.cwd()) {
+/**
+ * Exported entrypoint: never throws; every outcome maps to an exit code.
+ * `opts.historyCommitCap` is a test knob only; the CLI never passes it.
+ */
+export function runMergeInvariants(ref = "HEAD", repoRoot = process.cwd(), opts = {}) {
     if (ref.startsWith("-") || ref.length === 0) {
         return result("USAGE_ERROR", `merge-invariants: invalid ref ${JSON.stringify(ref)}\n${MERGE_INVARIANTS_USAGE}`);
     }
@@ -440,7 +671,30 @@ export function runMergeInvariants(ref = "HEAD", repoRoot = process.cwd()) {
         const taskRegex = resolveTaskRegex(repoRoot);
         const cache = new Map();
         const snap = (sha, label) => readCommitSnapshot(repoRoot, sha, label, taskRegex, cache);
-        const findings = evaluateMergeInvariants(snap(parent1, "parent1"), snap(parent2, "parent2"), snap(base, "merge-base"), snap(mergeSha, "merge"));
+        const p1Snap = snap(parent1, "parent1");
+        const p2Snap = snap(parent2, "parent2");
+        const baseSnap = snap(base, "merge-base");
+        const mergeSnap = snap(mergeSha, "merge");
+        const requests = compactionHistoryRequests(p1Snap, p2Snap, baseSnap, mergeSnap);
+        const history = [];
+        if (requests.length > 0) {
+            const knob = opts.historyCommitCap;
+            const cap = knob !== undefined && Number.isInteger(knob) && knob >= 0 ? knob : HISTORY_COMMIT_CAP;
+            let shallow = false;
+            let shallowError = null;
+            try {
+                shallow = gitWalk(repoRoot, ["rev-parse", "--is-shallow-repository"]).toString().trim() === "true";
+            }
+            catch (err) {
+                shallowError = firstStderrLine(err);
+            }
+            for (const req of requests) {
+                history.push(...(shallowError !== null
+                    ? historyFallbackAll(req, "unreadable", shallowError)
+                    : readCompactionHistory(repoRoot, base, req, cache, { cap, shallow, taskRegex })));
+            }
+        }
+        const findings = evaluateMergeInvariants(p1Snap, p2Snap, baseSnap, mergeSnap, history);
         const report = renderMergeInvariantsReport({ merge: mergeSha, parent1, parent2, base }, findings);
         const failed = findings.missing.length + findings.lostCompletions.length + findings.sidecarShortfalls.length > 0;
         return result(failed ? "FAIL" : "PASS", report, findings);
