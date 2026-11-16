@@ -1,0 +1,9 @@
+{"ts":"2026-11-16T04:02:50.890Z","feature":"e418-gate-retro-prose-trim","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":null}
+{"ts":"2026-11-16T04:11:55.718Z","feature":"e418-gate-retro-prose-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T04:27:52.953Z","feature":"e418-gate-retro-prose-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T04:28:43.840Z","feature":"e418-gate-retro-prose-trim","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T04:55:13.084Z","feature":"e418-gate-retro-prose-trim","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T05:07:48.481Z","feature":"e418-gate-retro-prose-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T05:20:02.821Z","feature":"e418-gate-retro-prose-trim","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-16T05:20:53.954Z","feature":"e418-gate-retro-prose-trim","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-16T05:47:45.632Z","feature":"e418-gate-retro-prose-trim","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
