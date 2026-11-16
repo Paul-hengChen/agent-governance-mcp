@@ -403,11 +403,13 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    | S1 kept summarized row plus a post-base summarized row | P2 adds A04, compacts M(4); P1 = base; merge keeps A03 `[x]` literally and writes M(3) | H A01..04; `H_add` A04; A03 in H so not in `K_out` | 3 ≤ 3 / 4 > 3 | PASS → **FAIL**, MISSING A01, A02 |
 
    S1 is one member of a family. A kept row holds a slot in both checks
-   when it is a closed base row of S that P_c summarized and P_o still has
-   closed under S, wherever the merge keeps it (another section included)
-   and whatever its text; a kept row P_o reopened holds none (`E417 G7`).
-   So a merge FAILs whenever it keeps such a row while a history-only row
-   (an `H_add` id) also needs a slot, and its count leaves no slot for both.
+   when it is a base row of S (in any state at the base) that P_c
+   summarized and P_o has closed under S, wherever the merge keeps it
+   (another section included) and whatever its text or its state at the
+   merge; a kept row P_o reopened holds none (`E417 G7`). So, in history
+   mode (step 4), a merge FAILs whenever it keeps such a row while a
+   history-only row (an `H_add` id) also needs a slot, and its count
+   leaves no slot for both.
    The realistic way in is a modify/delete conflict (review round 2, N03):
    P1 edits A03's text and adds D01; the merge keeps the edited A03 and D01
    and writes M(3), P2's count minus A03 → FAIL, MISSING A01, A02. The
@@ -419,7 +421,9 @@ subtract component-wise. "Closed row" = `[x]` or `[-]`.
    M(2)) already FAILs before E417, on AC-E203-6's premise that a kept row
    the compacting side summarized never frees a manifest slot. The
    alternative reading loses a completed row silently. A merge that hits
-   this passes by keeping P2's count, M(4), alongside the kept row. Pinned
+   this satisfies (c) once its manifest counts the kept row in the state
+   P_o gives it, alongside every other row (c) must cover; for S1, N03 and
+   N04 that is P2's count, M(4). Pinned
    by `E417 S1`, `E417 N03` and `E417 N02` in
    `test/e417-merge-invariants-history.test.mjs`; N04 was run in review
    round 2 and has no test of its own.
