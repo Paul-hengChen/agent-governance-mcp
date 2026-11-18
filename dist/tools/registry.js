@@ -553,7 +553,11 @@ const IndexPrdArgs = z
 export const TOOL_REGISTRY = [
     defineTool({
         name: "tw_get_state",
-        description: "Read handoff state JSON. MANDATORY FIRST ACTION. Other tw_* writes blocked if skipped.",
+        description: "Read the workspace's handoff state: JSON { exists: true, ...state }, or { exists: false, message } " +
+            "when no state exists; either may add advisory keys. File mode fails on an unparseable handoff file " +
+            "or one a newer server wrote. Until it has run for the same workspace_path in this server process, " +
+            "tw_update_state, tw_complete_task, tw_rollback_task, tw_void_task, tw_add_task and tw_sync fail " +
+            "with ⛔ BLOCKED.",
         inputSchema: {
             type: "object",
             properties: {
@@ -569,7 +573,11 @@ export const TOOL_REGISTRY = [
     }),
     defineTool({
         name: "tw_update_state",
-        description: "Atomic write handoff state. Run at END of task. Subject to ALLOWED_TRANSITIONS — see specs/qa-flow-enforcement-architecture.md.",
+        description: "Atomically write the workspace's handoff state at the end of a role step. Returns JSON " +
+            "{ success: true, updated_at, ... }, with warnings when an advisory applies. Each write is checked " +
+            "against the role-transition matrix (ALLOWED_TRANSITIONS) and the gate pipeline; a rejection writes " +
+            "no state and returns text starting with ⛔ and the error code, plus a hint. Also fails with " +
+            "⛔ BLOCKED before tw_get_state, or ⛔ STATE DRIFT if the state changed since that read.",
         inputSchema: {
             type: "object",
             properties: {
@@ -734,7 +742,10 @@ export const TOOL_REGISTRY = [
     }),
     defineTool({
         name: "tw_get_next_task",
-        description: "Read next uncompleted task.",
+        description: "Return the first unchecked, non-voided task as JSON { next: { id, description, section, " +
+            "completed }, isCheckpoint, progress: { completed, total } }; isCheckpoint is true when the task " +
+            "before it is in another section. Returns { allComplete: true, totalTasks } when none is left, " +
+            "or { error } when there is no task list.",
         inputSchema: {
             type: "object",
             properties: {
@@ -806,7 +817,10 @@ export const TOOL_REGISTRY = [
     }),
     defineTool({
         name: "tw_rollback_task",
-        description: "Mark task uncompleted [ ]. Require reason.",
+        description: "Turn a checked task back to unchecked and record `(reverted: <reason>)` on it. Returns JSON " +
+            "{ success: true, taskId, marked: \"reverted\", reason }, or { error } when there is no task list, " +
+            "the task is unknown or unchecked, or (file mode) task_id or reason has a line break. Touches the " +
+            "task list only, not the handoff state or its completed_tasks. ⛔ BLOCKED before tw_get_state.",
         inputSchema: {
             type: "object",
             properties: {
@@ -830,15 +844,12 @@ export const TOOL_REGISTRY = [
     }),
     defineTool({
         name: "tw_void_task",
-        description: "Void a task: mark it as never-should-have-existed (E117), not 'done, then reverted'. " +
-            "Only legal on an incomplete [ ] row — an already-completed [x] row is refused (roll it " +
-            "back first). A voided row disappears from tw_get_next_task, tw_detect_drift, and tw_sync " +
-            "as though it never existed. Its id becomes structurally reusable in a re-cut, but review/QA " +
-            "evidence gates are existence-based and not void-aware: a re-cut under the SAME id can inherit " +
-            "the voided row's stale evidence artifacts and skip real review. Prefer a fresh id for unrelated work. " +
-            "File mode only: re-voiding an already-voided id is refused with an `alreadyVoided: true` flag " +
-            "distinguishing it from a plain not-found (the voided marker line is still on disk); SQLite/HTTP mode " +
-            "reports both cases as a uniform not-found, with no alreadyVoided distinction.",
+        description: "Void an unchecked task that should never have existed (not one done and then undone). Returns " +
+            "JSON { success: true, taskId, marked: \"voided\", reason }, or { error } when the task is checked " +
+            "or in the handoff's completed_tasks (the message names the fix), unknown, already voided " +
+            "(alreadyVoided: true), or (file mode) task_id or reason has a line break. A voided task drops out " +
+            "of tw_get_next_task, tw_detect_drift and tw_sync, and tw_add_task refuses its id. ⛔ BLOCKED " +
+            "before tw_get_state.",
         inputSchema: {
             type: "object",
             properties: {
@@ -862,7 +873,11 @@ export const TOOL_REGISTRY = [
     }),
     defineTool({
         name: "tw_detect_drift",
-        description: "Check state vs tasks drift. Run after get_state.",
+        description: "Compare the handoff state with the task list. Returns JSON { driftDetected, details, " +
+            "handoffLastTask, tasksCompleted, tasksIncomplete, stampAdvisory, fanoutAdvisory, " +
+            "evidenceBackedIds }; details has one line per finding, and the advisories are null or a note " +
+            "that never sets driftDetected. State written by a newer server is reported as drift. Repairs " +
+            "nothing (tw_sync copies handoff completions to the task list). Run it after tw_get_state.",
         inputSchema: {
             type: "object",
             properties: {

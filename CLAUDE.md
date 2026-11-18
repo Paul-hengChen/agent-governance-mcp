@@ -10,7 +10,7 @@ into a workspace by invoking one of the 12 registered role prompts (`teamwork`,
 `release-engineer`, `integrator`) or, if you opt in, the SessionStart hook.
 
 This repo is both the server's own source **and** a managed workspace — it
-dogfoods itself (`.current/handoff.md` and `tasks.md` exist at the root), so the
+dogfoods itself (`.current/_primary/handoff.md` and `tasks.md` exist), so the
 Pre-Flight Protocol below applies to work done here.
 
 ## What this repo is
@@ -41,7 +41,7 @@ workspace path, and picks a transport. The layers themselves live elsewhere:
    `integrator`) use matching `content/skill-<role>.md` file names
    (`integrator` is prompt-only — not a `tw_switch_role` / `agent_id` role).
 2. **Tools** — thirteen `tw_*` tools, each one entry in `tools/registry.ts`, that
-   read/write `.current/handoff.md`, `tasks.md`, and (in HTTP/SQLite mode)
+   read/write `.current/<lane>/handoff.md`, `tasks.md`, and (in HTTP/SQLite mode)
    PRD-derived RAG chunks in target workspaces. `tw_update_state` / `tw_get_state`
    are implemented in `tools/handoff-orchestrator.ts`.
 3. **Guards + gates** (`guards/{session,file-lock}.ts`) — pre-flight check, file
@@ -61,7 +61,7 @@ index.ts                  MCP server entry (~300 lines): iterates the registries
 tools/registry.ts         TOOL_REGISTRY + PROMPT_REGISTRY — ADD NEW TOOLS HERE
 tools/handoff-orchestrator.ts  tw_update_state / tw_get_state + the 19-step
                           UPDATE_STATE_GATE_PIPELINE (the write path)
-tools/handoff.ts          read/write .current/handoff.md (uses js-yaml)
+tools/handoff.ts          read/write .current/<lane>/handoff.md (uses js-yaml)
 tools/handoff-parse.ts    handoff YAML/markdown parsing (E36 split)
 tools/handoff-write.ts    handoff serialize + atomic publish (E36 split)
 tools/handoff-types.ts    HandoffState shape + per-field semantics (E36 split)
@@ -192,7 +192,7 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
 
 - It does NOT force agents to follow the constitution — it only puts the
   constitution into context. An agent that ignores tool calls cannot be
-  stopped from editing `.current/handoff.md` directly. (But `tw_detect_drift`
+  stopped from editing `.current/<lane>/handoff.md` directly. (But `tw_detect_drift`
   will surface the inconsistency on the next session.)
 - It is NOT cross-machine. The file lock is local-fs only.
 - Its `tw_*` tools never write to git (no commit, branch, push or pull request);
@@ -217,8 +217,8 @@ auto-arming can still register it per `docs/install.md`; never register it in
 more than one settings file (a global + project-local double registration
 double-fires, injecting the block twice).
 
-**This repo dogfoods its own server.** `.current/handoff.md` and `tasks.md`
-exist at the root, so this is a managed workspace like any other. Agents
+**This repo dogfoods its own server.** `.current/_primary/handoff.md` and
+`tasks.md` exist, so this is a managed workspace like any other. Agents
 working on the server itself follow the constitution and route through tw_*
 tools — that's how we catch regressions in our own governance rules before
 users hit them.

@@ -1,0 +1,7 @@
+# E436 (T-E436-02): release-engineer template line 9 reworded and line 13 path moved to
+# the lane form; these qa-owned pins still carry the old text and are re-pinned by T-E436-03.
+test/e404-release-engineer-template.test.mjs | AC-E404-1: 13 lines, frontmatter then exactly four non-blank body lines in order, no trailing blank
+test/e404-release-engineer-template.test.mjs | AC-E404-3: the load line is the base sentence plus the not-restated sentence
+test/e404-release-engineer-template.test.mjs | AC-E404-4: the RELAY paragraph is the pinned text and is the last line
+test/feature-lease.test.mjs | E9A-S4: templates/claude-code-agents/release-engineer.md carries the matching no-MCP-path relay paragraph (dispatch-context copy)
+test/subagent-templates.test.mjs | e9a AC2: templates/claude-code-agents/release-engineer.md carries the no-MCP-path relay paragraph
