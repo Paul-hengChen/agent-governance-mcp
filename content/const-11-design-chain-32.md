@@ -1,12 +1,6 @@
 <!-- design-only:start -->
 ### 3.2 Visual Verdict Authority & Separation of Duties<!-- origin:start --> (v3.26.0)<!-- origin:end -->
 
-Hard governance rules that emerged from a visual false-PASS retrospective
-(see `content/constitution-rationale.md` / `research/`). The decisive failure was a
-coordinator-authored accept-policy that pre-excused the exact visual defect; prompt-advisory rules
-proved insufficient, so these are also server-enforced (§3.1 visual evidence gate + report-schema
-validation).
-
 - **Visual verdict is qa-visual-owned.** ONLY qa-visual may define visual PASS criteria, accepted-diff
   tolerance, or pre-excused divergence classes — and only inside the `## Allowed Differences` section
   of `qa_reports/visual_<task-id>.md` (or PM/spec, before implementation). The coordinator and every
