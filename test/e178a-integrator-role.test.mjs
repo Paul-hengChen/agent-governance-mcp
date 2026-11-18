@@ -287,7 +287,7 @@ test("AC9: SOP merge stage — substantive-resolution code-reviewer duty, no-ff-
   assert.ok(SOP.includes("subagent-dispatch `code-reviewer` on that merge commit"));
   assert.ok(SOP.includes("`git show --remerge-diff <merge-sha>`"));
   assert.ok(SOP.includes("`review_reports/review_merge-<short-sha>.md`, committed on the integration branch"));
-  assert.ok(SOP.includes("no `tw_update_state` on the integration branch (the E222 precedent)"));
+  assert.ok(SOP.includes("no `tw_update_state` on the integration branch<!-- origin:start --> (the E222 precedent)<!-- origin:end -->"));
   assert.ok(SOP.includes("never open the pull request before that verdict is APPROVED."));
   assert.ok(SOP.includes("subagent-dispatch `qa-engineer` to regenerate and explain every hunk"));
   assert.ok(SOP.includes("**Never fix feature code on the integration branch**"));

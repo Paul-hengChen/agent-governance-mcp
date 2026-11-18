@@ -35,11 +35,11 @@ const CUT_HEADER = "`id | desc | depends_on | est. files | touches | design-link
 // Each check returns an array of failure strings (empty = holds).
 function checkAC1(sop) {
   const f = [];
-  const gov = sop.indexOf("## Governance state (D11)");
+  const gov = sop.indexOf("## Governance state<!-- origin:start --> (D11)<!-- origin:end -->");
   const h0 = sop.indexOf(H0);
   const s1 = sop.indexOf("## Stage 1 — Fan-out planning");
   if (count(sop, H0) !== 1) f.push("Stage 0 heading must occur exactly once");
-  if (!(gov >= 0 && h0 > gov && s1 > h0)) f.push("Stage 0 heading must sit between Governance state (D11) and Stage 1");
+  if (!(gov >= 0 && h0 > gov && s1 > h0)) f.push("Stage 0 heading must sit between Governance state and Stage 1");
   const overview = slice(sop, "## Work overview", "## Permissions");
   const r0 = overview.indexOf("| 0. Ticket cut (optional) |");
   const r1 = overview.indexOf("| 1. Fan-out planning |");

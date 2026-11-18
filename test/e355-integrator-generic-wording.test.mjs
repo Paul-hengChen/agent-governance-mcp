@@ -23,7 +23,7 @@ const S5A = SOP.slice(i5a, i5b);
 const S5B = SOP.slice(i5b, i5c);
 
 const W3 =
-  "(the repo's CI must run on a lane-branch push — the addendum names its trigger, E298); you push the lane branch — lanes never push. The local full suite runs only under the *CI fallback* below, and then it is still the **full suite**, never \"related files\", serial — the repo's full-suite command (the addendum names it), wrapped in `node <agc install>/scripts/test-lock.mjs -- <full-suite command>`.";
+  "(the repo's CI must run on a lane-branch push — the addendum names its trigger<!-- origin:start -->, E298<!-- origin:end -->); you push the lane branch — lanes never push. The local full suite runs only under the *CI fallback* below, and then it is still the **full suite**, never \"related files\", serial — the repo's full-suite command (the addendum names it), wrapped in `node <agc install>/scripts/test-lock.mjs -- <full-suite command>`.";
 const W4 = "no block below `## Applied`; any retired findings file the addendum names untouched; under";
 const W5 = "on the committed branch under `node <agc install>/scripts/test-lock.mjs -- <full-suite command>` as before,";
 const W6 = "is on the repo's load-sensitive test list (the addendum names it; no list, no re-run); any other red";
