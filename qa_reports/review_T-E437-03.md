@@ -107,3 +107,9 @@ Phase 0.5: clean (32/32 manifest entries confirmed red, 0 unexplained reds)
 
 - `content/skill-sr-engineer.md:29` 的 `**AC6 escape**` 是既有的 AC id 當名稱使用，位於 45 個 cut 站之外（與 pending_notes 一致，僅報告、不開票）。
 - 第一個 QA commit（`bb11826`）順帶包含 `qa-visual-skill-split AC-3` 的 re-pin（屬 E438，commit 標題僅寫 E437）；內容正確，只是分組歸屬略有出入。
+## 2026-11-18T07:10:28.410Z — PASS — by qa-engineer
+
+suite-result: 4318/4320 passed (server-recorded from qa_suite_result; command: node scripts/test-lock.mjs -- npm test)
+
+QA PASS for e437-prompt-content-hygiene (E437-E440, base 41c301e). Full detail: qa_reports/review_T-E437-03.md (covers all 13 tasks; includes ## Expected-Red Diff and ## AC Execution Log). Phase 0.5: clean (32/32 manifest entries confirmed red before any edit, 0 unexplained reds). New tests: e437 (15), e438 (45), e439 (23), e440 (9). 17 test files re-pinned; context-budget re-baselined per ruling 2 = a / R2 = a (lean 5731->5761, pm 4849->4791, sr 2852->2816, design const 9533->9387, teamwork 19225->19012, non-design 7533->7484, design-only floor 1999->1903; AC7 x2 and AC2/AC4 untouched per R1 = b). 12 goldens re-captured once; all 20 distinct hunks attributed to E437 s1-s4, E438 s1-s10, E439 s1 (R1 = b deletion), E440 s2-s6; no unattributable hunk; E439 site 8 has no golden hunk (goldens carry no design-auditor/sr skill text). AC-ALL: dist zero diff, npm audit exit 0, check:bookkeeping exit 0, fanout check --cut exit 0, scope diff only lite.md from templates. Final suite on clean committed tree: 4320 tests, 4318 pass, 0 fail, 2 skipped.
+
