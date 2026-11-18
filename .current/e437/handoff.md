@@ -2,25 +2,26 @@
 schema_version: 15
 active_feature: "e437-prompt-content-hygiene"
 status: "In_Progress"
-last_updated: "2026-11-18T06:08:44.350Z"
-last_agent: "pm"
+last_updated: "2026-11-18T06:33:29.808Z"
+last_agent: "sr-engineer"
 prd_path: "specs/e437-prompt-content-hygiene.md"
 scope_decision: "single-feature"
-scope_decision_why: "Fan-out lane plan specs/fanout-prompt-audit-fixes.md, human-approved 2026-11-18 (Stage 2 ruling 1 = a): E437, E438, E439, E440 run in this one lane as ONE cut, sequential, because all four edit content/** and move the same compose goldens and context-budget caps; golden re-captured once by qa at the end."
+scope_decision_why: "Fan-out lane plan specs/fanout-prompt-audit-fixes.md, human-approved 2026-11-18 (Stage 2 ruling 1 = a): E437–E440 in this one lane as ONE cut, sequential."
+cut_approved: true
 dispatch_pins:
   pm: "opus"
   sr-engineer: "opus"
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-11-18T06:08:44.350Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-11-18T06:33:29.808Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 1
+hop_count: 2
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -31,11 +32,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM: cut drafted in specs/e437-prompt-content-hygiene.md — 13 tasks (8 sr T-E437-01..T-E440-01, 5 qa T-E437-03, T-E438-04, T-E439-03, T-E440-02, T-E440-03). cut_approved NOT set: integrator mailbox pre-review first, then human in the coordinator session (cutApprovalAutoTier = {}).
-- PM: two needs-human-ruling items in Dependencies — R1 (const-11 §3.2 preamble rationale fence vs the §3.x rationale-free zone pinned by context-budget AC7; recommend a: fence + re-pin AC7 and AC2/AC4) and R2 (design-only saving floor >= 1999 falls to ~1903; recommend a: re-baseline like ruling 2). T-E439-01 waits on R1.
-- PM: integrator pre-review items — E438 recount 45 (41 audit + 4 cut-found: architect:24 R5 rename, architect:75 R1, pm:80 A10, qa-engineer:80 pre-E3); inline <agc install> definition at skill-coordinator-lite:43; tightening the 5 caps with headroom; owned-new reds compose-equivalence (11) + skill-manifest (1) go green by golden re-capture, no test edit.
-- PM: trial (base 41c301e copy, test-lock) — base 8 env-only reds, post 46 = 8 + 38 new; none e436-owned. feature-lease S4/E9A-S4/E9A-S5/E17-S3/E17-S4 are e436's per integrator to-lane#2. render-structure reds (architect:27, design-auditor:59) are a content fence-placement fix for sr, not a re-pin.
-- PM: fanout.mjs check --cut specs/fanout-prompt-audit-fixes.md e437 specs/e437-prompt-content-hygiene.md exit 0 (4 tickets, 53 tokens, 0 out of bounds).
+- sr-engineer: T-E437-01..T-E440-01 ready for code review. Commits: T-E437-01 da8a651 (sites 1-11, incl. inline <agc install> definition at skill-coordinator-lite:43); T-E437-02 f553481 (lite.md line 9 only; line 7 untouched); T-E438-01 26826b7 (sites 1-17, rename 17); T-E438-02 1ff0aec (skill-integrator 15 sites); T-E438-03 2381d6d (sites 33-45, renames 39/40/42, deletions 36/45); T-E439-01 3b71da5 (const-11 §3.2 preamble DELETED per R1 = b); T-E439-02 76ea391 (sites 2-11); T-E440-01 c0b9b23 (6 sites); manifest 17d4f56.
+- E439 fence placement (spec Fence placement constraint): leading space of each inline story sits INSIDE the fence (sites 2, 5, 7) so the stripped rule keeps single spacing (trial left a double space); site 3 (skill-architect:27) fence is 'PM<start>. Closes ... comparator<end>.' so the end marker is followed by '.' and full-detail stays markers-only; site 8 (skill-design-auditor:59, story is the line's last text, no non-newline char available) uses block style: the story moves to its own column-0 line '<!-- rationale:start -->(Method and rationale: ...)<!-- rationale:end -->' — the full-detail bundle there differs from base by one space -> newline besides the markers (qa: attribute that hunk to E439 site 8).
+- Checks: npm run build OK, dist/ zero diff (git diff 41c301e --name-only lists no dist/, tools/, CLAUDE.md, const-01, release-engineer files); npx tsc --noEmit 0; npm audit --audit-level=high exit 0 (7 low/moderate only); E438 recount scan on stripped content/*.md finds only coord-01 F0 placeholders; AC-E438-3 and AC-E440-1 greps return nothing; legacy-inert resume_of sentences byte-identical.
+- Full suite (node scripts/test-lock.mjs -- npm test, c0b9b23): 4228 tests, 4194 pass, 32 fail, 2 skipped. All 32 are on the spec Red-test list and listed one-to-one in qa_reports/expected-red_e437-prompt-content-hygiene.txt (12 golden, 4 context-budget, 16 re-pins). Green without test edits: render-structure (all 15), context-budget AC7 x2 + AC2/AC4 (R1 = b), all 8 env-only tests (real worktree has git history), all e436-owned tests. Measured: lean 5761 ~tok (cap 5731), design-only saving 1903 ~tok (floor 1999) — qa re-baselines in T-E440-03.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
