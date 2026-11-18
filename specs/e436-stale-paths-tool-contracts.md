@@ -239,6 +239,13 @@ sr-engineer's expected-red manifest lists these five rows.
 
 sr-engineer leaves the probe's reds intentionally (tests are qa-owned) and lists them in `qa_reports/expected-red_e436-stale-paths-tool-contracts.txt` (`<file> | <exact test name>`).
 
+## Cut
+
+| id | desc | depends_on | est. files | touches | design-link |
+|---|---|---|---|---|---|
+| E436 | Stale handoff paths: `CLAUDE.md` lines 13/220-221 to the primary path, lines 44/64/195 to the lane path (D1); release-engineer template line 9 reworded (D2), line 13 lane path | — | 2 + qa pins | `CLAUDE.md`、`templates/claude-code-agents/release-engineer.md`、`test/e404-release-engineer-template.test.mjs`、`test/feature-lease.test.mjs`、`test/subagent-templates.test.mjs`、`test/e436-*.test.mjs` | — |
+| E441 | Six tool descriptions rewritten as contracts, string-only, plus rebuilt registry output | — | 1 + dist + qa pins | `tools/registry.ts`、`dist/tools/registry.*`、`test/e441-*.test.mjs` | — |
+
 ## Out of Scope
 - Template line 7 `CRITICAL:` and the `CRITICAL:`/`NEVER` capitals on line 13 (E442, ruled keep).
 - Any other template, `content/**` (including `content/skill-release-engineer.md`), compose goldens, `test/context-budget.test.mjs`, guard behaviour, `docs/backlog.md`.
