@@ -35,5 +35,5 @@ Each `dispatch_pins` value is one of the four tier names `opus`, `sonnet`, `haik
 always resolves to the latest model of that tier, never a dated id); any other value is rejected at
 the tool boundary with `DISPATCH_PIN_TIER_REJECTED` naming the role and the value, before any gate
 runs, and an on-disk pin outside the four is surfaced by `tw_get_state` as `dispatch_pins_advisory`
-rather than rejected on read (E300).
+rather than rejected on read<!-- origin:start --> (E300)<!-- origin:end -->.
 

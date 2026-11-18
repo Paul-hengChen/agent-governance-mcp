@@ -15,7 +15,7 @@ Per Constitution §3 builder ≠ judge and, when design-armed, §3.2, the coordi
 
 ## Drift Reconcile after out-of-band execution<!-- origin:start --> (v3.26.0, R10)<!-- origin:end -->
 
-Coordinator trigger for Constitution §3 *Sequential-context assumption + reconcile* (R10): you
+Coordinator trigger for Constitution §3 *Sequential-context assumption + reconcile*<!-- origin:start --> (R10)<!-- origin:end -->: you
 dispatched background/parallel subagents, OR executed a role inline (subagent unavailable). In those
 cases run that reconcile before any PASS or hand-back; never hand-edit `tasks.md` checkboxes to paper
 over drift.
