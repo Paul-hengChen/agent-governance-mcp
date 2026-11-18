@@ -210,11 +210,14 @@ test("AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback
     /\*\*Fallback \(`tw_switch_role`\)\*\*/,
     "skill-coordinator.md must surface a **Fallback (`tw_switch_role`)** paragraph",
   );
+  // E440 removed the version-relative "pre-v3.20.0 ... no tw_* tool surface has changed" sentence; the
+  // fallback rule itself (what to call, and that it runs in the same context) is the remaining contract.
   assert.match(
     raw,
-    /no tw_\* tool surface has changed/i,
-    "Fallback paragraph must state 'no tw_* tool surface has changed' for backwards-compat clarity",
+    /Call `tw_switch_role\(<next_role>\)` and follow the returned SOP in the same context\./,
+    "Fallback paragraph must state the tw_switch_role fallback rule",
   );
+  assert.doesNotMatch(raw, /pre-v3\.20\.0/, "no version-relative degradation sentence (E440)");
 });
 
 // ---------------------------------------------------------------------------

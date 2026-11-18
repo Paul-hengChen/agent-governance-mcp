@@ -32,7 +32,7 @@ test("AC4: coord-05 Drift Reconcile body is the cited one-paragraph form", () =>
   const body = section(text, heading).replace(/^\s*<!-- origin:start -->.*?<!-- origin:end -->\n/s, "");
   assert.equal(
     body.trim(),
-    "Coordinator trigger for Constitution §3 *Sequential-context assumption + reconcile* (R10): you\n" +
+    "Coordinator trigger for Constitution §3 *Sequential-context assumption + reconcile*<!-- origin:start --> (R10)<!-- origin:end -->: you\n" +
       "dispatched background/parallel subagents, OR executed a role inline (subagent unavailable). In those\n" +
       "cases run that reconcile before any PASS or hand-back; never hand-edit `tasks.md` checkboxes to paper\n" +
       "over drift.",

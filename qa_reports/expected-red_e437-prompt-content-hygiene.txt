@@ -1,0 +1,49 @@
+# e437-prompt-content-hygiene — expected reds left for qa-engineer (Constitution §2: only qa edits tests)
+# Format: <relative test file path> | <exact test name/description string>
+# Source: full-suite run on c0b9b23 (node scripts/test-lock.mjs -- npm test): 4228 tests,
+# 4194 pass, 32 fail, 2 skipped. Every red below is on the spec's Red-test list
+# (specs/e437-prompt-content-hygiene.md). No environment-only test and no e436-owned
+# test is red in this worktree. render-structure is green with no test edit.
+
+# Golden byte-identity (owned-new; green once qa re-captures all 12 goldens in T-E440-03)
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# Budget (T-E440-03; ruling 2 = a, R2 = a). Measured: lean 5761 ~tok (cap 5731); design-only saving 1903 ~tok (floor 1999).
+# AC-P2-2 / AC-P2-3 pin the pre-fence label text (E438 sites 1-2). AC7 x2 and AC2/AC4 are GREEN (R1 = b, not re-pinned).
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 5731 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7533 ~tok)
+test/context-budget.test.mjs | AC-P2-2: §4 visual block (S3/S4/S5 + design-auditor) is PRESENT on the design arm
+test/context-budget.test.mjs | AC-P2-3: §1 L16/L17 + L19 are ABSENT on non-design, PRESENT on design; L15/L18 retained on both
+
+# E437 re-pins (T-E437-03)
+test/e408-core-task-alias-tail.test.mjs | AC5: lite template line 9 ends with the forbid + tier sentences; no server claim, no Task
+test/qa-visual-skill-split.test.mjs | AC-2: skill-qa-visual.md Step A.0 requires copying the frozen baseline manifest, no URL re-derivation
+
+# E438 re-pins (T-E438-04)
+test/widget-shape-spec.test.mjs | AC-1: skill-pm.md declares Visual Widgets as a required H2 section
+test/widget-shape-spec.test.mjs | AC-2: skill-design-auditor declares Visual Widgets in Artifact Schema
+test/widget-shape-spec.test.mjs | R5: Constitution §1 carries the Visual Widgets exception clause
+test/phase-0-5-sop.test.mjs | AC-4: Phase 0.5 references the Constitution §1 Visual Widgets exception
+test/qa-visual-skill-split.test.mjs | AC-3: lazy-load hook has both Absent and Present branches with correct contracts (v3.14.0 PASS-gated)
+test/design-auditor-volume-guard.test.mjs | AC-1: skill-design-auditor.md step 2c forbids eyeball-pick and mandates a deterministic baseline filter
+test/feature-lease.test.mjs | S5: content/coord-03-core-fallback.md carries the Feature-Scope Gate note (T-E1-03)
+test/e178a-integrator-role.test.mjs | AC9: SOP merge stage — substantive-resolution code-reviewer duty, no-ff-before-APPROVED, qa golden regen, no self-fix
+test/e226-integrator-sop-portable.test.mjs | AC-E226-2: exactly one Tool calls paragraph, verbatim, between the Invocation paragraph and the Governance state heading
+test/e288-integrator-stage0.test.mjs | AC-E288-1: Stage 0 heading, Work overview row, Lifecycle row and invocation stages 0–3 are placed correctly
+test/e355-integrator-generic-wording.test.mjs | AC-E355-2: W3-W8 generic replacements appear exactly once, in the step the spec names
+test/e407-restatement-citations.test.mjs | AC4: coord-05 Drift Reconcile body is the cited one-paragraph form
+
+# E440 re-pins (T-E440-02)
+test/e130-lane-default.test.mjs | AC7: the pre-v3.20.0 degradation sentence sits inside the Fallback paragraph, not after Dispatch-attestation
+test/subagent-templates.test.mjs | AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback

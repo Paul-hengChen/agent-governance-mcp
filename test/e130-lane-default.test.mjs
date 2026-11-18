@@ -181,11 +181,12 @@ test("AC6: the Worktree bootstrap obligation paragraph forbids the symlink, keep
 // misleadingly reads as describing them.
 // ---------------------------------------------------------------------------
 
-test("AC7: the pre-v3.20.0 degradation sentence sits inside the Fallback paragraph, not after Dispatch-attestation", () => {
+test("AC7: the tw_switch_role fallback rule sits inside the Fallback paragraph (version-relative sentence removed by E440), not after Dispatch-attestation", () => {
   const fallbackParagraph = extractBetween(COORD_03, "**Fallback (`tw_switch_role`)**", "**Dispatch attestation (`switch_role`)**", "AC7");
-  assert.match(fallbackParagraph, /This is the pre-v3\.20\.0 behavior — degradation stays graceful for those hosts; no tw_\* tool surface has changed\./, "the sentence must sit inside the Fallback paragraph");
+  assert.match(fallbackParagraph, /Call `tw_switch_role\(<next_role>\)` and follow the returned SOP in the same context\.\s*$/, "the fallback rule must sit inside the Fallback paragraph and end it");
+  assert.doesNotMatch(fallbackParagraph, /pre-v3\.20\.0/, "E440: the version-relative sentence is gone from the Fallback paragraph");
   const inlineAttestationParagraph = extractBetween(COORD_03, "**Dispatch attestation (`inline`)**", "**Stop conditions**", "AC7 (negative)");
-  assert.doesNotMatch(inlineAttestationParagraph, /This is the pre-v3\.20\.0 behavior/, "the sentence must NOT remain immediately after the Dispatch-attestation paragraphs");
+  assert.doesNotMatch(inlineAttestationParagraph, /pre-v3\.20\.0|Call `tw_switch_role\(<next_role>\)`/, "the degradation sentence / fallback rule must NOT sit after the Dispatch-attestation paragraphs");
 });
 
 // ---------------------------------------------------------------------------

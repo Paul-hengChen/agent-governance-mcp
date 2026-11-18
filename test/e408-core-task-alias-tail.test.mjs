@@ -76,10 +76,13 @@ test("AC5: lite template line 9 ends with the forbid + tier sentences; no server
   const raw = read("templates", "claude-code-agents", "lite.md");
   const lines = raw.replace(/\n$/, "").split("\n");
   const l9 = lines[8];
-  assert.ok(l9.includes("`content/skill-coordinator-lite.md`"), "line 9 still points at the lite SOP");
+  assert.ok(
+    l9.includes("`<agc install>/content/skill-coordinator-lite.md` (`<agc install>` = agc's install directory, not the workspace)"),
+    "line 9 still points at the lite SOP, via the <agc install> prefix with its inline definition",
+  );
   const forbid = "(that SOP's Hard rules forbid them).";
   const tier =
-    "The `model: haiku` pin deliberately differs from the skill's `recommended_model: sonnet`: when a coordinator dispatches this subagent it validates the reply watermark, while a direct session has no such check (`specs/d8-lite-recommended-model.md` Amendment, AC8).";
+    "The `model: haiku` pin deliberately differs from the skill's `recommended_model: sonnet`: when a coordinator dispatches this subagent it validates the reply watermark, while a direct session has no such check.";
   assert.ok(l9.endsWith(`Do NOT call any tw_* write tools ${forbid} ${tier}`), "forbid then tier, one space");
   assert.ok(!raw.includes("server rejects"), "no overstated server claim");
   assert.deepEqual(taskLines(raw), [], "template is Task-free");

@@ -13,7 +13,7 @@ Doer. Read request, do it, reply. No triage, no delegation.
 - **Full (`/teamwork`)**: cross-module work, anything needing `tasks.md`/`handoff.md` tracking or independent QA.
 
 ## Hard rules
-- **Server-read-only.** Lite has no `agent_id` in the routing chain (`tools/transitions.ts`); `tw_update_state` / `tw_complete_task`: server-rejected; `tw_add_task` / `tw_rollback_task` / `tw_void_task` / `tw_switch_role`: SOP-forbidden. Do NOT call them.
+- **Server-read-only.** Lite has no `agent_id` in the routing chain; `tw_update_state` / `tw_complete_task`: server-rejected; `tw_add_task` / `tw_rollback_task` / `tw_void_task` / `tw_switch_role`: SOP-forbidden. Do NOT call them.
 - `tw_get_state` allowed (read-only) if you need context. `tw_detect_drift` only on user request.
 - **No code-reviewer step.** Lite excludes the code-reviewer gate — solo-dev same-context work; the reviewer gate is a multi-context tool.
 - **No auto-routing.** Lite is single-shot; the auto-hop loop lives in `/teamwork` only.
@@ -40,7 +40,7 @@ Affirmative lite case:
 
 ## Subagent Reply Watermark Validation
 
-After a subagent dispatch, call `validateWatermark` from `dist/lib/watermark-check.js`; relay `corrected`. Regex:
+After a subagent dispatch, call `validateWatermark` from `<agc install>/dist/lib/watermark-check.js` (`<agc install>` = agc's install directory, not the workspace); relay `corrected`. Regex:
 
 ```
 /^—\s@[\w-]+\s\([\w-]+\)$/i
