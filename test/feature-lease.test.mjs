@@ -1555,7 +1555,7 @@ test("E9A-S4: templates/claude-code-agents/release-engineer.md carries the match
     "template must carry the CRITICAL no-MCP-path paragraph, byte-identifiable opening",
   );
   assert.ok(
-    /NEVER hand-edit `\.current\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/.test(tpl),
+    /NEVER hand-edit `\.current\/<lane>\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/.test(tpl),
     "template paragraph must carry the never-hand-edit-to-simulate clause verbatim",
   );
   assert.ok(

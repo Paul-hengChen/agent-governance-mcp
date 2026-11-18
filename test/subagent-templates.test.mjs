@@ -481,7 +481,7 @@ test("e9a AC2: templates/claude-code-agents/release-engineer.md carries the no-M
   );
   assert.match(
     raw,
-    /NEVER hand-edit `\.current\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/,
+    /NEVER hand-edit `\.current\/<lane>\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/,
     "paragraph must forbid hand-editing to simulate a tw_update_state write",
   );
   assert.match(
