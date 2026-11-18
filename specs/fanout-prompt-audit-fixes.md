@@ -2,7 +2,7 @@
 base: 01093e1    integration branch: integ/prompt-audit-fixes
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-11-18，派工中。**
+**狀態：已結案 2026-11-18。** 兩條 lane 都已合併進 `integ/prompt-audit-fixes`（e437 merge `562a530`、e436 `9293f60`，零衝突）、finish、拆除；派工 base `41c301e`（清單 PR #138 merge）；本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out E436–E442」，2026-11-18）。E442 已由人類在 2026-11-18 裁定維持原樣、結案、不改字（backlog 列 E442 開頭的 DONE 段），不進本波。各列的順序裁定（2026-11-18）：本波排在 v5.0.0 里程碑票（E422 起）之前，不屬於該里程碑；每張票都寫「no release of its own」→ 本波不發版，兩條合進 `integ/prompt-audit-fixes` 後一次 PR。
 
@@ -89,3 +89,19 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-18 | 整合者 | e437 lane 層驗證 close（to-integrator#7）：HEAD `7626d5c`，22 commits，hop 4/14，review 1 輪核准、qa 0 輪；fanout check 57 檔 0 越界、禁止清單無命中；證據 `qa_reports/review_T-E437-03.md`（covers 13 id，suite-result 4318/4320）、`review_reports/review_T-E437-01.md` APPROVED r1（covers 8 個 build task）；worktree porcelain 空；無 pending-tickets；`dist/` 零差異；12 golden 一次重抓（20 hunk 全歸屬）；預算 lean 5731→5761、skill-pm 4849→4791、skill-sr 2852→2816、design-arm 9533→9387、teamwork 19225→19012、non-design 7533→7484、design-only 下限 1999→1903；整合者 push 後 CI run 44257018320 在 `7626d5c` 綠。optional（`skill-sr-engineer.md:29` 的 AC6 escape 是 base 既有 id 當名稱；bb11826 標題漏寫 E438；`agc check` 註解 advisory：三個新測試檔開頭註解 9–11 行超過 7 行上限）列入結案報告、不開票 | 信箱 e437 to-lane#4 |
 | 2026-11-18 | 整合者 | 合併：`integ/prompt-audit-fixes` 自 `main` `41c301e` 開，← `--no-ff` e437 `7626d5c`（merge `562a530`）、e436 `4f1ac81`（merge `9293f60`），兩次零衝突（兩個依測試切的測試檔由 git 自動合併，非實質解決）→ 無合併審查；merge-invariants 兩次 PASS；合併樹 `npm run build` 後 `dist/` 無差異、golden capture 無差異、context-budget 54/54、`npm audit --audit-level=high` exit 0、`agc check` OK | 本檔 |
 | 2026-11-18 | 整合者 | 記帳：`docs/backlog.md` E436–E441 六列 done-mark（not yet released，附 merge sha 與證據路徑）；`docs/v4.0.0-new-tickets.md` 佇列六列 DONE；兩條 lane 無 pending-tickets、不開新票；`check:bookkeeping` OK；彙總 18 task、8 hop、review／qa 皆 0 退回 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 41c301e
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/prompt-audit-fixes @ 5a405eb）
+- lane-status：primary（main ← integ/prompt-audit-fixes @ 5a405eb）release-cd-v4.21.0／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 2 條 lane、6 張票（E437＋E438＋E439＋E440、E436＋E441）全部 qa PASS、合併、finish；E442 已由人類裁定維持原樣，不在本波。lane 紀錄在 `.current/history/2026-11/{e437,e436}/`；判定與驗證細節在本檔 Decisions 與結案段。新發現：無（兩條 lane 都沒有 pending-tickets）；無未配號的新發現。
+### 待人類決定
+- 是否發版：本波改了出貨的規章與 SOP 字句、六個 tool description、context-budget 上限，無新 gate／錯誤碼／schema，整合者建議 MINOR；CHANGELOG 提示見結案段。
+- 是否開下一波：由人類決定。
+### 進行中的背景工作
+無
