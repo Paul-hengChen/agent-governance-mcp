@@ -16,6 +16,64 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+MINOR release. It ships six backlog tickets from one prompt audit since v4.21.0, landed on `main`
+together by one pull request from two lanes: E436 and E441 (lane `e436`), and E437, E438, E439
+and E440 (lane `e437`). Release gate `specs/release-cd-v4.22.0.md`. Semver: MINOR, because the
+shipped constitution, role SOPs, two subagent templates and six tool descriptions change what
+every agent reads; no gate, error code, schema version, tool, prompt, transition table or
+dependency changes.
+
+### Changed
+
+- **Shipped prompts no longer cite files that exist only in the agc repository (E437).** Eleven
+  lines of the constitution and role SOPs pointed at specs, research notes or source files that an
+  adopter's workspace does not have. A file the agent may need to open is now named under agc's
+  install directory (the `<agc install>/` prefix, defined where it is used); a citation the agent
+  never needs is dropped. The lite subagent template (`templates/claude-code-agents/lite.md`) now
+  gives the coordinator-lite SOP path under agc's install directory, so it resolves in an
+  adopter's workspace. The qa-visual multi-value guard's FAIL note no longer carries a repository
+  path (`content/skill-qa-visual.md`).
+- **Ticket labels and incident stories are fenced out of dispatched prompts (E438, E439).** 45
+  ticket and version labels in the constitution and SOPs are wrapped in origin fences, renamed or
+  deleted, and 11 incident stories move into rationale fences, so a dispatched agent reads the
+  rule without the history. The full-detail bundle keeps them, with one exception: the preamble
+  story of constitution section 3.2 (`content/const-11-design-chain-32.md`) is deleted; its
+  history stays in `content/constitution-rationale.md` (context, not changed).
+- **Rules read as the current rule (E440).** Six sentences that described a change from an older
+  version (for example "is retired" or "pre-v3.20.0") now state the rule in force, or are deleted.
+  The sentences that keep an older handoff file working are unchanged.
+- **Six tool descriptions state their contract (E441).** The descriptions of `tw_get_state`,
+  `tw_update_state`, `tw_get_next_task`, `tw_rollback_task`, `tw_void_task` and `tw_detect_drift`
+  (`tools/registry.ts`) now say what each tool returns and when it fails, each claim checked
+  against the handler; `tw_get_state` names the six tools that stay blocked until it has run.
+  Capital-letter warnings for rules the server already enforces are gone, and two claims in the
+  `tw_void_task` description that no longer matched the code are corrected (a voided id cannot be
+  reused by `tw_add_task`; SQLite mode reports an already-voided task as such). What you may
+  notice: every tool-list response is about 340 tokens longer. No input schema, tool order or
+  behaviour changed.
+
+### Fixed
+
+- **Handoff paths in the repository guide and the release-engineer template (E436).** `CLAUDE.md`
+  and `templates/claude-code-agents/release-engineer.md` named the flat handoff path that the
+  lane-scoped layout replaced; they now name the lane form. The template's opening paragraph now
+  says which two of its paragraphs repeat the SOP (the step 5 re-baseline and the no-MCP relay
+  rule).
+
+### Notes
+
+- Context size (characters / 4, the measure of `test/context-budget.test.mjs`): full coordinator
+  bundle 19225 to 19012 tokens, design-armed constitution 9533 to 9387, non-design constitution
+  7533 to 7484, pm SOP 4847 to 4791, sr-engineer SOP 2851 to 2816. The lean bundle grows from
+  5731 to 5761, because it is composed without stripping and now carries the new origin-fence
+  markers; the floor for the design-only saving moves from 1999 to 1903. All 12 compose goldens
+  were re-captured once for the wave.
+- New tests: `test/e436-stale-handoff-paths.test.mjs`, `test/e437-repo-only-paths.test.mjs`,
+  `test/e438-origin-fenced-labels.test.mjs`, `test/e439-rationale-fenced-stories.test.mjs`,
+  `test/e440-current-rule-wording.test.mjs`, `test/e441-tool-description-contracts.test.mjs`.
+- No schema version, dependency, gate, transition table, script or CI workflow changed;
+  `.github/workflows/release.yml` (context, not changed) is untouched.
+
 ## [4.21.0] - 2026-11-16
 
 MINOR release. It ships four backlog tickets since v4.20.0, each landed on `main` by its own pull
