@@ -76,7 +76,7 @@ test("AC-3: lazy-load hook has both Absent and Present branches with correct con
   const body = fs.readFileSync(QA_PATH, "utf-8");
 
   // The hook lives in SOP step 4 — v3.14.0 label is "lazy-load + PASS-gated"
-  assert.match(body, /4\.\s+\*\*Phase 1\.5\s*—\s*Visual Compare\*\*\s*\(v3\.14\.0:?\s*lazy-load/, "step 4 must be the v3.14.0 lazy-load + PASS-gated hook");
+  assert.match(body, /4\.\s+\*\*Phase 1\.5\s*—\s*Visual Compare\*\*\s*\((?:<!-- origin:start -->v3\.14\.0:?\s*<!-- origin:end -->)?lazy-load/, "step 4 must be the lazy-load + PASS-gated hook (v3.14.0 label origin-fenced since E438)");
 
   // Absent branch: skip + log + proceed + explicit "Do NOT Read"
   assert.match(body, /Absent[^\n]*log[^\n]*skipped/is, "Absent branch must log skip");
@@ -86,7 +86,7 @@ test("AC-3: lazy-load hook has both Absent and Present branches with correct con
   // Present branch: Read the sub-skill via the Read tool + name the gate
   assert.match(body, /Present[^\n]*Read\s+`?(?:<agc install>\/)?content\/skill-qa-visual\.md`?[^\n]*Read tool/is, "Present branch must Read the sub-skill via the Read tool");
   assert.match(body, /VISUAL_EVIDENCE_MISSING/, "Present branch must name the server error code");
-  assert.match(body, /PASS GATE.*v3\.14\.0/i, "Present branch must declare the PASS gate");
+  assert.match(body, /PASS GATE(?:<!-- origin:start --> \(v3\.14\.0\)<!-- origin:end -->)?\*\*:/i, "Present branch must declare the PASS gate (v3.14.0 label origin-fenced since E438)");
 });
 
 test("AC-4: SOP step numbering 1..7 sequential with no duplicates", () => {
@@ -168,7 +168,7 @@ test("AC-7: [3.13.0] CHANGELOG entry preserved (history-append-only regression g
 test("AC-2: skill-qa-visual.md Step A.0 requires copying the frozen baseline manifest, no URL re-derivation", () => {
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
   const block = body.slice(body.indexOf("Baseline Source-of-Truth"));
-  assert.match(body, /### Step A\.0 — Baseline Source-of-Truth \(v3\.39\.0\)/, "Step A.0 must be present");
+  assert.match(body, /### Step A\.0 — Baseline Source-of-Truth(?:<!-- origin:start --> \(v3\.39\.0\)<!-- origin:end -->)?\n/, "Step A.0 must be present (version label origin-fenced since E438)");
   assert.match(block, /Source manifest/, "must cite the Source manifest as authoritative");
   assert.match(block, /\*\*verbatim\*\*/, "must require verbatim copy");
   assert.match(block, /MUST NOT re-derive the baseline set from the Figma URL/, "must forbid URL re-derivation");

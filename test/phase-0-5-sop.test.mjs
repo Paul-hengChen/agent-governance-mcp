@@ -51,7 +51,7 @@ test("AC-4: Phase 0.5 references the Constitution §1 Visual Widgets exception",
   // the procedural step. Without it the directive is unmoored — operators
   // would not know WHY they have to read the design.
   const body = fs.readFileSync(SKILL_SR, "utf-8");
-  assert.match(body, /Constitution\s*§1\s*v3\.14\.0\s*exception/i, "must reference §1 exception");
+  assert.match(body, /Constitution\s*§1\s*Visual Widgets\s*exception/i, "must reference the §1 Visual Widgets exception by name (E438 renamed the id-as-name form)");
   assert.match(body, /scope violation/i, "must restate the scope-violation framing");
 });
 

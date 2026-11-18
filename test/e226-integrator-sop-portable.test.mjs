@@ -50,7 +50,7 @@ test("AC-E226-2: exactly one Tool calls paragraph, verbatim, between the Invocat
   const inv = paras.findIndex((p) => p.startsWith("Invocation: the `integrator` MCP prompt."));
   assert.ok(inv >= 0, "Invocation paragraph present");
   assert.equal(paras[inv + 1], TOOL_CALLS, "Tool calls paragraph directly after Invocation, verbatim (sop.tool-calls)");
-  assert.ok(paras[inv + 2].startsWith("## Governance state (D11)"), "Governance state heading directly after");
+  assert.ok(paras[inv + 2].startsWith("## Governance state<!-- origin:start --> (D11)<!-- origin:end -->"), "Governance state heading directly after");
   // the facts the paragraph must carry, named so a future edit that drops one fails with a reason
   for (const f of ["node <agc install>/bin/agc-init.mjs", "laneProtocolAddendum", "use the generic forms", "gh run list --commit <sha>", "gh run view <run id>", "record its run id"]) {
     assert.ok(paras[inv + 1].includes(f), f);

@@ -21,7 +21,7 @@ const SKILL_QA_VISUAL = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md")
 // (Option R, architecture DR-1). CONSTITUTION is now the composed TEXT itself
 // (was a path) — both `fs.readFileSync(CONSTITUTION, ...)` call sites below are
 // updated to use the text directly.
-const { composeConstitution } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "build.js"));
+const { composeConstitution, stripOriginTags } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "build.js"));
 const CONSTITUTION = composeConstitution({ chain: true, design: true });
 
 // ---------- skill-pm declares the Visual Widgets schema (AC-1) ----------
@@ -30,7 +30,7 @@ test("AC-1: skill-pm.md declares Visual Widgets as a required H2 section", () =>
   const body = fs.readFileSync(SKILL_PM, "utf-8");
   // The required section list lives under "Spec Schema". Visual Widgets
   // must appear as a bullet AND carry the v3.14.0 tag for grep-stability.
-  assert.match(body, /-\s+\*\*Visual Widgets\*\*\s*\(v3\.14\.0\)/, "skill-pm must list Visual Widgets as v3.14.0 schema bullet");
+  assert.match(body, /-\s+\*\*Visual Widgets\*\*<!-- origin:start --> \(v3\.14\.0\)<!-- origin:end -->/, "skill-pm must list Visual Widgets as a schema bullet, v3.14.0 tag kept in an origin fence (E438)");
 });
 
 test("AC-1: Visual Widgets schema names the 3-column table format", () => {
@@ -66,7 +66,7 @@ test("AC-1: skill-pm cross-references Constitution §1 Visual Widgets exception"
 
 test("AC-2: skill-design-auditor declares Visual Widgets in Artifact Schema", () => {
   const body = fs.readFileSync(SKILL_DESIGN_AUDITOR, "utf-8");
-  assert.match(body, /-\s+\*\*Visual Widgets\*\*\s*\(v3\.14\.0\)/, "design-auditor must list Visual Widgets as v3.14.0 schema bullet");
+  assert.match(body, /-\s+\*\*Visual Widgets\*\*<!-- origin:start --> \(v3\.14\.0\)<!-- origin:end -->/, "design-auditor must list Visual Widgets as a schema bullet, v3.14.0 tag kept in an origin fence (E438)");
 });
 
 test("AC-2: widget-shape heuristics table enumerates the 8 known cases", () => {
@@ -134,7 +134,9 @@ test("R5: Constitution §1 carries the Visual Widgets exception clause", () => {
   const body = CONSTITUTION;
   // The exception MUST be a sub-bullet of **MVP strict** (per arch),
   // and MUST name "scope violation" explicitly.
-  assert.match(body, /Visual Widgets exception\s*\(v3\.14\.0\)/, "exception clause must be tagged v3.14.0");
+  assert.match(body, /Visual Widgets exception<!-- origin:start --> \(v3\.14\.0\)<!-- origin:end -->\*\*/, "exception clause keeps its v3.14.0 tag, origin-fenced (E438)");
+  // the name an agent reads (origin pass applied) is the bare heading that skill-sr-engineer cites
+  assert.match(stripOriginTags(body), /\*\*Visual Widgets exception\*\*:/, "stripped heading is exactly 'Visual Widgets exception'");
   assert.match(body, /scope violation, NOT MVP compliance/i, "must declare primitive substitution = scope violation");
 });
 

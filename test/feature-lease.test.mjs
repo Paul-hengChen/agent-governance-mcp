@@ -455,7 +455,7 @@ test("S4 [E404 re-pin]: templates/claude-code-agents/release-engineer.md carries
 
 test("S5: content/coord-03-core-fallback.md carries the Feature-Scope Gate note (T-E1-03)", () => {
   const coord = readContentFile("coord-03-core-fallback.md");
-  assert.match(coord, /\*\*Feature-Scope Gate\*\* \(E1\)/, "must carry the Feature-Scope Gate note heading");
+  assert.match(coord, /\*\*Feature-Scope Gate\*\*<!-- origin:start --> \(E1\)<!-- origin:end -->:/, "must carry the Feature-Scope Gate note heading (E1 label origin-fenced since E438)");
   assert.ok(coord.includes("`FEATURE_LEASE_HELD`"), "must backtick-quote the error code");
   assert.ok(coord.includes("30-min TTL"), "must document the 30-min TTL");
   assert.ok(
@@ -1555,7 +1555,7 @@ test("E9A-S4: templates/claude-code-agents/release-engineer.md carries the match
     "template must carry the CRITICAL no-MCP-path paragraph, byte-identifiable opening",
   );
   assert.ok(
-    /NEVER hand-edit `\.current\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/.test(tpl),
+    /NEVER hand-edit `\.current\/<lane>\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/.test(tpl),
     "template paragraph must carry the never-hand-edit-to-simulate clause verbatim",
   );
   assert.ok(

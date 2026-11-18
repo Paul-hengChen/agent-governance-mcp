@@ -82,7 +82,7 @@ test("AC3: coordinator gate section stays within the always-on footprint budget"
 // edit can't drop it, and so the id-prefix anti-pattern stays explicitly banned.
 test("AC-1: skill-design-auditor.md step 2c forbids eyeball-pick and mandates a deterministic baseline filter", () => {
   const block = AUDITOR.slice(AUDITOR.indexOf("Mechanical baseline selection"));
-  assert.match(AUDITOR, /2c\.\s+\*\*Mechanical baseline selection \(v3\.39\.0\)\*\*/, "step 2c must be present");
+  assert.match(AUDITOR, /2c\.\s+\*\*Mechanical baseline selection<!-- origin:start --> \(v3\.39\.0\)<!-- origin:end -->\*\*/, "step 2c must be present");
   assert.match(block, /Do NOT eyeball-scan/, "must forbid eyeball-scan selection");
   assert.match(block, /deterministic structural filter/, "must require a deterministic structural filter");
   assert.match(block, /componentId/, "must mention componentId grouping");
