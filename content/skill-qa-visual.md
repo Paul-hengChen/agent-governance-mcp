@@ -25,7 +25,7 @@ Before any diff, the impl capture MUST be in the SAME state the baseline depicts
 
 ### Actual-Capture Output Convention<!-- origin:start --> (E30)<!-- origin:end -->
 
-Actual (impl) screenshot captures — yours and any consumer test suite's (`ACTUAL_DIR` or equivalent) — go to an **UNTRACKED directory outside the committed baseline dir** (e.g. a `.gitignore`d `__actual__/` sibling or a tmp dir), NEVER into the baseline dir itself. Actuals written next to committed baselines dirty git status on every run, making a real visual regression indistinguishable from routine overwrite at a glance (this once cost a full pixelmatch forensics round to clear a false alarm). QA flags any suite whose actual-capture output violates this convention as a finding in the visual report.
+Actual (impl) screenshot captures — yours and any consumer test suite's (`ACTUAL_DIR` or equivalent) — go to an **UNTRACKED directory outside the committed baseline dir** (e.g. a `.gitignore`d `__actual__/` sibling or a tmp dir), NEVER into the baseline dir itself. Actuals written next to committed baselines dirty git status on every run, making a real visual regression indistinguishable from routine overwrite at a glance<!-- rationale:start --> (this once cost a full pixelmatch forensics round to clear a false alarm)<!-- rationale:end -->. QA flags any suite whose actual-capture output violates this convention as a finding in the visual report.
 
 ### Step B — Region Diff
 
