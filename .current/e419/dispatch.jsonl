@@ -3,3 +3,5 @@
 {"ts":"2026-11-19T10:10:59.930Z","feature":"e419-retire-bookkeeping-stamp","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-19T10:15:16.506Z","feature":"e419-retire-bookkeeping-stamp","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-19T10:27:03.206Z","feature":"e419-retire-bookkeeping-stamp","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-19T10:27:59.270Z","feature":"e419-retire-bookkeeping-stamp","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-19T10:37:20.404Z","feature":"e419-retire-bookkeeping-stamp","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
