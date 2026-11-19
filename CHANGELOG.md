@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.22.0] - 2026-11-19
+
 MINOR release. It ships six backlog tickets from one prompt audit since v4.21.0, landed on `main`
 together by one pull request from two lanes: E436 and E441 (lane `e436`), and E437, E438, E439
 and E440 (lane `e437`). Release gate `specs/release-cd-v4.22.0.md`. Semver: MINOR, because the
