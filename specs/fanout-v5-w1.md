@@ -99,3 +99,19 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-19 | 整合者 | e422 lane 層驗證 close（to-integrator#16）：HEAD `fec8353`，20 commits，hop 8/14，review 3 輪（r1、r2 CHANGES_REQUESTED：格式文件的引號規則；r3 APPROVED）、qa 0 輪；fanout check 29 檔、唯一 OUT 是 `CLAUDE.md`（上兩列人類核准的改劃）；證據 `qa_reports/review_T-E422-01..03.md` PASS（suite-result 4407/4409）、`review_reports/review_T-E422-01..02.md` Round 3 APPROVED；ledger 3/3；content、golden、預算、backlog 未動；無 pending-tickets；整合者 push 後 CI run 44515756265 在 `fec8353` 綠。r2 期間 sr 在 review 報告內寫了標明的回覆段，r3 報告已註明非審查內容 | 信箱 e422 to-lane#15 |
 | 2026-11-19 | 整合者 | 合併：`integ/v5-w1` 自 `main` `15474c2` 開，← `--no-ff` e419（merge `3b32939`）、e422（merge `7c019aa`），兩次零衝突 → 無合併審查；merge-invariants 兩次 PASS；合併樹 build 後 `dist/` 無差異、golden capture 無差異、`CLAUDE.md` 250 行、相關測試 169/169、audit exit 0、`agc check` OK（4.22.0） | 本檔 |
 | 2026-11-19 | 整合者 | 記帳：`docs/backlog.md` E419、E422 兩列 done-mark（not yet released）；`docs/v4.0.0-new-tickets.md` 佇列兩列 DONE；兩條 lane 無 pending-tickets、不開新票；`check:bookkeeping` OK；彙總 10 task、12 hop、review 2 次退回（e422）、qa 0 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 15474c2
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/v5-w1 @ e30f6f9）
+- lane-status：primary（main ← integ/v5-w1 @ e30f6f9）release-cd-v4.22.0／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 2 條 lane、2 張票（E419、E422）全部 qa PASS、合併、finish、拆除；兩張都 not yet released，依 16.1 裁定 18 隨 v5.0.0（E435）發出，本波不發版。lane 紀錄在 `.current/history/2026-11/{e419,e422}/`；判定與驗證細節在本檔 Decisions 與結案段。新發現：無（兩條 lane 都沒有 pending-tickets）；無未配號的新發現。
+### 待人類決定
+- 是否開下一波：v5.0.0 里程碑順序的下一張是 E423（相依 E422，本波已合併）；由人類決定何時開。
+- 合併後 primary 的 MCP server 需重啟一次，下一次 `tw_*` 呼叫才會跑本波合併後的程式（移除 `bookkeeping_write` 與 stamp-provenance）。
+### 進行中的背景工作
+無
