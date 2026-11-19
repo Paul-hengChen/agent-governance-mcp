@@ -628,14 +628,14 @@ export function readHandoffState(workspacePath) {
             qaRoundsTotal: state.qa_rounds_total,
             reviewRoundsTotal: state.review_rounds_total,
             visualRoundsTotal: state.visual_rounds_total,
-            // The heal-write always behaves as a bookkeeping write: a schema heal
-            // is not a real state transition, so it must keep the pre-heal
-            // last_updated exactly instead of extending a lease that may be dead.
+            // The heal-write always preserves last_updated: a schema heal is not a
+            // real state transition, so it must keep the pre-heal last_updated
+            // exactly instead of extending a lease that may be dead.
             // Server-internal, so no attestation is needed (the same trust as the
             // pendingNotes passthrough above). Always same-feature by
             // construction, so writeHandoffState's same-feature guard always takes
             // the preserve branch. (E10)
-            bookkeepingWrite: true,
+            preserveLastUpdated: true,
         }).catch(() => {
             /* swallowed — read still returns migrated state */
         });

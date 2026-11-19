@@ -19,7 +19,6 @@ export type GateErrorCode =
   | "SOURCE_CREDIBILITY_UNVERIFIED"
   | "FEATURE_LEASE_HELD"
   | "LEASE_OVERRIDE_AUDIT_MISSING"
-  | "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE"
   | "MISSING_EVIDENCE"
   | "QA_COMPLETION_EVIDENCE_MISSING"
   | "MISSING_REVIEW_EVIDENCE"
@@ -87,7 +86,6 @@ export interface GateDefinition {
 //   SOURCE_CREDIBILITY_UNVERIFIED   coord-03-core-fallback.md, skill-design-auditor.md, skill-pm.md
 //   FEATURE_LEASE_HELD              const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-release-engineer.md
 //   LEASE_OVERRIDE_AUDIT_MISSING    const-08-chain-31-mid.md
-//   BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE  const-08-chain-31-mid.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
 //   QA_COMPLETION_EVIDENCE_MISSING  const-08-chain-31-mid.md, skill-code-reviewer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md, const-08-chain-31-mid.md
@@ -111,18 +109,11 @@ export interface GateDefinition {
 //   PASS_TASKS_INCOMPLETE           skill-qa-engineer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
 
-// The 36-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
-// added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
-// generalized to every non-qa identity; the dispatch_pins tier enum, E300, added the 34th,
-// DISPATCH_PIN_TIER_REJECTED — the first tool-boundary producer, raised by zod before the
-// pipeline; it shipped as the one documentedInProse: false entry and flipped to true when
-// coord-02-host-dispatch.md quoted it, E295; the review_verdict authorship gate, E139, added
-// the 35th, NON_REVIEWER_VERDICT_REJECTED — the authorship half of the review_verdict
-// consistency gate, shipped documentedInProse: false and flipped to true when
-// const-08-chain-31-mid.md quoted it, E365; the PASS-time open-task gate, E247, added the
-// 36th, PASS_TASKS_INCOMPLETE, placed before the tool-boundary entry so it stays last). Array order is DOC order only — it MUST NOT be relied
-// on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
-// UPDATE_STATE_GATE_PIPELINE array, E35).
+// The 34-gate catalog, in documentation order, grouped by envelope; the one
+// tool-boundary entry (DISPATCH_PIN_TIER_REJECTED, raised by zod before the
+// pipeline) stays last. Array order is DOC order only — it MUST NOT be relied
+// on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the
+// ordered UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
   // ---- transition-json (codes 1-6, producer: validateTransition) ----
   {
@@ -192,7 +183,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     // parity test runs (T-D2-05).
     documentedInProse: true,
   },
-  // ---- orchestrator-json (codes 7-10, producer: orchestrator) ----
+  // ---- orchestrator-json (codes 7-12, producer: orchestrator) ----
   {
     errorCode: "SCOPE_DECISION_REQUIRED",
     producer: "orchestrator",
@@ -288,27 +279,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "See specs/e10-lease-override.md AC2.",
     documentedInProse: true,
   },
-  {
-    // bookkeeping_write: true is valid only on a same-active_feature write: on a new
-    // feature, keeping the old last_updated would make the new lease look pre-aged.
-    // Checked inline in the orchestrator from feature_changed; a fresh workspace
-    // (no prevState) never trips it. Spec: specs/e10-lease-override.md (AC6).
-    errorCode: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
-    producer: "orchestrator",
-    envelope: "orchestrator-json",
-    triggerEdge:
-      "bookkeeping_write:true whose active_feature differs from the incumbent's (file-mode only)",
-    armCondition: "bookkeeping_write===true && prevState && feature_changed; FileHandoffStorage only",
-    clearingArtifact: "same-active_feature write, or drop bookkeeping_write",
-    hintStatic:
-      "bookkeeping_write is valid only on a same-active_feature write: it preserves " +
-      "the incumbent lease's last_updated, and suppressing a NEW feature's own " +
-      "freshness stamp would make its lease look pre-aged (premature-clobber " +
-      "footgun). Drop bookkeeping_write on feature-changing writes. " +
-      "See specs/e10-lease-override.md AC6.",
-    documentedInProse: true,
-  },
-  // ---- plain-text (codes 11-25, producer: orchestrator) ----
+  // ---- plain-text (codes 13-33, producer: orchestrator) ----
   {
     errorCode: "MISSING_EVIDENCE",
     producer: "orchestrator",
@@ -642,7 +613,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "work) are exempt. See docs/backlog.md E247.",
     documentedInProse: true,
   },
-  // ---- tool-boundary (code 36, producer: zod at tools/registry.ts) ----
+  // ---- tool-boundary (code 34, producer: zod at tools/registry.ts) ----
   {
     // dispatch_pins tier enum (E300): each value must be one of the four tier
     // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no

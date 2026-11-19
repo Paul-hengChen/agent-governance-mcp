@@ -334,44 +334,6 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     },
   },
   {
-    name: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
-    codes: ["BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE"],
-    run: (ctx) => {
-      const { parsed, storage, prevState, feature_changed } = ctx;
-        // A bookkeeping_write must keep the same feature (file mode only; a fresh
-        // workspace with no prevState passes). Rejected rather than downgraded to
-        // a normal write: calling a new feature's first claim "bookkeeping" would
-        // keep the old last_updated and make its lease look older than it is,
-        // letting another feature take the slot.
-        if (
-          storage instanceof FileHandoffStorage &&
-          parsed.bookkeeping_write === true &&
-          prevState &&
-          feature_changed
-        ) {
-          const hint = gate("BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE").hintStatic;
-          const envelope = {
-            error: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
-            attempted_feature: parsed.active_feature,
-            incumbent: {
-              active_feature: prevState.active_feature,
-              status: prevState.status,
-              last_updated: prevState.last_updated,
-            },
-            hint,
-          };
-          return {
-            content: [{
-              type: "text" as const,
-              text: `⛔ BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE\n${JSON.stringify(envelope, null, 2)}`,
-            }],
-            isError: true,
-          };
-        }
-      return null;
-    },
-  },
-  {
     name: "SCOPE_DECISION_REQUIRED",
     codes: ["SCOPE_DECISION_REQUIRED"],
     run: (ctx) => {
@@ -1496,13 +1458,6 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           // SqliteHandoffStorage.writeState ignores both. (E99, v15)
           dispatchMechanism: parsed.dispatch_mechanism,
           dispatchMechanismTier: parsed.dispatch_mechanism_tier,
-          // bookkeeping_write attestation, passed straight through:
-          // writeHandoffState's same-feature-guarded branch uses it to keep
-          // the existing last_updated (a second line of defence); the
-          // different-feature reject already fired above. Applies to this
-          // write only: never persisted to frontmatter, no schema bump. File
-          // mode only: SqliteHandoffStorage.writeState ignores it. (E10)
-          bookkeepingWrite: parsed.bookkeeping_write,
         }));
 
         // Append one line per hop to the dispatch-mechanism sidecar so the

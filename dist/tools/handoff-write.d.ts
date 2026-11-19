@@ -37,7 +37,7 @@ export interface WriteHandoffStateOptions {
     cutApprovedSource?: string;
     dispatchMechanism?: DispatchMechanism;
     dispatchMechanismTier?: string;
-    bookkeepingWrite?: boolean;
+    preserveLastUpdated?: boolean;
 }
 /**
  * Write handoff state. Pass a {@link WriteHandoffStateOptions} object; the

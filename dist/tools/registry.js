@@ -374,17 +374,11 @@ const UpdateStateArgs = z
     // File-mode only. (E99, v15)
     dispatch_mechanism: z.enum(["task", "switch_role", "inline"]).optional(),
     dispatch_mechanism_tier: z.string().max(40).optional(),
-    // Two attested booleans, NO schema bump (never in frontmatter): this write
-    // only, file-mode only. (E10)
     // lease_override: human-attested FEATURE_LEASE_HELD bypass on any edge,
     // read only by the orchestrator lease gate; requires a pending_notes[0]
-    // line matching /^lease-override:/ (gates/lease-override.ts).
+    // line matching /^lease-override:/ (gates/lease-override.ts). Attested,
+    // NO schema bump (never in frontmatter): this write only, file-mode only.
     lease_override: z.boolean().optional(),
-    // bookkeeping_write: non-substantive-write attestation. Consumed ONLY as
-    // a writeHandoffState option selecting last_updated (preserve the
-    // incumbent's stamp instead of now()); valid on same-active_feature
-    // writes only (BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE otherwise, AC6).
-    bookkeeping_write: z.boolean().optional(),
     // v9 review_task_ids: the task id(s) the qa_review evidence auto-record
     // targets. Transient, never persisted; read only by the orchestrator's id
     // resolution: review_task_ids if non-empty, else completed_tasks; both
@@ -729,10 +723,6 @@ export const TOOL_REGISTRY = [
                 lease_override: {
                     type: "boolean",
                     description: "Human-attested FEATURE_LEASE_HELD bypass (file-mode only, e10-lease-override). Set true ONLY by the context that directly witnessed the human's chat-turn attestation that the incumbent lease is dead (same-context dispatch: the acting role; Task-subagent dispatch: the coordinator — the cut_approved §3.1 trust mechanics, but usable on ANY edge, not build-entry-pinned). The write MUST also carry pending_notes[0] matching /^lease-override:/ with a human-readable reason, or it is rejected with LEASE_OVERRIDE_AUDIT_MISSING. Transient: applies to THIS write only, never persisted, never carried forward — a later write omitting it is evaluated by the normal lease predicate. Ignored in SQLite/HTTP mode.",
-                },
-                bookkeeping_write: {
-                    type: "boolean",
-                    description: "Non-substantive-write attestation (file-mode only, e10-lease-override). Set true on a failure-record / administrative-note touch that records no forward progress: the server PRESERVES the existing on-disk last_updated verbatim instead of stamping now(), so the incumbent feature's lease age keeps reflecting the last REAL write. Valid ONLY when this write's active_feature equals the existing on-disk active_feature — a differing-feature combination is rejected with BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE. Transient: applies to THIS write only, never persisted. Ignored in SQLite/HTTP mode.",
                 },
             },
             required: ["workspace_path", "active_feature", "status"],
