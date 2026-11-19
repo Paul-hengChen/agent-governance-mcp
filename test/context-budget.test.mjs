@@ -492,7 +492,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4791 cap", () => {
   assert.ok(toks <= 4791, `skill-pm stripped body (${toks} ~tok) must be ≤ 4791 (AC9, E437-E440 re-baseline, zero headroom)`);
 });
 
-test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2816 cap", () => {
+test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2805 cap", () => {
   // WHY: the same budget for the sr-engineer dispatch, with the same composition and zero-headroom
   // cap rule as the pm cap test above. History: specs/e260i-comment-rationale.md
   // (test/context-budget.test.mjs).
@@ -503,7 +503,8 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2816 cap", () =>
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
   // E437-E440 re-baseline (ruling 2 = a, 2026-11-18): E438 sites 39-41 and E439 sites 9/10 trims, -36 ~tok (measured 2816); was 2852, zero headroom.
-  assert.ok(toks <= 2816, `skill-sr stripped body (${toks} ~tok) must be ≤ 2816 (AC2, E437-E440 re-baseline, zero headroom)`);
+  // E419 re-baseline: crash-checkpoint line is an ordinary write, -11 ~tok (measured 2805); was 2816, zero headroom.
+  assert.ok(toks <= 2805, `skill-sr stripped body (${toks} ~tok) must be ≤ 2805 (AC2, E419 re-baseline, zero headroom)`);
 });
 
 // --- Constitution rationale fencing (second-round strip) ---
@@ -557,7 +558,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9387 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8840 ~tok)", () => {
   // WHY: the design arm keeps design-only fenced text, so this floor sits above the non-design one.
   // Each cap is the exact re-measured value (chars/4 estimator), zero headroom; bumps are
   // qa-owned unless noted sr-owned.
@@ -569,14 +570,15 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // E350 re-baseline: const-08 manifest-tier condition 3 `<agc install>/scripts/fanout.mjs`, +4 ~tok; was 10523, zero headroom.
   // E418 re-baseline: gate-retro prose trim of const-08 (and the const-08 bullets in this arm), -1065 ~tok; was 10598, zero headroom.
   // E437-E440 re-baseline (ruling 2 = a, 2026-11-18): const-10/08 path cites, const-02/13/15 origin fences, const-11 §3.2 preamble deleted (R1 = b), const-05 rewrite, -146 ~tok (measured 9387); was 9533, zero headroom.
-  assert.ok(stripped <= 9387, `stripped constitution (${stripped} ~tok) must be ≤ 9387 (AC8 design-arm floor, E437-E440 re-baseline, zero headroom)`);
+  // E419 re-baseline: the Bookkeeping-Write and Stamp-Provenance bullets are deleted, -547 ~tok (measured 8840); was 9387, zero headroom.
+  assert.ok(stripped <= 8840, `stripped constitution (${stripped} ~tok) must be ≤ 8840 (AC8 design-arm floor, E419 re-baseline, zero headroom)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19012 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18465 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -596,7 +598,8 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // E350 re-baseline: const-08 cond 3 + coord-03 writer action + coord-03 roll-up `<agc install>` path tokens (3 sites), +11 ~tok; was 21633, zero headroom.
   // E418 re-baseline: const-08, coord-03, coord-04 and coord-06 prose trim, -2490 ~tok; was 21715, zero headroom.
   // E437-E440 re-baseline (ruling 2 = a, 2026-11-18): constitution trims above plus coord-02/03/05 path, label and E440 rewrites, -213 ~tok (measured 19012); was 19225, zero headroom.
-  assert.ok(bundle <= 19012, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19012 (AC8 design-arm floor, E437-E440 re-baseline, zero headroom)`);
+  // E419 re-baseline: the two const-08 bullets are deleted, -547 ~tok (measured 18465); was 19012, zero headroom.
+  assert.ok(bundle <= 18465, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 18465 (AC8 design-arm floor, E419 re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -905,14 +908,14 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- rebaseline + pin the new non-design figure (AC8) ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7484 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6937 ~tok)", () => {
   // WHY: the budget win that justified the feature, regression-guarded. Both sides are measured
   // like production (origin tags, then rationale, stripped); the non-design side composes without
   // the design fragments. The cap is the exact measured size (zero headroom) and the design-only
   // saving must stay at least 1903 ~tok, since core and chain edits land on both arms.
   // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 9387 (E437-E440 re-baseline, zero headroom)
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7484 (E437-E440 re-baseline, zero headroom)
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 8840 (E419 re-baseline, zero headroom)
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 6937 (E419 re-baseline, zero headroom)
   // Floor bumps from e43 (test-file ask at dispatch) through E258 (comment-discipline bullet)
   // continue the same cap history, pointed to above.
   // E336 re-baseline: portable pull command form (const-15 site), +6 ~tok; was 8420, zero headroom.
@@ -920,7 +923,8 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // E340 re-baseline: const-05 line 17 narrow in-place task-list edit exception, +17 ~tok; was 8501, zero headroom.
   // E418 re-baseline: const-08 prose trim, -985 ~tok; was 8518, zero headroom.
   // E437-E440 re-baseline (ruling 2 = a, 2026-11-18): core / chain edits land on both arms, -49 ~tok (measured 7484); was 7533, zero headroom.
-  assert.ok(nonDesign <= 7484, `non-design constitution (${nonDesign} ~tok) must be ≤ 7484 (AC8 non-design floor, E437-E440 re-baseline, zero headroom)`);
+  // E419 re-baseline: the two const-08 bullets are deleted, -547 ~tok (measured 6937); was 7484, zero headroom.
+  assert.ok(nonDesign <= 6937, `non-design constitution (${nonDesign} ~tok) must be ≤ 6937 (AC8 non-design floor, E419 re-baseline, zero headroom)`);
   assert.ok(
     ratStripped - nonDesign >= 1903,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 1903 (E393 re-baseline: builder ≠ judge moved from the design-only §3.2 fragment into core §3; E437-E440 re-baseline, ruling R2 = a, 2026-11-18: const-11 §3.2 preamble and const-02/13 labels shrink the design-only fragments, floor was 1999, measured 1903)`,

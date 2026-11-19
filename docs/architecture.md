@@ -34,7 +34,7 @@ How the three layers fit together, what gates a state write, and how the routing
 │  guards/file-lock.ts  — O_EXCL cross-process lock          │
 │                       + mtime freshness check              │
 │                       + atomic tmp+rename publish          │
-│  gates/ (15 modules)  — the 19-step gate pipeline below    │
+│  gates/ (14 modules)  — the 17-step gate pipeline below    │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -44,7 +44,7 @@ How the three layers fit together, what gates a state write, and how the routing
 
 Every `tw_update_state` call runs this **before** `.current/<lane>/handoff.md` (or the SQLite row) is touched. A rejection at any step returns `{ error, attempted, allowed, hint }` — the AI can self-correct or escalate.
 
-Three guard steps run first, then the **19-step gate pipeline** (`UPDATE_STATE_GATE_PIPELINE`, `tools/handoff-orchestrator.ts`; step bodies in `gates/`), then round accounting and the atomic publish. Each gate is one entry in the array — the order below is the execution order, and it is load-bearing (see `test/e35-pipeline-order.test.mjs`).
+Three guard steps run first, then the **17-step gate pipeline** (`UPDATE_STATE_GATE_PIPELINE`, `tools/handoff-orchestrator.ts`; step bodies in `gates/`), then round accounting and the atomic publish. Each gate is one entry in the array — the order below is the execution order, and it is load-bearing (see `test/e35-pipeline-order.test.mjs`).
 
 ```
 caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
@@ -64,7 +64,7 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │    SQLite mode: SNAPSHOT_KEY token unchanged?                   │
 │    drift → ⛔ STATE DRIFT (caller must re-read)                  │
 ╞═════════════════════════════════════════════════════════════════╡
-│ UPDATE_STATE_GATE_PIPELINE — 19 steps, in order                 │
+│ UPDATE_STATE_GATE_PIPELINE — 17 steps, in order                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  1 TRANSITION_VALIDATION          (tools/transitions.ts)        │
 │      (prev_agent, prev_status) → (next_agent, next_status) must │
@@ -74,25 +74,23 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │        qa_round     ≥ 4 (ROUND_CAP)        ┐ matrix collapses   │
 │        review_round ≥ 4 (REVIEW_ROUND_CAP) ├ to {(pm,           │
 │        visual_round ≥ 6 (VISUAL_ROUND_CAP) ┘ In_Progress)}      │
-│  2 STAMP_PROVENANCE_SUSPECT       (gates/stamp-provenance.ts)   │
-│  3 FEATURE_LEASE                  (gates/feature-lease.ts)      │
-│  4 BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE                     │
-│  5 SCOPE_DECISION_REQUIRED        (gates/scope-decision.ts)     │
-│  6 CUT_APPROVAL_REQUIRED          (gates/cut-approval.ts)       │
-│  7 EXTERNAL_REFS_UNRESOLVED       (gates/external-refs.ts)      │
-│  8 SOURCE_CREDIBILITY_UNVERIFIED                                │
-│  9 REPRO_MANIFEST_MISSING                                       │
-│ 10 REVIEW_VERDICT_STATUS_MISMATCH (gates/code-review.ts)        │
-│ 11 REVIEWER_COMPLETED_TASKS_REJECTED                            │
-│ 12 QA_REVIEW_RECORD               (gates/qa-review.ts)          │
-│ 13 QA_COMPLETION_EVIDENCE_MISSING (gates/evidence-schema.ts)    │
-│ 14 PASS_TASKS_INCOMPLETE          (gates/open-tasks.ts)         │
-│ 15 PASS_MISSING_EVIDENCE          — qa_reports/review_<id>.md   │
+│  2 FEATURE_LEASE                  (gates/feature-lease.ts)      │
+│  3 SCOPE_DECISION_REQUIRED        (gates/scope-decision.ts)     │
+│  4 CUT_APPROVAL_REQUIRED          (gates/cut-approval.ts)       │
+│  5 EXTERNAL_REFS_UNRESOLVED       (gates/external-refs.ts)      │
+│  6 SOURCE_CREDIBILITY_UNVERIFIED                                │
+│  7 REPRO_MANIFEST_MISSING                                       │
+│  8 REVIEW_VERDICT_STATUS_MISMATCH (gates/code-review.ts)        │
+│  9 REVIEWER_COMPLETED_TASKS_REJECTED                            │
+│ 10 QA_REVIEW_RECORD               (gates/qa-review.ts)          │
+│ 11 QA_COMPLETION_EVIDENCE_MISSING (gates/evidence-schema.ts)    │
+│ 12 PASS_TASKS_INCOMPLETE          (gates/open-tasks.ts)         │
+│ 13 PASS_MISSING_EVIDENCE          — qa_reports/review_<id>.md   │
 │      must exist per completed task (file mode) or `reports` row │
-│ 16 PASS_VISUAL_SUBGATES           (gates/visual.ts)             │
-│ 17 PASS_EXPECTED_RED_DIFF         (gates/expected-red.ts)       │
-│ 18 PASS_AC_EXECUTION_LOG          (gates/ac-execution.ts)       │
-│ 19 MISSING_REVIEW_EVIDENCE                                      │
+│ 14 PASS_VISUAL_SUBGATES           (gates/visual.ts)             │
+│ 15 PASS_EXPECTED_RED_DIFF         (gates/expected-red.ts)       │
+│ 16 PASS_AC_EXECUTION_LOG          (gates/ac-execution.ts)       │
+│ 17 MISSING_REVIEW_EVIDENCE                                      │
 ╞═════════════════════════════════════════════════════════════════╡
 │ POST-PIPELINE                                                   │
 ├─────────────────────────────────────────────────────────────────┤
@@ -110,7 +108,7 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
                                   handoff state updated
 ```
 
-Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 36 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
+Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 34 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
 
 ---
 

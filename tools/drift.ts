@@ -10,7 +10,6 @@ import { getActiveStorage, type TaskRecord } from "./storage.js";
 import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import { findTasksFile, loadConfig } from "./config.js";
 import { CURRENT_VERSIONS, peekVersion, type SchemaKind } from "../schema/versions.js";
-import { isHandAuthoredStamp } from "../gates/stamp-provenance.js";
 import { hasEvidenceAnywhere } from "./evidence-lookup.js";
 import { resolveCurrentLanePaths, resolveFlatLanePaths } from "./lane-paths.js";
 
@@ -20,17 +19,11 @@ interface DriftReport {
   handoffLastTask: string;
   tasksCompleted: string[];
   tasksIncomplete: string[];
-  // Advisory-only stamp-shape check. Non-null (a plain informational string)
-  // when handoff.last_updated matches the hand-authored round-second
-  // zero-millisecond shape; null otherwise. Independent of
-  // driftDetected/details — never merged into details, never flips
-  // driftDetected, consumed by no gate (no GateErrorCode). (E9A)
-  stampAdvisory: string | null;
   // Fan-out scope advisory: non-null when this workspace has active-scope
   // incomplete tasks, per computeFanoutAdvisory's header comment.
-  // Advisory-only, like stampAdvisory above: never merged into `details`,
-  // never flips `driftDetected`, consumed by no gate. Threaded into every
-  // return path below (null until tasks are known). (E112)
+  // Advisory-only: never merged into `details`, never flips `driftDetected`,
+  // consumed by no gate. Threaded into every return path below (null until
+  // tasks are known). (E112)
   fanoutAdvisory: string | null;
   // Ids that WOULD have produced a "Possible vibe-coding drift" detail line
   // (task list shows completed, handoff doesn't mention it, not on the drift
@@ -40,20 +33,6 @@ interface DriftReport {
   // (buildEvidenceBackedLine) — see that function's header for why tw_sync
   // is the wrong remedy for them. Always present (possibly empty). (E112)
   evidenceBackedIds: string[];
-}
-
-// The hand-authored-stamp predicate lives in gates/stamp-provenance.ts,
-// shared with the write-path STAMP_PROVENANCE_SUSPECT gate so the two never
-// drift apart. This stays advisory-only: the lease gate already fails open on
-// an untrustworthy stamp, and rejection is that gate's job.
-function computeStampAdvisory(lastUpdated: string): string | null {
-  if (!isHandAuthoredStamp(lastUpdated)) return null;
-  return (
-    `Handoff last_updated "${lastUpdated}" has a round-second, zero-millisecond shape ` +
-    `(seconds 00, ms .000) — consistent with a hand-authored, out-of-band edit rather than ` +
-    `the server's millisecond-entropy tw_update_state write path (new Date().toISOString()). ` +
-    `Advisory only: verify how this stamp was produced.`
-  );
 }
 
 // Detail line for ids that would read as "Possible vibe-coding drift" but have
@@ -318,7 +297,6 @@ export function detectDrift(workspacePath: string): string {
       handoffLastTask: "",
       tasksCompleted: [],
       tasksIncomplete: [],
-      stampAdvisory: null,
       fanoutAdvisory: null,
       evidenceBackedIds: [],
     };
@@ -336,7 +314,6 @@ export function detectDrift(workspacePath: string): string {
       handoffLastTask: "",
       tasksCompleted: [],
       tasksIncomplete: [],
-      stampAdvisory: null,
       fanoutAdvisory: null,
       evidenceBackedIds: [],
     };
@@ -350,18 +327,11 @@ export function detectDrift(workspacePath: string): string {
       handoffLastTask: "",
       tasksCompleted: [],
       tasksIncomplete: [],
-      stampAdvisory: null,
       fanoutAdvisory: null,
       evidenceBackedIds: [],
     };
     return JSON.stringify(report);
   }
-
-  // Stamp advisory: computed once, right after handoff is confirmed non-null,
-  // then threaded into every return path from this point forward. No
-  // storage-mode scoping: both HandoffStorage implementations stamp
-  // last_updated through the same new Date().toISOString() path.
-  const stampAdvisory = computeStampAdvisory(handoff.last_updated);
 
   if (!tasks) {
     const report: DriftReport = {
@@ -370,7 +340,6 @@ export function detectDrift(workspacePath: string): string {
       handoffLastTask: handoff.active_feature,
       tasksCompleted: handoff.completed_tasks,
       tasksIncomplete: [],
-      stampAdvisory,
       fanoutAdvisory: null,
       evidenceBackedIds: [],
     };
@@ -483,7 +452,6 @@ export function detectDrift(workspacePath: string): string {
     // a baselined id recorded in handoff never misreports as incomplete.
     tasksCompleted: completedTasks.filter((id) => !baselineIds.has(id)),
     tasksIncomplete: incompleteTasks,
-    stampAdvisory,
     fanoutAdvisory,
     evidenceBackedIds,
   };

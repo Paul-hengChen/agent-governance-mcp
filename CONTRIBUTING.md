@@ -61,11 +61,11 @@ tools/
   rag.ts                  #   PRD chunking + embeddings (SQLite mode)
   rag-coalesce.ts         #   shared _indexingInFlight registry
 gates/                    # one module per gate predicate (14 files)
-  registry.ts             #   GATE_REGISTRY — 33 gate definitions
+  registry.ts             #   GATE_REGISTRY — 34 gate definitions
   pipeline.ts             #   runUpdateStatePipeline() step runner
   {cut-approval,scope-decision,feature-lease,external-refs,
    code-review,qa-review,evidence-schema,visual,expected-red,
-   ac-execution,stamp-provenance,lease-override}.ts
+   ac-execution,lease-override,open-tasks}.ts
 schema/                   # schema_version constants + migration runners
   versions.ts             #   current versions + registries
   migrations-*.ts         #   lazy migrate-on-read

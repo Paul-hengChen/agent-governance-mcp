@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
 // Tests that the qa-engineer and sr-engineer role SOPs carry two rules: a long test or
 // build run finishes (or is collected) within the same turn (E20), and a crash checkpoint
-// with bookkeeping_write (file-mode only) precedes a long regression run (E21). Only
+// written as an ordinary lease-refreshing write precedes a long regression run (E21). Only
 // content/skill-qa-engineer.md and content/skill-sr-engineer.md are checked; the spec is
 // the backlog rows. Test ids: QA/SR-E20-1/2 same-turn; QA/SR-E21-1..4 checkpoint.
 // Rationale: specs/e260f-comment-rationale.md (test/e20-e21-crash-resilience.test.mjs).
@@ -63,7 +63,7 @@ test("SR-E20-2: skill-sr-engineer.md's step 4b states the same synchronous-or-po
   );
 });
 
-// --- Crash checkpoint written via bookkeeping_write (E21) -------------------
+// --- Crash checkpoint written as an ordinary write (E21) -------------------
 
 test("QA-E21-1: skill-qa-engineer.md Phase 4 carries the E21 crash-checkpoint bullet with its origin tag", () => {
   assert.match(
@@ -73,14 +73,14 @@ test("QA-E21-1: skill-qa-engineer.md Phase 4 carries the E21 crash-checkpoint bu
   );
 });
 
-test("QA-E21-2: skill-qa-engineer.md's crash-checkpoint bullet fires BEFORE the full regression run and names bookkeeping_write=true", () => {
+test("QA-E21-2: skill-qa-engineer.md's crash-checkpoint bullet fires before the full regression run and passes no bookkeeping argument", () => {
   const lineMatch = SKILL_QA.match(/^   - \*\*Crash checkpoint\*\*.*$/m);
   assert.ok(lineMatch, "must locate the full crash-checkpoint bullet line");
   assert.ok(
     lineMatch[0].includes("BEFORE launching the full regression run"),
     "the bullet must checkpoint BEFORE the full regression run, not after",
   );
-  assert.ok(lineMatch[0].includes('bookkeeping_write=true'), "the bullet must invoke bookkeeping_write=true");
+  assert.ok(!lineMatch[0].includes("bookkeeping_write"), "the checkpoint is an ordinary write: no bookkeeping argument");
   assert.ok(lineMatch[0].includes('agent_id="qa-engineer"'), "the checkpoint write must stamp agent_id=\"qa-engineer\"");
 });
 
@@ -91,13 +91,14 @@ test("QA-E21-3: skill-qa-engineer.md's crash-checkpoint bullet appears strictly 
   assert.ok(checkpointIdx < buildIdx, "the crash checkpoint must precede the build/regression run, not follow it");
 });
 
-test("QA-E21-4: skill-qa-engineer.md's crash-checkpoint bullet carries the qa-added file-mode-only accuracy caveat", () => {
+test("QA-E21-4: skill-qa-engineer.md's crash-checkpoint bullet says the checkpoint is an ordinary write that refreshes the lease", () => {
   const lineMatch = SKILL_QA.match(/^   - \*\*Crash checkpoint\*\*.*$/m);
   assert.ok(lineMatch, "must locate the full crash-checkpoint bullet line");
   assert.ok(
-    lineMatch[0].includes("(file-mode only)"),
-    "bookkeeping_write is file-mode-only (tools/registry.ts + handoff-orchestrator.ts ignore it in SQLite mode) — the bullet must say so",
+    lineMatch[0].includes("an ordinary write that refreshes the lease"),
+    "a checkpoint is written by a live role, so it must extend the feature lease — the bullet must say so",
   );
+  assert.ok(!/administrative|untouched|file-mode only/.test(lineMatch[0]), "no lease-untouched or file-mode-only wording");
 });
 
 test("SR-E21-1: skill-sr-engineer.md step 4a carries the E21 crash-checkpoint step with its origin tag", () => {
@@ -108,14 +109,14 @@ test("SR-E21-1: skill-sr-engineer.md step 4a carries the E21 crash-checkpoint st
   );
 });
 
-test("SR-E21-2: skill-sr-engineer.md's step 4a fires BEFORE any long-running build/suite and names bookkeeping_write=true", () => {
+test("SR-E21-2: skill-sr-engineer.md's step 4a fires before any long-running build/suite and passes no bookkeeping argument", () => {
   const lineMatch = SKILL_SR.match(/^4a\. \*\*Crash checkpoint before long steps\*\*.*$/m);
   assert.ok(lineMatch, "must locate the full step 4a line");
   assert.ok(
     lineMatch[0].includes("BEFORE launching any long-running build/suite"),
     "step 4a must checkpoint BEFORE the long-running step, not after",
   );
-  assert.ok(lineMatch[0].includes('bookkeeping_write=true'), "step 4a must invoke bookkeeping_write=true");
+  assert.ok(!lineMatch[0].includes("bookkeeping_write"), "step 4a is an ordinary write: no bookkeeping argument");
   assert.ok(lineMatch[0].includes('agent_id="sr-engineer"'), "the checkpoint write must stamp agent_id=\"sr-engineer\"");
 });
 
@@ -128,26 +129,24 @@ test("SR-E21-3: skill-sr-engineer.md's step 4a sits strictly between step 4 (Imp
   assert.ok(step4Idx < step4aIdx && step4aIdx < step5Idx, "4a must sit strictly between step 4 and step 5");
 });
 
-test("SR-E21-4: skill-sr-engineer.md's step 4a carries the qa-added file-mode-only accuracy caveat", () => {
+test("SR-E21-4: skill-sr-engineer.md's step 4a says the checkpoint is an ordinary write that refreshes the lease", () => {
   const lineMatch = SKILL_SR.match(/^4a\. \*\*Crash checkpoint before long steps\*\*.*$/m);
   assert.ok(lineMatch, "must locate the full step 4a line");
   assert.ok(
-    lineMatch[0].includes("(file-mode only)"),
-    "bookkeeping_write is file-mode-only (tools/registry.ts + handoff-orchestrator.ts ignore it in SQLite mode) — step 4a must say so",
+    lineMatch[0].includes("an ordinary write that refreshes the lease"),
+    "a checkpoint is written by a live role, so it must extend the feature lease — step 4a must say so",
   );
+  assert.ok(!/administrative|untouched|file-mode only/.test(lineMatch[0]), "no lease-untouched or file-mode-only wording");
 });
 
-// --- Cross-file consistency: both copies describe the SAME bookkeeping_write
-// contract actually implemented server-side (tools/handoff-orchestrator.ts
-// L323-357, L1147-1153: file-mode only, preserves on-disk last_updated
-// verbatim on a same-feature write; rejected with
-// BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE on a feature change). Both SOP
-// lines say "administrative write" + "lease timestamp"/"lease-timestamp" —
-// pin that neither drifted from that contract in wording.
+// --- Cross-file consistency: both SOP copies describe the same contract (an
+// ordinary write that refreshes the lease) in the same words.
 
-test("CROSS-1: both E21 bullets describe an administrative write that does not refresh the lease timestamp (matches the server contract)", () => {
+test("CROSS-1: both E21 bullets describe an ordinary write that refreshes the lease, with no bookkeeping argument", () => {
   const qaLine = SKILL_QA.match(/^   - \*\*Crash checkpoint\*\*.*$/m)[0];
   const srLine = SKILL_SR.match(/^4a\. \*\*Crash checkpoint before long steps\*\*.*$/m)[0];
-  assert.match(qaLine, /administrative write.*lease timestamp untouched/, "qa-engineer copy must describe the lease-timestamp-untouched contract");
-  assert.match(srLine, /administrative write.*does NOT refresh the lease timestamp/, "sr-engineer copy must describe the lease-timestamp-not-refreshed contract");
+  for (const [who, line] of [["qa-engineer", qaLine], ["sr-engineer", srLine]]) {
+    assert.match(line, /an ordinary write that refreshes the lease/, `${who} copy must say the checkpoint refreshes the lease`);
+    assert.ok(!line.includes("bookkeeping_write"), `${who} copy must not pass a bookkeeping argument`);
+  }
 });

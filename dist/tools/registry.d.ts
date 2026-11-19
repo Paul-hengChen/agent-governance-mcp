@@ -141,7 +141,6 @@ declare const UpdateStateArgs: z.ZodObject<{
     }>>;
     dispatch_mechanism_tier: z.ZodOptional<z.ZodString>;
     lease_override: z.ZodOptional<z.ZodBoolean>;
-    bookkeeping_write: z.ZodOptional<z.ZodBoolean>;
     review_task_ids: z.ZodOptional<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;
 declare const CompleteTaskArgs: z.ZodObject<{

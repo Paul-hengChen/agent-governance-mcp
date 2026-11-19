@@ -1,9 +1,8 @@
 // Coded by @qa-engineer
 // Shared deterministic-stamp helpers for seed-then-write tests (docs/backlog.md row E148).
-// gates/stamp-provenance.ts arms STAMP_PROVENANCE_SUSPECT when the on-disk `last_updated`
-// matches HAND_AUTHORED_STAMP_RE; a wall-clock seed hits that shape in ~1/60000 of runs.
-// These helpers force the stamp at the test layer only (the gate is untouched). Callers MUST
-// markStateRead AFTER forceSeedStamp, or verifyFreshness rejects the write as stale.
+// A wall-clock seed gives each fixture a different `last_updated`; these helpers pin it at the
+// test layer so seed-then-write fixtures are reproducible. Callers MUST markStateRead AFTER
+// forceSeedStamp, or verifyFreshness rejects the write as stale.
 // Rationale: specs/e260f-comment-rationale.md (test/e148-seed-stamp.mjs).
 
 import * as fs from "node:fs";
@@ -13,22 +12,12 @@ import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 const LAST_UPDATED_LINE_RE = /^last_updated:\s*"[^"]*"$/m;
 
 /**
- * A fixed ISO-8601 stamp that can NEVER match HAND_AUTHORED_STAMP_RE
- * (milliseconds ".123", never ".000"). Use for seeds whose absolute time
- * doesn't matter to the test (the overwhelming majority of seed-then-write
- * fixtures — they only need SOME valid millisecond-entropy-shaped stamp on
- * disk before the write under test runs).
+ * A fixed ISO-8601 stamp with a non-zero millisecond part (".123"), the shape the server
+ * writes. Use for seeds whose absolute time doesn't matter to the test (the overwhelming
+ * majority of seed-then-write fixtures: they only need SOME valid stamp on disk before the
+ * write under test runs).
  */
 export const SAFE_SEED_STAMP = "2026-01-01T00:00:00.123Z";
-
-/**
- * A fixed stamp that DOES match HAND_AUTHORED_STAMP_RE. Exported so tests
- * whose subject IS the gate/advisory (test/drift-stamp-advisory.test.mjs,
- * test/e18-write-provenance.test.mjs, test/e148-stamp-provenance-seed.test.mjs)
- * share one literal instead of each hand-rolling it — those tests seed this
- * ON PURPOSE and must NOT be "fixed" by forceSeedStamp.
- */
-export const SUSPECT_SEED_STAMP = "2026-01-01T00:00:00.000Z";
 
 // Route through the lane-aware resolver instead of
 // restating the flat `.current/handoff.md` path — these fixture workspaces
@@ -69,10 +58,9 @@ export function forceSeedStampIfExists(workspacePath, stamp = SAFE_SEED_STAMP) {
 }
 
 /**
- * A "now, but never suspect" stamp: wall-clock time with milliseconds forced away from 0.
+ * A "now" stamp with milliseconds forced away from 0, so it has the shape the server writes.
  * Use where the seed must be fresh relative to Date.now() (feature-lease TTL math,
  * staleness checks) so a fixed stamp like SAFE_SEED_STAMP would break the test.
- * Deterministically escapes HAND_AUTHORED_STAMP_RE, which requires ms === "000".
  */
 export function freshNonSuspectStamp() {
   return nonSuspectStampAt(0);
@@ -81,9 +69,7 @@ export function freshNonSuspectStamp() {
 /**
  * freshNonSuspectStamp at an arbitrary offset from now (milliseconds; negative = past).
  * Replaces a hand-rolled `new Date(Date.now() - minutesAgo * 60_000).toISOString()`
- * backdate, which keeps real ms entropy and so is itself exposed to the E148 hazard.
- * Deterministically escapes HAND_AUTHORED_STAMP_RE (ms forced !== 0) and keeps the
- * requested age intact to the second.
+ * backdate. The ms part is forced !== 0 and the requested age is kept intact to the second.
  */
 export function nonSuspectStampAt(offsetMs) {
   const d = new Date(Date.now() + offsetMs);

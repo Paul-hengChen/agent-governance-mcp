@@ -1,0 +1,76 @@
+# e419-retire-bookkeeping-stamp — expected-red manifest (feature mode)
+# Format: <relative test file path> | <exact test name/description string>
+# Source: full run `node --test test/*.test.mjs` on 71f0f5c after `npm run build`:
+# 4310 tests, 42 failed, in exactly the 14 files of the spec Probe table. Every
+# red is a pin on a retired mechanism or count; qa owns all test edits
+# (T-E419-05..07). Whole-file reds are listed with the file path as the name.
+
+# six compose goldens carry the two deleted const-08 bullets and the old checkpoint wording; qa re-captures them once (AC16)
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# dedicated suite for the removed stampAdvisory field (D1); qa deletes the file (AC14)
+test/drift-stamp-advisory.test.mjs | AC3: fires (non-null) on the AC3 fixture shape 2026-07-12T01:35:00.000Z
+test/drift-stamp-advisory.test.mjs | AC3: fires (non-null) on a round-hour stamp (2026-07-08T12:00:00.000Z, forensics v3.48.0 hit)
+test/drift-stamp-advisory.test.mjs | AC4: null on an ms-entropy stamp (2026-07-13T03:22:38.181Z, the tw_update_state shape)
+test/drift-stamp-advisory.test.mjs | AC3 control: driftDetected/details/tasksCompleted/tasksIncomplete are unaffected by stamp shape (clean case)
+test/drift-stamp-advisory.test.mjs | early return: version-skew short-circuit returns stampAdvisory null (even with a hand-authored-shaped stamp on disk)
+test/drift-stamp-advisory.test.mjs | early return: no handoff and no tasks (fresh project) returns stampAdvisory null
+test/drift-stamp-advisory.test.mjs | early return: tasks exist but handoff is missing returns stampAdvisory null
+
+# whole file: imports the deleted gates/stamp-provenance module; qa deletes the file (AC14)
+test/e148-stamp-provenance-seed.test.mjs | test/e148-stamp-provenance-seed.test.mjs
+
+# whole file: imports the deleted gates/stamp-provenance module; qa drops the stamp-provenance import and tests, keeps every QA_COMPLETION_EVIDENCE_MISSING test (AC14)
+test/e18-write-provenance.test.mjs | test/e18-write-provenance.test.mjs
+
+# pins bookkeeping_write=true and the administrative/lease-untouched wording on the E21 checkpoint lines; qa re-pins to the ordinary-write wording (AC5)
+test/e20-e21-crash-resilience.test.mjs | QA-E21-2: skill-qa-engineer.md's crash-checkpoint bullet fires BEFORE the full regression run and names bookkeeping_write=true
+test/e20-e21-crash-resilience.test.mjs | QA-E21-4: skill-qa-engineer.md's crash-checkpoint bullet carries the qa-added file-mode-only accuracy caveat
+test/e20-e21-crash-resilience.test.mjs | SR-E21-2: skill-sr-engineer.md's step 4a fires BEFORE any long-running build/suite and names bookkeeping_write=true
+test/e20-e21-crash-resilience.test.mjs | SR-E21-4: skill-sr-engineer.md's step 4a carries the qa-added file-mode-only accuracy caveat
+test/e20-e21-crash-resilience.test.mjs | CROSS-1: both E21 bullets describe an administrative write that does not refresh the lease timestamp (matches the server contract)
+
+# GATE_REGISTRY size pinned at 36; now 34 (AC10)
+test/e26-gate-stats.test.mjs | R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 36
+test/e26-gate-stats.test.mjs | R2: fired.length + zero_fire.length === 36 always, and the two sets are disjoint (no code counted twice)
+test/e26-gate-stats.test.mjs | U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 36/36 coverage
+test/e26-gate-stats.test.mjs | D1: both sidecars absent -> never throws, full 36-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths
+test/e26-gate-stats.test.mjs | D2: only metrics.jsonl present (telemetry absent) -> telemetry side degrades independently, metrics side still fully populated
+test/e26-gate-stats.test.mjs | T3b: handleGateStats never throws even against a workspace with no .current directory at all
+
+# GATE_REGISTRY size pinned at 36; now 34 (AC10)
+test/e308-single-source-tier-enum.test.mjs | E303-AC12: no new gate code beyond E139 (36 entries) and DISPATCH_PIN_TIER_REJECTED is the only tool-boundary producer
+
+# pipeline pinned at 19 steps with STAMP_PROVENANCE_SUSPECT and BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE; now 17 steps, the other 17 in unchanged order (AC10)
+test/e35-pipeline-order.test.mjs | UPDATE_STATE_GATE_PIPELINE exists and has exactly 19 steps
+test/e35-pipeline-order.test.mjs | t-order-exact: step NAME sequence matches the frozen 19-step order exactly
+test/e35-pipeline-order.test.mjs | t-order-exact: each step's codes[] matches the frozen sequence exactly, in order
+
+# asserts the relay rule cites STAMP_PROVENANCE_SUSPECT; the parenthetical is removed (AC9)
+test/e394-release-sop.test.mjs | L:E18 L:E9 relay rule
+
+# const-08-chain-31-mid.md line count pinned at 13; now 11 after the two bullets are deleted (AC13)
+test/e410-task-alias-content-tail.test.mjs | AC2: each edited file keeps its line count
+
+# site 2 anchors on the deleted Stamp-Provenance bullet; qa retires or re-anchors it (AC13)
+test/e437-repo-only-paths.test.mjs | AC-E437-1 site 2: content/const-08-chain-31-mid.md no longer cites gates/stamp-provenance.ts
+
+# tw_detect_drift description pinned with stampAdvisory; new text drops it and reads "and fanoutAdvisory is null or a note that never sets driftDetected" (AC8, D1)
+test/e441-tool-description-contracts.test.mjs | AC3: the six descriptions equal the spec strings exactly
+
+# three tests pin the registry / doc-map size at 36; now 34 (AC10). The doc-map test fails only on its 36 count: the map itself now lists exactly the 34 registered codes
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 36 entries (36 in, 36 out — e247 added PASS_TASKS_INCOMPLETE; before it e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: "<echo>" ` + gate hintStatic byte-for-byte; registry still has 36 codes
+
+# AC4 (e10) carries a stamp-provenance block (qa cuts it, keeps the first assertion); E10-AC5a/AC6a/AC8b test the retired bookkeeping_write mechanism; E9A-S1 asserts STAMP_PROVENANCE_SUSPECT in the release relay rule (AC4, AC9, AC14)
+test/feature-lease.test.mjs | AC4 (e10): migration heal-write preserves pre-heal last_updated verbatim
+test/feature-lease.test.mjs | E10-AC5a: bookkeeping_write:true on a SAME-feature write preserves the existing on-disk last_updated verbatim (spec AC5)
+test/feature-lease.test.mjs | E10-AC6a: bookkeeping_write:true whose active_feature DIFFERS from the incumbent's is rejected BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE, never silently accepted or downgraded (spec AC6)
+test/feature-lease.test.mjs | E10-AC8b: content/const-08-chain-31-mid.md carries the Bookkeeping-Write bullet — timestamp-preservation semantics, same-active_feature restriction, migration heal-write hard-wired equivalent (spec AC8b)
+test/feature-lease.test.mjs | E9A-S1 [E394 re-pin AC-P6]: the SOP carries the no-MCP-path relay Hard rule, never hand-edit state to simulate a write

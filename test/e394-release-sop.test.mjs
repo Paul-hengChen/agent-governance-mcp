@@ -206,7 +206,9 @@ test("L:E18 L:E9 relay rule", () => {
   assert.match(h, /No-MCP-path sessions relay/);
   assert.match(h, /`RELAY REQUIRED:`/);
   assert.match(h, /coordinator makes it/);
-  assert.match(h, /STAMP_PROVENANCE_SUSPECT/);
+  assert.match(h, /Never hand-edit state to simulate a write/);
+  assert.match(h, /No dispatch brief overrides this rule/);
+  assert.doesNotMatch(h, /STAMP_PROVENANCE/, "the retired rejection code is no longer cited");
   assert.match(section("Output rule"), /coordinator confirmed the relayed write landed/, "a relayed write is confirmed before Done");
 });
 
