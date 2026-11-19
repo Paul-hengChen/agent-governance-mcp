@@ -535,6 +535,7 @@ agent，依共用的程式範圍分組核對票面與 repo 現況，結果整理
 | 6 | 寫死「只有 qa 能寫 PASS」的地方歸哪張票 | 依性質分：E431 改工具入口的 PASS 限制（`tools/registry.ts`）、`tw_complete_task`（`tools/tasks.ts`）與交接表中 PASS 之後的出口（`tools/transitions.ts`），依路徑標記判斷裁判；E432 改發版腳本（`scripts/release.mjs`）與 lane 狀態（`tools/lane-status.ts`）；E433 改 release-engineer、doc-writer、integrator 的 SOP 文字與派工範本（`tools/fanout-manifest.ts`）。全部在 E434 動工前落地。E443 的「派工內容與今天逐字相同」改為「與 E443 動工前的輸出相同」 | coordinator 提案，操作者選定 |
 | 7 | 新流程中視覺退件怎麼計數（E434、E420） | 併進審查輪數：`reviewer-visual` 的退件與其他 code-reviewer 退件同算審查輪數上限。視覺計數、上限與拆票門檻退役；計數行為在 E434 改，錯誤碼 `VISUAL_ROUND_EXCEEDED` 在 E420 收掉。E434 的 sr SOP 寫明：比對測試的差異每次都變小算有進展，不算同一個失敗；差異沒變小才照 §5 的連續修正上限停下 | coordinator 提案，操作者選定 |
 | 9 | 波次表由 `spec-workshop` 寫到多細（E423） | `spec-workshop` 只寫精簡波次表（票、分波、相依）與人類核准列；integrator 在 stage 1 照當下的 `main` 調查程式碼，轉成完整 lane 清單（起點、branch、worktree、擁有／禁止檔案）。轉出的清單沒改動已核准的票、分組與順序，且沒有需要人類選的項目時，`spec-workshop` 已 commit 的核准就算數，stage 2 不再停；有任何改動或待選項目就照舊停下請人類核准。此條為 §3.1「不能憑轉述的核准」的明文例外，寫進 `content/skill-integrator.md`，E423 檔案清單補上該檔 | coordinator 提案，操作者選定 |
+| 10 | 設計工具匯出的原型交給誰、用哪個 mode（E423、E434） | ① 沒有票檔時，coordinator 提示改走 `spec-workshop`；已有票檔時，照其他設計來源先交 design-auditor。② 新增正式 mode `prototype`，涵蓋單一畫面原型頁與可執行的 demo app；同時有 Figma 時為雙來源：Figma 定有哪些狀態、原型定狀態的行為，兩者每處衝突都是待裁定項目（有票前在 `spec-workshop` 裁，有票後停下問人）。能讀遠端專案時套量體檢查，不套可信度檢查。③ ② 由 E434(6) 移到 E423；同票修伺服器的 mode 解析：設計檔有寫 mode 但值認不得時改為啟動視覺檢查並在錯誤訊息點名該值，不再靜默不啟動，E384 的保護照舊。E423 檔案清單補 `content/skill-design-auditor.md`、`gates/visual.ts` | coordinator 提案，操作者選定 |
 | 8 | E435 之後路徑標記要不要保留 | 移除。升級時停在舊流程中途的提示改由「這次寫入是否為已拆掉的舊步驟」判斷（pm 直交 sr、code-reviewer 核准後交 qa、qa 寫 PASS），不靠標記。E435 加：交接檔結構升版、讀舊檔時丟掉該欄位；`resume_of` 移除 `qa-engineer` 這個值；票面「若沒人讀就移除」改為「移除」 | coordinator 提案，操作者選定 |
 
 裁定 1 的理由：§3.3 表的「0 次」量的是交接檔，但這個欄位不寫入交接檔，數字證明不了沒人用；實際用到它的是
@@ -552,6 +553,8 @@ lane 協定與 §3.1 的文字（E425 的範圍），不是這道檢查。
 裁定 4 的理由：qa 的紅燈情境測試是在沒看實作的情況下照票寫的，本身就證明 bug 存在且被抓到，獨立性比建置者
 自寫的重現測試高。sr 另寫重現測試的價值在於逼出根本原因，但伺服器只看檔案在不在，擋不住只修症狀的修法；
 真正抓得到的是看實作的 code-reviewer，所以把這項檢查放在它的 SOP。
+
+裁定 10 的依據：2026-11-19 實際查 adopter B 的設計檔。原型來自 Claude Design，本機副本有兩種形式：單一畫面頁（內嵌狀態機、載入 design system token）與可執行的 demo app。design-auditor 沒有寫 `no-design`，而是自創 `mockup` 與「雙來源」寫法；但伺服器只認 8 個 mode，認不得的值當作沒有 mode。以伺服器自己的判斷函式檢查，5 份原型相關設計檔中有 4 份視覺檢查沒啟動。14.3「會落到 `no-design`」的說法原因不對、結果相同，而且已實際發生。那 4 個已結案 feature 要不要補跑視覺比對，屬 adopter B 的範圍，不在本次審查。
 
 ### 16.2 審查中新發現、待裁定的題目
 
