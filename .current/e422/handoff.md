@@ -1,9 +1,10 @@
 ---
 schema_version: 15
 active_feature: "e422-ticket-file-format"
-status: "In_Progress"
-last_updated: "2026-11-19T11:00:47.647Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-11-19T11:03:43.144Z"
+blocking_reason: "Round 2: round-1 finding fixed, but the new double-quote advice (docs/ticket-format.md:21-23) silently turns \\n / \\t inside the quotes into control characters (checker reports 0 problems); doc must state the backslash escape or switch to single quotes."
+last_agent: "code-reviewer"
 scope_decision: "single-feature"
 scope_decision_why: "One backlog ticket (E422) in one fan-out lane: a new parser module, a thin checker script, one additive config key, two new Markdown files. No design file, no shared generated files, no MCP tool; files fixed by the human-approved fan-out row."
 cut_approved: true
@@ -13,16 +14,17 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-11-19T11:00:47.647Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-11-19T11:03:43.144Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 1
+review_round: 2
 visual_round: 0
-hop_count: 4
+hop_count: 5
 qa_rounds_total: 0
-review_rounds_total: 1
+review_rounds_total: 2
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -31,11 +33,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: addressed code-reviewer Round 1 (T-E422-02 required finding) — ready for code review
-- fix (commit 81c2def, docs/ticket-format.md only, 171 -> 185 lines): lines 10-11 now say the Added-during-build section is present only when scenarios were added during the work (optional note); lines 15-19 say the field block is YAML front matter and replace 'every value is read as text' with 'values are not converted to numbers or true/false' (no/007 kept); lines 21-31 give the quoting rule (quote a text value or list entry that contains ': ' or ' #', or starts with [ ] { } , # & * ! | > ' " % @ or a backtick; inside a list also quote an entry with a comma; unquoted ' #' starts a comment that silently drops the rest of the line) plus a quoted example block: title: "Retry 3 times #flaky", allowed paths: ["**/*.md", src/export/csv.ts], status: "stopped — blocked by #123". No parser change. Lane state commit 33574bf.
-- checker: node scripts/check-tickets.mjs templates/ticket.md + extracted ## Example ticket -> ok (1 and 4 scenarios), exit 0. Reviewer repros in quoted form all pass with exit 0 and keep the whole value (parseTicketFile: title 'Retry 3 times #flaky', status 'stopped — blocked by #123', allowed paths ['**/*.md','src/export/csv.ts']; 'stopped — vendor: late' and '&a T' quoted also pass). check:md-tables OK (799 files, 0 malformed). grep test/ for ticket-format: no pins.
-- full suite: node scripts/test-lock.mjs -- npm test -> 4328/4330 pass, 0 fail, 2 skipped, exit 0.
-- other optional/recommended review notes left untouched for the final report, as assigned.
+- code-reviewer round 2: CHANGES_REQUESTED on T-E422-02 (T-E422-01 approval carried). review_report: review_reports/review_T-E422-02.md (## Round 2)
+- required — docs/ticket-format.md:21-23: inside the advised double quotes a backslash is an escape. Repro: title: "Escape \n in notes: crash" parses with 0 problems and stores a real newline (char 10); "C:\temp\new: crash" gets tab + newline; "match \d+" errors 'unknown escape sequence'. Fix (doc only), either: (a) add 'Inside double quotes, \ starts an escape: write a backslash as \\ and a double quote as \"', or (b) switch the rule to single quotes '...' (everything literal, ' written as '') and update the three example lines (27-31). Re-run the example lines plus one backslash value through the checker.
+- recommended (same edit, non-blocking) — docs/ticket-format.md:21-23: loud-but-uncovered cases: list entry containing [ ] { } mid-entry (app/[id]/page.tsx -> 'missed comma between flow collection entries'; suggest 'inside a list, also quote an entry that contains a comma or any of [ ] { }'); value starting with '- ', '? ' or ': '; value ending with ':' (title: Note:). A 'when in doubt, quote it' clause covers all.
+- verified OK this round: round-1 repros quoted per the rule all pass with whole values; listed leading chars all accurate against js-yaml FAILSAFE_SCHEMA; comma-in-list rule correct; template + embedded example pass check-tickets (exit 0); doc stays tool-neutral; only docs/ticket-format.md + .current/e422/ changed since 20bd6cf.
+- carry-forward for final report (non-blocking, unchanged from round 1): T-E422-01 — recommended scenario-heading shape unchecked (ticket-file.ts:166-169); optional fenced-block content lines count (149-161), Added-during-build not enforced last (150-153), source/depends-on single-value inconsistency (104), yes/no via mismatch line (217-222), unclosed-block wording (194-195), '-x.md' as option (250), Added date not range-checked (70), TICKET_STATUSES vs isKnownStatus duplication (38 vs 83-85), loader heal-on-read write via checker. T-E422-02 — optional '.'/whitespace ticketDir usable (config.ts:203-207), id uniqueness human-only (doc:35), isRejectedSisterPath name (out of lane scope per integrator), AC8 'four status forms' spec wording slip.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

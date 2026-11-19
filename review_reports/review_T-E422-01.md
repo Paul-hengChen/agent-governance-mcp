@@ -62,3 +62,6 @@ Same-model note: sr-engineer and code-reviewer both ran on opus (dispatch pins),
 
 ## Verdict
 APPROVED (task scope) — the parser and checker meet AC1–AC7 and AC10 with exact Copy / Strings text and exit codes; only recommended and optional notes remain. The feature-round verdict is CHANGES_REQUESTED on T-E422-02.
+
+## Round 2 — APPROVED (task scope, carried) — by code-reviewer
+No T-E422-01 file changed in `20bd6cf..HEAD` (only `docs/ticket-format.md` and `.current/e422/`), so the round-1 task approval and its recommended/optional notes carry over unchanged. The feature-round verdict is CHANGES_REQUESTED on T-E422-02 (round 2: double-quote backslash escape, docs/ticket-format.md:21-23).

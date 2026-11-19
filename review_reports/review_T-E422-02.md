@@ -49,3 +49,58 @@ Same-model note: sr-engineer and code-reviewer both ran on opus (dispatch pins),
 
 ## Verdict
 CHANGES_REQUESTED — the format doc's field-block section must name YAML front matter and give the quoting rule, because unquoted ` #`, `: ` and leading-`*` values are currently cut off silently or rejected with an error the doc never explains.
+
+## Round 2 — CHANGES_REQUESTED — by code-reviewer
+
+## Summary
+- Round-2 diff (`git diff 20bd6cf..HEAD`): `docs/ticket-format.md` only (+18/-4, commit 81c2def), plus `.current/e422/` lane state. No source, test, template or `dist/` change.
+- The round-1 required finding is fixed as asked. The doc now says the block is YAML front matter (line 16). It no longer promises "every value is read as text" (lines 17-18 now say "not converted to numbers or true/false", which is accurate for `FAILSAFE_SCHEMA`). It gives the quoting rule (21-25) and a quoted example (27-31). Lines 10-11 also fix the round-1 optional note on `## Added during build`.
+- All three round-1 repros, quoted as the new rule says, now pass and keep the whole value. The unquoted forms still fail or truncate in the same way, so the rule is needed.
+- New defect from this fix: the rule tells the reader to use double quotes but does not say that a backslash inside double quotes starts an escape. A quoted value that contains `\n` or `\t` is silently changed, and the checker reports 0 problems. See Correctness.
+- Verdict: CHANGES_REQUESTED, one required doc-only fix (one sentence, or switch the rule to single quotes).
+
+## AC Completeness
+AC3 — implemented (doc half) — unchanged from round 1.
+AC8 — partial — docs/ticket-format.md:16-31 now explains the YAML front matter and the quoting rule, and the template and embedded example still pass (`node scripts/check-tickets.mjs templates/ticket.md <extracted example>` → ok, 1 and 4 scenarios, 0 problems). But the double-quote advice at 21-23 silently changes values that contain a backslash; see the required finding.
+AC9, AC11, AC12 — implemented — no source, config, test or `dist/` change this round (`git diff --stat 20bd6cf..HEAD`).
+
+## Correctness
+Round-1 repros through `parseTicketFile` (dist build), each swapped into the doc's embedded example ticket:
+
+| value | unquoted | quoted per the new rule |
+|---|---|---|
+| title `Retry 3 times #flaky` | title stored as `Retry 3 times` (silent) | `"Retry 3 times #flaky"` → whole value, 0 problems |
+| status `stopped — vendor: late` | `field block is not valid YAML: bad indentation of a mapping entry` | `"stopped — vendor: late"` → whole value, 0 problems |
+| allowed paths `[**/*.md]` | `unidentified alias "*/*.md"` | `["**/*.md"]` → `["**/*.md"]`, 0 problems |
+| doc's own example block (27-31) | — | title, status and both path entries kept whole, 0 problems |
+
+The doc alone now explains how to fix each one. The listed leading characters were checked one by one against js-yaml `FAILSAFE_SCHEMA`: every one either errors or changes the value when left unquoted (`#x` → empty, `&a T` → `T`, the rest error). None is listed wrongly. The comma rule for list entries is correct (`[a, b]` is two entries).
+
+- **required** — docs/ticket-format.md:21-23: the rule says to use double quotes `"…"` but does not say that a backslash inside double quotes is an escape character. Following the rule can therefore change a value silently, which is the same kind of defect round 1 asked to remove. Repro: `title: "Escape \n in notes: crash"` must be quoted because it contains `: `. It parses with 0 problems, and the stored title holds a real line break (char code 10) where `\n` was written. `"C:\temp\new: crash"` gets a tab and a line break the same way. `"match \d+"` fails instead, with `unknown escape sequence`, an error the doc does not explain. A value that contains a `"` cannot be written by following the doc either. Ticket titles and stop reasons often mention `\n`, regexes or Windows paths. Fix (doc only, either option):
+  - (a) add one sentence: "Inside double quotes, `\` starts an escape: write a backslash as `\\` and a double quote as `\"`." or
+  - (b) switch the rule to single quotes `'…'`, inside which every character is kept as written except `'`, which is written twice (`''`). Update the three example lines to match.
+
+  Option (b) is the simpler rule for a reader who does not know YAML. Re-run the three example lines and one backslash value through the checker after the edit.
+- **recommended** — docs/ticket-format.md:21-23: three cases that the rule does not cover still fail loudly (the checker reports `field block is not valid YAML`), so nothing is lost silently, but a reader cannot fix them from the doc alone:
+  - a list entry that contains `[ ] { }` partway through, e.g. the route path `app/[id]/page.tsx` → `missed comma between flow collection entries`. Suggested change: "inside a list, also quote an entry that contains a comma or any of `[ ] { }`";
+  - a value that starts with `- `, `? ` or `: ` (dash, question mark or colon followed by a space);
+  - a value that ends with `:`, e.g. `title: Note:`.
+
+  The rule could be shortened to "when in doubt, quote it; quoting a plain value never hurts". That covers all of these in one clause and could be added in the same edit.
+
+## Quality
+No new findings. The added prose is plain and has no jargon beyond the word YAML, which the reader needs to search for the rule. The example block has no language tag, which is consistent with the `Added:` block at 112-114.
+
+## Architecture
+No change; no parser change was needed or made.
+
+## Security
+No findings. Doc-only change.
+
+## Performance
+No findings. Doc-only change.
+
+Same-model note: sr-engineer and code-reviewer both ran on opus (dispatch pins).
+
+## Verdict
+CHANGES_REQUESTED — the round-1 finding is fixed, but the new double-quote advice silently turns `\n` and `\t` written inside the quotes into real control characters. The doc must state the backslash escape or switch to single quotes.
