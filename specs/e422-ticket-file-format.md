@@ -334,6 +334,8 @@ code-reviewer → qa-engineer (T-E422-03).
 
 | id | role | P | summary | depends_on |
 |---|---|---|---|---|
-| T-E422-01 | sr-engineer | P0 | `tools/ticket-file.ts` parser + checker core, `scripts/check-tickets.mjs`, `ticketDir` key + `DEFAULT_TICKET_DIR` + `resolveTicketDir` in `tools/config.ts`, `package.json` script line, build `dist/` | none |
-| T-E422-02 | sr-engineer | P1 | `docs/ticket-format.md` (self-contained, example ticket embedded), `templates/ticket.md`, `docs/config.md` `ticketDir` section; template and example pass the checker | T-E422-01 |
+| T-E422-01 | sr-engineer | P0 | `tools/ticket-file.ts` parser + checker core, `scripts/check-tickets.mjs`, build `dist/tools/ticket-file.*` | none |
+| T-E422-02 | sr-engineer | P1 | `ticketDir` key + `DEFAULT_TICKET_DIR` + `resolveTicketDir` in `tools/config.ts`, `package.json` script line, build `dist/tools/config.*`; `docs/ticket-format.md` (self-contained, example ticket embedded), `templates/ticket.md`, `docs/config.md` `ticketDir` section; template and example pass the checker | T-E422-01 |
 | T-E422-03 | qa-engineer | P1 | `test/e422-*.test.mjs` for AC1–AC10; run AC11 and AC12 commands and the full suite | T-E422-02 |
+
+Cut amendment (coordinator, 2026-11-19, with the human's approval of the cut): the config key and the `package.json` line moved from T-E422-01 to T-E422-02 so each task stays within the 300-line task budget (T-E422-01 about 275 lines, T-E422-02 about 261). AC9 is therefore implemented in T-E422-02.
