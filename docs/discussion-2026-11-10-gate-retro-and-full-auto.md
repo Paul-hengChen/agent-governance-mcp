@@ -516,3 +516,58 @@ lane 內的 coordinator 再把各角色派成子 agent。不把整條 lane 派�
 連帶問題：一張 bug 票同時有 qa 可先寫的情境測試與 sr 寫的重現測試時，各由誰寫哪一條。
 coordinator 建議讀法 B：票上有可自動驗的情境就由 qa 寫，否則記「不需新測試」，sr 的重現測試照舊。
 E431 的交接表設計與 E433 的 SOP 都要用到這個答案。操作者於 2026-11-18 選定讀法 B。
+
+## 16. v5.0.0 里程碑十五張票的逐張審查（2026-11-19）
+
+起因：操作者要求逐張檢查里程碑的十五張票，找出要改的、要討論的、與現況不符的。coordinator 派五個唯讀審查
+agent，依共用的程式範圍分組核對票面與 repo 現況，結果整理成十四個待裁定題目與一批不需裁定的票面更正。
+裁定逐題記在 16.1；票面更正在全部裁定後一次寫入 backlog。
+
+### 16.1 裁定（2026-11-19）
+
+| # | 題目 | 裁定 | 依據 |
+|---|---|---|---|
+| 1 | E419 要不要退役 `bookkeeping_write` | 退役欄位，保留 E21 的當機存檔點，改成一般寫入（照常延長租約）。E419 加改 sr、qa 兩份 SOP 各一行與 `test/e20-e21-crash-resilience.test.mjs` 的釘點；結構遷移的修補寫入仍保留「不更新時間戳」的內部選項，可改名 | coordinator 提案，操作者選定 |
+| 2 | 新流程的入口與「pm 交回 qa」怎麼分（E431） | 新流程由入口那筆寫入明確帶路徑標記（如 `chain_path: "test-first"`）進入，設定後到換 feature 前不可改。沒帶標記的 pm → qa 維持現行規則（須帶 `resume_of`）；兩者都沒帶就拒絕，提示兩種寫法。新流程 feature 的 pm 改 spec 後再交 qa，不需 `resume_of` | coordinator 提案，操作者選定 |
+| 3 | 新流程入口要不要過四道開工檢查（E431） | 要。cut 核准、範圍決定、外部參考、設計來源可信度四道檢查也套用在「pm → qa 且帶路徑標記」這一步，比照舊流程的 pm → sr；帶 `resume_of` 的交回 qa 照舊不檢查。E431 檔案清單補 `tools/handoff-orchestrator.ts` 這四處判斷，驗收加「未核准 cut 的 pm → qa（帶標記）被拒」 | coordinator 提案，操作者選定 |
+| 4 | bug 票上 qa 與 sr 共用紅燈測試清單（E432、E433） | qa 寫了紅燈情境測試時，那條測試就算重現測試，sr 不必另寫；qa 記了「不需新測試」時才由 sr 寫重現測試並建清單。sr → code-reviewer 的檢查照舊只看清單在不在（qa 或 sr 建的都算）。E433 的 code-reviewer SOP 加一條：bug 票要確認修的是原因，不只是讓票上的情境通過。sr 仍可自行加底層測試，不強制、不檢查。修訂 15.2 裁定 7 的「sr 的重現測試照舊」 | coordinator 提案，操作者選定 |
+| 5 | 新流程較早撞到交接次數上限（E431） | 維持 14。只把 `tools/transitions.ts` 中「輪數上限會先到」的註解改成符合新流程，併進 E431。退件四、五次以上的 feature 交給人類；token 預算煞車未啟用前，這是唯一的成本上限 | coordinator 提案，操作者選定 |
+| 6 | 寫死「只有 qa 能寫 PASS」的地方歸哪張票 | 依性質分：E431 改工具入口的 PASS 限制（`tools/registry.ts`）、`tw_complete_task`（`tools/tasks.ts`）與交接表中 PASS 之後的出口（`tools/transitions.ts`），依路徑標記判斷裁判；E432 改發版腳本（`scripts/release.mjs`）與 lane 狀態（`tools/lane-status.ts`）；E433 改 release-engineer、doc-writer、integrator 的 SOP 文字與派工範本（`tools/fanout-manifest.ts`）。全部在 E434 動工前落地。E443 的「派工內容與今天逐字相同」改為「與 E443 動工前的輸出相同」 | coordinator 提案，操作者選定 |
+| 7 | 新流程中視覺退件怎麼計數（E434、E420） | 併進審查輪數：`reviewer-visual` 的退件與其他 code-reviewer 退件同算審查輪數上限。視覺計數、上限與拆票門檻退役；計數行為在 E434 改，錯誤碼 `VISUAL_ROUND_EXCEEDED` 在 E420 收掉。E434 的 sr SOP 寫明：比對測試的差異每次都變小算有進展，不算同一個失敗；差異沒變小才照 §5 的連續修正上限停下 | coordinator 提案，操作者選定 |
+| 9 | 波次表由 `spec-workshop` 寫到多細（E423） | `spec-workshop` 只寫精簡波次表（票、分波、相依）與人類核准列；integrator 在 stage 1 照當下的 `main` 調查程式碼，轉成完整 lane 清單（起點、branch、worktree、擁有／禁止檔案）。轉出的清單沒改動已核准的票、分組與順序，且沒有需要人類選的項目時，`spec-workshop` 已 commit 的核准就算數，stage 2 不再停；有任何改動或待選項目就照舊停下請人類核准。此條為 §3.1「不能憑轉述的核准」的明文例外，寫進 `content/skill-integrator.md`，E423 檔案清單補上該檔 | coordinator 提案，操作者選定 |
+| 10 | 設計工具匯出的原型交給誰、用哪個 mode（E423、E434） | ① 沒有票檔時，coordinator 提示改走 `spec-workshop`；已有票檔時，照其他設計來源先交 design-auditor。② 新增正式 mode `prototype`，涵蓋單一畫面原型頁與可執行的 demo app；同時有 Figma 時為雙來源：Figma 定有哪些狀態、原型定狀態的行為，兩者每處衝突都是待裁定項目（有票前在 `spec-workshop` 裁，有票後停下問人）。能讀遠端專案時套量體檢查，不套可信度檢查。③ ② 由 E434(6) 移到 E423；同票修伺服器的 mode 解析：設計檔有寫 mode 但值認不得時改為啟動視覺檢查並在錯誤訊息點名該值，不再靜默不啟動，E384 的保護照舊。E423 檔案清單補 `content/skill-design-auditor.md`、`gates/visual.ts` | coordinator 提案，操作者選定 |
+| 11 | 開發中補情境由誰補、寫在哪（E426） | 三分法：延伸票上或既有程式已決定的行為 → 追加情境；要新決定一個行為 → 停票（11.4 裁定 2）；介面細節 → qa 自決記入摘要（14.2 裁定 12）。可追加的角色只有 pm（切 cut 時）與 qa（寫測試時）；sr 照 14.2 裁定 14 退回 qa，code-reviewer 以退件請 qa 補。追加的情境寫在票檔末尾，標明新增者、日期、理由與驗證方式，E424 的檢查與 E425 的摘要因此都看得到。spec 改為引用票檔情境，不另抄；E426 的「原樣抄進 spec、在 spec 加情境」照此改寫 | coordinator 提案，操作者選定 |
+| 12 | 票上的測試名稱誰填、CI 檢查哪些票（E427） | `spec-workshop` 寫票時驗證欄只寫「自動測試」；qa 寫完測試後回填名稱（測試檔路徑加測試標題），回填只動驗證欄、不動 Given/When/Then，不算改情境；code-reviewer 確認該名稱的測試確實在測這條情境。CI 每個 PR 檢查所有狀態為 `done` 的票，`not started` 與 `stopped` 跳過；測試改名的 PR 須在同一 PR 更新票上名稱。E427 驗收「沒改票檔的 branch 直接通過」改為「沒有 `done` 票時直接通過」，並加測試改名的驗收；E422 的格式說明寫明驗證欄可回填 | coordinator 提案，操作者選定 |
+| 13 | E443 的啟動器怎麼開 lane、怎麼讀波次 | ① 啟動器先跑 `agc feature start` 建 worktree，再直接在 worktree 裡開 session；worktree 已存在（續跑）就跳過建立。批次模式下 `render` 的開工段改為「worktree 已建好，先確認位置與 branch」，手動開 lane 的輸出不變；E443 第 (1) 條照此放寬。② 派工清單的 Lanes 表加「波次」欄（整數），「相依」欄限定為 `無` 或以逗號分隔的 lane 名，說明文字移到「範圍切線」；`fanout.mjs check` 驗格式。依賴是否滿足以「被依賴 lane 的 branch 已是整合 branch 的祖先」判定，沿用 `tools/join-precondition.ts`。舊清單不回頭改，沒有「波次」欄的清單啟動器拒絕並說明。兩欄由 integrator 在 stage 1 照 `spec-workshop` 的精簡波次表填。實數：`specs/` 41 份清單、105 條 lane，「相依」欄 32 種寫法（審查初稿的「50 多種」更正） | coordinator 提案，操作者選定 |
+| 14 | 撞到用量上限時怎麼辦（E443） | ① `content/coord-03-core-fallback.md` 補一句：用量上限或限流不算「工具不可用」，重試一次，仍失敗就存檔、寫下暫停原因並結束 session（即 E443 偵測的暫停訊號）；不換模型，也不改用 `tw_switch_role` 在自己的 context 代跑。換模型只能由人類以 `dispatch_pins` 明確指定。併入 E443，檔案清單補該檔，驗收加「派工回傳用量上限錯誤時不走 fallback」。② 操作者目前只用一個帳號，E443 拿掉第 (4) 條「每條 lane 指定帳號設定的本機對照表」與對應驗收，Phase 0 的「指定的帳號設定」改為「目前帳號」；日後要多帳號另開票。③ 用量上限的處理以 Claude Code 內建行為為主：互動式 session 撞到上限時會停在原地等，到恢復時間自動繼續（預設開啟，同一 session 最多 3 次；電腦休眠可能需按 Enter；背景與 `-p` 模式沒有）。E443 Phase 0 改為實測：啟動器開互動式 session、撞到上限時是否自動繼續、subagent 派工中途撞到時的行為、3 次用完後的狀況；行不通時的後備是 statusline 腳本把 `rate_limits.*.resets_at` 寫進檔案，由 `CronCreate` 在該時間喚醒。模型本身讀不到額度百分比；文件只列 Pro、Max、Ultra 提供該欄位。① 仍保留，作為自動等待失效時的最後一道防線 | coordinator 提案，操作者選定 |
+| 15 | E433 與 E434 之間的視覺判定空窗 | E433 合進 `main` 後不單獨發版，與 E434 合發一個小版，adopter 拿不到只有 E433 的版本。本 repo 沒有 `design/`，`main` 上的空窗不影響自身開發。E433 票面加「不單獨發版」；14.2 裁定 20「前四張照常發小版」修訂為「E431、E432 照常發小版，E433 與 E434 合發一版」；發版前由 coordinator 確認 `main` 不是「有 E433、沒有 E434」 | coordinator 提案，操作者選定 |
+| 8 | E435 之後路徑標記要不要保留 | 移除。升級時停在舊流程中途的提示改由「這次寫入是否為已拆掉的舊步驟」判斷（pm 直交 sr、code-reviewer 核准後交 qa、qa 寫 PASS），不靠標記。E435 加：交接檔結構升版、讀舊檔時丟掉該欄位；`resume_of` 移除 `qa-engineer` 這個值；票面「若沒人讀就移除」改為「移除」 | coordinator 提案，操作者選定 |
+
+裁定 1 的理由：§3.3 表的「0 次」量的是交接檔，但這個欄位不寫入交接檔，數字證明不了沒人用；實際用到它的是
+E21 的存檔點。「不延長租約」原是為閒置 feature 上的 PM 當機紀錄設計的；存檔點是正在工作的角色寫的，feature
+確實還活著，延長租約才對。E21 當初用這個欄位只因它是現成的。
+
+裁定 2 的理由：E431 到 E433 之間 SOP 還是舊流程，實際 feature 都走舊路；要明確標記才會進新流程，這段期間伺服器
+行為與現在完全相同。若改成「沒帶 `resume_of` 就算新流程」，舊流程 feature 在 pm 改完 spec 交回 qa 時漏帶欄位，
+會被悄悄改走新流程。
+
+裁定 3 與自動化不衝突：檢查只看 `cut_approved` 有沒有寫入，不限定由人類寫。批次自動化時由 Auto-tier 或
+Manifest-tier 自動寫入並留紀錄；越界的 cut（動到別條 lane 的檔）才會停。要讓批次 lane 不等人類打字，要改的是
+lane 協定與 §3.1 的文字（E425 的範圍），不是這道檢查。
+
+裁定 4 的理由：qa 的紅燈情境測試是在沒看實作的情況下照票寫的，本身就證明 bug 存在且被抓到，獨立性比建置者
+自寫的重現測試高。sr 另寫重現測試的價值在於逼出根本原因，但伺服器只看檔案在不在，擋不住只修症狀的修法；
+真正抓得到的是看實作的 code-reviewer，所以把這項檢查放在它的 SOP。
+
+裁定 10 的依據：2026-11-19 實際查 adopter B 的設計檔。原型來自 Claude Design，本機副本有兩種形式：單一畫面頁（內嵌狀態機、載入 design system token）與可執行的 demo app。design-auditor 沒有寫 `no-design`，而是自創 `mockup` 與「雙來源」寫法；但伺服器只認 8 個 mode，認不得的值當作沒有 mode。以伺服器自己的判斷函式檢查，5 份原型相關設計檔中有 4 份視覺檢查沒啟動。14.3「會落到 `no-design`」的說法原因不對、結果相同，而且已實際發生。那 4 個已結案 feature 要不要補跑視覺比對，屬 adopter B 的範圍，不在本次審查。
+
+### 16.2 審查中新發現、待裁定的題目
+
+- **E433 與 E434 之間的視覺判定空窗。** E433 落地後 qa 不再當裁判，但視覺判定要到 E434 才移給 code-reviewer 的
+  `reviewer-visual`；這段期間有設計稿的新 feature 沒有人做視覺判定。兩張票都沒寫。（已由 16.1 裁定 15 處理。）
+- **3.2 把 `REPRO_MANIFEST_MISSING` 列進視覺系列是錯的。** 它是 bugfix 重現測試清單的檢查（`gates/registry.ts` 的 expected-red 系），不在視覺步驟的 9 個碼裡；從未觸發的視覺碼是 6 個，不是 7 個。E420 照此重寫（見 16.3）。
+
+### 16.3 票面修正
+
+裁定 1–15 與審查中不需裁定的更正（檔案清單、測試影響計數、過期排序、E424/E426 改寫為 code-reviewer 當裁判、E433 預拆至少 3 個 sr 任務、E431「伺服器的 builder-is-not-judge 檢查」改為「§3 條文不動」、E420 重寫）已寫進 `docs/backlog.md` 十五列，各列以「Audit amendment (2026-11-19 …)」附註標示，與上文衝突處以附註為準。
+
