@@ -188,7 +188,7 @@ function checkScenario(raw: RawScenario, problems: string[]): TicketScenario {
 
 /** Parses one ticket file's text and lists every format problem found. */
 export function parseTicketFile(text: string): TicketParseResult {
-  const lines = text.replace(/^﻿/, "").split(/\r?\n/);
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
   const problems: string[] = [];
   const close = lines.findIndex((l, i) => i > 0 && l.trimEnd() === "---");
   if (lines[0]?.trimEnd() !== "---" || close < 0) {
