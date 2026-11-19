@@ -14,6 +14,7 @@
     "check:transitions-sync": "node scripts/check-transitions-sync.mjs",
     "check:md-tables": "node scripts/check-md-tables.mjs",
     "check:bookkeeping": "node scripts/check-bookkeeping.mjs",
+    "check:tickets": "node scripts/check-tickets.mjs",
     "prebuild": "npm run check:version",
     "build": "tsc",
     "postbuild": "npm run check:transitions-sync",

@@ -187,6 +187,28 @@ Semantics:
 - **Who reads it.** The integrator SOP's `status` and take-over (`接手`) modes read each sister repo, read-only, through `node scripts/lane-status.mjs --repo <path>` (its in-flight lanes and their branches) and `git -C <path> rev-parse --short <branch>` (each branch's sha), with `<path>` resolved against primary. `node scripts/fanout.mjs handoff --check <manifest>` resolves each row of the manifest's optional `## 外部依賴` table through this key: the row's `repo` cell is a `name` declared here, and the recorded sha is compared with that branch in the sister repo now. A row naming an undeclared repo stops the check with `SISTER_REPO_UNKNOWN`; a declared `path` that is not a git repository stops it with `SISTER_REPO_NOT_GIT`. Nothing else reads the key.
 - **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists. The parser is `parseSisterRepos` in `tools/config.ts`.
 
+### `ticketDir` — ticket-file directory (optional)
+
+Ticket files (one Markdown file per ticket, format in `docs/ticket-format.md`) live in one directory. `node scripts/check-tickets.mjs` with no argument (also `npm run check:tickets`) checks every `.md` file directly inside it, except `README.md`. A repo that keeps its documents somewhere else names the directory here:
+
+```json
+{
+  "ticketDir": "work/tickets"
+}
+```
+
+| Value | Ticket directory |
+|---|---|
+| absent (or not usable) | `docs/tickets` (the default, `DEFAULT_TICKET_DIR`) |
+| `"work/tickets"` | `work/tickets` |
+
+Semantics:
+
+- **Optional.** A path relative to the workspace root. When the directory does not exist, the checker prints that there is no ticket directory and exits 0.
+- **Usable value.** A non-empty string that is relative (not POSIX or Windows absolute, no drive prefix such as `C:`), does not start with `~`, and does not normalize to a path whose first segment is `..` (a name such as `..foo` is accepted). Any other value (absolute, `~`, escaping with `..`, empty, not a string) is dropped silently and the default applies; it is never an error.
+- **Where the default is applied.** `loadConfig` surfaces the value verbatim as `WorkspaceConfig.ticketDir` only when it is usable; `resolveTicketDir(workspacePath)` in `tools/config.ts` returns the configured directory, or `docs/tickets`, joined to the workspace path.
+- **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists.
+
 ---
 
 ## `.current/const-*.md` — constitution override
