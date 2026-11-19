@@ -997,8 +997,8 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
     name: "tw_detect_drift",
     description:
       "Compare the handoff state with the task list. Returns JSON { driftDetected, details, " +
-      "handoffLastTask, tasksCompleted, tasksIncomplete, stampAdvisory, fanoutAdvisory, " +
-      "evidenceBackedIds }; details has one line per finding, and the advisories are null or a note " +
+      "handoffLastTask, tasksCompleted, tasksIncomplete, fanoutAdvisory, " +
+      "evidenceBackedIds }; details has one line per finding, and fanoutAdvisory is null or a note " +
       "that never sets driftDetected. State written by a newer server is reported as drift. Repairs " +
       "nothing (tw_sync copies handoff completions to the task list). Run it after tw_get_state.",
     inputSchema: {

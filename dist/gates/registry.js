@@ -19,7 +19,6 @@
 //   FEATURE_LEASE_HELD              const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-release-engineer.md
 //   LEASE_OVERRIDE_AUDIT_MISSING    const-08-chain-31-mid.md
 //   BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE  const-08-chain-31-mid.md
-//   STAMP_PROVENANCE_SUSPECT        const-08-chain-31-mid.md, skill-release-engineer.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
 //   QA_COMPLETION_EVIDENCE_MISSING  const-08-chain-31-mid.md, skill-code-reviewer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md, const-08-chain-31-mid.md
@@ -222,27 +221,6 @@ export const GATE_REGISTRY = [
             "freshness stamp would make its lease look pre-aged (premature-clobber " +
             "footgun). Drop bookkeeping_write on feature-changing writes. " +
             "See specs/e10-lease-override.md AC6.",
-        documentedInProse: true,
-    },
-    {
-        // Stamp-provenance gate: blocks any write while the on-disk last_updated has the
-        // hand-authored shape (the predicate in gates/stamp-provenance.ts, shared with the
-        // read-only advisory in tools/drift.ts), unless pending_notes[0] is a remediation
-        // note. Runs before the feature-lease gate, which trusts last_updated. File mode
-        // only; a new workspace is never gated.
-        // Rationale: specs/e260d-comment-rationale.md (gates/stamp-provenance.ts).
-        errorCode: "STAMP_PROVENANCE_SUSPECT",
-        producer: "orchestrator",
-        envelope: "orchestrator-json",
-        triggerEdge: "any write while the on-disk handoff last_updated matches the hand-authored stamp shape (file-mode only)",
-        armCondition: "isHandAuthoredStamp(prevState.last_updated) && !hasStampRemediationAudit; FileHandoffStorage only; prevState present",
-        clearingArtifact: "pending_notes[0] matching /^stamp-remediation:/ on this write (self-disarms after any accepted write, which stamps a fresh server now())",
-        hintStatic: "The on-disk handoff last_updated has the hand-authored, out-of-band stamp shape " +
-            "(seconds 00, ms .000) — the server write path always stamps millisecond entropy. " +
-            "Acknowledge the contamination before overwriting the evidence: prepend a " +
-            "\"stamp-remediation: <how the suspect stamp was produced / verified>\" note as " +
-            "pending_notes[0] (gates/stamp-provenance.ts). " +
-            "See docs/backlog.md E18 incident (a).",
         documentedInProse: true,
     },
     // ---- plain-text (codes 11-25, producer: orchestrator) ----
