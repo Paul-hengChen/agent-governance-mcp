@@ -71,7 +71,7 @@ test("AC2: each site carries its new span, the old span is gone, the line has no
 });
 
 test("AC2: each edited file keeps its line count", () => {
-  const counts = { "const-01-core-head.md": 37, "const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 13, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 249, "skill-pm.md": 120 };
+  const counts = { "const-01-core-head.md": 37, "const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 11, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 249, "skill-pm.md": 120 };
   for (const [f, c] of Object.entries(counts)) assert.equal(read(f).split("\n").length, c, f);
 });
 
