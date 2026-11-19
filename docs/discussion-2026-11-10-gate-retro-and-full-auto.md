@@ -534,6 +534,7 @@ agent，依共用的程式範圍分組核對票面與 repo 現況，結果整理
 | 5 | 新流程較早撞到交接次數上限（E431） | 維持 14。只把 `tools/transitions.ts` 中「輪數上限會先到」的註解改成符合新流程，併進 E431。退件四、五次以上的 feature 交給人類；token 預算煞車未啟用前，這是唯一的成本上限 | coordinator 提案，操作者選定 |
 | 6 | 寫死「只有 qa 能寫 PASS」的地方歸哪張票 | 依性質分：E431 改工具入口的 PASS 限制（`tools/registry.ts`）、`tw_complete_task`（`tools/tasks.ts`）與交接表中 PASS 之後的出口（`tools/transitions.ts`），依路徑標記判斷裁判；E432 改發版腳本（`scripts/release.mjs`）與 lane 狀態（`tools/lane-status.ts`）；E433 改 release-engineer、doc-writer、integrator 的 SOP 文字與派工範本（`tools/fanout-manifest.ts`）。全部在 E434 動工前落地。E443 的「派工內容與今天逐字相同」改為「與 E443 動工前的輸出相同」 | coordinator 提案，操作者選定 |
 | 7 | 新流程中視覺退件怎麼計數（E434、E420） | 併進審查輪數：`reviewer-visual` 的退件與其他 code-reviewer 退件同算審查輪數上限。視覺計數、上限與拆票門檻退役；計數行為在 E434 改，錯誤碼 `VISUAL_ROUND_EXCEEDED` 在 E420 收掉。E434 的 sr SOP 寫明：比對測試的差異每次都變小算有進展，不算同一個失敗；差異沒變小才照 §5 的連續修正上限停下 | coordinator 提案，操作者選定 |
+| 9 | 波次表由 `spec-workshop` 寫到多細（E423） | `spec-workshop` 只寫精簡波次表（票、分波、相依）與人類核准列；integrator 在 stage 1 照當下的 `main` 調查程式碼，轉成完整 lane 清單（起點、branch、worktree、擁有／禁止檔案）。轉出的清單沒改動已核准的票、分組與順序，且沒有需要人類選的項目時，`spec-workshop` 已 commit 的核准就算數，stage 2 不再停；有任何改動或待選項目就照舊停下請人類核准。此條為 §3.1「不能憑轉述的核准」的明文例外，寫進 `content/skill-integrator.md`，E423 檔案清單補上該檔 | coordinator 提案，操作者選定 |
 | 8 | E435 之後路徑標記要不要保留 | 移除。升級時停在舊流程中途的提示改由「這次寫入是否為已拆掉的舊步驟」判斷（pm 直交 sr、code-reviewer 核准後交 qa、qa 寫 PASS），不靠標記。E435 加：交接檔結構升版、讀舊檔時丟掉該欄位；`resume_of` 移除 `qa-engineer` 這個值；票面「若沒人讀就移除」改為「移除」 | coordinator 提案，操作者選定 |
 
 裁定 1 的理由：§3.3 表的「0 次」量的是交接檔，但這個欄位不寫入交接檔，數字證明不了沒人用；實際用到它的是
