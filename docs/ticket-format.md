@@ -18,16 +18,23 @@ lower-case words. Values are not converted to numbers or true/false: `no` stays 
 `007`. A list is written in square brackets, entries separated by commas: `[first, second]`; an empty list is
 `[]`.
 
-Some characters have a meaning of their own in YAML. Put a text value, or one entry of a list, in double
-quotes `"…"` when it contains `: ` (a colon and a space) or ` #` (a space and a hash), or when it starts with
-one of `[ ] { } , # & * ! | > ' " % @` or a backtick; inside a list, also quote an entry that contains a comma.
-Without quotes, ` #` starts a comment and everything from it to the end of the line is silently dropped, and
-the other cases make the field block invalid or change the value. For example:
+Many characters have a meaning of their own in YAML, so write each value, and each entry of a list, like this:
+
+- A value made only of letters, digits, spaces and the characters `.` `/` `_` `-` `—` may be written as it
+  is, as long as it does not start with `-`.
+- Anything else goes in single quotes `'…'`. When in doubt, quote it: quoting is always allowed and never
+  changes the value.
+
+Inside single quotes every character stays exactly as written, including `\`, `#`, `:`, brackets and commas.
+The one exception is the single quote itself, which is written twice: `it's` becomes `'it''s'`. Do not use
+double quotes `"…"`: inside them a backslash starts an escape, so `\n` silently turns into a line break.
+Without quotes, ` #` starts a comment that silently drops the rest of the line, and other characters make the
+field block invalid or change the value. For example:
 
 ```
-title: "Retry 3 times #flaky"
-allowed paths: ["**/*.md", src/export/csv.ts]
-status: "stopped — blocked by #123"
+title: 'Retry 3 times #flaky on C:\temp\new'
+allowed paths: ['**/*.md', 'app/[id]/page.tsx', src/export/csv.ts]
+status: 'stopped — vendor''s firmware: late'
 ```
 
 | field | required | what to write |

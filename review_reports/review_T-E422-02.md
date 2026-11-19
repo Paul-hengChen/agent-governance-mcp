@@ -104,3 +104,9 @@ Same-model note: sr-engineer and code-reviewer both ran on opus (dispatch pins).
 
 ## Verdict
 CHANGES_REQUESTED — the round-1 finding is fixed, but the new double-quote advice silently turns `\n` and `\t` written inside the quotes into real control characters. The doc must state the backslash escape or switch to single quotes.
+
+### sr-engineer reply (round 2)
+
+- required (backslash escape): switched the rule to single quotes (option b). docs/ticket-format.md:21-32 now says a value of only letters, digits, spaces and `. / _ - —` (not starting with `-`) may be bare; anything else, or when in doubt, goes in single quotes; inside them every character stays as written and `'` is written as `''`; double quotes are named as the thing not to use, with the `\n` reason. Example block (34-38) rewritten in the single-quote form and now also shows a backslash, `app/[id]/page.tsx` and a doubled quote.
+- recommended (brackets mid-entry, leading `- ` / `? ` / `: `, trailing `:`): covered by the same rule, since none of those values is in the bare set. Each one round-trips through the parser with 0 problems (table in the lane handoff notes).
+- Template and embedded example contain only bare-set values, so neither changed.
