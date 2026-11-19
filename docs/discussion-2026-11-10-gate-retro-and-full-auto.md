@@ -532,6 +532,7 @@ agent，依共用的程式範圍分組核對票面與 repo 現況，結果整理
 | 3 | 新流程入口要不要過四道開工檢查（E431） | 要。cut 核准、範圍決定、外部參考、設計來源可信度四道檢查也套用在「pm → qa 且帶路徑標記」這一步，比照舊流程的 pm → sr；帶 `resume_of` 的交回 qa 照舊不檢查。E431 檔案清單補 `tools/handoff-orchestrator.ts` 這四處判斷，驗收加「未核准 cut 的 pm → qa（帶標記）被拒」 | coordinator 提案，操作者選定 |
 | 4 | bug 票上 qa 與 sr 共用紅燈測試清單（E432、E433） | qa 寫了紅燈情境測試時，那條測試就算重現測試，sr 不必另寫；qa 記了「不需新測試」時才由 sr 寫重現測試並建清單。sr → code-reviewer 的檢查照舊只看清單在不在（qa 或 sr 建的都算）。E433 的 code-reviewer SOP 加一條：bug 票要確認修的是原因，不只是讓票上的情境通過。sr 仍可自行加底層測試，不強制、不檢查。修訂 15.2 裁定 7 的「sr 的重現測試照舊」 | coordinator 提案，操作者選定 |
 | 5 | 新流程較早撞到交接次數上限（E431） | 維持 14。只把 `tools/transitions.ts` 中「輪數上限會先到」的註解改成符合新流程，併進 E431。退件四、五次以上的 feature 交給人類；token 預算煞車未啟用前，這是唯一的成本上限 | coordinator 提案，操作者選定 |
+| 6 | 寫死「只有 qa 能寫 PASS」的地方歸哪張票 | 依性質分：E431 改工具入口的 PASS 限制（`tools/registry.ts`）、`tw_complete_task`（`tools/tasks.ts`）與交接表中 PASS 之後的出口（`tools/transitions.ts`），依路徑標記判斷裁判；E432 改發版腳本（`scripts/release.mjs`）與 lane 狀態（`tools/lane-status.ts`）；E433 改 release-engineer、doc-writer、integrator 的 SOP 文字與派工範本（`tools/fanout-manifest.ts`）。全部在 E434 動工前落地。E443 的「派工內容與今天逐字相同」改為「與 E443 動工前的輸出相同」 | coordinator 提案，操作者選定 |
 | 8 | E435 之後路徑標記要不要保留 | 移除。升級時停在舊流程中途的提示改由「這次寫入是否為已拆掉的舊步驟」判斷（pm 直交 sr、code-reviewer 核准後交 qa、qa 寫 PASS），不靠標記。E435 加：交接檔結構升版、讀舊檔時丟掉該欄位；`resume_of` 移除 `qa-engineer` 這個值；票面「若沒人讀就移除」改為「移除」 | coordinator 提案，操作者選定 |
 
 裁定 1 的理由：§3.3 表的「0 次」量的是交接檔，但這個欄位不寫入交接檔，數字證明不了沒人用；實際用到它的是
