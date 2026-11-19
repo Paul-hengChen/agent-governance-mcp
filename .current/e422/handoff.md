@@ -2,8 +2,8 @@
 schema_version: 15
 active_feature: "e422-ticket-file-format"
 status: "In_Progress"
-last_updated: "2026-11-19T11:14:57.436Z"
-last_agent: "sr-engineer"
+last_updated: "2026-11-19T11:17:56.672Z"
+last_agent: "qa-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "One backlog ticket (E422) in one fan-out lane: a new parser module, a thin checker script, one additive config key, two new Markdown files. No design file, no shared generated files, no MCP tool; files fixed by the human-approved fan-out row."
 cut_approved: true
@@ -13,14 +13,15 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-11-19T11:14:57.436Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-11-19T11:17:56.672Z"
+review_verdict: "APPROVED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 2
+review_round: 0
 visual_round: 0
-hop_count: 6
+hop_count: 8
 qa_rounds_total: 0
 review_rounds_total: 2
 visual_rounds_total: 0
@@ -31,14 +32,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: addressed code-reviewer Round 2 on T-E422-02 — ready for code review round 3. Fix commit 554934d (doc + reply appended under Round 2 in review_reports/review_T-E422-02.md); lane-state checkpoint 8fc33b7. Doc-only: no parser, test, template, config or dist change.
-- fix — docs/ticket-format.md:21-32: quoting rule switched to SINGLE quotes. Bare allowed only for a value/list entry made of letters, digits, spaces and . / _ - — (em dash included so 'stopped — <reason>' stays bare) that does not start with -; anything else, or when in doubt, goes in '…'; quoting always allowed. States plainly: inside single quotes every character stays as written (\, #, :, brackets, commas); the only exception is ' written as ''. Names double quotes as the thing not to use (backslash escape turns \n into a line break). Lines 34-38: example block now title: 'Retry 3 times #flaky on C:\temp\new' / allowed paths: ['**/*.md', 'app/[id]/page.tsx', src/export/csv.ts] / status: 'stopped — vendor''s firmware: late' -> parses to the intended values, 0 problems. templates/ticket.md and the embedded ## Example ticket hold only bare-set values, so unchanged.
-- round-trip A (written per the rule -> parsed value via dist/tools/ticket-file.js; each 0 problems, byte-equal): 'Escape \n in notes' -> "Escape \\n in notes" | 'Tab \t here' -> "Tab \\t here" | 'C:\temp\new' -> "C:\\temp\\new" | 'match \d+' -> "match \\d+" | 'it''s broken' -> "it's broken" | 'vendor: late' -> "vendor: late" | 'Retry 3 times #flaky' -> whole | '- leading dash' -> whole | '? question first' -> whole | ': colon first' -> whole | 'Note:' -> "Note:" | 'say "hi"' -> whole.
-- round-trip B: status 'stopped — vendor''s firmware: late' -> "stopped — vendor's firmware: late" | list ['app/[id]/page.tsx', 'src/a,b.ts'] -> ["app/[id]/page.tsx","src/a,b.ts"] | list ['**/*.md', 'src/{a,b}.ts'] -> both whole | bare forms (CSV export adds a header row; stopped — waiting on vendor firmware; [src/export/csv.ts, test/export-csv.test.ts]; non-ASCII letters) -> all whole. Named cases 19/19.
-- round-trip C (fuzz): 17874/17874 random bare-set strings written bare round-trip (as title and as list entry); 19832/19832 random strings over a \ ' " : # [ ] { } , - ? ! & * | > % @ ` tab — written per the rule round-trip. Scripts: $TMPDIR/e422-r3/roundtrip.mjs, docblocks.mjs.
-- checker: node scripts/check-tickets.mjs on the 19 named cases as files -> 19 file(s), 0 problem(s), exit 0; templates/ticket.md + extracted embedded example + embedded example with the quoting-example lines swapped in -> 3 file(s), 9 scenario(s), 0 problem(s), exit 0. npm run check:md-tables -> OK (799 files, 0 malformed).
-- full suite: node scripts/test-lock.mjs -- npm test -> 4328/4330 pass, 0 fail, 2 skipped, exit 0.
-- carry-forward (non-blocking, unchanged): round-1/2 optional notes in review_reports/review_T-E422-01.md and review_T-E422-02.md.
+- code-reviewer round 3: APPROVED (T-E422-01, T-E422-02). The round-2 required fix (double-quote backslash escape) is resolved by the single-quote rule in docs/ticket-format.md:21-38 (commit 554934d). Diff 8a0508b..HEAD touches only docs/ticket-format.md, review_reports/review_T-E422-02.md (sr fix note) and .current/e422/.
+- review_report: review_reports/review_T-E422-02.md (covers: T-E422-01, T-E422-02); task-scope carry-over noted in review_reports/review_T-E422-01.md.
+- Reviewer verification, independent: values written per the rule read back byte for byte as title and as a list entry via dist/tools/ticket-file.js. Quoted cases: \n, \t, C:\temp\new, \d+, a quote, ': ', ' #', leading '- '/'? '/': ', trailing ':', app/[id]/page.tsx, a comma in a list entry. Bare-set probes: all-digit, yes/no/null/true/on/~-quoted, ..., ' - ', a trailing '.', non-ASCII. Fuzz: 16893 bare strings. check-tickets on the template, the embedded example and 80 generated files: 0 problems, exit 0.
+- The 'sr-engineer reply (round 2)' subsection in review_T-E422-02.md is sr's fix note, not review content; left in place, not used as evidence.
+- Final-report notes (non-blocking) — recommended: tools/ticket-file.ts:166-169 does not check the scenario heading shape or the id rule (hyphen instead of em dash; id not starting with a letter); PM should add a Copy string before E424 keys on scenario ids.
+- Final-report notes (non-blocking) — optional, T-E422-01: tools/ticket-file.ts:149-161 counts content lines inside fenced blocks in a scenario; :150-153 does not require Added during build to be the last section; :104 single bare source accepted while bare depends on is rejected; :217-222 a yes/no value other than yes/no is reported only via the mismatch line; :194-195 an unclosed block says the first line must be ---; :250 an argument starting with - is always treated as an option; :70 the Added date is checked only by shape; :38 vs 83-85 TICKET_STATUSES duplicated in isKnownStatus; the checker can trigger loadConfig heal-on-read of a pre-v2 config; tools/config.ts:203-207 accepts '.' and whitespace-only ticketDir.
+- Final-report notes (non-blocking) — optional, T-E422-02: docs/ticket-format.md:21 id uniqueness is a human rule, not checked by the checker; :23-24 'spaces' in the bare set includes leading/trailing spaces, which YAML drops from a bare list entry (could say 'spaces between words'); :25-26 'quoting never changes the value' holds for YAML, but the parser still trims text fields. The isRejectedSisterPath rename is out of scope.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

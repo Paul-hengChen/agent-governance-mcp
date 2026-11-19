@@ -110,3 +110,63 @@ CHANGES_REQUESTED — the round-1 finding is fixed, but the new double-quote adv
 - required (backslash escape): switched the rule to single quotes (option b). docs/ticket-format.md:21-32 now says a value of only letters, digits, spaces and `. / _ - —` (not starting with `-`) may be bare; anything else, or when in doubt, goes in single quotes; inside them every character stays as written and `'` is written as `''`; double quotes are named as the thing not to use, with the `\n` reason. Example block (34-38) rewritten in the single-quote form and now also shows a backslash, `app/[id]/page.tsx` and a doubled quote.
 - recommended (brackets mid-entry, leading `- ` / `? ` / `: `, trailing `:`): covered by the same rule, since none of those values is in the bare set. Each one round-trips through the parser with 0 problems (table in the lane handoff notes).
 - Template and embedded example contain only bare-set values, so neither changed.
+
+## Round 3 — APPROVED — by code-reviewer
+
+covers: T-E422-01, T-E422-02
+
+## Summary
+- Round-3 diff (`git diff 8a0508b..HEAD`): `docs/ticket-format.md` (+15/-8, commit 554934d), the appended "sr-engineer reply (round 2)" subsection in this file, and `.current/e422/` lane state. No source, test, template, config or `dist/` change.
+- The round-2 required finding is fixed with option (b). docs/ticket-format.md:21-32 now gives a bare set (letters, digits, spaces, `. / _ - —`, not starting with `-`), single quotes for everything else, `''` for a quote inside, and "when in doubt, quote it". It also tells the reader not to use double quotes and gives the `\n` reason. The example block (34-38) uses the new form.
+- The round-2 recommended note (brackets partway through an entry, leading `- `/`? `/`: `, trailing `:`) is covered by the same rule, because none of those values is in the bare set.
+- About the "sr-engineer reply (round 2)" subsection above: it is sr-engineer's fix note, not review content. It stays in the file, but it is not evidence for this verdict. Everything below comes from my own runs.
+- Verdict: APPROVED. No required findings.
+
+## AC Completeness
+AC3 — implemented (doc half) — unchanged.
+AC8 — implemented — docs/ticket-format.md:15-38 explains the YAML front matter, the bare set and the single-quote rule. Every value written per the rule reads back byte for byte (see Correctness). The template and the embedded example still pass.
+AC1, AC2, AC4–AC7, AC9–AC12 — implemented — no file in their scope changed this round (`git diff --stat 8a0508b..HEAD`).
+
+## Correctness
+Independent verification. My own scratch script applies the doc's rule literally: bare when the value matches `^[\p{L}\p{N} ./_\-—]+$` and does not start with `-`, otherwise `'…'` with `'` doubled. Each value was written into a full ticket both as `title` and as the first `allowed paths` entry, then parsed with `parseTicketFile` from `dist/tools/ticket-file.js`:
+
+- Quoted per the rule, all byte-equal with 0 problems in both positions:
+  - `\n`, `Escape \n in notes`, `\t`, `C:\temp\new`, `\d+`
+  - `'` (written `''''`), `it's`, `''`
+  - `a: b`, `a:b`, `a #b`, `x # y`, `Retry #flaky`
+  - `- x`, `? x`, `: x`, `x:`
+  - `app/[id]/page.tsx`, `src/a,b.ts` (comma inside a list entry), `src/{a,b}.ts`
+  - `~`, `say "hi"`, a literal tab, and values starting with each of `%`, `@`, a backtick, `!`, `&`, `*`, `|` and `>`
+- Bare-set probes, all byte-equal with 0 problems:
+  - all-digit and number-like values: `123`, `007`, `0`, `0x1F`, `1e3`, `1.0`, `.inf`, `.nan`
+  - FAILSAFE keywords: `yes`, `no`, `null`, `Null`, `true`, `False`, `on`, `off`. Under `FAILSAFE_SCHEMA` all of these stay text.
+  - dots and dashes: `...`, `.`, `..`, `a - b`, `a -b`, `a --b`, `a---`, `a ... b`, `end.`, `x .`, `. x`
+  - paths: `/abs`, `a/b/`, `_x`
+  - non-ASCII: `café`, `日本語`, `Ωmega`, `a—b`, `— leading em dash`
+  - double space: `a  b`
+  - `stopped — waiting on vendor firmware`
+- `status` field: bare `stopped — reason` is accepted and kept whole. `'stopped — vendor''s firmware: late'`, `'stopped — blocked by #123'` and `'stopped — C:\temp\new'` are byte-equal.
+- Fuzz: 16 893 random bare-set strings (ASCII and non-ASCII letters, `²`, `٣`, em dash, `. / _ -`) were written bare as title and as list entry. All round-trip with 0 problems.
+- Negative controls, both confirming the doc's claims: `"a\nb"` in double quotes stores a real line break, and bare `Retry #flaky` stores `Retry`.
+- The doc's own example block (34-38) gives title `Retry 3 times #flaky on C:\temp\new`, paths `**/*.md`, `app/[id]/page.tsx`, `src/export/csv.ts`, and status `stopped — vendor's firmware: late`, with 0 problems.
+- Checker: `node scripts/check-tickets.mjs templates/ticket.md <extracted embedded example> <80 generated files>` gives `82 file(s), 85 scenario(s), 0 problem(s)`, exit 0. `npm run check:md-tables` reports OK.
+
+- **optional** — docs/ticket-format.md:23-24: "spaces" in the bare set includes leading and trailing spaces, and YAML drops those from a bare value. For text fields this changes nothing, because the parser trims them anyway (tools/ticket-file.ts:111). For a list entry, a bare entry loses them while a quoted one keeps them. A path with a trailing space is unrealistic, so this is not a defect. If the doc is touched again, it could say "spaces between words".
+- **optional** — docs/ticket-format.md:25-26: "quoting … never changes the value" is true for YAML. The parser still trims leading and trailing spaces from text fields after quoting (tools/ticket-file.ts:111). This does not matter for any realistic ticket.
+
+## Quality
+No new findings. The rule is two bullets plus one paragraph, uses no YAML jargon beyond the word YAML, and stays tool-neutral. Moving from "list the dangerous characters" to "allow a small safe set" is easier for a reader to apply, and it is stricter, so a reader who follows it cannot silently lose part of a value.
+
+## Architecture
+No change. This round is doc-only.
+
+## Security
+No findings. This round is doc-only.
+
+## Performance
+No findings. This round is doc-only.
+
+Same-model note: sr-engineer and code-reviewer both ran on opus (dispatch pins).
+
+## Verdict
+APPROVED — the single-quote rule and the bare set are accurate: every probed value written per the rule reads back byte for byte, and the template and embedded example still pass. Only optional notes remain.

@@ -65,3 +65,6 @@ APPROVED (task scope) — the parser and checker meet AC1–AC7 and AC10 with ex
 
 ## Round 2 — APPROVED (task scope, carried) — by code-reviewer
 No T-E422-01 file changed in `20bd6cf..HEAD` (only `docs/ticket-format.md` and `.current/e422/`), so the round-1 task approval and its recommended/optional notes carry over unchanged. The feature-round verdict is CHANGES_REQUESTED on T-E422-02 (round 2: double-quote backslash escape, docs/ticket-format.md:21-23).
+
+## Round 3 — APPROVED (task scope, carried) — by code-reviewer
+No T-E422-01 file changed in `8a0508b..HEAD` (only `docs/ticket-format.md`, review_reports/review_T-E422-02.md and `.current/e422/`), so the round-1 approval and its recommended/optional notes carry over unchanged. The feature-round verdict is APPROVED (round 3, see review_reports/review_T-E422-02.md).
