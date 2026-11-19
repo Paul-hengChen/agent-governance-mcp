@@ -29,7 +29,6 @@ const INSTALL_DEF = "(`<agc install>` = agc's install directory, not the workspa
 // [site#, file, anchor identifying the changed line, banned repo-only citation(s)]
 const SITES = [
   [1, "const-10-chain-31-tail.md", "read it and self-correct.", ["specs/qa-flow-enforcement-architecture.md", "Full matrix"]],
-  [2, "const-08-chain-31-mid.md", "the server write path always stamps millisecond entropy", ["gates/stamp-provenance.ts", "exact predicate lives"]],
   [4, "coord-02-host-dispatch.md", "`ALLOWED_TRANSITIONS` matrix", ["tools/transitions.ts"]],
   [5, "skill-pm.md", "**Source-Credibility Gate**", ["specs/e4-design-source-credibility-gate.md"]],
   [7, "skill-qa-visual.md", "(§3 builder ≠ judge provenance.)", ["research/figma-baselines.md"]],
@@ -113,7 +112,7 @@ test("AC-E437-1: a real buildPromptForRole bundle (qa-visual lazy skill and lite
     for (const skill of ["skill-coordinator-lite.md", "skill-doc-writer.md", "skill-pm.md", "skill-qa-visual.md"]) {
       const text = buildPromptForRole(skill, "e437", ws, false).messages[0].content.text;
       for (const b of [
-        "specs/qa-flow-enforcement-architecture.md", "gates/stamp-provenance.ts", "tools/transitions.ts",
+        "specs/qa-flow-enforcement-architecture.md", "tools/transitions.ts",
         "specs/e4-design-source-credibility-gate.md", "research/figma-baselines.md",
         "research/mode-feature-process-retrospective.md", "specs/d8-lite-recommended-model.md",
       ]) assert.ok(!text.includes(b), `${skill} bundle must not cite ${b}`);

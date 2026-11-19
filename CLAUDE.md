@@ -45,7 +45,7 @@ workspace path, and picks a transport. The layers themselves live elsewhere:
    PRD-derived RAG chunks in target workspaces. `tw_update_state` / `tw_get_state`
    are implemented in `tools/handoff-orchestrator.ts`.
 3. **Guards + gates** (`guards/{session,file-lock}.ts`) — pre-flight check, file
-   lock, mtime freshness check; then the 19-step `UPDATE_STATE_GATE_PIPELINE`
+   lock, mtime freshness check; then the 17-step `UPDATE_STATE_GATE_PIPELINE`
    (`tools/handoff-orchestrator.ts`) whose predicates live in `gates/` and whose
    metadata is declared once per gate in `gates/registry.ts`.
 
@@ -59,7 +59,7 @@ on first read. See `docs/schema-versions.md` for how to ship a new version.
 index.ts                  MCP server entry (~300 lines): iterates the registries,
                           resolves workspace path, picks stdio vs HTTP transport
 tools/registry.ts         TOOL_REGISTRY + PROMPT_REGISTRY — ADD NEW TOOLS HERE
-tools/handoff-orchestrator.ts  tw_update_state / tw_get_state + the 19-step
+tools/handoff-orchestrator.ts  tw_update_state / tw_get_state + the 17-step
                           UPDATE_STATE_GATE_PIPELINE (the write path)
 tools/handoff.ts          read/write .current/<lane>/handoff.md (uses js-yaml)
 tools/handoff-parse.ts    handoff YAML/markdown parsing (E36 split)
@@ -74,8 +74,8 @@ tools/skill-frontmatter.ts  parses recommended_model out of role SOP frontmatter
 tools/storage.ts          HandoffStorage interface + getActiveStorage()/setActiveStorage()
 tools/storage-sqlite.ts   SQLite implementation of HandoffStorage (HTTP mode)
 tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
-tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (ROUND_CAP=4,
-                          REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6)
+tools/ticket-file.ts      ticket-file parser + checker core (scripts/check-tickets.mjs)
+tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (ROUND_CAP=4, REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6)
 tools/exemptions.ts       per-gate exemption resolution (E24)
 tools/evidence-file.ts    file-mode QA evidence write/check (v3.2.0)
 tools/stale-notify.ts     stale in-flight dispatch advisory (E22)
@@ -104,7 +104,7 @@ gates/pipeline.ts         runUpdateStatePipeline() step runner
 gates/*.ts                one module per gate predicate (cut-approval, scope-decision,
                           feature-lease, external-refs, code-review, qa-review,
                           evidence-schema, visual, expected-red, ac-execution,
-                          stamp-provenance, lease-override, open-tasks)
+                          lease-override, open-tasks)
 schema/versions.ts        schema_version constants + migration registries (v3.4.0)
 schema/migrations-*.ts    handoff / tasks / sqlite / config migration runners (v3.4.0)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"

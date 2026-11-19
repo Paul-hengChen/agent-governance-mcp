@@ -157,11 +157,12 @@ export interface WriteHandoffStateOptions {
   // hop. Record only; no gate reads either. File mode only.
   dispatchMechanism?: DispatchMechanism;
   dispatchMechanismTier?: string;
-  // Bookkeeping-write attestation: when true, keep the on-disk last_updated
-  // (same active_feature only) instead of stamping now(), so a touch that
-  // records no progress cannot extend the incumbent feature's lease. Selects
-  // the timestamp only; never written or carried forward. File mode only.
-  bookkeepingWrite?: boolean;
+  // When true, keep the on-disk last_updated (same active_feature only)
+  // instead of stamping now(), so a write that records no progress cannot
+  // extend the incumbent feature's lease. Server-internal: only the
+  // migration heal-write sets it. Selects the timestamp only; never written
+  // or carried forward. File mode only.
+  preserveLastUpdated?: boolean;
 }
 
 function escapeRegExp(s: string): string {
@@ -237,10 +238,10 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
   const qaRoundsTotal = opts.qaRoundsTotal;
   const reviewRoundsTotal = opts.reviewRoundsTotal;
   const visualRoundsTotal = opts.visualRoundsTotal;
-  // Bookkeeping-write attestation. Left undefined by the legacy positional
-  // overload's packing (the heal-write call site always uses the options
-  // object directly; a positional caller always gets a fresh stamp). (E10)
-  const bookkeepingWrite = opts.bookkeepingWrite;
+  // Left undefined by the legacy positional overload's packing (the
+  // heal-write call site always uses the options object directly; a
+  // positional caller always gets a fresh stamp). (E10)
+  const preserveLastUpdated = opts.preserveLastUpdated;
   // Hoist required strings to the names the body below already uses.
   const _activeFeature: string = activeFeature;
   const _status: string = status;
@@ -346,11 +347,11 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
     let effectiveCutApprovedSource: string | undefined = cutApprovedSource;
     const cutApprovedSourceNeedsExisting = cutApprovedSource === undefined;
     // Archive-on-feature-change needs the on-disk active_feature on every
-    // write, even when a caller sets all six fields above and this is not a
-    // bookkeeping write, so this flag only forces the read to happen.
+    // write, even when a caller sets all six fields above and does not set
+    // preserveLastUpdated, so this flag only forces the read to happen.
     const archiveCheckNeedsExisting = true;
     // `existing` is declared outside the preserve block so the timestamp
-    // resolution below can read it; a bookkeeping write also triggers the
+    // resolution below can read it; preserveLastUpdated also triggers the
     // read (it needs existing.last_updated). Otherwise `existing` stays null
     // unless some preserve clause needed the read. (E10)
     let existing: HandoffState | null = null;
@@ -364,7 +365,7 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
       dispatchModeNeedsExisting ||
       evidenceSchemaNeedsExisting ||
       cutApprovedSourceNeedsExisting ||
-      bookkeepingWrite === true ||
+      preserveLastUpdated === true ||
       archiveCheckNeedsExisting
     ) {
       existing = parseHandoff(workspacePath);
@@ -463,14 +464,14 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
       // reconstruction from `existing`.
       fs.copyFileSync(handoffPath, archivePath);
     }
-    // Timestamp: a fresh stamp, except a bookkeeping write keeps the on-disk
+    // Timestamp: a fresh stamp, except preserveLastUpdated keeps the on-disk
     // last_updated so the lease age reflects the last real write. Guarded to
-    // the same feature here too, because the migration heal-write calls this
-    // writer without the orchestrator. dispatched_at still gets now(): it
-    // feeds the stale-dispatch advisory, not the lease.
+    // the same feature, so a new feature's lease never starts pre-aged.
+    // dispatched_at still gets now(): it feeds the stale-dispatch advisory,
+    // not the lease.
     let effectiveLastUpdated = now;
     if (
-      bookkeepingWrite === true &&
+      preserveLastUpdated === true &&
       existing &&
       existing.active_feature === _activeFeature &&
       existing.last_updated
@@ -545,7 +546,7 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
     // dispatched_at: stamped with the same now() as last_updated, only when
     // this write names a next_role, and never carried forward. Set here so
     // every write path (orchestrator, heal-write, positional callers) gets it.
-    // A bookkeeping write that dispatches keeps last_updated but still stamps
+    // A preserveLastUpdated write that dispatches keeps last_updated but stamps
     // dispatched_at; that only feeds an advisory. Server-derived; cannot throw.
     if (nextRole) frontmatterData.dispatched_at = now;
     if (resumeOf) frontmatterData.resume_of = resumeOf;
@@ -624,7 +625,7 @@ ${pendingList}
     fs.renameSync(tmpPath, handoffPath);
 
     refreshSnapshotFor(workspacePath, handoffPath, "handoff");
-    // Report the timestamp actually persisted (kept on a bookkeeping write,
+    // Report the timestamp actually persisted (kept under preserveLastUpdated,
     // fresh otherwise), not always now(). (E10)
     return JSON.stringify({ success: true, path: handoffPath, updated_at: effectiveLastUpdated });
   });

@@ -2,7 +2,7 @@
 base: c16fe90    integration branch: integ/v5-w1
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（2026-11-19），派工中。**
+**狀態：已結案 2026-11-19。** 兩條 lane 都已合併進 `integ/v5-w1`（e419 merge `3b32939`、e422 merge `7c019aa`，零衝突）、finish、拆除；派工 base `c29f100`（清單 PR #150 merge）；整合 branch 自 v4.22.0 發版後的 `main` `15474c2` 開；本波以一個 PR 合進 `main`，不發版（16.1 裁定 18）。
 
 範圍由人類指定（integrator prompt「fan-out E422」，再於同一 session「fan-out E419」，2026-11-19）。兩張都是 v5.0.0 里程碑的票（`docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 16.1 裁定 17 的順序）；依裁定 18，合進 `main` 但不單獨發版，與 E435 一起發 v5.0.0。E419 原排在 E423 之後，人類裁定提前與 E422 並行（見 Decisions）。
 
@@ -66,6 +66,14 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 4. `npm run build`、golden byte-identical、預算、`check:bookkeeping`、audit；記帳 commit。
 5. 依序 `finish <lane> --shipped --base integ/v5-w1`；`fanout.mjs handoff --closing`；push、CI、`gh pr create`、`gh pr merge --auto --merge`；merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only`、`git branch -d integ/v5-w1`。不發版。
 
+## 結案
+- 日期 2026-11-19。`integ/v5-w1` 自 `main` `15474c2`（v4.22.0 發版後）開；← `--no-ff` e419 `1ee184f`（merge `3b32939`）、e422 `fec8353`（merge `7c019aa`），兩次零衝突 → 無合併審查；merge-invariants 兩次 PASS；合併樹 `npm run build` 後 `dist/` 無差異、`capture-constitution-golden.mjs` 無差異、`CLAUDE.md` 250 行、context-budget 與 e395／e436／compose-equivalence／e419／e422 測試 169/169、`npm audit --audit-level=high` exit 0、`agc check` OK（4.22.0）。
+- 彙總（上限按 lane 計，全部在上限內、證據與帳本一致）：e419 7 task／hop 4/14／review 0 退回／qa 0；e422 3 task／hop 8/14／review 2 退回（第 3 輪核准）／qa 0。合計 10 task、12 hop。
+- 完成定義：表中「同一波 ✓」的列全部成立。
+- 記帳：`docs/backlog.md` 兩列 done-mark（not yet released，隨 v5.0.0 發出）；佇列 `docs/v4.0.0-new-tickets.md` 兩列 DONE；`check:bookkeeping` OK。新票：無（兩條 lane 都沒有 pending-tickets）。接線票：無。
+- 不開票的觀察（reviewer／qa 的 recommended、optional）：e422——parser 不檢查情境標題形狀與 id 規則（`### S1 - x` 用連字號會通過、id 變成 `S1 - x`；E424 以情境 id 當 key 前宜補上）；`ticketDir` 接受 `.` 與全空白；`tools/config.ts` 的 `isRejectedSisterPath` 名稱已不只用於 sister repo（改名超出本波範圍，未做）；其餘 parser 小項見 lane 報告。e419——`agc check` 註解比例 advisory 7 則（多為既有比例）。流程觀察：`test/e436-stale-handoff-paths.test.mjs` 以固定行號釘 `CLAUDE.md`，任何增減行都會打紅；規劃時未把新 `tools/*.ts` 的 Layout 列劃給 lane，e422 因此兩度 Blocked、人類在 lane 補核准兩次。
+- 給 v5.0.0 CHANGELOG 的提示：breaking——`tw_update_state` 移除 `bookkeeping_write` 參數（舊呼叫被忽略、照常延長租約）、移除錯誤碼 `BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE` 與 `STAMP_PROVENANCE_SUSPECT`、`tw_detect_drift` 回傳移除 `stampAdvisory`；gate registry 34、寫入 pipeline 17 步；context-budget 四個上限調降（6937／8840／18465／2805）。新增——票檔格式 `docs/ticket-format.md`、範本 `templates/ticket.md`、`scripts/check-tickets.mjs`（`npm run check:tickets`）、config key `ticketDir`（預設 `docs/tickets`）。
+
 ## Dispatch pins
 - e419：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
 - e422：`pm=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=sonnet`。
@@ -79,3 +87,31 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-19 | 人類 | E419 提前、與 E422 並行（同一波、一個 PR）；合併順序因此為 E422、E419 之後才 E423，修訂 16.1 裁定 17 中 E419 排在 E423 之後的位置；其餘順序不變 | 整合者 session（「fan-out E419」，回應整合者的並行建議 (a)） |
 | 2026-11-19 | 整合者 | Stage 1 核對（E419）：與 E422 檔案不相交、`dist/` 各自不同檔；共享生成物全歸 e419；票面清單外新增 `CONTRIBUTING.md` 第 68 行與 `test/e441-tool-description-contracts.test.mjs` 第 46 行，劃給 e419；合併順序 e419 先 | 本檔 |
 | 2026-11-19 | 人類 | 核准兩條 lane 的清單（e419 ∥ e422），含本檔所有權重劃與合併順序；寫進各 lane 的 spec，lane 不再問 | 整合者 session（回覆「approve」） |
+| 2026-11-19 | 整合者 | 清單 PR #150 merge `c29f100` = 派工 base（CI run 44496507899 綠）；派工前核對在 `c29f100` 重做：既有檔都 tracked、新建檔都不存在、兩條 branch 與 `.current/<lane>/` 與 worktree 都不存在；`npm run build` 後工作樹乾淨、`agc check` OK、audit exit 0；信箱 `_mailbox/{e419,e422}/` 建為空、watch armed baseline 全 0、`lane-status --watch` 已掛；兩份 prompt 由 `fanout.mjs render --base c29f100` 產生 | 整合者 session |
+| 2026-11-19 | 人類 | v4.22.0 已過發版驗證卻未發版：選 (a) 先發 v4.22.0，本波 PR 等 tag 存在才開；兩條 lane 與發版同時進行。v4.22.0 由另一個 coordinator session 以 CD workflow 發出（release PR #154、bookkeeping PR #155，`main` `15474c2`） | 整合者 session |
+| 2026-11-19 | 整合者 | e422 cut 預審 close（spec `bff6184`，to-integrator#1）：check --cut 10 token、0 越界、每個 AC 有實作 task；D1（`ticketDir`，預設 `docs/tickets`，只在有設時回傳、resolver 套預設）與 E423／E424／E425／E427／E428 相容；D5 拆字比對不誤殺；非阻擋提醒 T-E422-01 約 306 行略超 task_size | 信箱 e422 to-lane#2 |
+| 2026-11-19 | 人類 | 在 e422 lane session 核准 cut（D1–D7 照原樣）；lane 採整合者提醒把 config.ts 與 package.json 移到 T-E422-02（D8，task 分配就地改，範圍不變，`bed4bf8`）。只影響 e422、寫在核准的 spec 裡 | e422 lane session；信箱 e422 to-integrator#2 |
+| 2026-11-19 | 整合者 | e419 cut 預審 close（spec `ef543dd`，to-integrator#2）：check --cut 31 token、14 OUT 全是測試檔，13 檔在本檔測試面內；改劃 `test/e410-task-alias-content-tail.test.mjs`（釘 const-08 行數，PM probe 找到）→ e419；每個 AC 有實作 task；D1–D6 同意（D6 核對過 `tw_update_state` 頂層 inputSchema 不擋額外參數） | 信箱 e419 to-lane#3 |
+| 2026-11-19 | 人類 | 在 e419 lane session 核准 cut（spec `ef543dd`，含 D1 移除 `stampAdvisory` 為 breaking、D4 四個上限調降數字） | e419 lane session；信箱 e419 to-integrator#3 |
+| 2026-11-19 | 人類 | 改劃 `CLAUDE.md` 一列給 e422：`tools/config.ts` 列之後新增 `tools/ticket-file.ts` Layout 列（`test/e395-claude-md-tail.test.mjs` AC-E395-5 要求；不放在 AC-E395-4 釘死的 11 列區段）。整合者提，人類在 e422 lane session 核准；`b647540` | e422 lane session；信箱 e422 to-lane#4、#5，to-integrator#5 |
+| 2026-11-19 | 人類 | 改劃 `CLAUDE.md` 第二處給 e422：`tools/transitions.ts` 兩行列接成一行（文字不變），讓總行數維持 250，`test/e436-stale-handoff-paths.test.mjs` 的固定行號不移位；e419 已 ack 不增減行數。整合者建議，人類在 e422 lane session 核准；`9f9da82` | e422 lane session；信箱 e422 to-lane#7、#8，to-integrator#7 |
+| 2026-11-19 | 整合者 | e419 lane 層驗證 close（to-integrator#8）：HEAD `1ee184f`，10 commits，hop 4/14，review 1 輪核准、qa 0 輪；fanout check 77 檔、14 OUT 全是預審已確認的測試檔；證據 `qa_reports/review_T-E419-01..07.md` PASS（suite-result 4310/4312，`review_T-E419-05.md` covers 七個 id）、`review_reports/review_T-E419-01..04.md` Round 1 APPROVED；ledger 7/7；worktree porcelain 空；無 pending-tickets；整合者 push 後 CI run 44512068943 在 `1ee184f` 綠 | 信箱 e419 to-lane#9 |
+| 2026-11-19 | 整合者 | e422 lane 層驗證 close（to-integrator#16）：HEAD `fec8353`，20 commits，hop 8/14，review 3 輪（r1、r2 CHANGES_REQUESTED：格式文件的引號規則；r3 APPROVED）、qa 0 輪；fanout check 29 檔、唯一 OUT 是 `CLAUDE.md`（上兩列人類核准的改劃）；證據 `qa_reports/review_T-E422-01..03.md` PASS（suite-result 4407/4409）、`review_reports/review_T-E422-01..02.md` Round 3 APPROVED；ledger 3/3；content、golden、預算、backlog 未動；無 pending-tickets；整合者 push 後 CI run 44515756265 在 `fec8353` 綠。r2 期間 sr 在 review 報告內寫了標明的回覆段，r3 報告已註明非審查內容 | 信箱 e422 to-lane#15 |
+| 2026-11-19 | 整合者 | 合併：`integ/v5-w1` 自 `main` `15474c2` 開，← `--no-ff` e419（merge `3b32939`）、e422（merge `7c019aa`），兩次零衝突 → 無合併審查；merge-invariants 兩次 PASS；合併樹 build 後 `dist/` 無差異、golden capture 無差異、`CLAUDE.md` 250 行、相關測試 169/169、audit exit 0、`agc check` OK（4.22.0） | 本檔 |
+| 2026-11-19 | 整合者 | 記帳：`docs/backlog.md` E419、E422 兩列 done-mark（not yet released）；`docs/v4.0.0-new-tickets.md` 佇列兩列 DONE；兩條 lane 無 pending-tickets、不開新票；`check:bookkeeping` OK；彙總 10 task、12 hop、review 2 次退回（e422）、qa 0 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 15474c2
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/v5-w1 @ e30f6f9）
+- lane-status：primary（main ← integ/v5-w1 @ e30f6f9）release-cd-v4.22.0／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 2 條 lane、2 張票（E419、E422）全部 qa PASS、合併、finish、拆除；兩張都 not yet released，依 16.1 裁定 18 隨 v5.0.0（E435）發出，本波不發版。lane 紀錄在 `.current/history/2026-11/{e419,e422}/`；判定與驗證細節在本檔 Decisions 與結案段。新發現：無（兩條 lane 都沒有 pending-tickets）；無未配號的新發現。
+### 待人類決定
+- 是否開下一波：v5.0.0 里程碑順序的下一張是 E423（相依 E422，本波已合併）；由人類決定何時開。
+- 合併後 primary 的 MCP server 需重啟一次，下一次 `tw_*` 呼叫才會跑本波合併後的程式（移除 `bookkeeping_write` 與 stamp-provenance）。
+### 進行中的背景工作
+無

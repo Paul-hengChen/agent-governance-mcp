@@ -1,9 +1,8 @@
 // Coded by @qa-engineer
-// Tests for two write-provenance gates, stamp-provenance and QA-evidence (backlog E18;
-// T-E18-01, T-E18-02; spec = the E18 section of docs/backlog.md). They close two holes:
-// hand-authored closing writes with fabricated zero-entropy stamps, and an identity swap where
-// a code-reviewer's write stamped qa-engineer pre-filled completed_tasks. Cases STAMP-*,
-// QAEV-*, CONTENT-*; E32 regression pins live in test/e32-e33-gate-hardening.test.mjs.
+// Tests for the QA-evidence write gate, QA_COMPLETION_EVIDENCE_MISSING (backlog E18;
+// T-E18-02; spec = the E18 section of docs/backlog.md). It closes an identity-swap hole: a
+// code-reviewer's write stamped qa-engineer pre-filled completed_tasks. Cases QAEV-*, CONTENT-*;
+// E32 regression pins live in test/e32-e33-gate-hardening.test.mjs.
 // Rationale: specs/e260f-comment-rationale.md (test/e18-write-provenance.test.mjs).
 
 import { test } from "node:test";
@@ -20,8 +19,7 @@ import { writeHandoffState, parseHandoff } from "../dist/tools/handoff.js";
 import { markStateRead, resetSession } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { handleUpdateState } from "../dist/tools/handoff-orchestrator.js";
-import { isHandAuthoredStamp, hasStampRemediationAudit } from "../dist/gates/stamp-provenance.js";
-import { forceSeedStamp, SAFE_SEED_STAMP } from "./e148-seed-stamp.mjs";
+import { forceSeedStamp } from "./e148-seed-stamp.mjs";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 
 // SQLite storage relies on `better-sqlite3`, an optionalDependency. Skip the
@@ -57,18 +55,9 @@ async function seedFileState(ws, feature, agent, status) {
     pendingNotes: ["seed"],
     lastAgent: agent,
   });
-  // Force the seed's last_updated off the wall clock, so a live timestamp can
-  // never randomly look hand-authored (~1/60000 flake; E148) — see
-  // test/e148-seed-stamp.mjs. Harmless where a caller
-  // (STAMP-1/2/3) immediately overwrites it again via setLastUpdated(...,
-  // SUSPECT_STAMP) — those tests seed a suspect shape ON PURPOSE.
+  // Pin the seed's last_updated to a fixed stamp so seed-then-write fixtures are deterministic
+  // (see test/e148-seed-stamp.mjs).
   forceSeedStamp(ws);
-}
-
-function setLastUpdated(ws, iso) {
-  const p = resolveCurrentLanePaths(ws).handoffPath;
-  const raw = fs.readFileSync(p, "utf-8");
-  fs.writeFileSync(p, raw.replace(/^last_updated:\s*"[^"]*"$/m, `last_updated: "${iso}"`), "utf-8");
 }
 
 function writeQaEvidence(ws, taskId) {
@@ -83,151 +72,6 @@ function writeCodeReviewEvidence(ws, taskId) {
   fs.writeFileSync(path.join(dir, `review_${taskId}.md`), `# Code review — ${taskId}\n\nAPPROVED.\n`, "utf-8");
 }
 
-// A hand-authored-shaped stamp: seconds "00", milliseconds ".000" — matches
-// gates/stamp-provenance.ts's HAND_AUTHORED_STAMP_RE. Distinct from the date
-// ("2026-05-01") the feature-lease test fixture uses (E10, AC4), so this file's fixtures are independent.
-const SUSPECT_STAMP = "2026-07-14T00:00:00.000Z";
-
-// ---------------------------------------------------------------------------
-// Sanity: the shared predicate itself agrees with the fixture (belt-and-braces
-// — if this fails, every test below built on SUSPECT_STAMP is vacuous).
-// ---------------------------------------------------------------------------
-
-test("sanity: SUSPECT_STAMP matches isHandAuthoredStamp; a real ms-entropy stamp does not", () => {
-  assert.equal(isHandAuthoredStamp(SUSPECT_STAMP), true);
-  // Asserting against a LIVE new Date() read here would itself carry a
-  // ~1/60000 flake (a live stamp can randomly land on the hand-authored shape;
-  // this exact call used to be that flake, just as a bare
-  // assertion rather than a JSON.parse crash) — SAFE_SEED_STAMP is a fixed
-  // ms-entropy-shaped stamp instead, deterministically not-suspect (E148).
-  assert.equal(isHandAuthoredStamp(SAFE_SEED_STAMP), false, "an ms-entropy stamp must not land on seconds=00/ms=.000");
-  assert.equal(hasStampRemediationAudit({ pending_notes: ["stamp-remediation: x"] }), true);
-  assert.equal(hasStampRemediationAudit({ pending_notes: ["not a remediation note"] }), false);
-  assert.equal(hasStampRemediationAudit({}), false);
-  assert.equal(hasStampRemediationAudit(null), false);
-});
-
-// ===========================================================================
-// STAMP gate (fix a) — STAMP_PROVENANCE_SUSPECT
-// ===========================================================================
-
-test("STAMP-1: a suspect on-disk last_updated rejects the NEXT write with STAMP_PROVENANCE_SUSPECT (file mode)", async () => {
-  setActiveStorage(new FileHandoffStorage());
-  const ws = mkWs("e18-stamp1-");
-  await seedFileState(ws, "e18-stamp1-feat", "release-engineer", "In_Progress");
-  setLastUpdated(ws, SUSPECT_STAMP);
-  resetSession(ws);
-  markStateRead(ws);
-
-  const result = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: "e18-stamp1-feat",
-    status: "In_Progress",
-    agent_id: "pm",
-    completed_tasks: [],
-    pending_notes: ["pm continuing after a suspect stamp"],
-  });
-  assert.ok(result.isError, "a write against a hand-authored-shaped on-disk stamp must be rejected");
-  assert.match(result.content[0].text, /STAMP_PROVENANCE_SUSPECT/);
-  assert.equal(parseHandoff(ws).last_updated, SUSPECT_STAMP, "the suspect stamp must be left untouched by the rejected write");
-});
-
-test("STAMP-2: a write carrying an audited stamp-remediation note is ACCEPTED, and the note persists verbatim in the written handoff", async () => {
-  setActiveStorage(new FileHandoffStorage());
-  const ws = mkWs("e18-stamp2-");
-  await seedFileState(ws, "e18-stamp2-feat", "release-engineer", "In_Progress");
-  setLastUpdated(ws, SUSPECT_STAMP);
-  resetSession(ws);
-  markStateRead(ws);
-
-  const remediationNote = "stamp-remediation: confirmed test fixture, not a real out-of-band edit — safe to overwrite";
-  const result = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: "e18-stamp2-feat",
-    status: "In_Progress",
-    agent_id: "pm",
-    completed_tasks: [],
-    pending_notes: [remediationNote, "pm continuing"],
-  });
-  assert.ok(!result.isError, `an audited stamp-remediation write must be accepted: ${result.content?.[0]?.text}`);
-  const healed = parseHandoff(ws);
-  assert.equal(healed.pending_notes[0], remediationNote, "the stamp-remediation note must persist verbatim in the written handoff (forensic trail)");
-  assert.notEqual(healed.last_updated, SUSPECT_STAMP, "the accepted write must stamp a fresh (ms-entropy) now(), not preserve the suspect stamp");
-});
-
-test("STAMP-3: the gate self-disarms after an accepted remediation write — the VERY NEXT write needs no remediation note", async () => {
-  setActiveStorage(new FileHandoffStorage());
-  const ws = mkWs("e18-stamp3-");
-  await seedFileState(ws, "e18-stamp3-feat", "release-engineer", "In_Progress");
-  setLastUpdated(ws, SUSPECT_STAMP);
-  resetSession(ws);
-  markStateRead(ws);
-
-  const remediated = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: "e18-stamp3-feat",
-    status: "In_Progress",
-    agent_id: "pm",
-    completed_tasks: [],
-    pending_notes: ["stamp-remediation: clearing the suspect fixture stamp", "pm continuing"],
-  });
-  assert.ok(!remediated.isError, `remediation write must be accepted: ${remediated.content?.[0]?.text}`);
-
-  // Same session, no intervening resetSession/markStateRead — mirrors a real
-  // agent's next tool call in the same turn. The gate must be disarmed purely
-  // because the on-disk stamp is now fresh (ms entropy), not because of any
-  // carried-forward note.
-  const next = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: "e18-stamp3-feat",
-    status: "In_Progress",
-    agent_id: "pm",
-    completed_tasks: [],
-    pending_notes: ["pm continuing, no remediation needed now"],
-  });
-  assert.ok(!next.isError, `the gate must self-disarm after the prior accepted write: ${next.content?.[0]?.text}`);
-});
-
-test("STAMP-4: a brand-new workspace (no prevState at all) is inert — first write never gated regardless of remediation", async () => {
-  setActiveStorage(new FileHandoffStorage());
-  const ws = mkWs("e18-stamp4-");
-  resetSession(ws);
-  markStateRead(ws);
-
-  const result = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: "e18-stamp4-feat",
-    status: "In_Progress",
-    agent_id: "pm",
-    completed_tasks: [],
-    pending_notes: ["first write in a brand-new workspace"],
-    cut_approved: true,
-  });
-  assert.ok(!result.isError, `a fresh workspace must never trip STAMP_PROVENANCE_SUSPECT (no prevState to distrust): ${result.content?.[0]?.text}`);
-  assert.equal(parseHandoff(ws).active_feature, "e18-stamp4-feat");
-});
-
-test("STAMP-5: a real ms-entropy on-disk stamp never trips the gate (negative control)", async () => {
-  setActiveStorage(new FileHandoffStorage());
-  const ws = mkWs("e18-stamp5-");
-  // seedFileState's writeHandoffState stamps a genuine new Date().toISOString()
-  // — vanishingly unlikely to land on seconds=00/ms=.000 (the sanity test
-  // above already confirms this predicate behavior directly).
-  await seedFileState(ws, "e18-stamp5-feat", "sr-engineer", "In_Progress");
-  resetSession(ws);
-  markStateRead(ws);
-
-  const result = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: "e18-stamp5-feat",
-    status: "In_Progress",
-    agent_id: "pm",
-    completed_tasks: [],
-    pending_notes: ["ordinary continuation, no remediation note"],
-  });
-  assert.ok(!result.isError, `an ordinary ms-entropy stamp must never trip STAMP_PROVENANCE_SUSPECT: ${result.content?.[0]?.text}`);
-});
-
 const sqliteDescribe = (name, fn) =>
   SqliteHandoffStorage ? fn() : test(name + " (skipped — no better-sqlite3)", () => {});
 
@@ -236,47 +80,6 @@ function mkSqliteWorkspace(prefix = "e18-sql-") {
   const dbPath = path.join(dir, "agc.db");
   return { dir, dbPath };
 }
-
-sqliteDescribe("STAMP-SQL: SQLite mode — a suspect on-disk stamp has NO effect; STAMP_PROVENANCE_SUSPECT never fires (file-mode-only gate)", () => {
-  test("STAMP-SQL: SQLite-mode suspect stamp is inert", async () => {
-    const { dir, dbPath } = mkSqliteWorkspace("e18-stampsql-");
-    try {
-      const storage = new SqliteHandoffStorage(dbPath);
-      setActiveStorage(storage);
-      await storage.writeState({
-        workspacePath: dir,
-        activeFeature: "e18-sql-feat",
-        status: "In_Progress",
-        completedTasks: [],
-        pendingNotes: ["seed"],
-        lastAgent: "release-engineer",
-      });
-      // Direct row poke to a hand-authored-shaped stamp (same convention as the
-      // E13 AC4b test — storage.db is a plain runtime property; TS `private` is
-      // compile-time only).
-      storage.db
-        .prepare("UPDATE handoff_state SET last_updated = ? WHERE workspace_path = ?")
-        .run(SUSPECT_STAMP, dir);
-      resetSession(dir);
-      storage.readState(dir);
-      assert.equal(storage.parse(dir).last_updated, SUSPECT_STAMP, "sanity: direct row poke landed the suspect stamp");
-
-      const result = await handleUpdateState({
-        workspace_path: dir,
-        active_feature: "e18-sql-feat",
-        status: "In_Progress",
-        agent_id: "pm",
-        completed_tasks: [],
-        pending_notes: ["pm continuing, no remediation note — SQLite mode ignores the suspect stamp"],
-      });
-      assert.ok(!result.isError, `SQLite mode must ignore the suspect stamp entirely: ${result.content?.[0]?.text}`);
-      assert.doesNotMatch(result.content?.[0]?.text ?? "", /STAMP_PROVENANCE_SUSPECT/);
-    } finally {
-      setActiveStorage(new FileHandoffStorage());
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
-    }
-  });
-});
 
 // ===========================================================================
 // QA-evidence gate (fix b) — QA_COMPLETION_EVIDENCE_MISSING
@@ -518,22 +321,6 @@ function readContentFile(f) {
 const CONST08 = readContentFile("const-08-chain-31-mid.md");
 const SKILL_RELEASE_ENGINEER = readContentFile("skill-release-engineer.md");
 
-test("CONTENT-1: const-08 Stamp-Provenance bullet carries the (v3.86.0, E18) origin tag and the STAMP_PROVENANCE_SUSPECT code", () => {
-  assert.match(
-    CONST08,
-    /\*\*Stamp-Provenance<!-- origin:start --> \(v3\.86\.0, E18\)<!-- origin:end -->\*\*/,
-    "must locate the Stamp-Provenance bullet heading with its (v3.86.0, E18) origin tag",
-  );
-});
-
-test("CONTENT-1b: const-08 Stamp-Provenance bullet body backtick-quotes STAMP_PROVENANCE_SUSPECT", () => {
-  assert.match(
-    CONST08,
-    /\*\*Stamp-Provenance[\s\S]*?`STAMP_PROVENANCE_SUSPECT`/,
-    "the Stamp-Provenance bullet must backtick-quote its own error code",
-  );
-});
-
 test("CONTENT-2: const-08 QA Completion-Evidence bullet carries the (v3.86.0, E18) origin tag and the QA_COMPLETION_EVIDENCE_MISSING code", () => {
   assert.match(
     CONST08,
@@ -547,7 +334,7 @@ test("CONTENT-2: const-08 QA Completion-Evidence bullet carries the (v3.86.0, E1
   );
 });
 
-test("CONTENT-3 [E394 re-pin AC-P6/AC-P10]: the SOP carries the coordinator-relayed rule (no brief overrides, STAMP_PROVENANCE_SUSPECT backstop); the history keeps the E18 line naming the v3.85.0 incident", () => {
+test("CONTENT-3 [E394 re-pin AC-P6/AC-P10]: the SOP carries the coordinator-relayed rule (no brief overrides); the history keeps the E18 line naming the v3.85.0 incident", () => {
   // Rule: one condensed Hard-rule bullet in the rewritten SOP.
   const ruleMatch = SKILL_RELEASE_ENGINEER.match(/^-\s+\*\*No-MCP-path sessions relay\*\*.*$/m);
   assert.ok(ruleMatch, "must locate the No-MCP-path relay Hard rule bullet");
@@ -560,8 +347,8 @@ test("CONTENT-3 [E394 re-pin AC-P6/AC-P10]: the SOP carries the coordinator-rela
     "the rule must state it outranks any dispatch brief instructing otherwise",
   );
   assert.ok(
-    ruleMatch[0].includes("STAMP_PROVENANCE_SUSPECT"),
-    "the rule must cross-reference the server-side gate that also catches this incident class",
+    !ruleMatch[0].includes("STAMP_PROVENANCE_SUSPECT"),
+    "the retired stamp gate is no longer cited as a backstop",
   );
   // Incident: the verbatim E18 line (v3.85.0 incident) moved to the history file.
   const history = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");

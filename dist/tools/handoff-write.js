@@ -99,10 +99,10 @@ async function writeHandoffStateCore(opts) {
     const qaRoundsTotal = opts.qaRoundsTotal;
     const reviewRoundsTotal = opts.reviewRoundsTotal;
     const visualRoundsTotal = opts.visualRoundsTotal;
-    // Bookkeeping-write attestation. Left undefined by the legacy positional
-    // overload's packing (the heal-write call site always uses the options
-    // object directly; a positional caller always gets a fresh stamp). (E10)
-    const bookkeepingWrite = opts.bookkeepingWrite;
+    // Left undefined by the legacy positional overload's packing (the
+    // heal-write call site always uses the options object directly; a
+    // positional caller always gets a fresh stamp). (E10)
+    const preserveLastUpdated = opts.preserveLastUpdated;
     // Hoist required strings to the names the body below already uses.
     const _activeFeature = activeFeature;
     const _status = status;
@@ -201,11 +201,11 @@ async function writeHandoffStateCore(opts) {
         let effectiveCutApprovedSource = cutApprovedSource;
         const cutApprovedSourceNeedsExisting = cutApprovedSource === undefined;
         // Archive-on-feature-change needs the on-disk active_feature on every
-        // write, even when a caller sets all six fields above and this is not a
-        // bookkeeping write, so this flag only forces the read to happen.
+        // write, even when a caller sets all six fields above and does not set
+        // preserveLastUpdated, so this flag only forces the read to happen.
         const archiveCheckNeedsExisting = true;
         // `existing` is declared outside the preserve block so the timestamp
-        // resolution below can read it; a bookkeeping write also triggers the
+        // resolution below can read it; preserveLastUpdated also triggers the
         // read (it needs existing.last_updated). Otherwise `existing` stays null
         // unless some preserve clause needed the read. (E10)
         let existing = null;
@@ -218,7 +218,7 @@ async function writeHandoffStateCore(opts) {
             dispatchModeNeedsExisting ||
             evidenceSchemaNeedsExisting ||
             cutApprovedSourceNeedsExisting ||
-            bookkeepingWrite === true ||
+            preserveLastUpdated === true ||
             archiveCheckNeedsExisting) {
             existing = parseHandoff(workspacePath);
             if (effectivePrdPath === undefined)
@@ -312,13 +312,13 @@ async function writeHandoffStateCore(opts) {
             // reconstruction from `existing`.
             fs.copyFileSync(handoffPath, archivePath);
         }
-        // Timestamp: a fresh stamp, except a bookkeeping write keeps the on-disk
+        // Timestamp: a fresh stamp, except preserveLastUpdated keeps the on-disk
         // last_updated so the lease age reflects the last real write. Guarded to
-        // the same feature here too, because the migration heal-write calls this
-        // writer without the orchestrator. dispatched_at still gets now(): it
-        // feeds the stale-dispatch advisory, not the lease.
+        // the same feature, so a new feature's lease never starts pre-aged.
+        // dispatched_at still gets now(): it feeds the stale-dispatch advisory,
+        // not the lease.
         let effectiveLastUpdated = now;
-        if (bookkeepingWrite === true &&
+        if (preserveLastUpdated === true &&
             existing &&
             existing.active_feature === _activeFeature &&
             existing.last_updated) {
@@ -400,7 +400,7 @@ async function writeHandoffStateCore(opts) {
         // dispatched_at: stamped with the same now() as last_updated, only when
         // this write names a next_role, and never carried forward. Set here so
         // every write path (orchestrator, heal-write, positional callers) gets it.
-        // A bookkeeping write that dispatches keeps last_updated but still stamps
+        // A preserveLastUpdated write that dispatches keeps last_updated but stamps
         // dispatched_at; that only feeds an advisory. Server-derived; cannot throw.
         if (nextRole)
             frontmatterData.dispatched_at = now;
@@ -474,7 +474,7 @@ ${pendingList}
         fs.writeFileSync(tmpPath, content, "utf-8");
         fs.renameSync(tmpPath, handoffPath);
         refreshSnapshotFor(workspacePath, handoffPath, "handoff");
-        // Report the timestamp actually persisted (kept on a bookkeeping write,
+        // Report the timestamp actually persisted (kept under preserveLastUpdated,
         // fresh otherwise), not always now(). (E10)
         return JSON.stringify({ success: true, path: handoffPath, updated_at: effectiveLastUpdated });
     });

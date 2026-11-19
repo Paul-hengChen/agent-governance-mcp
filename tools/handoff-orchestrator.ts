@@ -39,7 +39,6 @@ import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-e
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
-import { isHandAuthoredStamp, hasStampRemediationAudit } from "../gates/stamp-provenance.js";
 import { hasEvidenceInFile, qaEvidencePath, recordReviewInFileUndoable } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { featureLaneLedger, listOpenFeatureTasks } from "../gates/open-tasks.js";
@@ -239,46 +238,6 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     },
   },
   {
-    name: "STAMP_PROVENANCE_SUSPECT",
-    codes: ["STAMP_PROVENANCE_SUSPECT"],
-    run: (ctx) => {
-      const { parsed, storage, prevState } = ctx;
-        // Stamp-provenance gate: when the on-disk last_updated looks hand-authored,
-        // reject any write whose pending_notes[0] does not start with
-        // "stamp-remediation:". Runs before the feature-lease gate, which trusts
-        // last_updated. No prevState (a new workspace) means nothing to distrust.
-        // Self-clearing: the accepted remediation write stamps a fresh now().
-        // File mode only.
-        // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — STAMP_PROVENANCE_SUSPECT".
-        if (
-          storage instanceof FileHandoffStorage &&
-          prevState &&
-          isHandAuthoredStamp(prevState.last_updated) &&
-          !hasStampRemediationAudit(parsed)
-        ) {
-          const hint = gate("STAMP_PROVENANCE_SUSPECT").hintStatic;
-          const envelope = {
-            error: "STAMP_PROVENANCE_SUSPECT",
-            attempted_feature: parsed.active_feature,
-            incumbent: {
-              active_feature: prevState.active_feature,
-              status: prevState.status,
-              last_updated: prevState.last_updated,
-            },
-            hint,
-          };
-          return {
-            content: [{
-              type: "text" as const,
-              text: `⛔ STAMP_PROVENANCE_SUSPECT\n${JSON.stringify(envelope, null, 2)}`,
-            }],
-            isError: true,
-          };
-        }
-      return null;
-    },
-  },
-  {
     name: "FEATURE_LEASE",
     codes: ["FEATURE_LEASE_HELD", "LEASE_OVERRIDE_AUDIT_MISSING"],
     run: (ctx) => {
@@ -370,44 +329,6 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
               isError: true,
             };
           }
-        }
-      return null;
-    },
-  },
-  {
-    name: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
-    codes: ["BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE"],
-    run: (ctx) => {
-      const { parsed, storage, prevState, feature_changed } = ctx;
-        // A bookkeeping_write must keep the same feature (file mode only; a fresh
-        // workspace with no prevState passes). Rejected rather than downgraded to
-        // a normal write: calling a new feature's first claim "bookkeeping" would
-        // keep the old last_updated and make its lease look older than it is,
-        // letting another feature take the slot.
-        if (
-          storage instanceof FileHandoffStorage &&
-          parsed.bookkeeping_write === true &&
-          prevState &&
-          feature_changed
-        ) {
-          const hint = gate("BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE").hintStatic;
-          const envelope = {
-            error: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
-            attempted_feature: parsed.active_feature,
-            incumbent: {
-              active_feature: prevState.active_feature,
-              status: prevState.status,
-              last_updated: prevState.last_updated,
-            },
-            hint,
-          };
-          return {
-            content: [{
-              type: "text" as const,
-              text: `⛔ BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE\n${JSON.stringify(envelope, null, 2)}`,
-            }],
-            isError: true,
-          };
         }
       return null;
     },
@@ -1537,13 +1458,6 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           // SqliteHandoffStorage.writeState ignores both. (E99, v15)
           dispatchMechanism: parsed.dispatch_mechanism,
           dispatchMechanismTier: parsed.dispatch_mechanism_tier,
-          // bookkeeping_write attestation, passed straight through:
-          // writeHandoffState's same-feature-guarded branch uses it to keep
-          // the existing last_updated (a second line of defence); the
-          // different-feature reject already fired above. Applies to this
-          // write only: never persisted to frontmatter, no schema bump. File
-          // mode only: SqliteHandoffStorage.writeState ignores it. (E10)
-          bookkeepingWrite: parsed.bookkeeping_write,
         }));
 
         // Append one line per hop to the dispatch-mechanism sidecar so the
