@@ -7,14 +7,28 @@ A ticket file has three parts, in this order:
 
 1. a **field block** at the very top,
 2. optional free prose (for example a `## Context` section),
-3. a `## Scenarios` section, and at the end an `## Added during build` section.
+3. a `## Scenarios` section, and, when scenarios were added during the work, an `## Added during build`
+   section at the end.
 
 ## Field block
 
 The file starts with a line holding only `---`. The field block ends at the next line holding only `---`.
-Between them, each line is `name: value`. Field names are plain lower-case words. Every value is read as text:
-`no` stays the word `no`, and `007` stays `007`. A list is written in square brackets, entries separated by
-commas: `[first, second]`; an empty list is `[]`.
+The block is YAML front matter: between the two `---` lines, each line is `name: value`. Field names are plain
+lower-case words. Values are not converted to numbers or true/false: `no` stays the word `no`, and `007` stays
+`007`. A list is written in square brackets, entries separated by commas: `[first, second]`; an empty list is
+`[]`.
+
+Some characters have a meaning of their own in YAML. Put a text value, or one entry of a list, in double
+quotes `"…"` when it contains `: ` (a colon and a space) or ` #` (a space and a hash), or when it starts with
+one of `[ ] { } , # & * ! | > ' " % @` or a backtick; inside a list, also quote an entry that contains a comma.
+Without quotes, ` #` starts a comment and everything from it to the end of the line is silently dropped, and
+the other cases make the field block invalid or change the value. For example:
+
+```
+title: "Retry 3 times #flaky"
+allowed paths: ["**/*.md", src/export/csv.ts]
+status: "stopped — blocked by #123"
+```
 
 | field | required | what to write |
 |---|---|---|
