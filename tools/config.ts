@@ -89,6 +89,10 @@ export interface WorkspaceConfig {
   // order, first name wins. Read by `fanout.mjs handoff --check` to resolve a
   // manifest's `## 外部依賴` rows and by the integrator SOP.
   sisterRepos?: SisterRepo[];
+  // Directory holding ticket files, relative to the workspace root. Surfaced
+  // verbatim only when usable (isUsableTicketDir); resolveTicketDir applies
+  // DEFAULT_TICKET_DIR otherwise.
+  ticketDir?: string;
 }
 
 // One sisterRepos entry. `path` is relative to the repo root; `backlog` and
@@ -190,6 +194,16 @@ export function parseSisterRepos(value: unknown): SisterRepo[] | null {
     if (repo !== null && !repos.some((r) => r.name === repo.name)) repos.push(repo);
   }
   return repos.length > 0 ? repos : null;
+}
+
+/** Ticket-file directory used when `ticketDir` is absent or unusable. */
+export const DEFAULT_TICKET_DIR = "docs/tickets";
+
+// Usable: a non-empty relative path that does not start with "~" and does not
+// normalize to a path whose first segment is "..".
+function isUsableTicketDir(value: unknown): value is string {
+  if (!isNonEmptyString(value) || isRejectedSisterPath(value)) return false;
+  return path.posix.normalize(value.replace(/\\/g, "/")).split("/")[0] !== "..";
 }
 
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
@@ -419,6 +433,12 @@ function loadConfigEntry(workspacePath: string): ConfigCacheEntry {
   if (sisterRepos !== null) {
     result.sisterRepos = sisterRepos;
   }
+  // Additive-optional field (no schema_version bump). Non-fatal filter: an
+  // unusable value is treated as absent, never an error.
+  const ticketDir = migration.payload.ticketDir;
+  if (isUsableTicketDir(ticketDir)) {
+    result.ticketDir = ticketDir;
+  }
   // Cache under the pre-read mtime. If the migration heal-on-read above
   // rewrote the file, the recorded mtime is already stale — the NEXT call's
   // stat will mismatch and trigger one redundant (but correct) re-read,
@@ -464,6 +484,11 @@ export function resolveTaskPaths(workspacePath: string): string[] {
   const config = loadConfig(workspacePath);
   const rels = config.taskPaths?.length ? config.taskPaths : DEFAULT_TASK_PATHS;
   return rels.map((p) => path.join(workspacePath, p));
+}
+
+/** Absolute ticket-file directory: the configured `ticketDir` or the default. */
+export function resolveTicketDir(workspacePath: string): string {
+  return path.join(workspacePath, loadConfig(workspacePath).ticketDir ?? DEFAULT_TICKET_DIR);
 }
 
 /**

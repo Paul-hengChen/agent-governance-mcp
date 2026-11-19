@@ -19,6 +19,7 @@ export interface WorkspaceConfig {
     nodeModulesLinks?: string[];
     laneProtocolAddendum?: string;
     sisterRepos?: SisterRepo[];
+    ticketDir?: string;
 }
 export interface SisterRepo {
     name: string;
@@ -46,6 +47,8 @@ export declare function parseNodeModulesLinks(value: unknown): NodeModulesLinksP
  * entry. Invalid entries are dropped silently. Never throws.
  */
 export declare function parseSisterRepos(value: unknown): SisterRepo[] | null;
+/** Ticket-file directory used when `ticketDir` is absent or unusable. */
+export declare const DEFAULT_TICKET_DIR = "docs/tickets";
 export declare const DEFAULT_TASK_REGEX: RegExp;
 /**
  * Typed workspace config view. Absent file OR any unusable config file
@@ -64,6 +67,8 @@ export declare function loadConfig(workspacePath: string): WorkspaceConfig;
  */
 export declare function getConfigError(workspacePath: string): string | null;
 export declare function resolveTaskPaths(workspacePath: string): string[];
+/** Absolute ticket-file directory: the configured `ticketDir` or the default. */
+export declare function resolveTicketDir(workspacePath: string): string;
 /**
  * The current lane's ledger `.current/<lane>/tasks.md` when it exists, else
  * the legacy file (findLegacyTasksFile). Side-effect-free — no write, no
