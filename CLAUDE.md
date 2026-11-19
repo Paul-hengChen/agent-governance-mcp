@@ -74,6 +74,7 @@ tools/skill-frontmatter.ts  parses recommended_model out of role SOP frontmatter
 tools/storage.ts          HandoffStorage interface + getActiveStorage()/setActiveStorage()
 tools/storage-sqlite.ts   SQLite implementation of HandoffStorage (HTTP mode)
 tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
+tools/ticket-file.ts      ticket-file parser + checker core (scripts/check-tickets.mjs)
 tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (ROUND_CAP=4,
                           REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6)
 tools/exemptions.ts       per-gate exemption resolution (E24)
