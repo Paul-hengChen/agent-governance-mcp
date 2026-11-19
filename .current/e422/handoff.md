@@ -1,9 +1,10 @@
 ---
 schema_version: 15
 active_feature: "e422-ticket-file-format"
-status: "In_Progress"
-last_updated: "2026-11-19T10:45:34.763Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-11-19T10:52:16.969Z"
+blocking_reason: "docs/ticket-format.md field-block section omits that it is YAML front matter and the quoting rule: unquoted ' #' values are silently truncated (title/stop reason), ': ' and leading-'*' globs fail with an unexplained 'not valid YAML' error — reader cannot work from the doc alone (BA4/AC8)."
+last_agent: "code-reviewer"
 scope_decision: "single-feature"
 scope_decision_why: "One backlog ticket (E422) in one fan-out lane: a new parser module, a thin checker script, one additive config key, two new Markdown files. No design file, no shared generated files, no MCP tool; files fixed by the human-approved fan-out row."
 cut_approved: true
@@ -13,16 +14,17 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-11-19T10:45:34.763Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-11-19T10:52:16.969Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
-review_rounds_total: 0
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -31,13 +33,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E422-01, T-E422-02 ready for code review
-- CLAUDE.md transitions row joined per human approval in the lane session 2026-11-19 (integrator to-lane#7/#8); first row per to-lane#4/#5. CLAUDE.md wc -l = 250 (base count); git diff c29f100 -- CLAUDE.md shows exactly the added tools/ticket-file.ts row and the joined tools/transitions.ts row (text unchanged word for word). No test edited.
-- Commits: 627a845 (T-E422-01 + T-E422-02), 771fc1c (byte-order-mark escape fix), b647540 (CLAUDE.md ticket-file layout row), a6f7093 (lane state), 9f9da82 (CLAUDE.md transitions row joined), 87a9b66 (lane state before full suite).
-- Full suite (node scripts/test-lock.mjs -- npm test) at 87a9b66: 4328/4330 pass, 0 fail, 2 skipped. node --test test/e395-claude-md-tail.test.mjs test/e436-stale-handoff-paths.test.mjs: 12/12 pass. No expected-red manifest (no intentional reds).
-- Line counts: T-E422-01 tools/ticket-file.ts 285, scripts/check-tickets.mjs 13 (+dist/tools/ticket-file.*), CLAUDE.md +1 row net (ticket-file row added, transitions row joined, total unchanged at 250); T-E422-02 tools/config.ts +27, package.json +1, docs/ticket-format.md 171, templates/ticket.md 37, docs/config.md +25 (+dist/tools/config.*).
-- Verified: npm run build 0 errors (dist changes only dist/tools/ticket-file.* and dist/tools/config.*); template and extracted example pass the checker (1 and 4 scenarios, exit 0); AC1-AC10 hand-run with throwaway files, all lines and exit codes per Copy/Strings; AC9 loadConfig/resolveTicketDir checked for valid, absolute, ~, ../ escape, Windows forms, empty, non-string; AC11 13 config files 213/213; AC12 diff stat clean; check:md-tables OK; npm audit --audit-level=high exit 0.
-- Interpretations for review: a required field with an empty value reports missing field; an empty allowed-paths list reports missing field; a needs-device-or-person value other than yes/no reports the mismatch line; a single unbracketed source entry is accepted as a one-entry list; scenario-id shape is not checked (no Copy string for it); unclosed field block reports the no-field-block line; exit-2 lines go to stderr, all else stdout; spec AC8 says four status forms but the format defines three (not started, done, stopped — reason), doc explains those three — code-reviewer to judge.
+- review_report: review_reports/review_T-E422-02.md (also review_reports/review_T-E422-01.md — T-E422-01 has no required finding, APPROVED at task scope)
+- REQUIRED (T-E422-02) docs/ticket-format.md:14-17 (+25, 28, 38): state the field block is YAML front matter and when a value must be quoted (contains ': ' or ' #', or starts with one of [ ] { } , # & * ! | > ' " % @ or a backtick); add one quoted example (e.g. allowed paths: ["**/*.md"] or status: "stopped — blocked by #123"); reword 'every value is read as text' so it does not over-promise. Repro: title: Retry 3 times #flaky -> stored 'Retry 3 times', checker exit 0; status: stopped — vendor: late -> bad-YAML line; allowed paths: [**/*.md] -> 'unidentified alias'. Doc-only fix; recheck that the example and template still pass the checker and that docs/ticket-format.md stays tool-neutral.
+- recommended (not blocking) tools/ticket-file.ts:166-169: scenario heading shape / id charset not enforced ('### S1 - x' passes as id 'S1 - x'); no Copy string exists, so this is a spec gap for PM before E424 keys on ids.
+- optional: fence-unaware content lines (ticket-file.ts:149-161); Added-during-build not enforced as last section; scalar source accepted vs scalar depends on rejected (ticket-file.ts:104); TICKET_STATUSES unused by isKnownStatus (ticket-file.ts:38/83); ticketDir '.' and whitespace accepted (config.ts:203-207, spec-literal); isRejectedSisterPath name now misleading (config.ts:205); doc line 10 reads Added section as required; AC8 'four status forms' is a spec wording slip (three forms correct per backlog amendment (3)).
+- Reviewer reruns: npm run build clean, dist in sync; AC11 13 config files 213/213; check:md-tables OK; npm run check:tickets -> no-dir line exit 0; agc check comments warning on tools/config.ts is pre-existing at base.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
