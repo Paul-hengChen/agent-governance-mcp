@@ -211,9 +211,9 @@ write surrounding prose freely within the AC shapes; the anchor text is exact.
 | sop.entry.tracker | `an issue-tracker item that has no ticket file, whatever its size` | authored-here — §15.2 ruling 2, §15.3 |
 | sop.entry.named-only | `Work only on the items the human names; never pull items from the tracker yourself.` | authored-here — §15.2 ruling 6 |
 | sop.entry.small | `Work that fits one or two files and is not a tracker item goes to the ordinary coordinator intake.` | authored-here — §11.5 |
-| sop.out.record | `## Rulings` | authored-here — rulings table heading in the discussion record: `| # | date | question | ruling | replaces |` |
-| sop.out.wave | `| wave | ticket | depends on |` | authored-here — §16.1 ruling 9 compact wave table |
-| sop.out.approval | `| date | decided by | content | source |` | authored-here — approval row table; the human's row has `decided by` = `human` |
+| sop.out.record | `## Rulings` | authored-here — rulings table heading in the discussion record: `\| # \| date \| question \| ruling \| replaces \|` |
+| sop.out.wave | `\| wave \| ticket \| depends on \|` | authored-here — §16.1 ruling 9 compact wave table |
+| sop.out.approval | `\| date \| decided by \| content \| source \|` | authored-here — approval row table; the human's row has `decided by` = `human` |
 | sop.out.format | `` `<agc install>/docs/ticket-format.md` `` and `` `<agc install>/templates/ticket.md` `` with ``(`<agc install>` = agc's install directory, not the workspace)`` | authored-here — E437 prefix convention |
 | sop.done | `every scenario has one verification, every device-or-person scenario is marked, and every conflict between sources has a ruling` | authored-here — §11.4 ruling 3 |
 | sop.end | `` `not doing` `` and `` `not ready to cut` `` | authored-here — §11.5 |
@@ -224,12 +224,12 @@ write surrounding prose freely within the AC shapes; the anchor text is exact.
 | coord.hint | `No ticket file for this design prototype — start the `spec-workshop` prompt first.` | authored-here — §16.1 ruling 10 ①, §15.2 ruling 2 reply-only form |
 | coord.ticket-file | `A ticket file is a Markdown file in the ticket format, by default under `docs/tickets/` (`ticketDir` in `.current/.config.json`).` | authored-here — ticket directory default |
 | da.mode-list | `- **Mode** — one of `figma`, `sketch`, `xd`, `penpot`, `pdf`, `image`, `paper`, `prototype`, `no-design`. One line.` | authored-here — existing line plus `prototype` |
-| da.detect-row | `| local prototype export (a single-screen prototype page or a runnable demo app exported from a design tool) | `prototype` |` | authored-here — §16.1 ruling 10 ② |
+| da.detect-row | `\| local prototype export (a single-screen prototype page or a runnable demo app exported from a design tool) \| `prototype` \|` | authored-here — §16.1 ruling 10 ② |
 | da.volume | `` `prototype` runs this gate only when the design tool's remote project is readable (count its screens from project metadata); a local-only export skips it. `` | authored-here — ruling 10 ② |
 | da.credibility | `` `prototype` skips this gate: every prototype page is a full screen. `` | authored-here — ruling 10 ② |
 | da.extract | `` - `prototype`: open the exported page or run the demo app locally; capture each state as a screenshot for *Visual Baselines*; record each state's behaviour (transitions, inputs) from the prototype's own logic. `` | authored-here |
 | da.dual | `**Dual source (`prototype` + Figma)**: declare mode `prototype` and list both in `## Source`. Figma fixes which states exist; the prototype fixes how each state behaves. Every divergence is a ruling item: before a ticket file exists it is ruled in `spec-workshop`; after, STOP per *Escalation Routes: dual-source divergence*. A divergence already ruled in the ticket's discussion record is not raised again.` | authored-here — ruling 10 ② |
-| da.escalation | `| dual-source divergence (mode `prototype` with Figma) | Blocked | `design-auditor: dual-source divergence — <n> item(s) between Figma and the prototype need a human ruling` | pm |` | authored-here — mirrors the two existing Blocked rows |
+| da.escalation | `\| dual-source divergence (mode `prototype` with Figma) \| Blocked \| `design-auditor: dual-source divergence — <n> item(s) between Figma and the prototype need a human ruling` \| pm \|` | authored-here — mirrors the two existing Blocked rows |
 | claude.L7 | `into a workspace by invoking one of the 13 registered role prompts (`teamwork`,` | authored-here — count 12 → 13 |
 | claude.L10 | `` `release-engineer`, `integrator`, `spec-workshop`) or, if you opt in, the SessionStart hook. `` | authored-here |
 | claude.L33 | `   Thirteen prompts are registered. `teamwork` serves the full Coordinator` | authored-here |
@@ -239,7 +239,7 @@ write surrounding prose freely within the AC shapes; the anchor text is exact.
 | claude.L122 | `         qa-engineer,doc-writer,release-engineer,integrator,spec-workshop}.ts   the other eleven role prompts` | authored-here |
 | claude.L130 | `content/skill-*.md        the other 12 role SOPs, one file per role` | authored-here — 12 skill files + spec-workshop = 13; "other" excludes coordinator-lite listed on L129 |
 | readme.count | `in `content/skill-<role>.md` for the thirteen single-file roles` | authored-here — line 93 |
-| readme.rows | `| integrator       | high   | `opus`            | Cross-lane fan-out and fan-in; prompt-only.                          |` and `| spec-workshop    | high   | `opus`            | Rounds of rulings with the human; prompt-only.                       |` | authored-here — integrator row was missing; added with the new row |
+| readme.rows | `\| integrator       \| high   \| `opus`            \| Cross-lane fan-out and fan-in; prompt-only.                          \|` and `\| spec-workshop    \| high   \| `opus`            \| Rounds of rulings with the human; prompt-only.                       \|` | authored-here — integrator row was missing; added with the new row |
 | install.count | `All 13 registered prompts (`tools/registry.ts` → `PROMPT_REGISTRY`):` | authored-here |
 | install.row | `- `/mcp__agent-governance-mcp__spec-workshop` — rounds of rulings with the human into ticket files and a wave table (prompt-only)` | authored-here |
 | arch.count | `│  13 registered prompts (tools/registry.ts):                │` | authored-here — box width kept (60 columns inside the frame as today) |
