@@ -22,6 +22,7 @@ export interface ExternalRef {
 export type ResumeOfTarget = "code-reviewer" | "qa-engineer";
 export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
 export type DispatchMode = "feature" | "bugfix";
+export type ChainPath = "test-first";
 export type DispatchMechanism = "task" | "switch_role" | "inline";
 export interface HandoffState {
     active_feature: string;
@@ -53,5 +54,7 @@ export interface HandoffState {
     evidence_schema?: number;
     dispatch_mechanism?: DispatchMechanism;
     dispatch_mechanism_tier?: string;
+    chain_path?: ChainPath;
+    sr_return_count?: number;
 }
 //# sourceMappingURL=handoff-types.d.ts.map

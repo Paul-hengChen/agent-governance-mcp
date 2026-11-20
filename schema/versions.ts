@@ -5,7 +5,7 @@
 export type SchemaKind = "handoff" | "tasks" | "sqlite" | "config";
 
 export const CURRENT_VERSIONS: Record<SchemaKind, number> = {
-  handoff: 15,
+  handoff: 16,
   tasks: 2,
   sqlite: 2,
   config: 2,

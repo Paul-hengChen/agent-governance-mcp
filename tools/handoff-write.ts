@@ -25,6 +25,7 @@ import type {
   ReviewVerdict,
   DispatchMode,
   DispatchMechanism,
+  ChainPath,
 } from "./handoff-types.js";
 import {
   parseHandoff,
@@ -157,6 +158,16 @@ export interface WriteHandoffStateOptions {
   // hop. Record only; no gate reads either. File mode only.
   dispatchMechanism?: DispatchMechanism;
   dispatchMechanismTier?: string;
+  // Test-first chain marker. Feature-scoped carry, the dispatch_mode rule:
+  // given -> set; omitted on the same feature -> carry existing; omitted
+  // after a feature change -> unset. There is no clearing value (the enum
+  // has one member). NOT re-armed on PM re-entry. File mode only:
+  // SqliteHandoffStorage.writeState ignores it. (E431, v16)
+  chainPath?: ChainPath;
+  // sr-engineer -> qa-engineer return counter. Server-computed like
+  // hopCount; NOT carried when omitted (an omitting write means 0). Written
+  // only when > 0. File mode only. (E431, v16)
+  srReturnCount?: number;
   // When true, keep the on-disk last_updated (same active_feature only)
   // instead of stamping now(), so a write that records no progress cannot
   // extend the incumbent feature's lease. Server-internal: only the
@@ -242,6 +253,10 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
   // heal-write call site always uses the options object directly; a
   // positional caller always gets a fresh stamp). (E10)
   const preserveLastUpdated = opts.preserveLastUpdated;
+  // v16 — test-first marker (carried by the same-feature preserve clause
+  // below) and the server-computed sr-return counter (never carried).
+  const chainPath = opts.chainPath;
+  const srReturnCount = opts.srReturnCount;
   // Hoist required strings to the names the body below already uses.
   const _activeFeature: string = activeFeature;
   const _status: string = status;
@@ -346,6 +361,11 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
     // re-witnessed on every PM bounce. Absence means non-inherited.
     let effectiveCutApprovedSource: string | undefined = cutApprovedSource;
     const cutApprovedSourceNeedsExisting = cutApprovedSource === undefined;
+    // chain_path: the dispatch_mode rule. The marker is permanent for the
+    // feature (no clearing value), so an omitting write carries it; a feature
+    // change drops it. Absence means the old chain. (E431)
+    let effectiveChainPath: ChainPath | undefined = chainPath;
+    const chainPathNeedsExisting = chainPath === undefined;
     // Archive-on-feature-change needs the on-disk active_feature on every
     // write, even when a caller sets all six fields above and does not set
     // preserveLastUpdated, so this flag only forces the read to happen.
@@ -365,6 +385,7 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
       dispatchModeNeedsExisting ||
       evidenceSchemaNeedsExisting ||
       cutApprovedSourceNeedsExisting ||
+      chainPathNeedsExisting ||
       preserveLastUpdated === true ||
       archiveCheckNeedsExisting
     ) {
@@ -401,6 +422,11 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
         // v14 clauses (2)/(3): carry the value forward only within the same feature.
         effectiveCutApprovedSource =
           existing?.active_feature === _activeFeature ? existing?.cut_approved_source : undefined;
+      }
+      if (chainPathNeedsExisting) {
+        // v16: carry the marker forward only within the same feature.
+        effectiveChainPath =
+          existing?.active_feature === _activeFeature ? existing?.chain_path : undefined;
       }
     }
     // completed_tasks ledger (E150). With the orchestrator's carry directive,
@@ -537,6 +563,9 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
     // (the safe direction) — never materialize a claim the writer did not make
     // (the dispatch_mode / scope_decision absence-is-signal emit posture).
     if (effectiveCutApprovedSource) frontmatterData.cut_approved_source = effectiveCutApprovedSource;
+    // v16 — chain_path: emit only on a marked feature. Absence === the old
+    // chain, so an unmarked feature's file never gains the key. (E431)
+    if (effectiveChainPath === "test-first") frontmatterData.chain_path = effectiveChainPath;
     // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
     // semantics). Deliberately NOT joined to the existing-state preserve read
     // above — carrying a stale single-hop directive forward would be a
@@ -599,6 +628,14 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
         ? Math.floor(visualRoundsTotal as number)
         : 0;
     frontmatterData.visual_rounds_total = normalisedVisualRoundsTotal;
+    // v16 — sr_return_count: emit only when > 0 (unlike the always-emitted
+    // counters above), so an unmarked feature, which can never make a
+    // test-first return, never carries the key. Falsy input means 0. (E431)
+    const normalisedSrReturnCount =
+      Number.isFinite(srReturnCount) && (srReturnCount as number) >= 0
+        ? Math.floor(srReturnCount as number)
+        : 0;
+    if (normalisedSrReturnCount > 0) frontmatterData.sr_return_count = normalisedSrReturnCount;
 
     const frontmatter = yaml
       .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })

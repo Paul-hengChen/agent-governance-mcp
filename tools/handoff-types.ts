@@ -54,6 +54,11 @@ export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
 // Dispatch-mode classification. (handoff schema v11, E2)
 export type DispatchMode = "feature" | "bugfix";
 
+// Test-first chain marker (handoff schema v16, E431). One value; absence means
+// the old chain. Defined here, not in transitions.ts, so the types module stays
+// the owner of persisted shapes; transitions.ts takes it with `import type`.
+export type ChainPath = "test-first";
+
 // Per-hop dispatch-mechanism attestation values: which mechanism carried
 // THIS hop — a Task-spawned subagent, an in-context tw_switch_role swap, or
 // inline work with no role hand-off at all. Attested, not verified.
@@ -183,4 +188,15 @@ export interface HandoffState {
   // pin-vs-actual mismatch; nothing compares them automatically. Same
   // one-write lifetime, file mode only.
   dispatch_mechanism_tier?: string;
+  // Which chain the feature entered by. Set by a pm write or by the entry
+  // write pm/architect -> qa-engineer:In_Progress; carried across writes that
+  // omit it; never cleared; dropped when active_feature changes; NOT re-armed
+  // on PM re-entry. File mode only. Read by validateTransition (overlay), the
+  // build-entry checks and every judge-identity check.
+  chain_path?: ChainPath;
+  // sr-engineer -> qa-engineer returns on a test-first feature. Server-computed
+  // each write (computeSrReturnCount); reset on pm:In_Progress and on
+  // active_feature change; not a review round. Present only when > 0, so an
+  // unmarked feature never carries it. File mode only.
+  sr_return_count?: number;
 }
