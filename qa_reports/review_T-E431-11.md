@@ -1,8 +1,11 @@
 # QA review — T-E431-11 (final verification, qa round 1 of 3)
 
-covers: T-E431-01, T-E431-02, T-E431-03, T-E431-04, T-E431-05, T-E431-06, T-E431-11
+covers: T-E431-01, T-E431-02, T-E431-03, T-E431-04, T-E431-05, T-E431-06, T-E431-07, T-E431-08, T-E431-09, T-E431-10, T-E431-11
 
-T-E431-07..10 were completed earlier. Code review: `review_reports/review_T-E431-01.md` (T-01..06) and `review_reports/review_T-E431-04.md` (docs fix 23f8a0e, APPROVED).
+T-E431-07..10 were completed earlier; their ACs were executed in their own evidence files and are covered by the final suite result 4428/4430 pass, 0 fail, 2 skip (the AC20 row below):
+- T-E431-07: AC1..AC18 pass per `review_T-E431-07.md`; its 2 reds (e295 AC11, visual-evidence-gate AC-4) were re-pinned in this round and are green in the final suite.
+- T-E431-08: pass per `review_T-E431-08.md`; its 2 reds are the same re-pinned cross-lane tests, green in the final suite.
+- T-E431-09, T-E431-10: covered by `review_T-E431-08.md` (`covers: 08..10`); pass in the final suite. Code review: `review_reports/review_T-E431-01.md` (T-01..06) and `review_reports/review_T-E431-04.md` (docs fix 23f8a0e, APPROVED).
 
 ## Test changes this round (commit 17a8f0a)
 - `test/e295-hop-cap-and-sop-halves.test.mjs` AC11 (`(none)` assertion): now exactly one `(none)` row, and it is `SR_RETURN_CAP_EXCEEDED`. Made under human ruling 5a (2026-11-20).
