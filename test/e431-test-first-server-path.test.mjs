@@ -406,6 +406,35 @@ test("AC11: unmarked code-reviewer PASS rejected as today", async () => {
   assert.equal(handoffBytes(ws), before);
 });
 
+// Feature change: the next step after a PASS almost always opens a different
+// active_feature (next ticket, release feature). The exit is judged against the
+// PREVIOUS feature's marker; the new feature itself starts unmarked.
+const EXIT_ROLES = ["pm", "researcher", "release-engineer", "design-auditor"];
+
+test("AC11: validateTransition accepts all four exits from marked code-reviewer:PASS on a feature change", () => {
+  for (const next of EXIT_ROLES) {
+    const r = validateTransition({
+      prev: { agent: "code-reviewer", status: "PASS" },
+      next: { agent: next, status: "In_Progress" },
+      prev_qa_round: 0, prev_review_round: 0, prev_chain_path: "test-first", feature_changed: true,
+    });
+    assert.equal(r, null, `code-reviewer:PASS -> ${next} on a feature change accepted`);
+  }
+});
+
+for (const next of EXIT_ROLES) {
+  test(`AC11: feature change from marked code-reviewer:PASS accepted via handler for ${next}, new feature unmarked`, async () => {
+    const ws = mkWs("e431-ac11fc-");
+    await seed(ws, F, "code-reviewer", "PASS", { chainPath: "test-first" });
+    const r = await upd(ws, { active_feature: "e431-next-feat", status: "In_Progress", agent_id: next });
+    assert.ok(!rejected(r), `${next} opening a new feature from marked code-reviewer:PASS accepted: ${text(r)}`);
+    const s = state(ws);
+    assert.equal(s.active_feature, "e431-next-feat");
+    assert.equal(s.chain_path, undefined, "new feature starts unmarked");
+    assert.ok(!s.sr_return_count, "new feature carries no sr_return_count");
+  });
+}
+
 // ---------------------------------------------------------------- AC12
 
 const NOTHING_NEW = (s) => {
