@@ -291,7 +291,7 @@ If (2) produces no output:
 
 In Claude Code, MCP prompts are namespaced slash commands:
 
-All 12 registered prompts (`tools/registry.ts` → `PROMPT_REGISTRY`):
+All 13 registered prompts (`tools/registry.ts` → `PROMPT_REGISTRY`):
 
 - `/mcp__agent-governance-mcp__teamwork` — Coordinator (auto-routes to specialists)
 - `/mcp__agent-governance-mcp__teamwork-lite` — Coordinator (lite): solo-dev direct execution
@@ -305,6 +305,7 @@ All 12 registered prompts (`tools/registry.ts` → `PROMPT_REGISTRY`):
 - `/mcp__agent-governance-mcp__doc-writer`
 - `/mcp__agent-governance-mcp__release-engineer`
 - `/mcp__agent-governance-mcp__integrator` — cross-lane fan-out planning + fan-in integration (prompt-only)
+- `/mcp__agent-governance-mcp__spec-workshop` — rounds of rulings with the human into ticket files and a wave table (prompt-only)
 
 Want shorter aliases like `/teamwork`? Create `~/.claude/commands/teamwork.md` (or per-project `.claude/commands/teamwork.md`) with one line invoking the namespaced command.
 

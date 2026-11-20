@@ -1187,4 +1187,10 @@ export const PROMPT_REGISTRY: PromptRegistryEntry[] = [
     arguments: [PROMPT_WORKSPACE_ARG],
     skillFile: "skill-integrator.md",
   },
+  {
+    name: "spec-workshop",
+    description: "Spec workshop — turn specs, design sources, issue-tracker items or an idea into dated rulings, ticket files and a wave table, in rounds with the human. Human-started; writes no handoff state.",
+    arguments: [PROMPT_WORKSPACE_ARG],
+    skillFile: "skill-spec-workshop.md",
+  },
 ];

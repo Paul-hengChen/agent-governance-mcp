@@ -135,7 +135,7 @@ second.** Flipping the repo to private *before* removing the files is what kept 
 
 ## Three layers, where each lives
 
-1. **Prompts** — thin wrappers around `prompts/build.ts`, which composes the constitution from `content/const-*.md` (15 fragments, selected per dispatch mode by `prompts/constitution-manifest.ts`) + the role SOP + live handoff state, then applies text-transform passes for size. 11 prompts registered.
+1. **Prompts** — thin wrappers around `prompts/build.ts`, which composes the constitution from `content/const-*.md` (15 fragments, selected per dispatch mode by `prompts/constitution-manifest.ts`) + the role SOP + live handoff state, then applies text-transform passes for size. 13 prompts registered.
 2. **Tools** — twelve `tw_*` tools declared in `tools/registry.ts` that read/write `.current/handoff.md`, `tasks.md`, and (HTTP/SQLite mode) PRD-derived RAG chunks.
 3. **Guards + gates** — `guards/session.ts` (pre-flight check) and `guards/file-lock.ts` (O_EXCL lock + mtime freshness), then the 18-step `UPDATE_STATE_GATE_PIPELINE` in `tools/handoff-orchestrator.ts` with predicates under `gates/`.
 
