@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // `agc` — agent-governance-mcp workspace CLI (details: specs/e260c-bin-scripts.md).
-//   agc init [--artifacts=local|repo]  scaffold .current/.config.json, tasks.md, adapters.
+//   agc init [--artifacts=local|repo] [--adapter=shared|local]  scaffold
+//     .current/.config.json, tasks.md, adapters.
 //     Never writes .current/<lane>/handoff.md: any seeded prev tuple dead-ends the
 //     ALLOWED_TRANSITIONS lookup, so the first pm:In_Progress write creates it (E34).
 //   agc check  exit 1 on a stale adapter stamp; every other check is advisory.
@@ -33,7 +34,7 @@ const ADAPTERS = [
 
 const STR_USAGE =
   "Usage: agc <command>\n" +
-  "  init [--artifacts=local|repo]\n" +
+  "  init [--artifacts=local|repo] [--adapter=shared|local]\n" +
   "          Scaffold .current/.config.json, tasks.md, and per-agent entry\n" +
   "          adapters (CLAUDE.md, AGENTS.md, .antigravityrules) in the current\n" +
   "          directory. Existing files are left as-is, except CLAUDE.md's agc\n" +
@@ -42,6 +43,10 @@ const STR_USAGE =
   "          tasks.md, qa_reports/ and review_reports/ out of git via\n" +
   "          .git/info/exclude; --artifacts=repo tracks them. If any of them is\n" +
   "          already tracked, omitting the flag declares nothing — choose one.\n" +
+  "          --adapter=local puts CLAUDE.md's agc block in CLAUDE.local.md\n" +
+  "          instead, kept out of git via .git/info/exclude. With no flag,\n" +
+  "          local is picked only on a first install into a tracked CLAUDE.md\n" +
+  "          with local artifacts — see docs/install.md.\n" +
   "  check   Warn if any generated adapter files are stale vs the installed\n" +
   "          agent-governance-mcp version.\n";
 
@@ -77,13 +82,35 @@ function stampTemplate(tplName, version) {
   return readAdapterTemplate(tplName).split(AGC_VERSION_TOKEN).join(version);
 }
 
-// Upsert the marker-delimited block into CLAUDE.md.
-//   file absent           -> create CLAUDE.md containing just the block.
+// Where `agc init --adapter=<value>` puts the CLAUDE.md marker block: the
+// shared, usually tracked CLAUDE.md, or CLAUDE.local.md, which Claude Code
+// loads beside it and which agc keeps out of git via info/exclude.
+const ADAPTER_PLACEMENTS = { shared: "CLAUDE.md", local: "CLAUDE.local.md" };
+
+// Whether `text` holds a well-formed agc block: BEGIN marker, then END later.
+// The one definition of "holds a block" for init, check and eject.
+function holdsClaudeBlock(text) {
+  const beginIdx = text.indexOf(CLAUDE_BEGIN);
+  const endIdx = text.indexOf(CLAUDE_END);
+  return beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx;
+}
+
+// holdsClaudeBlock() for a file; false when it is absent or unreadable.
+function fileHoldsClaudeBlock(abs) {
+  try {
+    return holdsClaudeBlock(fs.readFileSync(abs, "utf-8"));
+  } catch {
+    return false;
+  }
+}
+
+// Upsert the marker-delimited block into `rel` (CLAUDE.md or CLAUDE.local.md).
+//   file absent           -> create the file containing just the block.
 //   file present, no block-> append a blank line + block.
 //   file present, block   -> replace text between markers (inclusive); prose untouched.
 // Returns "created" | "appended" | "updated".
-function writeClaudeBlock(cwd, stampedBlock) {
-  const target = path.join(cwd, "CLAUDE.md");
+function writeClaudeBlock(cwd, stampedBlock, rel = "CLAUDE.md") {
+  const target = path.join(cwd, rel);
   const block = stampedBlock.replace(/\n+$/, ""); // normalize trailing newlines
 
   if (!fs.existsSync(target)) {
@@ -331,18 +358,24 @@ function readDeclaredArtifacts(abs) {
 }
 
 // --- subcommand: init ------------------------------------------------------
-// Parse `agc init`'s arguments. Only --artifacts is recognised; any other
-// argument is ignored, as before the flag existed. An invalid value throws a
-// usage error BEFORE anything is written, so a typo never leaves a partial
-// scaffold behind. Returns { artifacts } — undefined when the flag is omitted.
+// Parse `agc init`'s arguments. Only --artifacts and --adapter are
+// recognised (`--name value` or `--name=value`); any other argument is
+// ignored, as before the flags existed. An invalid value throws a usage error
+// BEFORE anything is written, so a typo never leaves a partial scaffold
+// behind. Returns { artifacts, adapter } — each undefined when omitted.
 function parseInitArgs(argv) {
   let artifacts;
+  let adapter;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--artifacts") {
       artifacts = i + 1 < argv.length ? argv[++i] : "";
     } else if (a.startsWith("--artifacts=")) {
       artifacts = a.slice("--artifacts=".length);
+    } else if (a === "--adapter") {
+      adapter = i + 1 < argv.length ? argv[++i] : "";
+    } else if (a.startsWith("--adapter=")) {
+      adapter = a.slice("--adapter=".length);
     }
   }
   if (artifacts !== undefined && !isArtifactsMode(artifacts)) {
@@ -350,7 +383,10 @@ function parseInitArgs(argv) {
       `agc init: --artifacts must be "local" or "repo" (got ${JSON.stringify(artifacts)})`
     );
   }
-  return { artifacts };
+  if (adapter !== undefined && !Object.prototype.hasOwnProperty.call(ADAPTER_PLACEMENTS, adapter)) {
+    throw usageError(`agc init: --adapter must be "shared" or "local" (got ${JSON.stringify(adapter)})`);
+  }
+  return { artifacts, adapter };
 }
 
 function runInit(cwd, argv = []) {
@@ -363,7 +399,7 @@ function runInit(cwd, argv = []) {
 
   // Everything that can fail on bad input or an unusable git setup runs
   // before the first write, so a failure leaves the directory untouched.
-  const { artifacts: requested } = parseInitArgs(argv);
+  const { artifacts: requested, adapter: requestedAdapter } = parseInitArgs(argv);
   const repoRoot = resolveRepoRootOrNull(cwd); // null = not inside a git repo
   // Rules and pathspecs are anchored at the workspace, not at the repo root:
   // run from a subdirectory, the scaffold lands there and so must the rules.
@@ -400,6 +436,31 @@ function runInit(cwd, argv = []) {
         `contains a character unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character), ` +
         `so the exclude rule agc would write could match unintended files or be split across lines. ` +
         `Rename the directory, or re-run with --artifacts=repo.`
+    );
+  }
+
+  // Where CLAUDE.md's agc block goes. An explicit --adapter wins. Otherwise
+  // "local" only on a first install into a team file: inside git, CLAUDE.md
+  // tracked, artifacts mode "local", and no block in CLAUDE.md yet. Every
+  // other case is "shared", so a workspace whose CLAUDE.md already holds the
+  // block re-runs exactly as before.
+  const claudeTracked = isWorkspaceFileTracked({ repoRoot, workspace }, "CLAUDE.md");
+  const claudeHoldsBlock = fileHoldsClaudeBlock(path.join(cwd, "CLAUDE.md"));
+  const adapter =
+    requestedAdapter !== undefined
+      ? requestedAdapter
+      : claudeTracked && mode === "local" && !claudeHoldsBlock
+        ? "local"
+        : "shared";
+
+  // Same refusal as local artifacts: the CLAUDE.local.md exclude rule is
+  // built from the workspace prefix, so an unsafe segment cannot be anchored.
+  if (adapter === "local" && workspace !== null && workspace.unsafeSegment !== null) {
+    throw usageError(
+      `agc init: refusing --adapter=local — workspace path segment "${escapeSegmentForDisplay(workspace.unsafeSegment)}" ` +
+        `contains a character unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character), ` +
+        `so the exclude rule agc would write could match unintended files or be split across lines. ` +
+        `Rename the directory, or re-run with --adapter=shared.`
     );
   }
 
@@ -517,6 +578,32 @@ function runInit(cwd, argv = []) {
     );
   }
 
+  // Git-side half of the adapter choice, independent of the artifacts mode.
+  // A CLAUDE.md that still holds the block is never edited here: it is a
+  // shared file, so removing the block is the user's own commit.
+  if (adapter === "local") {
+    if (repoRoot === null) {
+      errBlocks.push(
+        `agc init — note: not inside a git repository — skipped .git/info/exclude for CLAUDE.local.md`
+      );
+    } else {
+      const added = upsertSharedExclude(
+        repoRoot,
+        artifactExcludeRulesForPrefix(workspace.prefix, ADAPTER_LOCAL_EXCLUDE_RULES)
+      );
+      if (added.length > 0) {
+        notices.push(`agc init — added ${added.join(", ")} to the shared info/exclude`);
+      }
+    }
+    if (claudeHoldsBlock) {
+      errBlocks.push(
+        `agc init — note: CLAUDE.md still holds an agc adapter block; the block was also written to ` +
+          `CLAUDE.local.md. agc init does not edit CLAUDE.md: delete the lines from ` +
+          `"${CLAUDE_BEGIN}" to "${CLAUDE_END}" there by hand and commit that change.`
+      );
+    }
+  }
+
   // Remaining scaffolding (preserved verbatim; skip-if-exists).
   const files = [{ rel: "tasks.md", content: tasksTemplate }];
   for (const { rel, content } of files) {
@@ -534,11 +621,20 @@ function runInit(cwd, argv = []) {
   const ver = installedVersion();
   for (const { rel, tpl, mode } of ADAPTERS) {
     if (mode === "upsert") {
-      const result = writeClaudeBlock(cwd, stampTemplate(tpl, ver));
+      const target = ADAPTER_PLACEMENTS[adapter];
+      const result = writeClaudeBlock(cwd, stampTemplate(tpl, ver), target);
       if (result === "updated" || result === "appended") {
-        updated.push(rel); // both mean the file pre-existed
+        updated.push(target); // both mean the file pre-existed
       } else {
-        created.push(rel); // "created" — brand-new file
+        created.push(target); // "created" — brand-new file
+      }
+      // Only a fresh append prints this: an in-place update is an existing
+      // adopter's re-run, whose output stays as it was. No git command runs.
+      if (adapter === "shared" && result === "appended" && claudeTracked) {
+        errBlocks.push(
+          `agc init — note: CLAUDE.md is tracked by git, so the agc adapter block just added to it shows in ` +
+            `the team's diff — to keep the block out of git, use agc init --adapter=local (see docs/install.md)`
+        );
       }
       continue;
     }
@@ -1037,6 +1133,14 @@ const LANE_EXCLUDE_RULES = [".env", "/node_modules", "/.current/**/base-sha"];
 // artifacts choice. A subdirectory workspace must go through
 // artifactExcludeRulesForPrefix() / artifactPathsForPrefix() below.
 const ARTIFACT_EXCLUDE_RULES = ["/.current/", "/tasks.md", "/qa_reports/", "/review_reports/"];
+
+// The exclude rule `agc init --adapter=local` upserts, anchored to the
+// workspace through artifactExcludeRulesForPrefix(prefix, this list). Kept
+// apart from ARTIFACT_EXCLUDE_RULES: the adapter placement is independent of
+// the artifacts mode (check's drift test keys on that list), and eject
+// deletes every artifact path wholesale while CLAUDE.local.md may also hold
+// the user's own notes.
+const ADAPTER_LOCAL_EXCLUDE_RULES = ["/CLAUDE.local.md"];
 
 // Characters unsafe in a path segment agc writes verbatim into a gitignore
 // rule: the wildcards `* ? [ ]` (match too much), a backslash (git reads an
