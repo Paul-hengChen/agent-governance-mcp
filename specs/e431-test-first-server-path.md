@@ -99,7 +99,7 @@ Terms. *Marked feature*: a file-mode feature whose persisted handoff state carri
 - Architect hop is mandatory (intake: full chain with architect). Architect writes `specs/e431-test-first-server-path-architecture.md`; per `docs/lane-protocol.md` its Open Questions go to the mailbox for a second pre-review before sr-engineer starts.
 - No visual surface; no `design/` file (mode = no-design; Visual Structural Assertions omitted).
 - Resource audit: no external reference in the ticket, the plan row or the rulings → `external_refs` omitted.
-- Cross-lane red (mail the integrator, do not edit): `test/skill-evolution-v3.11.test.mjs:80` pins `handoff:\s*15,` and is E423-owned per the plan's test split; it turns red on the schema bump.
+- `test/skill-evolution-v3.11.test.mjs` lines 74–82 (the test pinning `handoff:\s*15,` at :80) are re-assigned to e431 by human ruling 1a (2026-11-20, recorded in the plan's Decisions); the rest of that file stays e423-owned. qa re-pins :80 to 16 directly.
 - During E431–E433 no served rule points at the marker, so real features stay on the old path (ruling 2's reason).
 
 ## Decisions
@@ -125,7 +125,7 @@ Expected to turn red only because of this ticket (literal + regex grep, not run;
 | transitions / PASS identity / hints / descriptions | `test/qa-flow.test.mjs` (:196, :1206, :1219, :1449), `test/e151-resume-of-rejection-hint.test.mjs` (:52, :64, :69 — AC9 hint), `test/handoff-write-arg-guard.test.mjs` (:477 — zod PASS refine), `test/e409-lite-write-tool-facts.test.mjs`, `test/e441-tool-description-contracts.test.mjs`; possibly `test/hop-count-transitions.test.mjs`, `test/visual-round-transitions.test.mjs`, `test/reviewer-completed-tasks-gate.test.mjs`, `test/e128-*.test.mjs` if they snapshot the matrix | e431 |
 | registry count 34→35 / union 16→17 | `test/error-code-contract.test.mjs` (:121, :258, :505, :654), `test/e26-gate-stats.test.mjs` (:78), `test/e308-single-source-tier-enum.test.mjs` (:91), `test/e419-retired-write-mechanisms.test.mjs` (:76–77) | e431 |
 | handoff schema 15→16 | `test/schema-versions.test.mjs`, `test/handoff-versioning.test.mjs`, `test/handoff-migration.test.mjs`, `test/cut-approval-gate.test.mjs`, `test/dispatch-pins.test.mjs`, `test/e114-cut-approval-inheritance.test.mjs`, `test/e123b9-lane-flip.test.mjs`, `test/e23-evidence-schema.test.mjs`, `test/e235a-relative-prd-path.test.mjs`, `test/e312-read-path-race.test.mjs`, `test/e405-release-runner.test.mjs`, `test/lane-migrate.test.mjs`, `test/stale-dispatch-detection.test.mjs` (:469), `test/success-metrics.test.mjs` (:130–133), `test/drift-skew.test.mjs` (:89, :232 "server max v15"), `test/e22-stale-notify.test.mjs` (:487), `test/repro-first-gate.test.mjs` (:302) | e431 (the last three are outside the plan's listed surface; they fall under "other tests red only because of this ticket") |
-| handoff schema 15→16 | `test/skill-evolution-v3.11.test.mjs` (:80 `handoff:\s*15,`) | **e423** — mail the integrator, do not edit |
+| handoff schema 15→16 | `test/skill-evolution-v3.11.test.mjs` (:80 `handoff:\s*15,`) | **e431** — lines 74–82 only (human ruling 1a, 2026-11-20); rest of file e423 |
 
 ## Cut
 
@@ -148,5 +148,5 @@ Ledger: `.current/e431/tasks.md` (written with `tw_add_task`). Chain for this ti
 | T-E431-07 | qa-engineer | P0 | New `test/e431-*.test.mjs`: one test per AC1–AC18 (titles start with the AC id) | `test/e431-*.test.mjs` | T-E431-06 |
 | T-E431-08 | qa-engineer | P1 | Re-pin transitions / PASS-identity / hint / description tests (Probe group 1) | ~5–9 test files | T-E431-06 |
 | T-E431-09 | qa-engineer | P1 | Re-pin registry count 34→35 and union 16→17 (Probe group 2) | 4 test files | T-E431-06 |
-| T-E431-10 | qa-engineer | P1 | Re-pin handoff schema 15→16 (Probe group 3); mail the integrator about `test/skill-evolution-v3.11.test.mjs` (e423) | ~17 test files | T-E431-06 |
+| T-E431-10 | qa-engineer | P1 | Re-pin handoff schema 15→16 (Probe group 3), including `test/skill-evolution-v3.11.test.mjs:80` (lines 74–82 only, re-assigned to e431) | ~17 test files | T-E431-06 |
 | T-E431-11 | qa-engineer | P0 | Review: run every AC `proof:`, full suite via `node scripts/test-lock.mjs -- npm test`, `dist/` scope, `npm audit --audit-level=high`; PASS | — | T-E431-07, T-E431-08, T-E431-09, T-E431-10 |
