@@ -3930,7 +3930,9 @@ function installedAgentTemplates() {
     .filter((f) => lstatOrNull(f) !== null);
 }
 
-function ejectCannotDoBlock() {
+// `flags` is adapterIndexFlags() output; item 5 is appended only when it is
+// non-empty, so an unflagged workspace gets the four-item block unchanged.
+function ejectCannotDoBlock(flags) {
   const present = installedAgentTemplates();
   const tail =
     present.length === 0
@@ -3948,7 +3950,11 @@ function ejectCannotDoBlock() {
     "       claude mcp remove -s user agent-governance-mcp\n" +
     "     Other hosts: remove this server's entry from their MCP config file by hand.\n" +
     "  4. Remove the machine-wide subagent templates in ~/.claude/agents/: they may be in use by other projects on this machine, so eject never deletes them. Present:\n" +
-    tail
+    tail +
+    (flags.length === 0
+      ? ""
+      : "  5. Clear git index flags: the adapter file(s) below are flagged in the git index, and git pull can fail on them until the flag is cleared. agc never runs git update-index:\n" +
+        flags.map(({ rel, flag }) => `       git update-index --no-${flag} ${escapeSegmentForDisplay(rel)}\n`).join(""))
   );
 }
 
@@ -3960,13 +3966,16 @@ function ejectCannotDoBlock() {
 //   display         the path named in that list; raw, escaped only when printed
 //   advisory        true for a report-only line that prints even with nothing to eject
 
-// Host-trace entries (class iii), in plan order: the CLAUDE.md adapter block,
-// AGENTS.md / .antigravityrules, and this workspace's artifact exclude lines.
+// Host-trace entries (class iii), in plan order: the adapter block in
+// CLAUDE.md then CLAUDE.local.md, AGENTS.md / .antigravityrules, and this
+// workspace's artifact and adapter exclude lines.
 // ctx = { cwd, repoRoot, workspace } (repoRoot null outside git).
 function planHostTraceEntries(ctx) {
   const entries = [];
-  const claude = planClaudeBlockEntry(ctx);
-  if (claude !== null) entries.push(claude);
+  for (const rel of CLAUDE_BLOCK_FILES) {
+    const claude = planClaudeBlockEntry(ctx, rel);
+    if (claude !== null) entries.push(claude);
+  }
   for (const { rel, tpl, mode } of ADAPTERS) {
     if (mode !== "skip") continue;
     const e = planAdapterFileEntry(ctx, rel, tpl);
@@ -3989,16 +3998,17 @@ function isWorkspaceFileTracked(ctx, rel) {
   return trackedArtifactPaths(ctx.repoRoot, [{ display: target, target }]).length > 0;
 }
 
-// Reverse of writeClaudeBlock: drop the first BEGIN..END block, markers
-// inclusive, keeping every byte outside it. When what remains is only
-// whitespace the file held nothing but the block (a fresh `agc init` creates
-// exactly that), so the whole file is deleted rather than left empty. An
-// absent file is skipped silently; a file without a well-formed marker pair
-// is reported and left alone.
-function planClaudeBlockEntry(ctx) {
-  const abs = path.join(ctx.cwd, "CLAUDE.md");
+// Reverse of writeClaudeBlock for `rel` (CLAUDE.md or CLAUDE.local.md): drop
+// the first BEGIN..END block, markers inclusive, keeping every byte outside
+// it. When what remains is only whitespace the file held nothing but the
+// block (a fresh `agc init` creates exactly that), so the whole file is
+// deleted rather than left empty; any other content keeps the file. An absent
+// file is skipped silently; a file without a well-formed marker pair is
+// reported and left alone.
+function planClaudeBlockEntry(ctx, rel) {
+  const abs = path.join(ctx.cwd, rel);
   if (!fs.existsSync(abs)) return null;
-  const display = workspaceDisplay(ctx.workspace, "CLAUDE.md");
+  const display = workspaceDisplay(ctx.workspace, rel);
   const label = `(iii) host traces — ${escapeSegmentForDisplay(display)}`;
   const existing = fs.readFileSync(abs, "utf-8");
   const beginIdx = existing.indexOf(CLAUDE_BEGIN);
@@ -4008,7 +4018,7 @@ function planClaudeBlockEntry(ctx) {
     return { line: () => line, apply: null, untrackedDelete: false };
   }
   const rest = existing.slice(0, beginIdx) + existing.slice(endIdx + CLAUDE_END.length);
-  const tracked = isWorkspaceFileTracked(ctx, "CLAUDE.md");
+  const tracked = isWorkspaceFileTracked(ctx, rel);
   if (rest.trim() === "") {
     return {
       line: (applied) =>
@@ -4069,13 +4079,13 @@ function planAdapterFileEntry(ctx, rel, tpl) {
   };
 }
 
-// Remove exactly the artifact exclude lines `agc init --artifacts=local`
-// wrote for THIS workspace's prefix from the shared info/exclude. A line is
-// removed only when it equals one of those rules (a trailing CR aside); every
-// other line — lane rules, another workspace's rules, the adopter's own —
-// keeps its exact bytes and position. A workspace whose path holds a
-// character unsafe for an exclude rule never had rules written (init refuses local mode
-// there), so there is nothing to look for.
+// Remove exactly the exclude lines `agc init --artifacts=local` and
+// `agc init --adapter=local` wrote for THIS workspace's prefix from the shared
+// info/exclude. A line is removed only when it equals one of those rules (a
+// trailing CR aside); every other line — lane rules, another workspace's
+// rules, the adopter's own — keeps its exact bytes and position. A workspace
+// whose path holds a character unsafe for an exclude rule never had rules
+// written (init refuses local mode there), so there is nothing to look for.
 function planExcludeEntry(ctx) {
   const label = "(iii) host traces — .git/info/exclude";
   if (ctx.repoRoot === null) {
@@ -4084,21 +4094,37 @@ function planExcludeEntry(ctx) {
   }
   if (ctx.workspace.unsafeSegment !== null) return null;
   const rules = new Set(artifactExcludeRulesForPrefix(ctx.workspace.prefix));
+  const [adapterRule] = artifactExcludeRulesForPrefix(ctx.workspace.prefix, ADAPTER_LOCAL_EXCLUDE_RULES);
   const { excludePath, existing, exists } = readSharedExclude(ctx.repoRoot);
   // Each line with its own terminator, so joining the survivors reproduces
   // their bytes exactly, including a missing final newline.
   const lines = exists ? existing.match(/[^\n]*\n|[^\n]+$/g) ?? [] : [];
-  const kept = lines.filter((l) => !rules.has(l.replace(/\r?\n$/, "")));
-  const n = lines.length - kept.length;
-  if (n === 0) {
+  let n = 0;
+  let adapterHit = false;
+  const kept = lines.filter((l) => {
+    const rule = l.replace(/\r?\n$/, "");
+    if (rules.has(rule)) {
+      n += 1;
+      return false;
+    }
+    if (rule === adapterRule) {
+      adapterHit = true;
+      return false;
+    }
+    return true;
+  });
+  if (n === 0 && !adapterHit) {
     const line = `${label}: nothing to remove`;
     return { line: () => line, apply: null, untrackedDelete: false };
   }
+  // Without the adapter rule the wording is the artifacts-only line as before.
+  const what = !adapterHit
+    ? `${n} artifact exclude line(s)`
+    : n === 0
+      ? `the ${adapterRule} line`
+      : `${n} artifact exclude line(s) and the ${adapterRule} line`;
   return {
-    line: (applied) =>
-      applied
-        ? `${label}: removed ${n} artifact exclude line(s)`
-        : `${label}: REMOVE ${n} artifact exclude line(s)`,
+    line: (applied) => (applied ? `${label}: removed ${what}` : `${label}: REMOVE ${what}`),
     apply: () => atomicWriteFile(excludePath, kept.join("")),
     untrackedDelete: false,
   };
@@ -4180,12 +4206,14 @@ function runEject(cwd, argv) {
   }
   entries.push(...planHostTraceEntries({ cwd, repoRoot, workspace }));
 
+  const indexFlags = repoRoot === null ? [] : adapterIndexFlags(cwd);
+
   if (tracked.length === 0 && !entries.some((e) => e.apply !== null)) {
     process.stdout.write("agc eject — nothing to eject.\n");
     for (const e of entries) {
       if (e.advisory) process.stdout.write(`${e.line(yes)}\n`);
     }
-    process.stdout.write(ejectCannotDoBlock());
+    process.stdout.write(ejectCannotDoBlock(indexFlags));
     return;
   }
 
@@ -4241,7 +4269,7 @@ function runEject(cwd, argv) {
         `Note: history still contains these files after that command.\n`
     );
   }
-  process.stdout.write(ejectCannotDoBlock());
+  process.stdout.write(ejectCannotDoBlock(indexFlags));
 }
 
 // --- dispatch --------------------------------------------------------------
