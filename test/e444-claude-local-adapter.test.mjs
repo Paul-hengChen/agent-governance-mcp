@@ -409,8 +409,17 @@ test("AC12: eject removes the local block + exclude line; keeps notes; no-block 
   // Integrator-accepted extra: a CLAUDE.local.md without an agc block is reported and untouched.
   const nb = teamRepo();
   write(path.join(nb, "CLAUDE.local.md"), "only my notes\n");
+  // Decision (k), last sentence: the user's own /CLAUDE.local.md rule survives a block-less
+  // eject, so the private file never turns into an untracked, committable file.
+  fs.appendFileSync(path.join(nb, ".git", "info", "exclude"), "/CLAUDE.local.md\n");
+  const nbDry = runAgc(nb, ["eject"]);
+  assert.equal(nbDry.status, 0, nbDry.stderr);
+  assert.ok(lines(nbDry.stdout).some((l) => keptLine.test(l)), `plan names the kept rule:\n${nbDry.stdout}`);
   const r3 = runAgc(nb, ["eject", "--yes"]);
   assert.equal(r3.status, 0, r3.stderr);
+  assert.ok(lines(r3.stdout).some((l) => keptLine.test(l)), `kept line printed:\n${r3.stdout}`);
+  assert.ok(excludeLines(nb).includes("/CLAUDE.local.md"), "rule kept for a block-less file");
+  assert.ok(!git(nb, ["status", "--porcelain"]).includes("CLAUDE.local.md"), "block-less notes stay out of git status");
   assert.ok(
     lines(r3.stdout).includes("(iii) host traces — CLAUDE.local.md: no adapter block found — nothing to do"),
     r3.stdout
