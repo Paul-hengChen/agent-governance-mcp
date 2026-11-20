@@ -1,0 +1,12 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [ ] T-E423-01 [P0] sr-engineer: gates/visual.ts mode parsing — add `prototype` to KNOWN_MODES (not FETCH_BASED_MODES); a declared but unrecognised token is returned (first such, only when no candidate yields a known mode; >40 chars cut to 40 + …) so the visual checks arm and `mode=` names it (spec D3/D4, AC15–AC18); build dist/gates/visual.* | depends_on: none
+- [ ] T-E423-02 [P0] sr-engineer: new SOP content/skill-spec-workshop.md (recommended_model: opus; six numbered steps + Short form; outputs: rulings table, ticket files in the ticket format, compact wave table + approval row; no handoff writes; no repo-only paths) per spec AC5–AC11 and Copy/Strings sop.* | depends_on: none
+- [ ] T-E423-03 [P0] sr-engineer: register prompt — prompts/spec-workshop.ts (integrator pattern, buildSpecWorkshopPrompt) + one tail PROMPT_REGISTRY entry in tools/registry.ts (nothing else in that file); build dist/prompts/spec-workshop.* and dist/tools/registry.* (spec AC1–AC4) | depends_on: T-E423-02
+- [ ] T-E423-04 [P1] sr-engineer: counts/lists 12 -> 13 — CLAUDE.md lines 7,10,33,38,41,42,122,130 in place (stays 250 lines; pinned lines untouched), README.md Per-Role Model Routing (count + integrator/spec-workshop rows), docs/install.md prompt list, docs/architecture.md line 18 (+ lines 20-21 only if D12 = a), CONTRIBUTING.md line 138 — exact text per spec claude.*/readme.*/install.*/arch.*/contrib.* (AC19, AC20) | depends_on: T-E423-03
+- [ ] T-E423-05 [P1] sr-engineer: append-only content edits — coord-01 Design-source detection: local prototype exports + no-ticket-file hint / ticket-file -> design-auditor; skill-design-auditor: `prototype` mode (list, detection row, 2a/2b/3 sentences, dual-source rule, escalation row); skill-integrator Stage 2: committed wave-table exception paragraph (spec D5–D8, AC12–AC14) | depends_on: none
+- [ ] T-E423-06 [P1] qa-engineer: new test/e423-*.test.mjs for AC1–AC4, AC6–AC17; re-pin expected reds e178a-integrator-role (AC3/AC5/:463), skill-frontmatter (13), e384-design-mode-declared, visual-evidence-gate (E319 AC-E319-5) | depends_on: T-E423-01, T-E423-02, T-E423-03, T-E423-04, T-E423-05
+- [ ] T-E423-07 [P1] qa-engineer: context-budget — new skill-spec-workshop stripped-token cap and teamwork bundle re-baseline at measured values, zero headroom; re-capture compose-golden skill-coordinator-monolith.txt with per-hunk notes; run AC19–AC23 commands and the full suite via test-lock | depends_on: T-E423-06
