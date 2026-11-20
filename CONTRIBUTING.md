@@ -50,7 +50,7 @@ tools/
   storage.ts              #   HandoffStorage interface
   storage-sqlite.ts       #   SQLite adapter (HTTP mode)
   config.ts               #   .current/.config.json loader
-  transitions.ts          #   ALLOWED_TRANSITIONS + round caps
+  transitions.ts          #   ALLOWED_TRANSITIONS + test-first overlay + round caps
   exemptions.ts           #   per-gate exemption resolution
   evidence-file.ts        #   QA evidence write/check
   stale-notify.ts         #   stale in-flight dispatch advisory
@@ -61,7 +61,7 @@ tools/
   rag.ts                  #   PRD chunking + embeddings (SQLite mode)
   rag-coalesce.ts         #   shared _indexingInFlight registry
 gates/                    # one module per gate predicate (14 files)
-  registry.ts             #   GATE_REGISTRY — 34 gate definitions
+  registry.ts             #   GATE_REGISTRY — 35 gate definitions
   pipeline.ts             #   runUpdateStatePipeline() step runner
   {cut-approval,scope-decision,feature-lease,external-refs,
    code-review,qa-review,evidence-schema,visual,expected-red,
