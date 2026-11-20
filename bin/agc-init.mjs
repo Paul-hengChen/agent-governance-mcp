@@ -1032,6 +1032,73 @@ async function checkComments(cwd) {
   }
 }
 
+// --- adapter placement + git index-flag advisories (E444) --------------------
+// The files the CLAUDE.md block can live in; the index-flag advisory covers
+// exactly these (AGENTS.md and .antigravityrules are out of scope).
+const CLAUDE_BLOCK_FILES = [ADAPTER_PLACEMENTS.shared, ADAPTER_PLACEMENTS.local];
+
+// Which of CLAUDE.md / CLAUDE.local.md the stale check reads: the file(s)
+// holding a block, else CLAUDE.md alone (any stamp in it, as before
+// CLAUDE.local.md was a placement).
+function claudeCheckTargets(cwd) {
+  const holders = CLAUDE_BLOCK_FILES.filter((rel) => fileHoldsClaudeBlock(path.join(cwd, rel)));
+  return holders.length > 0 ? holders : [ADAPTER_PLACEMENTS.shared];
+}
+
+// Git index flags on CLAUDE.md / CLAUDE.local.md, from `git ls-files -v`:
+// tag S or s = skip-worktree, any lowercase tag = assume-unchanged ("s" is
+// both). Returns [{ rel, flag }] with rel relative to cwd; [] outside git or
+// on any git failure. Read-only: agc never runs git update-index.
+function adapterIndexFlags(cwd) {
+  let out;
+  try {
+    out = execFileSync("git", ["ls-files", "-v", "-z", "--", ...CLAUDE_BLOCK_FILES], {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return [];
+  }
+  const flags = [];
+  const seen = new Set();
+  const add = (rel, flag) => {
+    const key = `${flag}\0${rel}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    flags.push({ rel, flag });
+  };
+  for (const entry of out.split("\0")) {
+    if (entry.length < 3 || entry[1] !== " ") continue;
+    const tag = entry[0];
+    const rel = entry.slice(2);
+    if (tag === "S" || tag === "s") add(rel, "skip-worktree");
+    if (tag !== tag.toUpperCase()) add(rel, "assume-unchanged");
+  }
+  return flags;
+}
+
+// Advisory only (never touches the exit code): the block in both files, and
+// index flags that hide local changes from git status and later stop git pull.
+function checkAdapterPlacement(cwd) {
+  if (CLAUDE_BLOCK_FILES.every((rel) => fileHoldsClaudeBlock(path.join(cwd, rel)))) {
+    process.stderr.write(
+      "agc check — adapter block found in both CLAUDE.md and CLAUDE.local.md — Claude Code loads both files, so the block is read twice; remove it from one of them\n"
+    );
+  }
+  for (const { rel, flag } of adapterIndexFlags(cwd)) {
+    if (flag === "skip-worktree") {
+      process.stderr.write(
+        `agc check — ${rel} is flagged skip-worktree in the git index: git status and git diff hide its local changes, and git pull stops with "local changes would be overwritten" once upstream changes it — clear the flag with: git update-index --no-skip-worktree ${rel}\n`
+      );
+    } else {
+      process.stderr.write(
+        `agc check — ${rel} is flagged assume-unchanged in the git index: git status and git diff hide its local changes, and git pull can stop with "local changes would be overwritten" once upstream changes it — clear the flag with: git update-index --no-assume-unchanged ${rel}\n`
+      );
+    }
+  }
+}
+
 // --- subcommand: check -----------------------------------------------------
 async function runCheck(cwd) {
   checkResearchBinaries(cwd); // advisory; never affects exit code
@@ -1041,12 +1108,16 @@ async function runCheck(cwd) {
   checkArtifactsDrift(cwd); // advisory; never affects exit code
   await checkHygiene(cwd); // advisory; never affects exit code
   await checkComments(cwd);
+  checkAdapterPlacement(cwd); // advisory; never affects exit code
 
   const ver = installedVersion();
   const stale = [];
   let present = 0;
 
-  for (const { rel } of ADAPTERS) {
+  const targets = ADAPTERS.flatMap(({ rel }) =>
+    rel === ADAPTER_PLACEMENTS.shared ? claudeCheckTargets(cwd) : [rel]
+  );
+  for (const rel of targets) {
     const target = path.join(cwd, rel);
     if (!fs.existsSync(target)) continue; // absent is not a stale condition
     present++;
