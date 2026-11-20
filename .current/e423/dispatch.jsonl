@@ -3,3 +3,5 @@
 {"ts":"2026-11-20T04:50:40.157Z","feature":"e423-spec-workshop","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-20T04:56:02.364Z","feature":"e423-spec-workshop","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-20T05:11:31.571Z","feature":"e423-spec-workshop","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-20T05:12:48.750Z","feature":"e423-spec-workshop","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-20T05:16:37.712Z","feature":"e423-spec-workshop","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
