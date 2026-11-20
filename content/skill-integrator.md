@@ -97,6 +97,8 @@ Input: tickets PM has already cut (backlog rows, a spec, or a wave of the execut
 
 Present the manifest as tables and **name every re-assignment and split**. Without the human's explicit yes in this session, do not enter stage 3. At this stage the human names every lane whose cut they still want to see in that lane's session (architect-hop lanes are the expected case); write `human` in the Lanes table's optional `approval` column for exactly those lanes, only on the human's instruction. Any other lane, in a workspace with `cutApprovalAutoTier.manifest: true`, may auto-approve its cut under Constitution §3.1 once your cut pre-review has closed. When Stage 0 ran, present the cut file with the manifest; one approval covers both.
 
+**Wave table approved in `spec-workshop`** — a stated exception to Constitution §3.1's rule that only a directly witnessed approval counts: when the manifest was converted from a committed `spec-workshop` wave table and the conversion changes none of the approved tickets, their grouping or their order, and leaves no open choice, Stage 2 does not halt. Write two Decisions rows: `人類` (`出處` = the wave-table file and its commit sha) and `整合者` (the conversion changed nothing). Any change to the approved tickets, their grouping or their order, or any open choice, halts here as above.
+
 ## Stage 3 — Dispatch
 
 **Pre-dispatch checks (every one, none optional)**:
