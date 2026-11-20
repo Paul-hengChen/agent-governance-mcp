@@ -61,3 +61,48 @@ No regression. One extra `parseHandoff` per `tw_complete_task` call and per code
 
 ## Verdict
 CHANGES_REQUESTED — one required finding: the moved PASS guard changes an unmarked write's outcome text outside the two deltas AC12 allows; the fix is a placement change in tools/handoff-orchestrator.ts, and everything else (marker, overlay, cap, counters, schema, judge identity, scope, docs) is correct.
+
+## Round 2 — APPROVED — by code-reviewer
+
+covers: T-E431-01, T-E431-02, T-E431-03, T-E431-04, T-E431-05, T-E431-06
+
+Reviewer model: opus. Scope of this round: fix commit `9926eee` (`git diff ce68ec3..9926eee`), checked against the spec and blueprint, plus a full-suite rerun of HEAD. Every check below was rerun against a fresh `npm run build` of HEAD.
+
+## Summary
+- `9926eee` touches tools/handoff-orchestrator.ts (guard moved, type annotation, comment), specs/qa-flow-enforcement-architecture.md:238 (one line), dist/ and lane state. Nothing else changed.
+- The PASS judge guard is back at its base position, tools/handoff-orchestrator.ts:1328-1341: after the `completed_tasks` normalisation and before `storage.parse`. It now reads the judge from `readPersistedChainPath(ws, active_feature)`. The post-context guard is gone.
+- Round-1 findings 1, 2, 3 and 5 are fixed. Finding 4 (optional) was left as is, which is allowed.
+- `npm run build` exits 0 and leaves `dist/` byte-identical to the committed tree (no diff after the build).
+- Full suite (`node scripts/test-lock.mjs -- npm test`): 4391 tests, 4320 pass, 69 fail, 2 skipped. The 69 failures match `qa_reports/expected-red_e431-test-first-server-path.txt` exactly: 0 unexpected, 0 missing.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1-AC11, AC13-AC20 — implemented. Round-1 evidence stands; `9926eee` touches none of them except AC4, rechecked below.
+AC4 — implemented — tools/handoff-orchestrator.ts:1332-1341 + tools/transitions.ts:187-202. Direct call on a marked feature: a qa-engineer PASS returns `⛔ BLOCKED: tw_update_state(status=PASS) is reserved for code-reviewer on a test-first feature (chain_path: test-first). Called by "qa-engineer". ...` and the handoff stays byte-identical. A sr-engineer PASS gets the same code-reviewer text. A code-reviewer PASS with `review_verdict: APPROVED` is accepted: `status: "PASS"` is written and `chain_path: "test-first"` is kept.
+AC12 — implemented — round-1 finding 1 is fixed. Unmarked sr-engineer PASS with a corrupted `handoff.md` (direct `handleUpdateState`): returns `⛔ BLOCKED: tw_update_state(status=PASS) is reserved for qa-engineer. Called by "sr-engineer". Hand off to qa-engineer and pass agent_id="qa-engineer".`, with no `isError` and no throw. That is base's `requireQaEngineer` text byte for byte. The missing-`agent_id` variant returns base's "unidentified agent" text. With a readable unmarked handoff the result is the same text and the handoff is unchanged. A marked file with a different `active_feature` reads as unmarked and returns the qa-engineer text, which matches the feature-change rule.
+OQ3 (AC12 widened, ruling a) — unchanged: an unmarked code-reviewer PASS still throws the refine `ZodError` (`status="PASS" requires agent_id="qa-engineer"`) before pre-flight.
+
+## Correctness
+No findings.
+- `readPersistedChainPath` (tools/handoff-orchestrator.ts:213-228) cannot throw earlier than base. `getActiveStorage()` does not throw, `storage.parse` is inside try/catch, and a non-file storage returns before any read. So the guard's only new I/O is a read-only peek that fails toward the unmarked (base) branch. Any `storage.parse` throw (corrupt file, newer-server file, SQLite) still happens where base had it, at :1344.
+- Peek vs the removed `resolvedChainPath`: the two agree on every PASS write except one. `isChainPathSetPoint` (tools/transitions.ts:405-413) is true for a PASS write only when `next.agent === "pm"`. So the one difference is a pm PASS carrying `chain_path` on an unmarked feature. It now gets the qa-engineer text instead of the code-reviewer text and is still rejected (direct call checked). Base has no equivalent, because base has no `chain_path` field. This is not a regression.
+- `resolvedChainPath` (:1413) is still used at :1514, :1595, :1619 and :1705, so removing the guard leaves no dead binding. The comment at :1410-1412 ("picks the feature's judge below") is still accurate.
+
+## Quality
+- Finding 2 is fixed: `let state: HandoffState | null;` at :219, with `HandoffState` added to the existing type-only import.
+- Finding 3 is fixed: the comment at :701 is one line. `agc check` no longer warns about the code-reviewer block. The only orchestrator warning left is :1501, which round 1 already kept with a reason.
+- The new guard comment (:1328-1331, 4 lines) is within the limit and explains why the peek is used.
+- Finding 4 (optional, tools/tasks.ts ternary) is unchanged. It is behaviour-neutral and not blocking.
+- Finding 5 is fixed: specs/qa-flow-enforcement-architecture.md:238 now names `MISSING_EVIDENCE` (the `PASS_MISSING_EVIDENCE` pipeline step).
+
+## Architecture
+The fix now follows the blueprint's decision record ("Every unmarked outcome keeps text, isError and ordering vs BLOCKED"). The identity check sits where base had it, the judge comes from the same read-only peek the code-reviewer pre-check uses (:1315-1323), and the pipeline gained no new step.
+
+## Security
+No findings. The peek is read-only, swallows parse errors toward the stricter (base) rule, and reads only the workspace's own handoff.
+
+## Performance
+No regression. Every PASS write now does one extra small `parseHandoff` read before pre-processing (code-reviewer PASS writes already did one). PASS writes are rare and the file is small.
+
+## Verdict
+APPROVED. The required AC12 finding is fixed with base text and ordering restored, AC4 and OQ3 still hold, the red set equals the manifest exactly, and nothing else in the diff regressed.
