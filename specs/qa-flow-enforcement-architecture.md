@@ -180,7 +180,62 @@ Derived mirror (see the footnote below) — the authoritative source is `ALLOWED
 
 This **replaces** the original v3.47.0 mechanism, which gated the same two edges on a `pending_notes` entry that, trimmed, exactly equalled `resume_of: <role>` (a literal string-grep convention). `tools/transitions.ts:39-44`'s own comment records the change: "Replaces the former next_pending_notes substring grep... which was removed with no fallback — legacy pending_notes tokens are inert (DR-2/DR-6)." A `pending_notes` line reading `resume_of: qa-engineer` today opens no edge; only the structured field does.
 
-These are NOT rows in the static table above — they are evaluated as step 3.5 in `validateTransition`, after the round-cap overrides, the hop-cap override (`HOP_CAP_EXCEEDED`, `tools/transitions.ts:494-518`, `HOP_CAP = 10` at `:388`), and the self-loop fast path, before the static-table lookup; the round caps and the hop cap therefore both outrank the resume edge. An absent or wrong-role field value opens no edge and falls through to the unchanged `TRANSITION_REJECTED` (the `allowed` list remains the static `pm:In_Progress` set — no new error code). The field is self-attested (trust class `scope_decision_why`): the server checks only field⟺target consistency; "the role was genuinely stranded" is a PM SOP attestation. Mode-agnostic (pure in-memory inputs; identical in file and SQLite/HTTP mode). The Scope Decision Gate and Cut-Approval Gate do not fire on these edges (their predicates require `next.agent ∈ {architect, sr-engineer}`).
+These are NOT rows in the static table above — they are evaluated as step 3.5 in `validateTransition`, after the round-cap overrides, the hop-cap override (`HOP_CAP_EXCEEDED`, `tools/transitions.ts:494-518`, `HOP_CAP = 10` at `:388`), and the self-loop fast path, before the static-table lookup; the round caps and the hop cap therefore both outrank the resume edge. An absent or wrong-role field value opens no edge and falls through to the unchanged `TRANSITION_REJECTED` (the `allowed` list remains the static `pm:In_Progress` set — no new error code). The field is self-attested (trust class `scope_decision_why`): the server checks only field⟺target consistency; "the role was genuinely stranded" is a PM SOP attestation. Mode-agnostic (pure in-memory inputs; identical in file and SQLite/HTTP mode). The Scope Decision Gate and Cut-Approval Gate do not fire on these edges (their predicates require `next.agent ∈ {architect, sr-engineer}`), with one exception: on a test-first feature (`chain_path: test-first`, see *Test-First Overlay* below) `(pm, In_Progress) → (qa-engineer, In_Progress)` is the build-entry edge, so every such write arms the Scope Decision, Cut-Approval, External-Refs and Source-Credibility gates, and `resume_of: "qa-engineer"` does not exempt it (human ruling, open question 1 of the E431 test-first blueprint: a qa-engineer resume after a pm amendment needs `cut_approved: true` on the pm write again, as every pm → sr-engineer re-entry already does). On an unmarked feature both resume edges stay exempt as described above.
+
+## Test-First Overlay (chain_path, E431)
+
+Derived mirror of `TEST_FIRST_OVERLAY` in `tools/transitions.ts` (E431, the server half of the test-first chain). `scripts/check-transitions-sync.mjs` parses only the matrix section above, so it does not check these tables; the E431 test suite compares them with the source instead. The matrix above is not edited and stays the old chain.
+
+A feature whose handoff carries `chain_path: test-first` (handoff schema v16, file mode only) runs pm → (architect) → qa-engineer (writes the scenario tests) → sr-engineer (builds until they pass) → code-reviewer (judges and writes PASS). For such a *marked* feature `validateTransition` looks up the effective successors of a key as: the matrix entries minus the closed edges below (matrix order kept), then the opened edges appended in table order (`allowedSuccessors(key, "test-first")`). Keys not listed are identical on both paths. The self-loop fast path, the Amend-Resume edges (including `(pm, In_Progress) → (code-reviewer, In_Progress)` with `resume_of: "code-reviewer"`) and the round-cap and hop-cap collapses apply on both paths unchanged. `qa-engineer:In_Progress` has no edge to code-reviewer on either path, so the tests qa-engineer writes always reach code-reviewer through sr-engineer.
+
+### Opened on a test-first feature
+
+None of these edges exists in the matrix, so an unmarked feature can never take one.
+
+| prev_agent | prev_status | opened (agent, status) |
+|---|---|---|
+| pm | In_Progress | (qa-engineer, In_Progress) |
+| architect | In_Progress | (qa-engineer, In_Progress) |
+| qa-engineer | In_Progress | (sr-engineer, In_Progress) |
+| sr-engineer | In_Progress | (qa-engineer, In_Progress) |
+| code-reviewer | In_Progress | (code-reviewer, PASS) |
+| code-reviewer | FAIL | (qa-engineer, In_Progress) |
+| code-reviewer | PASS | (pm, In_Progress), (researcher, In_Progress), (release-engineer, In_Progress), (design-auditor, In_Progress) |
+
+On a marked feature `(pm, In_Progress) → (qa-engineer, In_Progress)` needs no `resume_of`; on an unmarked one it stays the Amend-Resume edge above, and its rejection hint for qa-engineer now also points at the test-first entry (`chain_path: "test-first"` on the entry write, which needs an approved cut and no `resume_of`). `code-reviewer:PASS` has no matrix key, so on an unmarked feature every write after it is rejected (the state is unreachable there). Its four exits stay open when the write opens a new feature: see the feature-change exception in *Set-point rule* below.
+
+### Closed on a test-first feature
+
+Each of these edges exists in the matrix. A rejected write on a closed edge gets the usual `TRANSITION_REJECTED` hint plus the suffix ` This feature is on the test-first path (chain_path: test-first), which closes this edge.`
+
+| prev_agent | prev_status | closed (agent, status) |
+|---|---|---|
+| pm | In_Progress | (sr-engineer, In_Progress) |
+| architect | In_Progress | (sr-engineer, In_Progress) |
+| code-reviewer | In_Progress | (qa-engineer, In_Progress) |
+| qa-engineer | In_Progress | (qa-engineer, PASS), (qa-engineer, FAIL) |
+
+### Set-point rule
+
+`chain_path` admits only `"test-first"` and has no clearing value. On a feature not yet marked it may be carried only by a *set point* (`isChainPathSetPoint`):
+
+1. any pm write, or
+2. the entry write `(pm, In_Progress)` or `(architect, In_Progress)` → `(qa-engineer, In_Progress)`.
+
+A write is evaluated as marked when the persisted handoff of the same feature already carries the marker, or when the incoming write carries it at a set point. One exception applies on an `active_feature` change: a write out of `code-reviewer:PASS` that carries no `chain_path` is evaluated against the previous feature's marker, so the four exits out of `code-reviewer:PASS` (pm, researcher, release-engineer, design-auditor, all `In_Progress`) stay open. The previous marker judges only that exit; it is never persisted for the new feature. Any other write that carries it on an unmarked feature (sr-engineer, code-reviewer, qa-engineer outside the entry edge, architect including pm → architect, researcher, design-auditor, or a feature-opening write by a role other than pm) is rejected with `TRANSITION_REJECTED`; its `allowed` list is the unmarked successor set of the previous key. Once set, the marker is permanent for the feature: it is carried across writes that omit it, a repeated `chain_path` is a no-op, and pm re-entry does not re-arm it. An `active_feature` change drops it, so the new feature starts unmarked unless its own opening pm write carries it (the exception above only opens the exits and carries nothing). An in-flight old-path feature moves to the test-first path only through a pm write. In SQLite/HTTP mode the field is accepted by the tool schema but never persisted or passed to `validateTransition`, so every feature there is unmarked.
+
+### sr-return cap
+
+`(sr-engineer, In_Progress) → (qa-engineer, In_Progress)` is the sr-engineer return: the implementation contradicts a scenario test, and qa-engineer revisits it. `sr_return_count` counts these returns per feature (see *Round Counter Semantics*). When the persisted `sr_return_count ≥ 2` (`SR_RETURN_CAP`), the third return is rejected with `SR_RETURN_CAP_EXCEEDED`, `allowed: [(pm, In_Progress)]`, and a hint that names the count and routes to pm for a human ruling on the scenario. The cap is edge-specific: unlike the round caps it does not collapse the matrix, and every other write on the feature (for example sr-engineer → code-reviewer) is evaluated normally. It runs after the round caps and the hop cap, so a feature that has also reached one of those reports that code first. An `active_feature` change bypasses it. No cap-crossing pending note is added.
+
+### Judge rule
+
+On a marked feature code-reviewer is the judge (`judgeFor("test-first") === "code-reviewer"`); on an unmarked feature qa-engineer stays the judge and every check below behaves exactly as before.
+
+- **PASS**: only `agent_id: "code-reviewer"` may write `status: "PASS"` (from `code-reviewer:In_Progress`). Any other role's PASS on a marked feature returns `⛔ BLOCKED: tw_update_state(status=PASS) is reserved for code-reviewer on a test-first feature (chain_path: test-first). ...` and writes nothing. A code-reviewer PASS on an unmarked feature is rejected at the tool boundary with the same text as before (`status="PASS" requires agent_id="qa-engineer"`), ahead of the pre-flight guard. `review_verdict: "APPROVED"` is consistent with a code-reviewer PASS on a marked feature.
+- **completed_tasks**: only code-reviewer may grow it. A non-empty `completed_tasks` from any other role, qa-engineer included, is rejected with `NON_QA_COMPLETED_TASKS_REJECTED` and a marker-specific message naming code-reviewer as the judge. A code-reviewer FAIL with `review_task_ids` removes those ids from `completed_tasks`, as a qa-engineer FAIL does on the old path.
+- **tw_complete_task**: reserved for code-reviewer on the workspace's current feature when that feature is marked; a missing, unparseable or unmarked handoff keeps the qa-engineer rule.
+- **Evidence**: the PASS evidence gates are not yet adapted to the code-reviewer judge. A marked code-reviewer PASS whose `completed_tasks` lack `qa_reports/review_<id>.md` evidence is still rejected with `MISSING_EVIDENCE` (the `PASS_MISSING_EVIDENCE` pipeline step); aligning the evidence checks with the new judge is follow-up ticket E432.
 
 ## Round Counter Semantics
 
@@ -195,6 +250,18 @@ export function computeNewRound(prev_qa_round: number, next: TransitionTuple): n
 ```
 
 Round 4 (FAIL when prev_qa_round === 3): write succeeds (qa_round becomes 4) **but** server prepends a synthetic note to `pending_notes`: `"⛔ Round 4: forced rollback to pm — no further QA allowed until PM resets."`. Subsequent calls are gated by the round-cap override above.
+
+Test-first counter rules (E431; the events below occur only on a marked feature, because the overlay is what opens their edges):
+
+| event | counter | effect |
+|---|---|---|
+| next = `(code-reviewer, PASS)` | `review_round` | → 0 (one added branch in `computeNewRound`; its signature and 7-key return are unchanged) |
+| prev `(sr-engineer, In_Progress)` → next `(qa-engineer, In_Progress)` | `sr_return_count` | + 1 (`computeSrReturnCount`); the third return is rejected by the sr-return cap |
+| next = `(pm, In_Progress)` | `sr_return_count` | → 0 |
+| `active_feature` change | `sr_return_count` | 0 base |
+| any other write | `sr_return_count` | carried |
+
+`sr_return_count` is persisted in the handoff (schema v16, file mode only; absence reads as 0) and has no `*_total` mirror. On a marked feature the old `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` reset edge is closed, so `review_round` counts every code-reviewer FAIL until pm re-entry or the code-reviewer PASS.
 
 ## Interface Contracts
 

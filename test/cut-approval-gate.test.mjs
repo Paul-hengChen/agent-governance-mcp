@@ -119,7 +119,7 @@ test("R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed
   // evidence-schema versioning, e23 (evidence_schema pin, stamp-only, seeds
   // nothing). Re-baselined for the lane-layout migration (e123a): bumped 14->15
   // (dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing).
-  assert.match(raw, /schema_version:\s*15/, "schema_version must be 15 (e123a-lane-layout-migration)");
+  assert.match(raw, /schema_version:\s*16/, "schema_version must be 15 (e123a-lane-layout-migration)");
   assert.match(raw, /cut_approved:\s*true/, "cut_approved must be emitted as true");
 });
 
@@ -438,22 +438,23 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
+  registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
 
   const v4payload = { schema_version: 4, active_feature: "old-feat", status: "In_Progress" };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 15, "migration must bump schema_version to CURRENT (15)");
+  assert.equal(result.payload.schema_version, 16, "migration must bump schema_version to CURRENT (16)");
   assert.equal(result.payload.cut_approved, undefined, "v4→v5 migration MUST NOT seed cut_approved");
-  assert.deepEqual(result.applied, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the v4→v5 step must have been applied (v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, and v14→v15 also run to reach CURRENT)");
+  assert.deepEqual(result.applied, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "the v4→v5 step must have been applied (v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, and v14→v15 also run to reach CURRENT)");
   assert.equal(result.fromVersion, 4, "fromVersion must be 4");
-  assert.equal(result.toVersion, 15, "toVersion must be CURRENT (15)");
+  assert.equal(result.toVersion, 16, "toVersion must be CURRENT (16)");
 });
 
 test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)", () => {
   // WHY: AC-7 — no existing field may be modified or removed. Losslessness is
   // critical so that scope_decision, prd_path, qa_round, etc. survive the bump.
   // Re-baselined for the lane-layout migration (e123a): see M1 comment — chain
-  // extended to v15.
+  // extended to v16.
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -470,6 +471,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
+  registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
 
   const v4payload = {
     schema_version: 4,
@@ -485,7 +487,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 15, "schema_version bumped to CURRENT (15)");
+  assert.equal(result.payload.schema_version, 16, "schema_version bumped to CURRENT (16)");
   assert.equal(result.payload.active_feature, "scope-feat", "active_feature preserved");
   assert.equal(result.payload.scope_decision, "single-feature", "scope_decision preserved");
   assert.equal(result.payload.scope_decision_why, "small feature", "scope_decision_why preserved");

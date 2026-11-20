@@ -196,6 +196,18 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   up: (input) => ({ ...input, schema_version: 15 }),
 });
 
+// v15 -> v16: add optional chain_path marker and sr_return_count counter
+// (E431). Additive STAMP-ONLY, seeds nothing: absence of chain_path === the old
+// chain (every pre-v16 feature entered by it), absence of sr_return_count === 0
+// (a historical feature has never made a test-first return). Seeding either
+// would fabricate state. Same template as v14 -> v15.
+registerMigration<Record<string, unknown>, Record<string, unknown>>({
+  kind: "handoff",
+  from: 15,
+  to: 16,
+  up: (input) => ({ ...input, schema_version: 16 }),
+});
+
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

@@ -72,7 +72,7 @@ test("AC1: v13->v14 migration is stamp-only — bumps schema_version only, seeds
   // the public API without clearing the registry (the M1/M3-style tests do
   // that; this test intentionally exercises the real registry end to end).
   // Both steps are stamp-only, so the "no field added" assertion still holds.
-  assert.equal(CURRENT_VERSIONS.handoff, 15, "sanity: this server's CURRENT handoff version is 15 (e123a-lane-layout-migration)");
+  assert.equal(CURRENT_VERSIONS.handoff, 16, "sanity: this server's CURRENT handoff version is 16 (E431 chain_path/sr_return_count)");
   const v13Payload = {
     schema_version: 13,
     active_feature: "ac1-migrate-feat",
@@ -81,10 +81,10 @@ test("AC1: v13->v14 migration is stamp-only — bumps schema_version only, seeds
     evidence_schema: 2,
   };
   const result = runMigrations("handoff", v13Payload);
-  assert.deepEqual(result.applied, [14, 15], "the v13->v14 AND v14->v15 steps run on a v13 payload to reach CURRENT");
+  assert.deepEqual(result.applied, [14, 15, 16], "the v13->v14 AND v14->v15 steps run on a v13 payload to reach CURRENT");
   assert.deepEqual(
     result.payload,
-    { ...v13Payload, schema_version: 15 },
+    { ...v13Payload, schema_version: 16 },
     "the v13->v14 and v14->v15 steps must change schema_version ONLY — no field added, changed, or removed (both stamp-only, no seed)",
   );
   assert.equal(result.payload.cut_approved_source, undefined, "v13->v14 seeds NO cut_approved_source default (absence === non-inherited, the safe direction)");
@@ -122,7 +122,7 @@ visual_rounds_total: 0
   resetSession(ws);
   const json = JSON.parse(readHandoffState(ws));
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.match(readRaw(ws), /schema_version:\s*15/, "on-disk v13 fixture migrates to CURRENT (15)");
+  assert.match(readRaw(ws), /schema_version:\s*16/, "on-disk v13 fixture migrates to CURRENT (16)");
   assert.equal(json.cut_approved_source, undefined, "the v13->v14 step invents no claim for a historical payload");
   assert.equal(json.active_feature, "ac1-real-v13-feat", "sibling field survives losslessly");
 });
@@ -155,7 +155,7 @@ visual_round: 0
   resetSession(legacyWs);
   const legacyJson = JSON.parse(readHandoffState(legacyWs));
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.match(readRaw(legacyWs), /schema_version:\s*15/, "sanity: the legacy fixture migrated to CURRENT");
+  assert.match(readRaw(legacyWs), /schema_version:\s*16/, "sanity: the legacy fixture migrated to CURRENT");
   assert.equal(legacyJson.cut_approved_source, undefined, "a pre-E114 handoff must read cut_approved_source as undefined, not a false 'not inherited' or false 'inherited'");
 
   // Case 2: a fresh, current-schema write that simply never set the field.

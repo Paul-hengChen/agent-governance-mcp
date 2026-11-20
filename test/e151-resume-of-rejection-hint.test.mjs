@@ -23,11 +23,16 @@ function req(prev, next, extra = {}) {
 }
 const PM = { agent: "pm", status: "In_Progress" };
 
+// E431 AC9: a qa-engineer target also gets the test-first entry hint appended.
+const PM_TO_QA_HINT =
+  ' Test-first entry: set chain_path: "test-first" on the entry write instead (needs an approved cut; no resume_of).';
+
 function s1(role, received) {
   return (
     `No edge pm:In_Progress → ${role}:In_Progress in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md. ` +
     `Amend-Resume edge: set resume_of: "${role}" on this write itself (the resuming write, not only the PM amendment) ` +
-    `to open pm:In_Progress → ${role}:In_Progress; received resume_of: ${received}.`
+    `to open pm:In_Progress → ${role}:In_Progress; received resume_of: ${received}.` +
+    (role === "qa-engineer" ? PM_TO_QA_HINT : "")
   );
 }
 

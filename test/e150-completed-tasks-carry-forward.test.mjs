@@ -492,7 +492,7 @@ test("AC20: the tw_update_state completed_tasks description states the new lifet
   const desc = tool("tw_update_state").inputSchema.properties.completed_tasks.description;
   assert.equal(
     desc,
-    'Task ids QA has completed for this feature (only agent_id "qa-engineer" may change it). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; a qa-engineer FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
+    'Task ids the judge has completed for this feature (only agent_id "qa-engineer" may change it; "code-reviewer" on a test-first feature). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; the judge\'s FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
   );
   const src = fs.readFileSync(path.join(PROJECT_ROOT, "tools/registry.ts"), "utf8");
   assert.equal(src.split("Tasks completed now").length - 1, 0);

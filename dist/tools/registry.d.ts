@@ -133,6 +133,9 @@ declare const UpdateStateArgs: z.ZodObject<{
         feature: "feature";
         bugfix: "bugfix";
     }>>;
+    chain_path: z.ZodOptional<z.ZodEnum<{
+        "test-first": "test-first";
+    }>>;
     cut_approved_source: z.ZodOptional<z.ZodString>;
     dispatch_mechanism: z.ZodOptional<z.ZodEnum<{
         task: "task";

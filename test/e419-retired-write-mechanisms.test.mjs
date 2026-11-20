@@ -73,8 +73,8 @@ test("AC2: GATE_REGISTRY and UPDATE_STATE_GATE_PIPELINE exclude both retired cod
   }
 });
 
-test("AC2: the registry has 34 gates and the pipeline 17 steps", () => {
-  assert.equal(GATE_REGISTRY.length, 34);
+test("AC2: the registry has 35 gates and the pipeline 17 steps", () => {
+  assert.equal(GATE_REGISTRY.length, 35);
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17);
 });
 
