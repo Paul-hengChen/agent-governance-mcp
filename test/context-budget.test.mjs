@@ -492,6 +492,21 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4791 cap", () => {
   assert.ok(toks <= 4791, `skill-pm stripped body (${toks} ~tok) must be ≤ 4791 (AC9, E437-E440 re-baseline, zero headroom)`);
 });
 
+test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1092 cap", () => {
+  // WHY: the spec-workshop prompt is prompt-only and human-started, but its SOP body still loads in full
+  // on every invocation; a cap stops it growing unnoticed. Same measurement as the pm cap: the body is
+  // measured as production composes it, stripRationale(stripOriginTags(expandSkill(body))), frontmatter
+  // stripped, zero headroom (E336/E365 convention).
+  const SKILL_SW = fs.readFileSync(path.join(ROOT, "content", "skill-spec-workshop.md"), "utf-8");
+  const body = SKILL_SW.startsWith("---")
+    ? SKILL_SW.slice(SKILL_SW.indexOf("---", 3) + 3).trimStart()
+    : SKILL_SW;
+  const stripped = stripRationale(stripOriginTags(expandSkill(body)));
+  const toks = approxTokens(stripped);
+  // E423 baseline: new SOP, measured 1092 ~tok, zero headroom.
+  assert.ok(toks <= 1092, `skill-spec-workshop stripped body (${toks} ~tok) must be ≤ 1092 (AC21, E423 baseline, zero headroom)`);
+});
+
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2805 cap", () => {
   // WHY: the same budget for the sr-engineer dispatch, with the same composition and zero-headroom
   // cap rule as the pm cap test above. History: specs/e260i-comment-rationale.md
@@ -578,7 +593,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18465 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18614 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -599,7 +614,8 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // E418 re-baseline: const-08, coord-03, coord-04 and coord-06 prose trim, -2490 ~tok; was 21715, zero headroom.
   // E437-E440 re-baseline (ruling 2 = a, 2026-11-18): constitution trims above plus coord-02/03/05 path, label and E440 rewrites, -213 ~tok (measured 19012); was 19225, zero headroom.
   // E419 re-baseline: the two const-08 bullets are deleted, -547 ~tok (measured 18465); was 19012, zero headroom.
-  assert.ok(bundle <= 18465, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 18465 (AC8 design-arm floor, E419 re-baseline, zero headroom)`);
+  // E423 re-baseline: coord-01 gains the local prototype-export match bullet and the no-ticket-file hint paragraph, +149 ~tok (measured 18614); was 18465, zero headroom.
+  assert.ok(bundle <= 18614, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 18614 (AC8 design-arm floor, E423 re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

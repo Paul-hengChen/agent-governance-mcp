@@ -69,8 +69,11 @@ Match any of:
 - Host patterns: `figma.com`, `*.figma.com`, `sketch.cloud`, `xd.adobe.com`, `penpot.app`, `marvelapp.com`, `invisionapp.com`, `framer.com`.
 - File extensions referenced as design: `.fig`, `.sketch`, `.xd`, `.penpot`, plus `.pdf` / `.png` / `.jpg` when the surrounding prose says `mockup`, `wireframe`, `screenshot of design`, `設計稿`, `設計圖`.
 - Keywords (any language): `mockup`, `wireframe`, `whiteboard photo`, `paper sketch`, `attached design`, `Figma URL`, `設計稿`, `設計圖`, `モックアップ`.
+- Local prototype exports: a local directory or `.html` page exported from a design tool as a prototype (a single-screen prototype page or a runnable demo app), or local files the prose calls a `prototype`, `原型` or `プロトタイプ` of the design.
 
 If ≥ 1 hit → route to `design-auditor` *before* PM. The auditor produces `design/<feature>.md`, PM copies its tables into `specs/<feature>.md`. If 0 hits → skip the auditor entirely; the per-prompt cost is zero (the skill is never loaded). This is the token-frugal default.
+
+A local prototype export with no ticket file → reply only with "No ticket file for this design prototype — start the `spec-workshop` prompt first." and stop (no chain). With a ticket file → route to `design-auditor` as above. A ticket file is a Markdown file in the ticket format, by default under `docs/tickets/` (`ticketDir` in `.current/.config.json`).
 
 ## Auto-Routing
 
