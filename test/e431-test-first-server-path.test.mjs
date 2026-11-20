@@ -435,6 +435,28 @@ for (const next of EXIT_ROLES) {
   });
 }
 
+test("AC11: feature-change write out of marked code-reviewer:PASS that carries chain_path ignores the old marker (pm marks the new feature; other roles rejected)", async () => {
+  // Why: the previous marker only opens the exits for a write that carries no chain_path;
+  // a carrying write is judged by the set-point rule alone, so the old marker cannot
+  // launder a non-pm role into marking a new feature.
+  const ws = mkWs("e431-ac11cp-");
+  await seed(ws, F, "code-reviewer", "PASS", { chainPath: "test-first" });
+  const ok = await upd(ws, { active_feature: "e431-next-cp", status: "In_Progress", agent_id: "pm", chain_path: "test-first" });
+  assert.ok(!rejected(ok), `pm opening a new feature with chain_path accepted: ${text(ok)}`);
+  assert.equal(state(ws).active_feature, "e431-next-cp");
+  assert.equal(state(ws).chain_path, "test-first", "the new feature is marked by its own pm write");
+
+  for (const role of ["researcher", "release-engineer", "design-auditor"]) {
+    const ws2 = mkWs("e431-ac11cp2-");
+    await seed(ws2, F, "code-reviewer", "PASS", { chainPath: "test-first" });
+    const before = handoffBytes(ws2);
+    const r = await upd(ws2, { active_feature: "e431-next-cp", status: "In_Progress", agent_id: role, chain_path: "test-first" });
+    assert.ok(rejected(r), `${role} carrying chain_path on a feature change must be rejected`);
+    assert.match(text(r), /TRANSITION_REJECTED/);
+    assert.equal(handoffBytes(ws2), before);
+  }
+});
+
 // ---------------------------------------------------------------- AC12
 
 const NOTHING_NEW = (s) => {

@@ -619,7 +619,7 @@ test("AC-4: rejection envelope shape — error/attempted/allowed/hint keys prese
   const block = indexTs.slice(indexTs.indexOf('error: "SCOPE_DECISION_REQUIRED"'));
   assert.match(block, /error:\s*"SCOPE_DECISION_REQUIRED"/, "error code token");
   assert.match(block.slice(0, 1200), /attempted:\s*\{/, "attempted tuple");
-  assert.match(block.slice(0, 1200), /allowed:\s*\(ALLOWED_TRANSITIONS\.get\("pm:In_Progress"\)/, "allowed echoes pm:In_Progress edges");
+  assert.match(block.slice(0, 1200), /allowed:\s*allowedSuccessors\("pm:In_Progress"/, "allowed echoes pm:In_Progress edges");
   assert.match(block.slice(0, 1200), /hint,/, "hint field");
   assert.match(block.slice(0, 1600), /isError:\s*true/, "isError:true rejection");
 });
