@@ -2,7 +2,7 @@
 base: 8d57e41    integration branch: integ/v5-w3
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類已核准 2026-11-20（Stage 2，E432 ∥ E444）；待派工。**
+**狀態：已結案 2026-11-20。** 兩條 lane 都已合併進 `integ/v5-w3`（e432 merge `80a83c0`、e444 merge `8ab5d3d`，都零衝突、無實質解衝突）、finish、拆除；派工 base `5f50af1`（清單 PR #160 merge）；整合 branch 自 `main` `d7d917c` 開（波中 PR #161 開了 E445，不屬本波）；merge 後 build 無 `dist/` 差異、audit 通過、`CLAUDE.md` 250 行、共用生成物未動；本波以一個 PR 合進 `main`，不發版（16.1 裁定 18）。lane 層 CI：e432 run 44715287224 @ `f6ece2c` 紅（Node 20 的 AC12 測試讀 base 樹的時機錯誤，送回 qa 修），修後 run 44721118494 @ `11f5944` 綠；e444 run 44727017206 @ `f6a7b9c` 綠。Roll-up：e432 tickets 7、hop 5/14、review 退回 0、qa 退回 0；e444 tickets 7、hop 7/14、review 退回 0、qa 退回 0（qa 中途一次 Blocked 交 sr 做裁定後的修正，不計輪次）；證據 7/7、7/7。人類在 lane session 的裁定見 Decisions（e432 D2、OQ1–OQ6；e444 (e)(h)、(j)、(k)(l)）。
 
 範圍由人類指定（integrator prompt「fan-out v5.0.0 里程碑的下一波」，2026-11-20）：下一張是 E432，並找出剩下的票裡能與它同時跑的。E432 是 v5.0.0 里程碑的票（`docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 16.1 裁定 17 的順序）；依裁定 18，合進 `main` 但不單獨發版，與 E435 一起發 v5.0.0。本波結束時不發版。人類隨後問 E444（2026-11-20 開的票，不在里程碑內）能否同時跑：相依為無、檔案面與 E432 不相交，加入本波（待核准）。
 
@@ -110,9 +110,10 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 
 ## 整合後（整合者自己的 commit／接線）
 - merge 後 `node scripts/merge-invariants.mjs`；`npm run build` 後 `dist/` 無差異；golden capture 無差異；預算在上限內；`CLAUDE.md` 250 行。
-- 記帳：E432、E444 done-mark（not yet released）；`npm run check:bookkeeping` exit 0。
+- 記帳：E432、E444 done-mark（not yet released）；`npm run check:bookkeeping` exit 0。（已完成：`docs/backlog.md` 兩列、佇列 `docs/v4.0.0-new-tickets.md` E432 列；E444 不在佇列裡。E433 列補上 OQ4 的 `hintStatic` 備註。）
 - 接線票：無。
 - 不發版（裁定 18）：從本波合併到 E435 發版之間不從 `main` 發版。E444 是 adopter 回報的缺陷、不在里程碑內，合進 `main` 後也要等 v5.0.0 才發出；若要更早給 adopter，須依裁定 18 從 v4.22.0 tag 另開 v4.x 分支，做法未定（人類決定）。
+- 交給 E433 的 cut（不開新票）：e432 架構 OQ4 把 `MISSING_EVIDENCE`、`EXPECTED_RED_DIFF_MISSING`、`AC_EXECUTION_LOG_MISSING` 在新路徑上指向 skill-qa-engineer 的提示文字留給 E433 改寫，這些文字是 `gates/registry.ts` 的 `hintStatic`，不在 E433 票面的檔案清單裡；E433 的 cut 要把 `gates/registry.ts` 列進來或寫明不改。
 - 兩條 lane 共用同一個帳號額度（2026-11-19 起單一帳號）：並行會加快額度消耗，遇到 usage limit 時兩條都會停。
 - 若本波升了 handoff schema：合併後 primary 的 MCP server 需重啟，下一次 `tw_*` 呼叫才會跑合併後的程式。
 
@@ -135,3 +136,26 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-20 | 人類 | 詢問 E444 能否與 E432 同時開發 | 整合者 session（「我剛剛有開另一張票 e444，可以同步進行開發嗎？」） |
 | 2026-11-20 | 整合者 | E444 核對：相依為無、不在里程碑內、檔案面（`bin/agc-init.mjs`、`docs/install.md`、`README.md` 第 33–36 行）與 e432 不相交、無共用生成物、無 `dist/`；碰到 e432 擁有的 5 個測試檔都只是順帶提到，已在派工前核對寫明 e444 要維持的條件；`test/e351-lane-protocol-gaps.test.mjs` AC-E351-5 釘 `ARTIFACT_EXCLUDE_RULES` 四條，劃給 e444；提議加入本波，合併順序 e432 先 | 本檔 |
 | 2026-11-20 | 人類 | 核准兩條 lane 的清單（e432 ∥ e444），含本檔所有權重劃（共用生成物本波不歸任何 lane；`CLAUDE.md` Layout 列預先劃給 e432；第 2 波 e431 的檔有條件劃給 e432；跨 lane 測試釘點的條件）、Dispatch pins 與合併順序 e432 先；接受第 2 波交接 `handoff --check` 的兩個 `DIFF`（PR #159 造成）；本波結束不發版；寫進各 lane 的 spec，lane 不再問。E444 何時發給 adopter（等 v5.0.0 或另開 v4.x 分支）未裁定，不影響本波 | 整合者 session（回覆「approve」） |
+| 2026-11-20 | 人類 | e432 cut 核准（cut 預審整合者 close，to-lane#2）：D2 = (a) ——「不需新測試」紀錄是檔案 `qa_reports/no-new-test_<feature>.txt`，只看存在、只在 file mode，handoff schema 維持 16；D4 沿用 `REPRO_MANIFEST_MISSING`、不加 pipeline 步驟，其餘照草稿。只影響 e432 | e432 lane session；`specs/e432-judge-report-checks.md` D2 列，lane commit `7460f89` |
+| 2026-11-20 | 人類 | e444 cut 核准（cut 預審整合者 close，to-lane#3）：(h) —— 票面 acceptance 1 的「`git status` 無變化」解讀為 porcelain 不列 `CLAUDE.md`、`CLAUDE.local.md` 與 artifact 路徑（`AGENTS.md`、`.antigravityrules` 照裁定 3 照舊建立，fixture 先 commit）；(e) —— 一行建議只在本次新附加區塊進被追蹤的 `CLAUDE.md` 時印，artifacts `repo` 時也印（寫入的檔案不變，多一行 stderr）。只影響 e444 | e444 lane session；`specs/e444-claude-local-adapter.md` Decisions，lane commit `8720b17` |
+| 2026-11-20 | 人類 | e432 架構 Open Questions（第二次預審整合者 close，to-lane#5）：OQ1–OQ6 照 architect 預設——OQ1 已標記 feature 的 `qa-engineer:Blocked → sr-engineer` 也要清單或「不需新測試」紀錄；OQ2 lane-status 不論標記都認 code-reviewer 的 PASS 標頭；OQ3 `scripts/release.mjs` 自寫裁判規則（E435 拆）；OQ4 三個錯誤碼的提示改寫留給 E433；OQ5 報告首行不變；OQ6 改寫 `tools/registry.ts` 的 `qa_review`、`qa_suite_result` 描述。只影響 e432 | e432 lane session；`specs/e432-judge-report-checks-architecture.md` Open Questions，lane commit `da8cc53` |
+| 2026-11-20 | 人類 | e444 預設規則延伸（sr 實作時提出，整合者建議採納，to-lane#5）：decision (j) —— 沒帶 `--adapter` 時，`CLAUDE.local.md` 有區塊而 `CLAUDE.md` 沒有 → `local`，先於裁定 1（B'）的四條件判斷；與裁定 1「重跑 init 行為不變」同一原則。新增 AC2b 與 T-E444-06。只影響 e444 | e444 lane session；`specs/e444-claude-local-adapter.md` decision (j)，lane commit `2c7d1bf` |
+| 2026-11-20 | 人類 | e444 code review 建議 R3、R2 在本 lane 修（整合者建議，to-lane#11）：decision (k) —— `agc eject` 保留含使用者筆記的 `CLAUDE.local.md` 時，一併保留 `/CLAUDE.local.md` 的 exclude 行並在計畫說明，只剩區塊時照舊刪檔刪行；decision (l) —— decision (j) 隱含 `local` 遇到不安全路徑段時的拒絕文字不再寫「refusing --adapter=local」，exit 2、不寫檔不變。新增 AC7b、T-E444-07，AC12 修訂。只影響 e444 | e444 lane session；`specs/e444-claude-local-adapter.md` decisions (k)、(l)，lane commit `e89c82b` |
+| 2026-11-20 | 整合者 | e432 5a：`fanout.mjs check` 報 `test/e431-test-first-server-path.test.mjs` 越界，屬機械性誤報——本檔「派工前核對」的版本號／條數釘點與讀原始碼表都列了該檔，擁有欄以「三張測試清單列出的測試檔全部」概括，工具不解析這句。改動是 architect 預測的 5 個 fixture 補 no-new-test 檔、斷言未改，接受 | 本檔；lane branch `f6ece2c` |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ d7d917c
+- 目標分支對 origin：一致
+- git status：1 項： M .current/_primary/handoff.md
+- worktree：primary（main ← integ/v5-w3 @ d00af59）
+- lane-status：primary（main ← integ/v5-w3 @ d00af59）release-cd-v4.22.0／In_Progress／release-engineer，hop 3，commits 0，dirty
+### 已結案
+- 本波 2 條 lane、2 張票（E432、E444）全部 qa PASS、合併、finish、拆除；兩張都 not yet released——E432 依 16.1 裁定 18 隨 v5.0.0（E435）發出，E444 不在里程碑內，但同樣不從 `main` 單獨發版。lane 紀錄在 `.current/history/2026-11/{e432,e444}/`；裁定與驗證細節在本檔 Decisions 與狀態行。新發現：無（兩條 lane 都沒有 pending-tickets），無未配號的新發現。e432 架構 OQ4 留給 E433 的提示改寫已寫進 `docs/backlog.md` E433 列（不開票）。git status 那一項是 primary handoff 的 schema 15→16 lazy migration（server 讀檔時寫回；`next_role`、`dispatched_at` 本來就只屬於寫入它們的那一次），不屬本波。
+### 待人類決定
+- E444 何時發給 adopter：等 v5.0.0，或依裁定 18 從 v4.22.0 tag 另開 v4.x 分支（做法未定）。
+- 是否開下一波：v5.0.0 里程碑順序的下一張是 E433（相依 E432，本波已合併）；E433 的 cut 要處理 E433 列新增的 `gates/registry.ts` 提示備註。
+- primary 的 `.current/_primary/handoff.md` 未提交的 lazy migration 改動要不要提交。
+### 進行中的背景工作
+無

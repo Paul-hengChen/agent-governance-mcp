@@ -7,7 +7,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
+import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
 
 // The H2 heading qa-engineer's Phase 3.5 writes (skill-qa-engineer SOP 6a).
 const DISPOSITION_HEADING = "AC Execution Log";
@@ -31,8 +31,8 @@ export interface AcDispositionResult {
 // whitespace classes, so mid-line "proof:" prose never arms.
 const PROOF_LINE_RE = /^[^\S\n]*proof[^\S\n]*:/im;
 
-function qaReportsDir(workspacePath: string): string {
-  return path.join(workspacePath, "qa_reports");
+function judgeReportDir(workspacePath: string): string {
+  return resolveJudgeReport(workspacePath).dir;
 }
 
 // Same sanitiser as expectedRedManifestPath: replace disallowed chars and collapse
@@ -46,7 +46,7 @@ export function specFilePath(workspacePath: string, activeFeature: string): stri
 
 // Mirrors gates/qa-review.ts evidencePath (same dir, same encodeEvidenceId stem).
 function reviewPath(workspacePath: string, taskId: string): string {
-  return path.join(qaReportsDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
+  return path.join(judgeReportDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
 
 // Arm check: armed iff specs/<feature>.md exists and has >= 1 proof: line; a
@@ -76,7 +76,7 @@ export function hasAcExecutionLogDisposition(
   taskIds: string[],
   evidenceSchema?: number,
 ): AcDispositionResult {
-  const dir = qaReportsDir(workspacePath);
+  const dir = judgeReportDir(workspacePath);
   let coverage: Map<string, string> | null = null;
   const checked = new Set<string>();
   const checkedPaths: string[] = [];

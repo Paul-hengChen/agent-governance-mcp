@@ -7,10 +7,10 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
+import { buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
 
 function evidenceDir(workspacePath: string): string {
-  return path.join(workspacePath, "qa_reports");
+  return resolveJudgeReport(workspacePath).dir;
 }
 
 function evidencePath(workspacePath: string, taskId: string): string {

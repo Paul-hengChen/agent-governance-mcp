@@ -313,19 +313,20 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
   },
   {
     // QA completion-evidence gate: closes the identity-swap gap (another role writing
-    // agent_id="qa-engineer" with pre-filled completed_tasks). A qa-engineer write that
-    // adds ids to the on-disk completed set needs per-id QA evidence on disk
-    // (hasEvidenceInFile from gates/qa-review.ts, covers: honored); ids already there are
-    // exempt, and no edge or verdict is. Runs after the qa_review auto-record, so a PASS
+    // agent_id="qa-engineer" with pre-filled completed_tasks) (E432: the feature's
+    // judge — code-reviewer on a test-first feature — is armed the same way). A
+    // qa-engineer write that adds ids to the on-disk completed set needs per-id
+    // QA evidence on disk (hasEvidenceInFile from gates/qa-review.ts, covers:
+    // honored); ids already there are exempt, and no edge or verdict is. Runs after the qa_review auto-record, so a PASS
     // or FAIL write's own evidence counts. File mode only.
     // Spec: specs/c16-c10-role-boundary.md (the E32 amendment).
     errorCode: "QA_COMPLETION_EVIDENCE_MISSING",
     producer: "orchestrator",
     envelope: "plain-text",
     triggerEdge:
-      "any qa-engineer-stamped write whose completed_tasks adds ids not in the on-disk completed set — no edge/status/verdict exemption (file-mode only)",
+      "any write by the feature's judge (qa-engineer; code-reviewer on a test-first feature, chain_path: test-first) whose completed_tasks adds ids not in the on-disk completed set — no edge/status/verdict exemption (file-mode only)",
     armCondition:
-      "agent_id=qa-engineer && newly-added completed ids non-empty && hasEvidenceInFile(newIds).missing non-empty; FileHandoffStorage only",
+      "agent_id === resolveJudgeReport().judge && newly-added completed ids non-empty && hasEvidenceInFile(newIds).missing non-empty; FileHandoffStorage only",
     clearingArtifact:
       "qa_reports/review_<id>.md (or a covers: file) on disk for every newly-added id — including via the qa_review auto-record on this same write",
     hintStatic:
@@ -370,14 +371,21 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     // Repro-first gate for bugfix tickets: on sr-engineer:In_Progress ->
     // code-reviewer:In_Progress, when prevState.dispatch_mode is "bugfix" and no
     // qa_reports/expected-red_<feature>.txt manifest exists (hasExpectedRedManifest).
+    // E432: also arms on qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress
+    // on a test-first feature (chain_path: test-first) unless
+    // qa_reports/no-new-test_<feature>.txt exists (hasNoNewTestRecord);
+    // marker-specific message, no hintStatic.
     // Plain-text family, so not in the TransitionRejection["error"] union.
     // Design: specs/e2-bugfix-repro-gate-architecture.md.
     errorCode: "REPRO_MANIFEST_MISSING",
     producer: "orchestrator",
     envelope: "plain-text",
-    triggerEdge: "sr-engineer:In_Progress -> code-reviewer:In_Progress (file-mode only)",
-    armCondition: "prevState.dispatch_mode === bugfix; FileHandoffStorage only",
-    clearingArtifact: "qa_reports/expected-red_<feature>.txt present (hasExpectedRedManifest)",
+    triggerEdge:
+      "sr-engineer:In_Progress -> code-reviewer:In_Progress (bugfix), or qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress on a test-first feature (chain_path: test-first) (file-mode only)",
+    armCondition:
+      "prevState.dispatch_mode === bugfix on the sr -> code-reviewer edge, or resolveChainPath() === test-first on the qa -> sr edge without a no-new-test record (hasNoNewTestRecord); FileHandoffStorage only",
+    clearingArtifact:
+      "qa_reports/expected-red_<feature>.txt present (hasExpectedRedManifest); on the test-first qa -> sr edge, qa_reports/no-new-test_<feature>.txt present also clears (hasNoNewTestRecord)",
     hintStatic:
       "Bugfix-mode fix cannot hand off to code-reviewer until " +
       "qa_reports/expected-red_<feature>.txt records the failing reproduction " +
@@ -576,8 +584,9 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     producer: "orchestrator",
     envelope: "plain-text",
     triggerEdge:
-      "qa-engineer PASS/FAIL write carrying qa_review with review_task_ids and completed_tasks both empty",
-    armCondition: "qa_review present && agent_id=qa-engineer && status in {PASS, FAIL}",
+      "PASS/FAIL write by the feature's judge (qa-engineer; code-reviewer on a test-first feature) carrying qa_review with review_task_ids and completed_tasks both empty",
+    armCondition:
+      "qa_review present && agent_id=judge (qa-engineer; code-reviewer on a test-first feature) && status in {PASS, FAIL}",
     clearingArtifact:
       "review_task_ids=[<task-id>, ...] naming the reviewed task(s) on the write (or completed_tasks on PASS)",
     // Spec Copy/Strings row (d9-qa-review-scoped-append) — byte-exact.

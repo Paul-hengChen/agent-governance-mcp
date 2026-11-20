@@ -1,5 +1,6 @@
 // Coded by @sr-engineer
-// Archive-aware QA-evidence lookup, used only by tools/drift.ts. Not used by
+// Archive-aware lookup of the judge report (resolveJudgeReport,
+// tools/evidence-file.ts), used only by tools/drift.ts. Not used by
 // gates/qa-review.ts's hasEvidenceInFile, which is a live gate and scans the
 // qa_reports/ root only. Looks for review_<id>.md in the root and in
 // qa_reports/archive/<feature>/, plus `covers:` lines in both. A file counts
@@ -7,7 +8,7 @@
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/evidence-lookup.ts — verdict rule".
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex, encodeEvidenceId } from "./evidence-file.js";
+import { buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "./evidence-file.js";
 // Same filename stem as gates/qa-review.ts evidencePath: both derive it via
 // the shared injective encodeEvidenceId, so this lookup and the live gate
 // always agree on which file belongs to which task id.
@@ -40,7 +41,7 @@ function safeIsDirectory(p) {
 // SOP step 7a names each one after `active_feature` at release time). Absent
 // or unreadable archive root yields [] — never throws.
 function archivedFeatureDirs(workspacePath) {
-    const archiveRoot = path.join(workspacePath, "qa_reports", "archive");
+    const archiveRoot = path.join(resolveJudgeReport(workspacePath).dir, "archive");
     return safeReaddir(archiveRoot)
         .map((name) => path.join(archiveRoot, name))
         .filter(safeIsDirectory);
@@ -90,7 +91,7 @@ export function hasEvidenceAnywhere(workspacePath, taskIds) {
     const result = new Set();
     if (taskIds.length === 0)
         return result;
-    const qaReportsDir = path.join(workspacePath, "qa_reports");
+    const qaReportsDir = resolveJudgeReport(workspacePath).dir;
     const archiveDirs = archivedFeatureDirs(workspacePath); // built once, not per id
     // Direct per-id file check first (cheap, common case): root, then every
     // archived feature subdir.

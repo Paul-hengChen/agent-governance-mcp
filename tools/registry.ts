@@ -305,10 +305,11 @@ const UpdateStateArgs = z
     blocking_reason: z.string().max(2000).optional(),
     agent_id: z.string().max(200).optional(),
     // QA review notes attached when (status in {PASS, FAIL}) and
-    // (agent_id === "qa-engineer"). Storage records the review to
+    // (agent_id is the feature's judge: qa-engineer; code-reviewer on a
+    // test-first feature). Storage records the review to
     // qa_reports/review_<id>.md (file mode) or the reports table (SQLite).
     qa_review: z.string().max(10000).optional(),
-    // qa_suite_result: qa's structured suite figures. Shape-checked here (no
+    // qa_suite_result: the judge's structured suite figures. Shape-checked here (no
     // gate, no error code); recorded by QA_REVIEW_RECORD as one fixed
     // server-formatted line at the head of the qa evidence, only on a write
     // that records qa_review evidence. Never persisted to the handoff; no
@@ -724,7 +725,7 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
         qa_review: {
           type: "string",
           description:
-            "Review notes. Recorded as evidence when agent_id=qa-engineer and status in {PASS, FAIL}.",
+            "Review notes. Recorded as evidence when agent_id is the feature's judge (\"qa-engineer\"; \"code-reviewer\" on a test-first feature, chain_path: \"test-first\") and status in {PASS, FAIL}.",
         },
         qa_suite_result: {
           type: "object",
@@ -741,7 +742,7 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
           required: ["passed", "total"],
           additionalProperties: false,
           description:
-            "Optional structured suite result for a qa-engineer PASS/FAIL write: {passed, total, command?}, integers with 0 ≤ passed ≤ total and total ≥ 1. Attested, not verified. When this write records qa_review evidence (agent_id \"qa-engineer\", status PASS or FAIL, qa_review set), the server records it as one fixed line at the head of that evidence — `suite-result: <passed>/<total> passed (server-recorded from qa_suite_result)`, or `…; command: <command>)` when command is given — followed by a blank line and the qa_review text (file mode: the new section of qa_reports/review_<id>.md; SQLite: each reports row's notes). Ignored on any other write. Not persisted to the handoff. Transient: applies to THIS write only. Recording-only — gates nothing; passed < total is recorded as given.",
+            "Optional structured suite result for a PASS/FAIL write by the feature's judge (qa-engineer; code-reviewer on a test-first feature): {passed, total, command?}, integers with 0 ≤ passed ≤ total and total ≥ 1. Attested, not verified. When this write records qa_review evidence (agent_id the feature's judge, status PASS or FAIL, qa_review set), the server records it as one fixed line at the head of that evidence — `suite-result: <passed>/<total> passed (server-recorded from qa_suite_result)`, or `…; command: <command>)` when command is given — followed by a blank line and the qa_review text (file mode: the new section of qa_reports/review_<id>.md; SQLite: each reports row's notes). Ignored on any other write. Not persisted to the handoff. Transient: applies to THIS write only. Recording-only — gates nothing; passed < total is recorded as given.",
         },
         review_task_ids: {
           type: "array",

@@ -77,7 +77,7 @@ tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
 tools/ticket-file.ts      ticket-file parser + checker core (scripts/check-tickets.mjs)
 tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (ROUND_CAP=4, REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6, SR_RETURN_CAP=2)
 tools/exemptions.ts       per-gate exemption resolution (E24)
-tools/evidence-file.ts    file-mode QA evidence write/check (v3.2.0)
+tools/evidence-file.ts    file-mode QA evidence write/check (v3.2.0) + judge-report resolver (E432)
 tools/stale-notify.ts     stale in-flight dispatch advisory (E22)
 tools/telemetry.ts        gate-fire telemetry sidecar writer
 tools/metrics.ts          metrics record aggregation
