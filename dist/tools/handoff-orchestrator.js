@@ -640,8 +640,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // and the claim write has completed_tasks=[]. Reads only the incoming
             // args (every storage mode). The envelope text is published, cited in
             // skill-code-reviewer.md and pinned by a test: keep it byte-identical.
-            // On a test-first feature the judge is code-reviewer and every other
-            // identity, qa-engineer included, is rejected below. (E431)
+            // Test-first: code-reviewer is the judge, all others rejected. (E431)
             const testFirst = resolveChainPath(ctx) === "test-first";
             if (testFirst) {
                 if (parsed.agent_id &&
@@ -1208,6 +1207,16 @@ async function handleUpdateStateCore(parsed) {
     // skips zod may omit it. Normalise once so every gate reads a list
     // and omission and [] stay one input class. (E150)
     parsed = { ...parsed, completed_tasks: parsed.completed_tasks ?? [] };
+    // Defense-in-depth: zod refine already enforces this on PASS, but a
+    // client that bypasses zod still hits this guard. The judge comes from
+    // a read-only peek, so an unmarked or unreadable handoff gets the
+    // qa-engineer text before storage.parse, as before. (E431)
+    if (parsed.status === "PASS") {
+        const gate = requireJudge(parsed.agent_id, "tw_update_state(status=PASS)", readPersistedChainPath(parsed.workspace_path, parsed.active_feature));
+        if (!gate.ok) {
+            return { content: [{ type: "text", text: gate.message ?? "blocked" }] };
+        }
+    }
     const storage = getActiveStorage();
     const prevState = storage.parse(parsed.workspace_path);
     const prev_qa_round = prevState?.qa_round ?? 0;
@@ -1277,16 +1286,6 @@ async function handleUpdateStateCore(parsed) {
     // undefined under SQLite). It picks the feature's judge below and is
     // persisted after the pipeline.
     const resolvedChainPath = resolveChainPath(ctx);
-    // PASS judge guard. The zod refine already rejects most wrong-agent
-    // PASS writes, but a client that bypasses zod still hits this, and a
-    // qa-engineer PASS on a test-first feature is rejected only here.
-    // Unmarked: the qa-engineer text, as before. (E431)
-    if (parsed.status === "PASS") {
-        const gate = requireJudge(parsed.agent_id, "tw_update_state(status=PASS)", resolvedChainPath);
-        if (!gate.ok) {
-            return { content: [{ type: "text", text: gate.message ?? "blocked" }] };
-        }
-    }
     // A rejection or a throw means this write does not land, so any
     // evidence QA_REVIEW_RECORD appended is undone first; the rejection
     // envelope and the thrown error pass through unchanged.
