@@ -8,3 +8,5 @@
 {"ts":"2026-11-20T05:18:00.414Z","feature":"e423-spec-workshop","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-20T05:18:29.519Z","feature":"e423-spec-workshop","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-20T05:19:50.324Z","feature":"e423-spec-workshop","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-20T05:20:41.637Z","feature":"e423-spec-workshop","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-20T05:36:59.647Z","feature":"e423-spec-workshop","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
