@@ -55,8 +55,46 @@ No findings. The helper is O(1) and is called once per write and 64× per lookah
 ## Verdict
 CHANGES_REQUESTED — the code fix is correct and leak-free, but it makes `specs/qa-flow-enforcement-architecture.md:225` misstate the marker rule. That page is the AC19 mirror, so it needs a docs-only amendment, with no code or AC change.
 
-### Round 3 — sr-engineer reply
+## Round 3 — sr-engineer reply — by sr-engineer
+
+(Written by sr-engineer in 23f8a0e. Kept as their reply; it is not part of any code-reviewer verdict. The code-reviewer moved it from an H3 under Round 3's Verdict to its own H2.)
 
 - Required (1), addressed: `specs/qa-flow-enforcement-architecture.md` *Set-point rule* now names the feature-change exception (a write out of `code-reviewer:PASS` with no `chain_path` is evaluated against the previous feature's marker, so the four exits stay open; nothing is persisted for the new feature). The `code-reviewer:PASS` sentence under *Opened on a test-first feature* points to it. Tables and the matrix section are unchanged; `check:transitions-sync` OK.
 - Recommended (blueprint), addressed: `specs/e431-test-first-server-path-architecture.md` *Feature change* bullet, the `prev_chain_path` field comment, the TRANSITION_VALIDATION bullet and the lookahead comment now describe `exitChainPath`. Lane spec and AC text untouched.
 - Recommended (guard test): left to qa-engineer per routing. No code or test change in this round.
+
+## Round 4 — APPROVED — by code-reviewer
+
+Reviewer model: opus (sr-engineer also on opus). Scope: docs fix `23f8a0e` (`git diff dc70f4c..23f8a0e`). Outside `.current/e431/` and this report, it touches only `specs/qa-flow-enforcement-architecture.md` and `specs/e431-test-first-server-path-architecture.md`.
+
+### Summary
+- Round 3's required finding is fixed. The *Set-point rule* in `specs/qa-flow-enforcement-architecture.md` (:225) now states the feature-change exception. A write out of `code-reviewer:PASS` with no `chain_path` is judged against the previous feature's marker. That opens the four exits, and nothing is persisted for the new feature. The note under the *Opened* table (:205) points to that rule.
+- The recommended blueprint fixes in `specs/e431-test-first-server-path-architecture.md` (:167, :185, :311, :322) now describe `exitChainPath` as the code implements it.
+- No code, test, `dist/` or AC text change. `specs/e431-test-first-server-path.md` is not in the diff.
+- Verdict: APPROVED.
+
+### AC Completeness
+Unchanged from Round 3 (AC11 implemented in `0acbc85`). This round is docs only. The AC19 mirror (`specs/qa-flow-enforcement-architecture.md`) now matches the code again.
+
+### Correctness
+No findings. I checked the wording against `exitChainPath` at tools/handoff-orchestrator.ts:250-259:
+- Same feature: returns the persisted marker. The docs say "persisted handoff of the same feature".
+- Feature change out of `code-reviewer:PASS` with `nextChainPath === undefined`: returns the previous marker. The docs say the exception applies only to a write that "carries no `chain_path`".
+- Every other feature change returns `undefined`. The docs say the change "drops it", and the exception "carries nothing".
+- The blueprint call shapes match the two call sites: TRANSITION_VALIDATION :303-305, with `parsed.chain_path` as the 4th argument, and the lookahead :1317, with three arguments and no `next_chain_path`.
+- `npm run build` exits 0, and `check:transitions-sync` is OK (21 keys). The tables and the matrix are unchanged.
+
+### Quality
+No findings. The wording is consistent across both specs. One note on this file: sr-engineer's Round 3 reply had been appended as an H3 under the Round 3 Verdict. I moved it to its own attributed H2 so that the verdict sections hold only code-reviewer text.
+
+### Architecture
+No findings. The blueprint now records the qa-FAIL-round-1 amendment instead of the pre-fix `feature_changed ? undefined : ...` wiring.
+
+### Security
+No findings. Information hygiene: the diff has no personal names, credentials, hostnames or private paths. Neither file is under `content/**`, so the adopter-portability rule does not apply.
+
+### Performance
+No findings. Docs only.
+
+### Verdict
+APPROVED — the docs-only fix restores agreement between the AC19 mirror and `exitChainPath`, and changes no code, tests or AC text. Round 3's recommended guard test (a write carrying `chain_path` out of `code-reviewer:PASS` on a feature change ignores the old marker) is still recommended, for qa-engineer.
