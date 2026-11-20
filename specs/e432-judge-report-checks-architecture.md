@@ -195,8 +195,8 @@ Doc fields only; `hintStatic`, `errorCode`, `producer`, `envelope`, `documentedI
 
 | entry | field | new text |
 |---|---|---|
-| `REPRO_MANIFEST_MISSING` | block comment | add: `// E432: also arms on qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress on a test-first feature (chain_path: test-first) unless qa_reports/no-new-test_<feature>.txt exists (hasNoNewTestRecord); marker-specific message, no hintStatic.` |
-| | `triggerEdge` | `"sr-engineer:In_Progress -> code-reviewer:In_Progress (bugfix), or qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress on a test-first feature (chain_path: test-first) (file-mode only)"` |
+| `REPRO_MANIFEST_MISSING` | block comment | add: `// E432: also arms on qa-engineer:In_Progress\|Blocked -> sr-engineer:In_Progress on a test-first feature (chain_path: test-first) unless qa_reports/no-new-test_<feature>.txt exists (hasNoNewTestRecord); marker-specific message, no hintStatic.` |
+| | `triggerEdge` | `"sr-engineer:In_Progress -> code-reviewer:In_Progress (bugfix), or qa-engineer:In_Progress\|Blocked -> sr-engineer:In_Progress on a test-first feature (chain_path: test-first) (file-mode only)"` |
 | | `armCondition` | `"prevState.dispatch_mode === bugfix on the sr -> code-reviewer edge, or resolveChainPath() === test-first on the qa -> sr edge without a no-new-test record (hasNoNewTestRecord); FileHandoffStorage only"` |
 | | `clearingArtifact` | `"qa_reports/expected-red_<feature>.txt present (hasExpectedRedManifest); on the test-first qa -> sr edge, qa_reports/no-new-test_<feature>.txt present also clears (hasNoNewTestRecord)"` |
 | `QA_COMPLETION_EVIDENCE_MISSING` | block comment | first sentence gains `(E432: the feature's judge — code-reviewer on a test-first feature — is armed the same way)` |
@@ -375,7 +375,7 @@ Deferred by scope (not external resources): SOP / constitution prose telling qa 
 
 ## Open Questions
 
-All items are `architect default`; none needs a human ruling. They go to the integrator's second pre-review, which can overturn any of them before sr-engineer starts.
+All items are `architect default`; none needs a human ruling. They go to the integrator's second pre-review, which can overturn any of them before sr-engineer starts. Human approved the OQ1–OQ6 defaults in the lane session on 2026-11-20.
 
 1. **The qa → sr manifest check also arms on `qa-engineer:Blocked → sr-engineer:In_Progress`** — `architect default`. E431 left that edge open on both paths. Example: marked feature e450-readme-typo; qa-engineer writes `qa-engineer:Blocked` ("spec ambiguity"), pm clarifies in chat, qa then hands straight to `sr-engineer:In_Progress` without writing the manifest or the record. With the default: rejected `REPRO_MANIFEST_MISSING` (msg.qa_to_sr_manifest) until one file exists — the same rule as from `In_Progress`. With AC5's literal edge only: accepted, and sr builds against tests nobody declared, which is what user story 3 forbids. Unmarked features are unaffected either way (the marker guards the arm).
 2. **lane-status counts a `— PASS — by code-reviewer` header in any lane, marked or not** — `architect default` (D8). Example: lane e451 ran marked e451-drift-crash to PASS, its report stays in `qa_reports/`, and the lane then starts unmarked e451b with ids carrying the same ticket token. With the default the earlier judge PASS still counts as evidence; gating on the current marker would drop it. Delta on an unmarked lane: only a hand-written `— PASS — by code-reviewer` header in `qa_reports/`, which no server path writes there.
