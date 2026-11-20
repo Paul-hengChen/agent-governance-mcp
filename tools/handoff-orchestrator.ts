@@ -240,6 +240,24 @@ function resolveChainPath(ctx: UpdateStateGateContext): ChainPath | undefined {
   return undefined;
 }
 
+// The marker that judges the exits out of the previous tuple. Same feature:
+// the persisted marker. On a feature change the new feature starts unmarked,
+// except code-reviewer:PASS keeps its previous feature's marker: that tuple
+// exists only on a marked feature, has no exits without the marker, and the
+// marker closes none there, so this only opens those exits. A write carrying
+// its own chain_path gets no previous marker, so step 1.5 still checks it as
+// a set point. Nothing carries to the new feature. (E431)
+function exitChainPath(
+  prev: TransitionTuple,
+  prevChainPath: ChainPath | undefined,
+  featureChanged: boolean,
+  nextChainPath?: ChainPath,
+): ChainPath | undefined {
+  if (!featureChanged) return prevChainPath;
+  const fromReviewerPass = prev.agent === "code-reviewer" && prev.status === "PASS";
+  return fromReviewerPass && nextChainPath === undefined ? prevChainPath : undefined;
+}
+
 // The extra build-entry target on a test-first feature. The four attestation
 // checks arm on pm:In_Progress -> {architect, sr-engineer}:In_Progress, and on
 // a marked feature also on pm:In_Progress -> qa-engineer:In_Progress, with or
@@ -279,10 +297,12 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
           prev_hop_count,
           feature_changed,
           // E431 test-first marker inputs, file mode only (SQLite never
-          // passes them, so it is never marked). The persisted marker counts
-          // only for the same feature; validateTransition decides `marked`
-          // and rejects an incoming marker outside a set point.
-          prev_chain_path: fileMode && !feature_changed ? ctx.prevState?.chain_path : undefined,
+          // passes them, so it is never marked). exitChainPath limits the
+          // persisted marker on a feature change; validateTransition decides
+          // `marked` and rejects an incoming marker outside a set point.
+          prev_chain_path: fileMode
+            ? exitChainPath(prevTuple, ctx.prevState?.chain_path, feature_changed, parsed.chain_path)
+            : undefined,
           next_chain_path: fileMode ? parsed.chain_path : undefined,
           prev_sr_return_count: ctx.prevState?.sr_return_count ?? 0,
         });
@@ -1292,8 +1312,9 @@ function effectiveAllowedSuccessors(
                 : undefined,
             // E431: the post-write marker and counter. next_chain_path is
             // never passed: the lookahead asks what the NEXT write may do on
-            // the state just written. A feature change drops the marker.
-            prev_chain_path: feature_changed ? undefined : chainPath,
+            // the state just written. A feature change keeps the marker only
+            // for the exits out of code-reviewer:PASS (exitChainPath).
+            prev_chain_path: exitChainPath(prev, chainPath, feature_changed),
             prev_sr_return_count: counters.sr_return_count ?? 0,
           }) === null,
       );
