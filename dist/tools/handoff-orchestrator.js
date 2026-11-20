@@ -7,7 +7,7 @@
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — check order".
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
-import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, HOP_CAP_EXPORTED, } from "./transitions.js";
+import { requireQaEngineer, validateTransition, computeNewRound, computeSrReturnCount, allowedSuccessors, isChainPathSetPoint, HOP_CAP_EXPORTED, } from "./transitions.js";
 import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, visualEvidencePath, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, checkSourceCredibility, } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
@@ -166,6 +166,50 @@ function composeQaReviewNotes(qaReview, suite) {
         return qaReview;
     return `${suiteResultLine(suite)}\n\n${qaReview.trim()}`;
 }
+// Persisted test-first marker of `activeFeature` (file mode only). Read-only,
+// never throws: a missing, unparseable or other-feature handoff reads as
+// unmarked, which is the old-path behaviour. With no activeFeature it reads
+// the workspace's current feature. Exported for tools/tasks.ts. (E431)
+export function readPersistedChainPath(workspacePath, activeFeature) {
+    const storage = getActiveStorage();
+    if (!(storage instanceof FileHandoffStorage))
+        return undefined;
+    let state;
+    try {
+        state = storage.parse(workspacePath);
+    }
+    catch {
+        return undefined;
+    }
+    if (!state)
+        return undefined;
+    if (activeFeature !== undefined && state.active_feature !== activeFeature)
+        return undefined;
+    return state.chain_path === "test-first" ? "test-first" : undefined;
+}
+// The marker this write runs under, file mode only: the feature's persisted
+// marker (same feature), or the incoming one on a set point. Same rule as
+// validateTransition's `marked`; an incoming marker off a set point never
+// gets here (step 1 rejects it). Pure, no I/O. (E431)
+function resolveChainPath(ctx) {
+    if (!(ctx.storage instanceof FileHandoffStorage))
+        return undefined;
+    if (!ctx.feature_changed && ctx.prevState?.chain_path === "test-first")
+        return "test-first";
+    if (ctx.parsed.chain_path === "test-first" && isChainPathSetPoint(ctx.prevTuple, ctx.nextTuple)) {
+        return "test-first";
+    }
+    return undefined;
+}
+// The extra build-entry target on a test-first feature. The four attestation
+// checks arm on pm:In_Progress -> {architect, sr-engineer}:In_Progress, and on
+// a marked feature also on pm:In_Progress -> qa-engineer:In_Progress, with or
+// without resume_of (human ruling, E431 Open Question 1). An unmarked feature
+// never matches here, so its resume_of hand-back to qa-engineer stays exempt.
+// Each step keeps its own inline pm pin and storage guard. (E431)
+function isTestFirstEntryTarget(next, chainPath) {
+    return chainPath === "test-first" && next.agent === "qa-engineer";
+}
 // The tw_update_state gate pipeline: this array IS the frozen, additive check
 // order. Add a gate by inserting a step at its position, never by editing a
 // neighbour's body. One step per gate family; the PASS-path visual sub-gates
@@ -177,6 +221,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: TRANSITION_GATE_CODES,
         run: (ctx) => {
             const { parsed, prevTuple, nextTuple, prev_qa_round, prev_review_round, prev_visual_round, prev_hop_count, feature_changed } = ctx;
+            const fileMode = ctx.storage instanceof FileHandoffStorage;
             const rejection = validateTransition({
                 prev: prevTuple,
                 next: nextTuple,
@@ -193,6 +238,13 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                 // the (pm, In_Progress) landing; feature_changed=true bypasses.
                 prev_hop_count,
                 feature_changed,
+                // E431 test-first marker inputs, file mode only (SQLite never
+                // passes them, so it is never marked). The persisted marker counts
+                // only for the same feature; validateTransition decides `marked`
+                // and rejects an incoming marker outside a set point.
+                prev_chain_path: fileMode && !feature_changed ? ctx.prevState?.chain_path : undefined,
+                next_chain_path: fileMode ? parsed.chain_path : undefined,
+                prev_sr_return_count: ctx.prevState?.sr_return_count ?? 0,
             });
             if (rejection) {
                 return {
@@ -309,7 +361,9 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // (mode != no-design) and no scope decision is recorded. Pinning prev=pm
             // keeps re-entry safe: architect→sr-engineer and the sr-engineer
             // self-loop are never gated. Kept out of transitions.ts, which stays pure.
-            if ((nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+            // On a test-first feature pm -> qa-engineer is the build entry (E431).
+            if ((nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+                isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
                 nextTuple.status === "In_Progress" &&
                 prevTuple.agent === "pm" &&
                 prevTuple.status === "In_Progress") {
@@ -324,7 +378,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                             new_agent: nextTuple.agent,
                             new_status: nextTuple.status,
                         },
-                        allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                        allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                             new_agent: c.agent,
                             new_status: c.status,
                         })),
@@ -353,7 +407,8 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // hint stays actionable. File mode only: cut_approved lives in the handoff
             // frontmatter, so under SQLite/HTTP the gate would always fire.
             if (getActiveStorage() instanceof FileHandoffStorage &&
-                (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+                (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+                    isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
                 nextTuple.status === "In_Progress" &&
                 prevTuple.agent === "pm" &&
                 prevTuple.status === "In_Progress") {
@@ -367,7 +422,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                             new_agent: nextTuple.agent,
                             new_status: nextTuple.status,
                         },
-                        allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                        allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                             new_agent: c.agent,
                             new_status: c.status,
                         })),
@@ -397,7 +452,8 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // re-blocking later hops. File mode only: the ledger lives in the
             // handoff frontmatter.
             if (getActiveStorage() instanceof FileHandoffStorage &&
-                (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+                (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+                    isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
                 nextTuple.status === "In_Progress" &&
                 prevTuple.agent === "pm" &&
                 prevTuple.status === "In_Progress") {
@@ -413,7 +469,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                             new_agent: nextTuple.agent,
                             new_status: nextTuple.status,
                         },
-                        allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                        allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                             new_agent: c.agent,
                             new_status: c.status,
                         })),
@@ -442,7 +498,8 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // fetch-based-mode list inside checkSourceCredibility. Pinning prev=pm
             // keeps re-entry safe. Independent of the PASS-time baseline-manifest
             // gates: different edge, different check.
-            if ((nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+            if ((nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+                isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
                 nextTuple.status === "In_Progress" &&
                 prevTuple.agent === "pm" &&
                 prevTuple.status === "In_Progress") {
@@ -459,7 +516,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                             new_agent: nextTuple.agent,
                             new_status: nextTuple.status,
                         },
-                        allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                        allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                             new_agent: c.agent,
                             new_status: c.status,
                         })),
@@ -1074,7 +1131,7 @@ const ALL_STATUS_NAMES = ["In_Progress", "PASS", "FAIL", "Blocked"];
 // `featureChanged` pins one. Pure: 64 in-memory calls, no I/O.
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — effectiveAllowedSuccessors".
 function effectiveAllowedSuccessors(prev, counters, options = {}) {
-    const { assumeResumeOf = true, featureChanged } = options;
+    const { assumeResumeOf = true, featureChanged, chainPath } = options;
     // `featureChanged` lets a caller pin the union to one branch instead of
     // trying both. Used to compute the same-feature-only subset
     // (featureChanged: false) so entries reachable only through the hop-cap
@@ -1095,6 +1152,11 @@ function effectiveAllowedSuccessors(prev, counters, options = {}) {
                 next_resume_of: assumeResumeOf && (agent === "code-reviewer" || agent === "qa-engineer")
                     ? agent
                     : undefined,
+                // E431: the post-write marker and counter. next_chain_path is
+                // never passed: the lookahead asks what the NEXT write may do on
+                // the state just written. A feature change drops the marker.
+                prev_chain_path: feature_changed ? undefined : chainPath,
+                prev_sr_return_count: counters.sr_return_count ?? 0,
             }) === null);
             if (accepted)
                 out.push({ agent, status });
@@ -1207,6 +1269,12 @@ async function handleUpdateStateCore(parsed) {
     // feature change (the same rule as hop_count). Persisted via
     // storage.writeState below (file-mode frontmatter only). (E8, v12)
     qa_rounds_total: new_qa_rounds_total, review_rounds_total: new_review_rounds_total, visual_rounds_total: new_visual_rounds_total, } = computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, nextTuple, prevTuple, parsed.pending_notes, prev_hop_count, feature_changed, prev_qa_rounds_total, prev_review_rounds_total, prev_visual_rounds_total);
+    // E431 — the marker this write runs under and the sr -> qa return
+    // counter, both file mode only (resolvedChainPath is always undefined
+    // under SQLite, and an unmarked feature can never take the return
+    // edge, so its count stays 0 and is never emitted).
+    const resolvedChainPath = resolveChainPath(ctx);
+    const new_sr_return_count = computeSrReturnCount(prevState?.sr_return_count ?? 0, prevTuple, nextTuple, feature_changed);
     const pending = [...parsed.pending_notes];
     // v3.15.0 — symmetric cap-cross predicate fix.
     // v3.14.0 used `=== 4 && === 3` which would skip the sentinel when
@@ -1326,6 +1394,13 @@ async function handleUpdateStateCore(parsed) {
         // SqliteHandoffStorage.writeState ignores both. (E99, v15)
         dispatchMechanism: parsed.dispatch_mechanism,
         dispatchMechanismTier: parsed.dispatch_mechanism_tier,
+        // chain_path / sr_return_count (E431, v16). chainPath is the
+        // resolved marker: feature-scoped carry in writeHandoffState,
+        // undefined on an unmarked feature. srReturnCount is
+        // server-computed and written only when > 0. File mode only:
+        // SqliteHandoffStorage.writeState ignores both.
+        chainPath: resolvedChainPath,
+        srReturnCount: new_sr_return_count,
     }));
     // Append one line per hop to the dispatch-mechanism sidecar so the
     // record survives later state rewrites. Runs only after the state write
@@ -1419,8 +1494,10 @@ async function handleUpdateStateCore(parsed) {
             review_round: new_review_round,
             visual_round: new_visual_round,
             hop_count: new_hop_count,
+            sr_return_count: new_sr_return_count,
         };
-        const effective = effectiveAllowedSuccessors(nextTuple, counters);
+        const lookahead = { chainPath: resolvedChainPath };
+        const effective = effectiveAllowedSuccessors(nextTuple, counters, lookahead);
         const isLegalSuccessor = effective.some((e) => e.agent === parsed.next_role);
         if (!isLegalSuccessor) {
             // The remedy list prints `agent:status` pairs and excludes only the
@@ -1429,6 +1506,7 @@ async function handleUpdateStateCore(parsed) {
             // successors. Edges legal only with resume_of are marked, not
             // offered as unconditional advice.
             const strict = effectiveAllowedSuccessors(nextTuple, counters, {
+                ...lookahead,
                 assumeResumeOf: false,
             });
             const strictKeys = new Set(strict.map((e) => `${e.agent}:${e.status}`));
@@ -1437,6 +1515,7 @@ async function handleUpdateStateCore(parsed) {
             // featureChanged pinned to false isolates the same-feature subset;
             // below the cap the two sets match, so nothing is annotated there.
             const sameFeatureOnly = effectiveAllowedSuccessors(nextTuple, counters, {
+                ...lookahead,
                 featureChanged: false,
             });
             const sameFeatureKeys = new Set(sameFeatureOnly.map((e) => `${e.agent}:${e.status}`));
