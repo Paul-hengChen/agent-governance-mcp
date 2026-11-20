@@ -67,19 +67,20 @@ let baseSkipReason = null;
         baseSkipReason = `tar extract failed: ${String(x.stderr)}`;
       } else {
         fs.symlinkSync(path.join(ROOT, "node_modules"), path.join(dir, "node_modules"), "dir");
-        BASE = await loadMods(path.join(dir, "dist"));
-        BASE.srcDir = dir;
+        // Read the base storage sources into memory now, while the extracted tree is known to be present, so the
+        // later byte-identity check never depends on files still being on disk at assertion time.
+        const srcText = {};
+        try {
+          for (const f of ["tools/storage-sqlite.ts", "schema/migrations-sqlite.ts"]) srcText[f] = fs.readFileSync(path.join(dir, f), "utf-8");
+          BASE = await loadMods(path.join(dir, "dist"));
+          BASE.srcText = srcText;
+        } catch (err) {
+          baseSkipReason = `base tree incomplete after extraction: ${err.message}`;
+        }
       }
     }
   }
   if (baseSkipReason) console.warn(`[WARN] e432: base-commit replays skipped loudly: ${baseSkipReason}`);
-}
-
-// Base-commit source text straight from git, so no on-disk extraction of tools/ or schema/ is needed.
-function baseSource(rel) {
-  const r = spawnSync("git", ["show", `${BASE_SHA}:${rel}`], { cwd: ROOT, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
-  assert.equal(r.status, 0, `git show ${BASE_SHA}:${rel} failed: ${String(r.stderr)}`);
-  return r.stdout;
 }
 
 // ---------------------------------------------------------------- harness (parameterised by module set)
@@ -649,7 +650,7 @@ test("AC12: SQLite rejections and a qa PASS with qa_review replay identically on
   assert.equal(cur.rows.length, 1);
   assert.equal(CUR.versions.CURRENT_VERSIONS.sqlite, 2);
   for (const f of ["tools/storage-sqlite.ts", "schema/migrations-sqlite.ts"]) {
-    assert.equal(fs.readFileSync(path.join(ROOT, f), "utf-8"), baseSource(f), `${f} byte-identical to base`);
+    assert.equal(fs.readFileSync(path.join(ROOT, f), "utf-8"), BASE.srcText[f], `${f} byte-identical to base`);
   }
 });
 
