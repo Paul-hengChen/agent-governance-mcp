@@ -670,10 +670,10 @@ test("E319 AC-E319-5: backtick-wrapped value with trailing prose (`pdf` — expo
   assert.equal(hasDesignModeRequiringVisual(ws, "feat").mode, "pdf");
 });
 
-test("E319 AC-E319-5: a Mode line naming no known mode still returns mode null", () => {
+test("E319 AC-E319-5: a Mode line naming no known mode returns that token and arms the checks", () => {
   const ws = mkWorkspace();
   writeDesignWithMode(ws, "feat", "# design/feat\n\nmode: freehand\n");
   const r = hasDesignModeRequiringVisual(ws, "feat");
-  assert.equal(r.mode, null);
-  assert.equal(r.required, false);
+  assert.equal(r.mode, "freehand");
+  assert.equal(r.required, true);
 });

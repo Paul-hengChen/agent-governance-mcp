@@ -98,11 +98,12 @@ test("every content/skill-*.md carries a valid recommended_model frontmatter", (
   const files = fs.readdirSync(CONTENT_DIR).filter(
     (f) => f.startsWith("skill-") && f.endsWith(".md"),
   );
-  // 12 skill files (specs/model-routing.md AC1); the count catches a deleted
+  // 13 skill files (specs/model-routing.md AC1); the count catches a deleted
   // file. The coordinator skill was split into content/coord-NN-*.md
-  // fragments, named outside this glob, and the integrator role added
-  // content/skill-integrator.md, so the count went 12 -> 11 -> 12.
-  assert.equal(files.length, 12, "expected 12 skill files in content/ (skill-coordinator.md retired — see coord-NN-*.md fragments; skill-integrator.md added — e178a)");
+  // fragments, named outside this glob, the integrator role added
+  // content/skill-integrator.md and the spec-workshop role added
+  // content/skill-spec-workshop.md, so the count went 12 -> 11 -> 12 -> 13.
+  assert.equal(files.length, 13, "expected 13 skill files in content/ (skill-coordinator.md retired — see coord-NN-*.md fragments; skill-integrator.md added — e178a; skill-spec-workshop.md added — e423)");
 
   const tiers = new Set(MODEL_TIERS);
   for (const f of files) {
