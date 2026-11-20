@@ -2,7 +2,7 @@
 base: cc3fa5f    integration branch: integ/v5-w2
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類已核准 2026-11-20（Stage 2，選 (a) 按段落拆分並行）；待派工。**
+**狀態：已結案 2026-11-20。** 兩條 lane 都已合併進 `integ/v5-w2`（e423 merge `3f2d1e7` 零衝突；e431 merge `122d53e`，只有 `dist/tools/registry.*` 兩個 sourcemap 衝突，重建解掉、非實質；e431 補 QA 證據後再合一次 `8f7791d`）、finish、拆除；派工 base `0efc203`（清單 PR #157 merge）；整合 branch 自 `main` `0efc203` 開；整合 CI run 44698804351 綠；本波以一個 PR 合進 `main`，不發版（16.1 裁定 18）。派工後人類裁定四項擁有範圍改劃（1a、2a、5a、6a）與 e431 架構兩項（OQ1、OQ3），見 Decisions。Roll-up：e423 tickets 7、hop 6/14、review 退回 1 輪、qa 退回 0；e431 tickets 11、hop 12/14、review 退回 2 次（各 1 輪）、qa 退回 1 輪；證據 7/7、11/11。
 
 範圍由人類指定（integrator prompt「fan-out v5.0.0 里程碑的下一波」，2026-11-20）：下一張是 E423，並找出剩下的票裡能與它同時跑的。兩張都是 v5.0.0 里程碑的票（`docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 16.1 裁定 17 的順序）；依裁定 18，合進 `main` 但不單獨發版，與 E435 一起發 v5.0.0。本波結束時不發版。
 
@@ -96,3 +96,20 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-20 | 人類 | 派工後改劃：1a —— `test/skill-evolution-v3.11.test.mjs` 第 74–82 行（schema 版本 test）歸 e431（e431 預審發現 15→16 會打紅）；2a —— `docs/architecture.md` 第 20–21 行（prompt 名單）歸 e423（e423 cut D12） | 整合者 session（回覆「1a 2a」） |
 | 2026-11-20 | 人類 | e431 架構第二次預審：OQ1 = a —— 已標記（`chain_path: test-first`）的 feature 上 pm→qa 一律過四道開工檢查，`resume_of` 不豁免（修訂 16.1 裁定 3「帶 `resume_of` 的交回 qa 照舊不檢查」：只適用未標記的 feature）；OQ3 = a —— 接受舊路徑第二處文字差異（code-reviewer PASS 同時違反另一個輸入檢查時只列另一條，仍被拒），AC12 末句隨之放寬 | e431 lane session（人類親手裁定，lane commit `388c7d9`；整合者預審提出） |
 | 2026-11-20 | 人類 | 派工後改劃（e431 sr 發現的跨 lane 紅燈）：5a —— `test/e295-hop-cap-and-sop-halves.test.mjs` 第 121–126 行歸 e431（新錯誤碼依 E300 慣例標 `(none)`）；6a —— `test/visual-evidence-gate.test.mjs` 第 610–625 行歸 e431（開工檢查的 `allowed` 改用 `allowedSuccessors`）；兩檔其餘仍屬 e423，e423 未改這兩段 | 整合者 session（回覆「5a 6a」） |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 0efc203
+- 目標分支對 origin：一致
+- git status：1 項：?? docs/agc-feedback-2026-11-20-tracked-claude-md.md
+- worktree：primary（main ← integ/v5-w2 @ c263a6d）
+- lane-status：primary（main ← integ/v5-w2 @ c263a6d）release-cd-v4.22.0／In_Progress／release-engineer，hop 3，commits 0，dirty
+### 已結案
+- 本波 2 條 lane、2 張票（E423、E431）全部 qa PASS、合併、finish、拆除；兩張都 not yet released，依 16.1 裁定 18 隨 v5.0.0（E435）發出，本波不發版。lane 紀錄在 `.current/history/2026-11/{e423,e431}/`；裁定與驗證細節在本檔 Decisions 與狀態行。新發現：無（兩條 lane 都沒有 pending-tickets；e431 qa 發現的 `code-reviewer:PASS` 換 feature 出口缺口已在 lane 內修掉，不開票）；無未配號的新發現。git status 那一項是人類另外的討論暫存檔，不屬本波。
+### 待人類決定
+- 是否開下一波：v5.0.0 里程碑順序的下一張是 E432（相依 E431，本波已合併）；由人類決定何時開。
+- 合併後 primary 的 MCP server 需重啟一次，下一次 `tw_*` 呼叫才會跑本波合併後的程式（handoff schema 16、`spec-workshop` prompt）。
+- v5.0.0 發版時 CHANGELOG 要寫：宣告了認不得的 design mode 會啟動視覺檢查（E423 D3）；E435 要處理 SQLite 模式（已寫進 E435 列）。
+### 進行中的背景工作
+無
