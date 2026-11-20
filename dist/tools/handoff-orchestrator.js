@@ -12,7 +12,8 @@ import { requireJudge, judgeFor, PASS_IDENTITY_REFINE_MESSAGE, validateTransitio
 import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, visualEvidencePath, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, checkSourceCredibility, } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
-import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
+import { hasExpectedRedManifest, hasExpectedRedDisposition, hasNoNewTestRecord } from "../gates/expected-red.js";
+import { resolveJudgeReport } from "./evidence-file.js";
 import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-execution.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
@@ -561,14 +562,41 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // Blocked escape edge to pm is not checked, so escalation stays open.
             // A repro test is a declared-red test, so hasExpectedRedManifest() is
             // reused. File mode only: the manifest and dispatch_mode are file-only.
-            if (storage instanceof FileHandoffStorage &&
-                prevState?.dispatch_mode === "bugfix" &&
+            // Test-first hand-off (E432): on a marked feature the same manifest is
+            // also required when qa-engineer hands the tests to sr-engineer, unless
+            // qa recorded qa_reports/no-new-test_<feature>.txt (ruling 10). Existence
+            // only. Bug tickets share the manifest (ruling 4): the bugfix check
+            // below still runs on sr -> code-reviewer and never asks who wrote it.
+            const bugfixHandOff = prevState?.dispatch_mode === "bugfix" &&
                 prevTuple.agent === "sr-engineer" &&
                 prevTuple.status === "In_Progress" &&
                 nextTuple.agent === "code-reviewer" &&
-                nextTuple.status === "In_Progress") {
+                nextTuple.status === "In_Progress";
+            const testFirstHandOff = resolveChainPath(ctx) === "test-first" &&
+                prevTuple.agent === "qa-engineer" &&
+                (prevTuple.status === "In_Progress" || prevTuple.status === "Blocked") &&
+                nextTuple.agent === "sr-engineer" &&
+                nextTuple.status === "In_Progress";
+            const noNewTest = testFirstHandOff
+                ? hasNoNewTestRecord(parsed.workspace_path, parsed.active_feature)
+                : null;
+            if (storage instanceof FileHandoffStorage &&
+                (bugfixHandOff || (noNewTest !== null && !noNewTest.present))) {
                 const manifest = hasExpectedRedManifest(parsed.workspace_path, parsed.active_feature);
                 if (!manifest.present) {
+                    if (noNewTest !== null) {
+                        return {
+                            content: [{
+                                    type: "text",
+                                    text: `⛔ REPRO_MANIFEST_MISSING: ${parsed.active_feature}. ` +
+                                        `Test-first hand-off qa-engineer → sr-engineer needs the red-test manifest ` +
+                                        `at ${manifest.manifestPath}, or the no-new-test record at ` +
+                                        `${noNewTest.recordPath} when the ticket needs no new test. ` +
+                                        `Write one of them, then hand off again.`,
+                                }],
+                            isError: true,
+                        };
+                    }
                     return {
                         content: [{
                                 type: "text",
@@ -715,14 +743,16 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["QA_REVIEW_TARGET_REQUIRED"],
         run: async (ctx) => {
             const { parsed, storage } = ctx;
+            const judge = resolveJudgeReport(parsed.workspace_path, resolveChainPath(ctx)).judge;
             // Record QA evidence first so the PASS gate below sees the row or file
-            // just written. Fires only on a qa-engineer PASS/FAIL write with
+            // just written. Fires only on a PASS/FAIL write by the feature's judge
+            // (qa-engineer; code-reviewer on a test-first feature, E432) with
             // qa_review. The stamp targets review_task_ids if non-empty, else
             // completed_tasks; both empty is rejected with QA_REVIEW_TARGET_REQUIRED
             // before anything is recorded. Reads only the incoming args.
             // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — QA_REVIEW_RECORD".
             if (parsed.qa_review &&
-                parsed.agent_id === "qa-engineer" &&
+                parsed.agent_id === judge &&
                 (parsed.status === "PASS" || parsed.status === "FAIL")) {
                 const ids = parsed.review_task_ids && parsed.review_task_ids.length > 0
                     ? parsed.review_task_ids
@@ -744,13 +774,13 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                 // handleUpdateStateCore can revert the record if this write does not
                 // land. Any other storage records as before, with no undo.
                 if (storage instanceof FileHandoffStorage) {
-                    evidenceUndoByCtx.set(ctx, await recordReviewInFileUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes));
+                    evidenceUndoByCtx.set(ctx, await recordReviewInFileUndoable(parsed.workspace_path, ids, parsed.status, judge, notes));
                 }
                 else if (storage.recordReviewUndoable) {
-                    evidenceUndoByCtx.set(ctx, await storage.recordReviewUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes));
+                    evidenceUndoByCtx.set(ctx, await storage.recordReviewUndoable(parsed.workspace_path, ids, parsed.status, judge, notes));
                 }
                 else {
-                    await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes);
+                    await storage.recordReview(parsed.workspace_path, ids, parsed.status, judge, notes);
                 }
             }
             return null;
@@ -761,15 +791,18 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["QA_COMPLETION_EVIDENCE_MISSING"],
         run: (ctx) => {
             const { parsed, storage, prevState } = ctx;
-            // QA completion-evidence gate: a qa-engineer write whose completed_tasks
-            // adds ids not in the on-disk set needs per-id QA evidence on disk
+            const chainPath = resolveChainPath(ctx);
+            const judge = resolveJudgeReport(parsed.workspace_path, chainPath).judge;
+            // QA completion-evidence gate: a write by the feature's judge
+            // (qa-engineer; code-reviewer on a test-first feature, E432) whose
+            // completed_tasks adds ids not in the on-disk set needs per-id QA evidence on disk
             // (hasEvidenceInFile: a per-id file or a covers: line), whatever the
             // status. Ids already on disk need none. Runs after the qa_review record,
             // so a write's own review counts. No exemptions and no prevState guard;
             // other identities belong to the gate above. File mode only.
             // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — QA_COMPLETION_EVIDENCE_MISSING".
             if (storage instanceof FileHandoffStorage &&
-                parsed.agent_id === "qa-engineer" &&
+                parsed.agent_id === judge &&
                 parsed.completed_tasks.length > 0) {
                 const onDiskCompleted = new Set(prevState?.completed_tasks ?? []);
                 const newIds = parsed.completed_tasks.filter((id) => !onDiskCompleted.has(id));
@@ -788,7 +821,12 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                     text: `⛔ QA_COMPLETION_EVIDENCE_MISSING: ${ev.missing.join(", ")}. ` +
                                         `Expected evidence file(s): ${expectedPaths} ` +
                                         `(or an existing qa_reports/ report covering the id via a covers: line). ` +
-                                        gate("QA_COMPLETION_EVIDENCE_MISSING").hintStatic,
+                                        (chainPath !== "test-first"
+                                            ? gate("QA_COMPLETION_EVIDENCE_MISSING").hintStatic
+                                            : `On a test-first feature (chain_path: test-first) code-reviewer is the judge: ` +
+                                                `write its report for each newly added id first (qa_review with ` +
+                                                `review_task_ids on a PASS/FAIL write, or the report file), or drop the ` +
+                                                `unevidenced ids from completed_tasks.`),
                                 }],
                             isError: true,
                         };
