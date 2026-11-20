@@ -75,6 +75,13 @@ let baseSkipReason = null;
   if (baseSkipReason) console.warn(`[WARN] e432: base-commit replays skipped loudly: ${baseSkipReason}`);
 }
 
+// Base-commit source text straight from git, so no on-disk extraction of tools/ or schema/ is needed.
+function baseSource(rel) {
+  const r = spawnSync("git", ["show", `${BASE_SHA}:${rel}`], { cwd: ROOT, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
+  assert.equal(r.status, 0, `git show ${BASE_SHA}:${rel} failed: ${String(r.stderr)}`);
+  return r.stdout;
+}
+
 // ---------------------------------------------------------------- harness (parameterised by module set)
 
 function harness(m) {
@@ -642,7 +649,7 @@ test("AC12: SQLite rejections and a qa PASS with qa_review replay identically on
   assert.equal(cur.rows.length, 1);
   assert.equal(CUR.versions.CURRENT_VERSIONS.sqlite, 2);
   for (const f of ["tools/storage-sqlite.ts", "schema/migrations-sqlite.ts"]) {
-    assert.equal(fs.readFileSync(path.join(ROOT, f), "utf-8"), fs.readFileSync(path.join(BASE.srcDir, f), "utf-8"), `${f} byte-identical to base`);
+    assert.equal(fs.readFileSync(path.join(ROOT, f), "utf-8"), baseSource(f), `${f} byte-identical to base`);
   }
 });
 
