@@ -59,3 +59,38 @@ No findings. `parseDesignMode` adds one variable and one string slice. Its two c
 
 ## Verdict
 CHANGES_REQUESTED. R1: the shipped step 2b text makes a dual-source (`prototype` + Figma) design skip the Figma-row classification that approved decision D5 keeps, and the fix is one added sentence on line 55 of the design-auditor SOP.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Base `0efc203`, head `d3d24d2`. This round covers the fix for R1 and checks the whole feature diff for regressions since round 1 (`git diff 98608ae HEAD`). Reviewer model: opus, the same tier as the sr hop. The same-model caveat from round 1 still applies.
+
+## Summary
+- d3d24d2 changes one line in shipped content: `content/skill-design-auditor.md:55`. It also carries `.current/e423/handoff.md` and `dispatch.jsonl` (lane state). Since round 1's head (`98608ae`), the only other change is this report.
+- Step 2b now ends with: `` `prototype` skips this gate: every prototype page is a full screen. In a dual-source design (`prototype` + Figma), the Figma rows still run this gate. ``
+- R1 is resolved and the result matches D5. No new findings.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1–AC13 and AC15–AC20: unchanged since round 1 (`git diff 98608ae HEAD` does not touch their files) and still implemented as cited in Round 1.
+AC14 — implemented — `content/skill-design-auditor.md:55`. The `da.credibility` anchor matches spec line 229 byte-for-byte (`grep -c` = 1), and the new sentence brings the anchor in line with D5. The sentence `` `image`/`pdf`/`paper`/`no-design` modes skip this gate `` is unchanged in 2a and 2b. `wc -l` = 110, the same as round 1.
+AC21, AC22 — qa-owned (T-E423-07); out of this review's scope.
+AC23 — partial (qa-owned remainder) — the fix changes content only, so `dist/` is untouched. Running the full suite is qa's job.
+
+## Correctness
+- R1 — resolved. D5 says the design-auditor "still runs its step-2b classification on the Figma rows (SOP), but the server's credibility check keys on the declared mode and stays dormant for `prototype`". The added sentence covers the SOP half of that. The server half is unchanged: `FETCH_BASED_MODES` and `checkSourceCredibility` are untouched. A dual-source auditor now classifies its Figma nodes before extracting, and the existing "Record the attestation" bullet then records `credibility: full-page-composite` on each (a) row. The volume gate in 2a for the same rows is already covered by `da.volume` (line 49, spec line 228), so step 2a has no gap.
+- Expected-red: I re-ran `context-budget`, `e178a`, `e384`, `source-credibility-gate`, `e437`, `design-auditor-volume-guard`, `subagent-templates`, `skill-evolution-v3.11`, `e391`, `e438` and `e439`. 9 tests fail: context-budget AC8, e178a AC3/AC5 and e384 ×6. Each matches an entry in `qa_reports/expected-red_e423-spec-workshop.txt` (lines 6, 7, 15–20, 24). No new red. The context-budget AC8 red comes from the coordinator bundle (coord-01). The design-auditor SOP feeds only the partial-expansion tests there, and those are green. I also ran the other files that reference `skill-design-auditor` (`render-structure`, `pixel-perfect-*`, `widget-shape-spec`) together with `e437` and `check-md-tables`: 63/63 pass.
+
+## Quality
+No findings. The sentence follows the line's existing style. It sits on the same line, so the anchor and the e410 line pins hold. The round-1 `optional` D8 note on `content/skill-integrator.md:98` still stands and is not blocking.
+
+## Architecture
+No architecture spec (D2). The fix changes SOP text only, with no change to layering or code.
+
+## Security
+No findings. The added text has no repo-only path, ticket id or name, and `e437-repo-only-paths` is green.
+
+## Performance
+No findings. Content-only change.
+
+## Verdict
+APPROVED. The R1 fix applies the step-2b classification to the Figma rows of a dual-source design exactly as D5 requires, with no other change to shipped code or content since round 1.
