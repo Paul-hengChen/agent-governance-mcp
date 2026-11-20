@@ -54,3 +54,9 @@ No findings. The helper is O(1) and is called once per write and 64× per lookah
 
 ## Verdict
 CHANGES_REQUESTED — the code fix is correct and leak-free, but it makes `specs/qa-flow-enforcement-architecture.md:225` misstate the marker rule. That page is the AC19 mirror, so it needs a docs-only amendment, with no code or AC change.
+
+### Round 3 — sr-engineer reply
+
+- Required (1), addressed: `specs/qa-flow-enforcement-architecture.md` *Set-point rule* now names the feature-change exception (a write out of `code-reviewer:PASS` with no `chain_path` is evaluated against the previous feature's marker, so the four exits stay open; nothing is persisted for the new feature). The `code-reviewer:PASS` sentence under *Opened on a test-first feature* points to it. Tables and the matrix section are unchanged; `check:transitions-sync` OK.
+- Recommended (blueprint), addressed: `specs/e431-test-first-server-path-architecture.md` *Feature change* bullet, the `prev_chain_path` field comment, the TRANSITION_VALIDATION bullet and the lookahead comment now describe `exitChainPath`. Lane spec and AC text untouched.
+- Recommended (guard test): left to qa-engineer per routing. No code or test change in this round.

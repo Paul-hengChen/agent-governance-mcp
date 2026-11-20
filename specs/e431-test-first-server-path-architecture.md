@@ -164,7 +164,7 @@ export function isChainPathSetPoint(prev: TransitionTuple, next: TransitionTuple
 - **Marked** for a write = `prev_chain_path === "test-first"` (persisted, same feature) OR (`next_chain_path === "test-first"` AND `isChainPathSetPoint(prev, next)`).
 - **Illegal set** = `next_chain_path` present, `prev_chain_path` absent, not a set point → rejected (AC10). Covers sr-engineer, code-reviewer, qa-engineer outside the entry edge, architect (incl. pm → architect), researcher and design-auditor writes, including a feature-opening write by a non-pm role.
 - **Immutable**: zod admits only `"test-first"`, there is no clearing value, the write layer carries it, and pm re-entry does not re-arm it. A redundant `chain_path` on an already-marked feature is a no-op, never a rejection.
-- **Feature change**: the orchestrator passes `prev_chain_path: undefined` when `feature_changed`, and the write layer drops the old value, so the new feature starts unmarked unless its own opening pm write carries the marker.
+- **Feature change**: the orchestrator passes `prev_chain_path: exitChainPath(prev, prevState?.chain_path, feature_changed, next_chain_path)`. That is `undefined` on a feature change, except out of `code-reviewer:PASS` when the write carries no `chain_path`: there the previous feature's marker is passed, so the four exits of that key stay open (AC11; amended after qa FAIL round 1). The write layer drops the old value either way, so the new feature starts unmarked unless its own opening pm write carries the marker.
 - **Switching an in-flight old-path feature**: only through a pm write (set point (i)); from then on the old-path edges of the table are closed for it. No other route exists.
 - **SQLite/HTTP**: the orchestrator passes neither field, so marked is always false (AC18).
 
@@ -182,7 +182,7 @@ import type { ChainPath } from "./handoff-types.js"; // type-only: runtime graph
 export interface TransitionRequest {
   // ...existing fields unchanged...
   // E431 — all optional; omitting all three reproduces the base-commit result.
-  prev_chain_path?: ChainPath;   // persisted marker of the SAME feature; caller passes undefined on feature change and in SQLite mode
+  prev_chain_path?: ChainPath;   // persisted marker of the SAME feature; on feature change the caller passes exitChainPath(...) (undefined except out of code-reviewer:PASS with no incoming chain_path); undefined in SQLite mode
   next_chain_path?: ChainPath;   // the incoming write's chain_path; caller passes undefined in SQLite mode
   prev_sr_return_count?: number; // persisted sr_return_count; default 0
 }
@@ -308,7 +308,7 @@ function isBuildEntryEdge(prev: TransitionTuple, next: TransitionTuple, chainPat
 ```
 
 - `gates/pipeline.ts`'s `UpdateStateGateContext` is NOT extended (not this lane's file); steps call `resolveChainPath(ctx)` (pure, no I/O, cheap).
-- TRANSITION_VALIDATION step passes `prev_chain_path: fileMode && !feature_changed ? prevState?.chain_path : undefined`, `next_chain_path: fileMode ? parsed.chain_path : undefined`, `prev_sr_return_count: prevState?.sr_return_count ?? 0`.
+- TRANSITION_VALIDATION step passes `prev_chain_path: fileMode ? exitChainPath(prevTuple, prevState?.chain_path, feature_changed, parsed.chain_path) : undefined` (same feature: the persisted marker; feature change: see *Feature change* above), `next_chain_path: fileMode ? parsed.chain_path : undefined`, `prev_sr_return_count: prevState?.sr_return_count ?? 0`.
 - The four build-entry steps (SCOPE_DECISION_REQUIRED, CUT_APPROVAL_REQUIRED, EXTERNAL_REFS_UNRESOLVED, SOURCE_CREDIBILITY_UNVERIFIED) replace their inline edge predicate with `isBuildEntryEdge(prevTuple, nextTuple, resolveChainPath(ctx))`, keeping each step's own storage guard, and build `allowed` from `allowedSuccessors("pm:In_Progress", chainPath)`. Unmarked: identical boolean and identical `allowed`. On a marked feature every pm → qa-engineer write arms them, with or without `resume_of` (Open Question 1).
 - Post-pipeline: `new_sr_return_count = computeSrReturnCount(prevState?.sr_return_count ?? 0, prevTuple, nextTuple, feature_changed)`; `writeState({ ..., chainPath: resolvedChainPath, srReturnCount: new_sr_return_count })` (both ignored by SQLite; `resolvedChainPath` is always undefined there).
 - next_role lookahead: `effectiveAllowedSuccessors(nextTuple, { ...counters, sr_return_count: new_sr_return_count }, { ..., chainPath: resolvedChainPath })`.
@@ -319,7 +319,7 @@ function effectiveAllowedSuccessors(
   counters: { qa_round: number; review_round: number; visual_round: number; hop_count: number; sr_return_count?: number },
   options: { assumeResumeOf?: boolean; featureChanged?: boolean; chainPath?: ChainPath } = {},
 ): Array<{ agent: AgentName; status: StatusName }>;
-// inner call adds: prev_chain_path: feature_changed ? undefined : options.chainPath,
+// inner call adds: prev_chain_path: exitChainPath(prev, options.chainPath, feature_changed),
 //                  prev_sr_return_count: counters.sr_return_count ?? 0
 // (next_chain_path is never passed: the lookahead asks what the NEXT write may do on the post-write state)
 ```
