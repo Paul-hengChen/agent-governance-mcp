@@ -1163,7 +1163,8 @@ const STR_USAGE_FEATURE =
   "          .current/.config.json nodeModulesLinks), .env byte-copied.\n" +
   "          Primary's .current/.config.json is copied in when the checkout\n" +
   "          has none and git ignores it there (a snapshot: later edits in\n" +
-  "          primary do not reach the lane).\n" +
+  "          primary do not reach the lane). An ignored CLAUDE.local.md is\n" +
+  "          byte-copied the same way (agc init --adapter=local).\n" +
   "  feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>] [--pr <n>]\n" +
   "          Tear a lane down from the primary checkout. --shipped requires\n" +
   "          the branch merged into --base (default main), moves the lane's\n" +
@@ -1743,6 +1744,46 @@ function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
             `until it is copied by hand`
         );
       }
+    }
+  }
+
+  // CLAUDE.local.md (`agc init --adapter=local`): the agc adapter block lives
+  // in this untracked file, so a fresh worktree lacks it and the lane would
+  // load no governance block. Byte copy from the repo root, like .env, only
+  // when the lane has no file there and git ignores it in the lane: an
+  // unignored copy would show as untracked and make `finish` refuse to remove
+  // the worktree. Not ignored: copy nothing and say how to add the rule.
+  const claudeLocalRel = "CLAUDE.local.md";
+  const primaryClaudeLocal = path.join(repoRoot, claudeLocalRel);
+  const laneClaudeLocal = path.join(lanePath, claudeLocalRel);
+  let primaryIsFile = false;
+  try {
+    primaryIsFile = fs.statSync(primaryClaudeLocal).isFile();
+  } catch {
+    // Absent (or unreadable): nothing to copy.
+  }
+  if (primaryIsFile && !lstatOrNull(laneClaudeLocal)) {
+    const ignored = gitTry(lanePath, ["check-ignore", "-q", "--", claudeLocalRel]).status;
+    if (ignored === 0) {
+      try {
+        fs.copyFileSync(primaryClaudeLocal, laneClaudeLocal, fs.constants.COPYFILE_EXCL);
+        out.push(
+          "agc feature start — copied CLAUDE.local.md from the primary checkout (bytes only; contents never read)"
+        );
+      } catch (err) {
+        if (!err || err.code !== "EEXIST") {
+          warn.push(
+            `agc feature start — warning: could not copy CLAUDE.local.md into the lane ` +
+              `(${err && err.message ? err.message : String(err)}) — copy it by hand to load the agc block there`
+          );
+        }
+      }
+    } else if (ignored === 1) {
+      warn.push(
+        "agc feature start — warning: CLAUDE.local.md in the primary checkout is not ignored by git, " +
+          "so it was not copied into the lane (it would show as untracked there) — run agc init " +
+          "--adapter=local in the primary checkout to add the exclude rule"
+      );
     }
   }
 
