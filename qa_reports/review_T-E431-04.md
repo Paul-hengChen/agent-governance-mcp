@@ -25,3 +25,9 @@ Result: FAIL, routed to sr-engineer.
 
 AC11 feature-change exit defect: on a marked feature at code-reviewer:PASS, pm/researcher/release-engineer/design-auditor writing In_Progress with a different active_feature is TRANSITION_REJECTED via the real handler (4 red tests, commit 83af982); validateTransition with the previous marker accepts. Orchestrator passes prev_chain_path undefined on feature_changed. Spec/AC text unchanged. Evidence: qa_reports/review_T-E431-04.md.
 
+## 2026-11-20T07:51:45.483Z — PASS — by qa-engineer
+
+suite-result: 4428/4430 passed (server-recorded from qa_suite_result; command: node scripts/test-lock.mjs -- npm test)
+
+T-E431-11 final verification PASS. Suite 4428/4430 (2 known skips), AC1-AC20 proofs green, dist/audit/scope/CLAUDE.md/bookkeeping clean. e295 AC11 and visual-evidence-gate AC-4 re-pinned under human rulings 5a/6a (skill-evolution :75/:80 under 1a); new AC11 chain_path guard test added. See qa_reports/review_T-E431-11.md.
+
