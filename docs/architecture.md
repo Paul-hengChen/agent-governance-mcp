@@ -15,10 +15,10 @@ How the three layers fit together, what gates a state write, and how the routing
 │  + .current/<lane>/handoff.md state                        │
 │  (Fragment selection per dispatch mode via manifest)       │
 │                                                            │
-│  12 registered prompts (tools/registry.ts):                │
+│  13 registered prompts (tools/registry.ts):                │
 │    teamwork, teamwork-lite, pm, architect, researcher,     │
-│    design-auditor, sr-engineer, code-reviewer,             │
-│    qa-engineer, doc-writer, release-engineer, integrator   │
+│    design-auditor, sr-engineer, code-reviewer, qa-engineer,│
+│    doc-writer, release-engineer, integrator, spec-workshop │
 ├── Layer 2: Tools (12 tw_* MCP tools) ──────────────────────┤
 │  tw_get_state           tw_update_state                    │
 │  tw_get_next_task       tw_add_task                        │
@@ -74,6 +74,7 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │        qa_round     ≥ 4 (ROUND_CAP)        ┐ matrix collapses   │
 │        review_round ≥ 4 (REVIEW_ROUND_CAP) ├ to {(pm,           │
 │        visual_round ≥ 6 (VISUAL_ROUND_CAP) ┘ In_Progress)}      │
+│        sr_return_count ≥ 2 (SR_RETURN_CAP): sr→qa return → pm   │
 │  2 FEATURE_LEASE                  (gates/feature-lease.ts)      │
 │  3 SCOPE_DECISION_REQUIRED        (gates/scope-decision.ts)     │
 │  4 CUT_APPROVAL_REQUIRED          (gates/cut-approval.ts)       │
@@ -97,6 +98,8 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │ P1 Round accounting (computeNewRound)                           │
 │      (qa-engineer, FAIL) → prev + 1                             │
 │      (qa-engineer, PASS) | (pm, In_Progress) → 0                │
+│      (code-reviewer, PASS) → review_round 0 (test-first only)   │
+│      sr_return_count: sr→qa return + 1; (pm, In_Progress) → 0   │
 │      else → unchanged;  hop_count incremented per transition    │
 ├─────────────────────────────────────────────────────────────────┤
 │ P2 Atomic Write                                                 │
@@ -108,7 +111,7 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
                                   handoff state updated
 ```
 
-Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 34 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
+Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 35 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
 
 ---
 

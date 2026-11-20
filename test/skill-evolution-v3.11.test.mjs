@@ -72,12 +72,12 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
 });
 
 test("AC-10: schema/versions.ts schema versions track e123a-lane-layout-migration bump", () => {
-  // Each handoff bump from v6 to v15 added frontmatter fields (most stamp-only,
+  // Each handoff bump from v6 to v16 added frontmatter fields (most stamp-only,
   // seeding nothing); sqlite stays at 2 because only hop_count reached SQLite,
   // via an idempotent ALTER with no schema_meta bump.
   // Version history: specs/e260h-comment-rationale.md (test/skill-evolution-v3.11.test.mjs).
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*15,/, "CURRENT_VERSIONS.handoff must be 15 (e123a-lane-layout-migration)");
+  assert.match(versionsTs, /handoff:\s*16,/, "CURRENT_VERSIONS.handoff must be 16 (E431 chain_path/sr_return_count bump)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 

@@ -100,7 +100,7 @@ async function dispatch(ws, args) {
 // ============================================================================
 
 test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/lossless", () => {
-  // Re-baselined for the lane-layout migration bump (e123a-lane-layout-migration): CURRENT is now 15, so the
+  // Re-baselined for the lane-layout migration bump (e123a-lane-layout-migration): CURRENT is now 16 (E431), so the
   // manually-registered chain must extend two steps further (v13→v14,
   // cut_approved_source pin, stamp-only, seeds nothing; v14→v15,
   // dispatch_mechanism/dispatch_mechanism_tier pin, stamp-only, seeds
@@ -128,10 +128,11 @@ test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/loss
   registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
+  registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
 
   const result = runMigrations("handoff", { schema_version: 11, active_feature: "seed-feat", qa_round: 2, hop_count: 5 });
-  assert.deepEqual(result.applied, [12, 13, 14, 15], "the v11->v12, v12->v13, v13->v14 AND v14->v15 steps run when on-disk is four behind CURRENT");
-  assert.equal(result.payload.schema_version, 15);
+  assert.deepEqual(result.applied, [12, 13, 14, 15, 16], "the v11->v12, v12->v13, v13->v14 AND v14->v15 steps run when on-disk is four behind CURRENT");
+  assert.equal(result.payload.schema_version, 16);
   assert.equal(result.payload.qa_rounds_total, 0, "AC8 — stale rows migrate in with qa_rounds_total = 0");
   assert.equal(result.payload.review_rounds_total, 0, "AC8 — stale rows migrate in with review_rounds_total = 0");
   assert.equal(result.payload.visual_rounds_total, 0, "AC8 — stale rows migrate in with visual_rounds_total = 0");
@@ -143,7 +144,7 @@ test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/loss
   assert.equal(result.payload.hop_count, 5, "hop_count untouched by this step (sibling, unrelated counter)");
 });
 
-test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT (v15) via readHandoffState/parseHandoff", async () => {
+test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT (v16) via readHandoffState/parseHandoff", async () => {
   const ws = mkWs("e8-legacy-");
   resetSession(ws);
   fs.writeFileSync(
@@ -162,7 +163,7 @@ test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT
   await new Promise((resolve) => setTimeout(resolve, 30));
   const state = parseHandoff(ws);
   assert.equal(state.schema_version ?? CURRENT_VERSIONS.handoff, CURRENT_VERSIONS.handoff, "sanity: server CURRENT is what we migrate to");
-  assert.equal(CURRENT_VERSIONS.handoff, 15, "sanity: CURRENT is 15 (e123a-lane-layout-migration)");
+  assert.equal(CURRENT_VERSIONS.handoff, 16, "sanity: CURRENT is 16 (E431 chain_path/sr_return_count)");
   assert.equal(state.qa_rounds_total, 0, "v0 legacy chain lands with qa_rounds_total seeded 0");
   assert.equal(state.review_rounds_total, 0, "v0 legacy chain lands with review_rounds_total seeded 0");
   assert.equal(state.visual_rounds_total, 0, "v0 legacy chain lands with visual_rounds_total seeded 0");
@@ -170,21 +171,21 @@ test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT
   // readHandoffState above is what triggers the own-workspace migration (AC3) — the
   // flat fixture seeded above has already moved to the lane-scoped path.
   const raw = fs.readFileSync(currentHandoffPath(ws), "utf-8");
-  assert.match(raw, /schema_version:\s*15/, "on-disk heal lands at v15");
+  assert.match(raw, /schema_version:\s*16/, "on-disk heal lands at v16");
 });
 
-test("E8-M3: a v16 handoff refuses-loud against this v15 server (no silent downgrade)", () => {
+test("E8-M3: a v17 handoff refuses-loud against this v16 server (no silent downgrade)", () => {
   // Re-baselined for the lane-layout migration bump (coupled bump, not a bare
-  // constant swap): CURRENT is now 15, so "the future" this test probes must
+  // constant swap): CURRENT is now 16 (E431), so "the future" this test probes must
   // move to 16 or the payload/assertion pair collapses to the incoherent
-  // "16 > server max 16" — it was v15-vs-v14 before the cut-approval-inheritance
+  // "17 > server max 16" — it was v15-vs-v14 before the cut-approval-inheritance
   // bump (e123a-lane-layout-migration, e114-cut-approval-inheritance).
   const ws = mkWs("e8-future-");
   resetSession(ws);
   fs.writeFileSync(
     path.join(ws, ".current", "handoff.md"),
     `---
-schema_version: 16
+schema_version: 17
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -199,7 +200,7 @@ qa_round: 0
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 16 > server max 15/,
+    /on-disk version 17 > server max 16/,
     "a v16 file must refuse-loud, never silently downgrade",
   );
 });
@@ -236,7 +237,7 @@ hop_count: 4
   await new Promise((resolve) => setTimeout(resolve, 30));
   // readHandoffState above is what triggers the own-workspace migration (AC3).
   const healed = fs.readFileSync(currentHandoffPath(ws), "utf-8");
-  assert.match(healed, /schema_version:\s*15/, "heal lands at CURRENT (v15)");
+  assert.match(healed, /schema_version:\s*16/, "heal lands at CURRENT (v16)");
   // v11 file had no totals at all (pre-e8 shape) -> migration seeds 0, and the
   // heal write must persist that seeded 0 (not silently drop the fields).
   assert.match(healed, /qa_rounds_total:\s*0/, "heal write persists the seeded qa_rounds_total");

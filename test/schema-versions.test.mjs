@@ -22,12 +22,12 @@ function reset() {
 // ---------- CURRENT_VERSIONS / VERSION_WHEN_ABSENT ----------
 
 test("CURRENT_VERSIONS exposes the four kinds at their e123a-lane-layout-migration levels", () => {
-  // Each handoff bump from v6 to v15 added frontmatter fields; sqlite stays at
+  // Each handoff bump from v6 to v16 added frontmatter fields; sqlite stays at
   // 2 (only hop_count reached it, via an idempotent ALTER). tasks v2 is
   // stamp-only, its meaning carried by the file's lane-local path; config v2
   // added the optional "artifacts" key, stamp-only.
   // Version history: specs/e260h-comment-rationale.md (test/schema-versions.test.mjs).
-  assert.equal(CURRENT_VERSIONS.handoff, 15);
+  assert.equal(CURRENT_VERSIONS.handoff, 16);
   assert.equal(CURRENT_VERSIONS.tasks, 2);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);
   assert.equal(CURRENT_VERSIONS.config, 2);
@@ -98,8 +98,8 @@ test("registerMigration idempotent overwrite — last write wins", () => {
   reset();
   // Register v0→v1 twice (overwrite test); also register v1→v2, v2→v3, v3→v4, v4→v5,
   // v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, and
-  // v14→v15 since CURRENT_VERSIONS.handoff is now 15 (the lane-layout
-  // migration level, e123a-lane-layout-migration) — the runner must climb the full chain.
+  // v14→v15, and v15→v16 since CURRENT_VERSIONS.handoff is now 16 (the E431 chain_path/sr_return_count
+  // bump, after the e123a lane-layout level) — the runner must climb the full chain.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "first" }) });
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "second" }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
@@ -116,9 +116,10 @@ test("registerMigration idempotent overwrite — last write wins", () => {
   registerMigration({ kind: "handoff", from: 12, to: 13, up: (input) => ({ ...input, schema_version: 13 }) });
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (input) => ({ ...input, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (input) => ({ ...input, schema_version: 15 }) });
+  registerMigration({ kind: "handoff", from: 15, to: 16, up: (input) => ({ ...input, schema_version: 16 }) });
   const result = runMigrations("handoff", { /* no schema_version → v0 */ });
   // Overwrite semantics: the second v0→v1 registration is the one that runs;
-  // its `who: "second"` field threads through the v1→v2→...→v15 steps unchanged.
+  // its `who: "second"` field threads through the v1→v2→...→v16 steps unchanged.
   assert.equal(result.payload.who, "second");
 });
 
@@ -178,8 +179,8 @@ test("peekVersion handles array as non-object payload", () => {
 
 test("runMigrations no-op when current === target", () => {
   reset();
-  // CURRENT_VERSIONS.handoff === 15 (e123a-lane-layout-migration); payload
-  // already at v15. Must register all steps so the runner can reach v15 from
+  // CURRENT_VERSIONS.handoff === 16 (E431 chain_path/sr_return_count bump); payload
+  // already at v16. Must register all steps so the runner can reach v16 from
   // v0 in other tests.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (input) => ({ ...input, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
@@ -196,10 +197,11 @@ test("runMigrations no-op when current === target", () => {
   registerMigration({ kind: "handoff", from: 12, to: 13, up: (input) => ({ ...input, schema_version: 13 }) });
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (input) => ({ ...input, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (input) => ({ ...input, schema_version: 15 }) });
-  const result = runMigrations("handoff", { schema_version: 15, kept: true });
+  registerMigration({ kind: "handoff", from: 15, to: 16, up: (input) => ({ ...input, schema_version: 16 }) });
+  const result = runMigrations("handoff", { schema_version: 16, kept: true });
   assert.deepEqual(result.applied, []);
-  assert.equal(result.fromVersion, 15);
-  assert.equal(result.toVersion, 15);
+  assert.equal(result.fromVersion, 16);
+  assert.equal(result.toVersion, 16);
   assert.equal(result.payload.kept, true);
 });
 
@@ -228,11 +230,11 @@ test("runMigrations applies single v1→v2 step", () => {
 
 test("runMigrations refuses-loud when on-disk version > current (AC-4)", () => {
   reset();
-  // CURRENT_VERSIONS.handoff === 15 (lane-layout migration level, e123a-lane-layout-migration), so the
+  // CURRENT_VERSIONS.handoff === 16 (E431 chain_path/sr_return_count bump), so the
   // "server max" surfaced in the refuse-loud error tracks the bumped value.
   assert.throws(
     () => runMigrations("handoff", { schema_version: 99 }),
-    /on-disk version 99 > server max 15/
+    /on-disk version 99 > server max 16/
   );
 });
 

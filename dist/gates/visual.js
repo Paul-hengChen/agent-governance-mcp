@@ -82,14 +82,18 @@ export function hasDesignModeRequiringVisual(workspacePath, activeFeature) {
 // leading token (`[a-z][a-z0-9]*(?:-[a-z0-9]+)*`, case-insensitive, lowercased)
 // is compared whole against the known modes. A token that is not itself a known
 // mode but starts with `<known mode>-` (`no-design` first) resolves to that mode
-// (`figma-export` -> figma). Any other token (`code`, `freehand`) means that
-// candidate line yields no mode and the next candidate is tried, so explanatory
-// prose such as `code (not from Figma)` cannot arm a Figma-only gate (E384).
+// (`figma-export` -> figma). Any other token (`code`, `freehand`) is an
+// unrecognised declared mode: the next candidate is still tried, and a known mode
+// on any candidate wins. Only when no candidate yields a known mode is the FIRST
+// unrecognised token returned (cut to UNKNOWN_MODE_MAX chars + `…`), so the
+// caller arms the visual checks and names the value instead of silently staying
+// unarmed. It never arms the Figma-only check: that one reads FETCH_BASED_MODES.
 // Only a candidate line with no token at all (e.g. `<figma>`) falls back to the
 // known mode that appears EARLIEST on the line (lowest match index): trailing
 // prose such as `image (no Figma)` must not let a later-mentioned mode win
-// (E319). Returns null if no candidate yields a mode.
-const KNOWN_MODES = ["figma", "sketch", "xd", "penpot", "pdf", "image", "paper", "no-design"];
+// (E319). Returns null if no candidate declares or names a mode.
+const KNOWN_MODES = ["figma", "sketch", "xd", "penpot", "pdf", "image", "paper", "prototype", "no-design"];
+const UNKNOWN_MODE_MAX = 40;
 function parseDesignMode(content) {
     // 1. Inline form: `mode: no-design` (no-design fast path, design-auditor L14)
     //    or `**Mode** — figma` (bullet form, L20). Scan the whole doc for the
@@ -108,6 +112,7 @@ function parseDesignMode(content) {
     // `no-design` first, so a hyphenated token is tried against it before any
     // other known-mode prefix.
     const prefixOrder = ["no-design", ...KNOWN_MODES.filter((m) => m !== "no-design")];
+    let firstUnknown = null;
     for (const raw of candidates) {
         const lc = raw.toLowerCase();
         const declared = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*/.exec(lc.replace(/^[\s`*_"'([]+/, ""));
@@ -118,7 +123,11 @@ function parseDesignMode(content) {
             const prefixed = prefixOrder.find((mode) => token.startsWith(`${mode}-`));
             if (prefixed !== undefined)
                 return prefixed;
-            // A declared value outside the known list: this candidate yields nothing.
+            // A declared value outside the known list: remember the first one, keep looking.
+            if (firstUnknown === null) {
+                firstUnknown =
+                    token.length > UNKNOWN_MODE_MAX ? `${token.slice(0, UNKNOWN_MODE_MAX)}\u2026` : token;
+            }
             continue;
         }
         // No declared token. Lowest-index word-boundary match wins. Bare `design`
@@ -133,7 +142,7 @@ function parseDesignMode(content) {
         if (best !== null)
             return best.mode;
     }
-    return null;
+    return firstUnknown;
 }
 // Per-task existence check for `qa_reports/visual_<task-id>.md`.
 // Mirror of hasEvidenceInFile / hasCodeReviewEvidenceInFile — existence is

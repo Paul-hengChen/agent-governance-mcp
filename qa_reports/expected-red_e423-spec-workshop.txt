@@ -1,0 +1,27 @@
+# e423-spec-workshop — expected-red manifest (sr-engineer, T-E423-01..05)
+# Format: <relative test file path> | <exact test name/description string>
+# Every entry is re-pinned / re-baselined by qa-engineer in T-E423-06 / T-E423-07 (spec "Test placement guidance").
+
+# PROMPT_REGISTRY 12 -> 13 (spec-workshop appended after integrator) and CLAUDE.md counts per claude.* (T-E423-03, T-E423-04)
+test/e178a-integrator-role.test.mjs | AC3: `integrator` MCP prompt registered as PROMPT_REGISTRY entry 12; prompts/integrator.ts matches the pm.ts pattern
+test/e178a-integrator-role.test.mjs | AC5: prompt count synced 11 -> 12 in CLAUDE.md; integrator listed; AGENTS.md carries no prompt count
+# Note: e178a AC17 (regex `files.length,\s*12` over test/skill-frontmatter.test.mjs source) is still GREEN here;
+# it turns red only when qa re-pins skill-frontmatter to 13, and both are re-pinned together.
+
+# content/skill-*.md count 12 -> 13 (new content/skill-spec-workshop.md, T-E423-02)
+test/skill-frontmatter.test.mjs | every content/skill-*.md carries a valid recommended_model frontmatter
+
+# D3: an unrecognised declared mode is now returned (truncated to 40 chars + U+2026) and arms the visual checks (T-E423-01)
+test/e384-design-mode-declared.test.mjs | AC-E384-1 declared `code` with a Figma explanation is undeclared (bullet form)
+test/e384-design-mode-declared.test.mjs | AC-E384-1 declared `code` with a Figma explanation is undeclared (inline form)
+test/e384-design-mode-declared.test.mjs | AC-E384-2 H2 form `## Mode` + value line `code (no Figma export)` is undeclared
+test/e384-design-mode-declared.test.mjs | AC-E384-3 tokens not starting with a whole known mode are undeclared
+test/e384-design-mode-declared.test.mjs | AC-E384-3 an unknown declared value is never scanned past, whatever the prose names
+test/e384-design-mode-declared.test.mjs | security smoke: empty and oversized declared values stay undeclared, never throw
+test/visual-evidence-gate.test.mjs | E319 AC-E319-5: a Mode line naming no known mode still returns mode null
+
+# coord-01 grows by the prototype-export match bullet + no-ticket-file hint paragraph (T-E423-05): teamwork bundle cap re-baseline (D9)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18465 ~tok)
+
+# coord-01 text change -> skill-coordinator-monolith.txt golden re-capture (D10, T-E423-07)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte

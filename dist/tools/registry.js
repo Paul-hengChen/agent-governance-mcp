@@ -18,6 +18,7 @@ import { handleIndexPrd, handleClearPrdChunks, DEFAULT_EMBEDDING_MODEL } from ".
 import { handleGateStats } from "./gate-stats.js";
 import { emitGateTelemetry } from "./telemetry.js";
 import { ALL_GATE_CODES } from "../gates/registry.js";
+import { PASS_IDENTITY_REFINE_MESSAGE } from "./transitions.js";
 // ==========================================
 // Telemetry for rejections raised by zod (E303)
 // ==========================================
@@ -360,6 +361,13 @@ const UpdateStateArgs = z
     // check (REPRO_MANIFEST_MISSING) on the sr-engineer -> code-reviewer
     // edge. File-mode only. (E2, v11)
     dispatch_mode: z.enum(["feature", "bugfix"]).optional(),
+    // chain_path: test-first chain marker, a one-value enum checked here.
+    // Accepted only at its set points (a pm write, or the entry write
+    // pm/architect -> qa-engineer:In_Progress); anywhere else on an unmarked
+    // feature validateTransition rejects it. Permanent once set: carried
+    // across writes that omit it, never cleared, dropped on active_feature
+    // change, NOT re-armed on PM re-entry. File-mode only. (E431, v16)
+    chain_path: z.enum(["test-first"]).optional(),
     // cut_approved_source: client-set free text, NOT validated here. The
     // server cannot verify a claim about another workspace, so
     // tools/handoff-parse.ts silently drops a value not shaped
@@ -386,8 +394,12 @@ const UpdateStateArgs = z
     // QA_REVIEW_TARGET_REQUIRED (no "every open task" fallback).
     review_task_ids: z.array(z.string().max(500)).max(200).optional(),
 })
-    .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
-    message: 'status="PASS" requires agent_id="qa-engineer"',
+    // PASS identity, first half: only qa-engineer or code-reviewer may write
+    // PASS. A code-reviewer PASS on a feature without chain_path: "test-first"
+    // is rejected with this same message by the orchestrator, which can read
+    // the persisted marker (a schema refine cannot).
+    .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer" || d.agent_id === "code-reviewer", {
+    message: PASS_IDENTITY_REFINE_MESSAGE,
     path: ["agent_id"],
 })
     // Mirror tw_index_prd's path-traversal guard: if prd_path is given it MUST
@@ -586,12 +598,12 @@ export const TOOL_REGISTRY = [
                 status: {
                     type: "string",
                     enum: ["In_Progress", "PASS", "FAIL", "Blocked"],
-                    description: 'Execution status. status="PASS" requires agent_id="qa-engineer".',
+                    description: 'Execution status. status="PASS" requires agent_id="qa-engineer" (agent_id="code-reviewer" on a test-first feature, chain_path: "test-first").',
                 },
                 completed_tasks: {
                     type: "array",
                     items: { type: "string" },
-                    description: 'Task ids QA has completed for this feature (only agent_id "qa-engineer" may change it). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; a qa-engineer FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
+                    description: 'Task ids the judge has completed for this feature (only agent_id "qa-engineer" may change it; "code-reviewer" on a test-first feature). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; the judge\'s FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
                 },
                 pending_notes: {
                     type: "array",
@@ -604,7 +616,7 @@ export const TOOL_REGISTRY = [
                 },
                 agent_id: {
                     type: "string",
-                    description: 'Agent name. Validated against ALLOWED_TRANSITIONS. PASS reserved for "qa-engineer".',
+                    description: 'Agent name. Validated against ALLOWED_TRANSITIONS. PASS reserved for "qa-engineer" ("code-reviewer" on a test-first feature).',
                 },
                 qa_review: {
                     type: "string",
@@ -707,6 +719,11 @@ export const TOOL_REGISTRY = [
                     enum: ["feature", "bugfix"],
                     description: "Ticket dispatch-mode classification (file-mode only). PM sets \"bugfix\" at cut time to mark a repro-first bug-fix ticket: the server then BLOCKS the sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase handoff with REPRO_MANIFEST_MISSING until qa_reports/expected-red_<feature>.txt records the failing reproduction test(s), and QA's Phase 0.5 expected-red disposition becomes load-bearing for PASS. Absence === \"feature\" (the default) — feature-mode chains are unaffected. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry; opt back into the full chain by explicitly setting \"feature\". Never gates a transition edge itself (handoff schema v11).",
                 },
+                chain_path: {
+                    type: "string",
+                    enum: ["test-first"],
+                    description: "Test-first chain marker (handoff schema v16, file-mode only). Set \"test-first\" on a pm write or on the entry write pm/architect → qa-engineer:In_Progress to put this feature on the test-first chain (qa-engineer writes the tests, sr-engineer builds, code-reviewer judges and writes PASS). On any other write of an unmarked feature it is rejected (TRANSITION_REJECTED). Feature-scoped and permanent: carried across writes that omit it, never cleared, dropped when active_feature changes, NOT re-armed on PM re-entry. Ignored in SQLite/HTTP mode.",
+                },
                 cut_approved_source: {
                     type: "string",
                     description: "Cut-approval inheritance attestation (handoff schema v14, e114-cut-approval-inheritance). Client-settable: the writer's own honest claim that this workspace's cut_approved: true was NOT witnessed in this workspace's own conversation turn but inherited from a parent feature's human approval. Shape: inherited:<parent-feature> — malformed values (missing prefix, empty feature name) are dropped defensively at parse time, never rejected at the boundary. Does NOT satisfy CUT_APPROVAL_REQUIRED or any other gate by itself — recording-only (see spec Out of Scope). Feature-scoped: preserved across same-feature writes that omit it (the dispatch_mode scalar algorithm), dropped on active_feature change, NOT re-armed on PM re-entry. Absence === non-inherited (the safe direction).",
@@ -751,7 +768,7 @@ export const TOOL_REGISTRY = [
     }),
     defineTool({
         name: "tw_complete_task",
-        description: 'Mark task completed [x]. Reserved for qa-engineer — pass agent_id="qa-engineer".',
+        description: 'Mark task completed [x]. Reserved for qa-engineer — pass agent_id="qa-engineer" (code-reviewer on a test-first feature, chain_path: test-first).',
         inputSchema: {
             type: "object",
             properties: {
@@ -769,7 +786,7 @@ export const TOOL_REGISTRY = [
                 },
                 agent_id: {
                     type: "string",
-                    description: 'Must be "qa-engineer". Other values rejected.',
+                    description: 'Must be "qa-engineer" ("code-reviewer" on a test-first feature). Other values rejected.',
                 },
             },
             required: ["workspace_path", "task_id"],
@@ -1057,6 +1074,12 @@ export const PROMPT_REGISTRY = [
         description: "Integrator — plan parallel lanes, pre-review cuts, verify lane reports, merge, tear down. Cross-lane; writes no handoff state.",
         arguments: [PROMPT_WORKSPACE_ARG],
         skillFile: "skill-integrator.md",
+    },
+    {
+        name: "spec-workshop",
+        description: "Spec workshop — turn specs, design sources, issue-tracker items or an idea into dated rulings, ticket files and a wave table, in rounds with the human. Human-started; writes no handoff state.",
+        arguments: [PROMPT_WORKSPACE_ARG],
+        skillFile: "skill-spec-workshop.md",
     },
 ];
 //# sourceMappingURL=registry.js.map

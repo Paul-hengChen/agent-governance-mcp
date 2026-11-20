@@ -348,7 +348,7 @@ scope_decision_why: "one screen, no sub-flows"
 
 test("AC-7: scope_decision round-trips through writeHandoffState → readback (v10 stamp)", async () => {
   // Why: the modern options-object write must emit scope_decision into YAML and
-  // parse it back identically, stamped at the current schema version (v15).
+  // parse it back identically, stamped at the current schema version (v16).
   // This is the path PM's scope attestation is written through.
   const ws = mkWorkspace();
   resetSession();
@@ -365,7 +365,7 @@ test("AC-7: scope_decision round-trips through writeHandoffState → readback (v
   });
 
   const raw = readRaw(ws);
-  assert.match(raw, /schema_version:\s*15/, "write stamps current handoff schema v15");
+  assert.match(raw, /schema_version:\s*16/, "write stamps current handoff schema v16");
   assert.match(raw, /scope_decision:\s*["']?single-feature["']?/, "scope_decision emitted into YAML");
 
   const state = parseHandoff(ws);
@@ -463,9 +463,9 @@ test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DO
   assert.equal(state.last_agent, "qa-engineer", "the new write's own fields still apply");
 });
 
-test("AC-10(g): future v16 handoff refuses-loud against a v15 server (no silent downgrade)", () => {
+test("AC-10(g): future v17 handoff refuses-loud against a v16 server (no silent downgrade)", () => {
   // Why: forward-compat safety. A handoff written by a newer server (v16) must
-  // NOT be silently parsed by this v15 server — runMigrations throws because
+  // NOT be silently parsed by this v16 server — runMigrations throws because
   // the on-disk version is above the server max, so a newer file is refused
   // loudly instead of being downgraded.
   const ws = mkWorkspace();
@@ -473,7 +473,7 @@ test("AC-10(g): future v16 handoff refuses-loud against a v15 server (no silent 
   writeRaw(
     ws,
     `---
-schema_version: 16
+schema_version: 17
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -490,8 +490,8 @@ qa_round: 0
 
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 16 > server max 15/,
-    "v16 file must refuse-loud against a v15 server",
+    /on-disk version 17 > server max 16/,
+    "v17 file must refuse-loud against a v16 server",
   );
 });
 
@@ -548,7 +548,7 @@ prd_path: "${legacyPrdPath}"
 });
 
 test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs survives, new protocol fields (incl. dispatch_pins, dispatched_at) stay absent, hop_count seeds 0", async () => {
-  // Why: a v6 payload sits nine steps behind the current v15 and the runner walks stepwise, so one call climbs the
+  // Why: a v6 payload sits nine steps behind the current v16 and the runner walks stepwise, so one call climbs the
   // whole chain. external_refs survives; migration invents no value for fields only a writer can attest (next_role,
   // resume_of, review_verdict, dispatch_pins, dispatched_at, dispatch_mode, evidence_schema, cut_approved_source,
   // dispatch_mechanism and its tier), while hop_count and the three round totals seed to 0.
@@ -561,8 +561,8 @@ test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs su
     external_refs: [{ ref: "JIRA-1", state: "unresolved" }],
   };
   const result = runMigrations("handoff", v6Payload);
-  assert.deepEqual(result.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15], "the v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 stamp-only/seed-only chain must run when on-disk version is nine behind CURRENT");
-  assert.equal(result.payload.schema_version, 15, "schema_version bumped to CURRENT (15)");
+  assert.deepEqual(result.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "the v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 stamp-only/seed-only chain must run when on-disk version is nine behind CURRENT");
+  assert.equal(result.payload.schema_version, 16, "schema_version bumped to CURRENT (16)");
   assert.deepEqual(result.payload.external_refs, [{ ref: "JIRA-1", state: "unresolved" }], "external_refs survives the v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 chain verbatim");
   assert.equal(result.payload.next_role, undefined, "v6→v7 seeds no next_role default (DR-1)");
   assert.equal(result.payload.resume_of, undefined, "v6→v7 seeds no resume_of default (DR-1)");
@@ -595,7 +595,7 @@ test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is
     last_agent: "pm",
   };
   const healed = runMigrations("handoff", v6Payload);
-  assert.deepEqual(healed.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15], "first pass heals v6 to CURRENT (v15)");
+  assert.deepEqual(healed.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "first pass heals v6 to CURRENT (v16)");
   const reread = runMigrations("handoff", healed.payload);
   assert.deepEqual(reread.applied, [], "second pass against the now-current payload applies nothing");
   assert.equal(reread.payload, healed.payload, "no-op path returns the same reference");

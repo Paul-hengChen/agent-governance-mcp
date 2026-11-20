@@ -53,6 +53,14 @@ const expectNull = (block) => {
   assert.equal(r.ok, true, `${block}: credibility must not fire`);
   assert.equal(r.required, false, `${block}: visual gates must not arm`);
 };
+const expectUnknown = (block, token) => {
+  // WHY (E423 D3): a declared-but-unrecognised mode arms the visual checks and names the value, but must never
+  // arm the Figma-only credibility check (E384 protection: FETCH_BASED_MODES is unchanged).
+  const r = both(block);
+  assert.equal(r.mode, token, block);
+  assert.equal(r.ok, true, `${block}: credibility must not fire for an unrecognised mode`);
+  assert.equal(r.required, true, `${block}: visual gates must arm`);
+};
 const expectMode = (block, mode) => {
   const r = both(block);
   assert.equal(r.mode, mode, block);
@@ -61,16 +69,16 @@ const expectMode = (block, mode) => {
   assert.equal(r.required, mode !== "no-design", block);
 };
 
-test("AC-E384-1 declared `code` with a Figma explanation is undeclared (bullet form)", () => {
-  expectNull("- **Mode** — code (not from Figma)");
+test("AC-E384-1 declared `code` with a Figma explanation is returned as `code` and arms the visual checks (bullet form)", () => {
+  expectUnknown("- **Mode** — code (not from Figma)", "code");
 });
 
-test("AC-E384-1 declared `code` with a Figma explanation is undeclared (inline form)", () => {
-  expectNull("mode: code — screenshots, not Figma");
+test("AC-E384-1 declared `code` with a Figma explanation is returned as `code` and arms the visual checks (inline form)", () => {
+  expectUnknown("mode: code — screenshots, not Figma", "code");
 });
 
-test("AC-E384-2 H2 form `## Mode` + value line `code (no Figma export)` is undeclared", () => {
-  expectNull("## Mode\n\ncode (no Figma export)");
+test("AC-E384-2 H2 form `## Mode` + value line `code (no Figma export)` is returned as `code` and arms the visual checks", () => {
+  expectUnknown("## Mode\n\ncode (no Figma export)", "code");
 });
 
 test("AC-E384-3 wrappers and case: known value resolves whole", () => {
@@ -90,12 +98,12 @@ test("AC-E384-3 hyphen prefix of a whole known mode resolves to that mode (no-de
   expectMode("mode: no-design-v2", "no-design");
 });
 
-test("AC-E384-3 tokens not starting with a whole known mode are undeclared", () => {
-  for (const v of ["code", "code-figma", "freehand", "figmaexport"]) expectNull(`mode: ${v}`);
+test("AC-E384-3 tokens not starting with a whole known mode are returned as declared unrecognised modes", () => {
+  for (const v of ["code", "code-figma", "freehand", "figmaexport"]) expectUnknown(`mode: ${v}`, v);
 });
 
-test("AC-E384-3 an unknown declared value is never scanned past, whatever the prose names", () => {
-  expectNull("mode: freehand (figma, sketch and xd all rejected)");
+test("AC-E384-3 an unknown declared value is never scanned past, whatever the prose names (returned, arms)", () => {
+  expectUnknown("mode: freehand (figma, sketch and xd all rejected)", "freehand");
 });
 
 test("AC-E384-5 no declared token (line starts with a non-letter) -> pre-E384 earliest-known-mode scan", () => {
@@ -106,7 +114,7 @@ test("AC-E384-6 unknown inline value yields nothing and the H2 candidate is stil
   expectMode("## Mode\n\nfigma\n\n- mode: dark", "figma");
 });
 
-test("security smoke: empty and oversized declared values stay undeclared, never throw", () => {
+test("security smoke: empty declared value stays undeclared; an oversized one is cut to 40 chars + ellipsis, never throws", () => {
   expectNull("mode: —");
-  expectNull(`mode: ${"x".repeat(100_000)}`);
+  expectUnknown(`mode: ${"x".repeat(100_000)}`, `${"x".repeat(40)}\u2026`);
 });

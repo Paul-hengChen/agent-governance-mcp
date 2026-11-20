@@ -255,8 +255,8 @@ evidence_schema: 1
 // AC2 — v12→v13 migration invents no pin
 // ============================================================================
 
-test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 15 and NO evidence_schema seeded", () => {
-  // The handoff schema's CURRENT version is 15, so the manually-registered chain must
+test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 16 and NO evidence_schema seeded", () => {
+  // The handoff schema's CURRENT version is 16, so the manually-registered chain must
   // extend past v13 (v13→v14 cut_approved_source pin; v14→v15 dispatch_mechanism/tier pin;
   // both stamp-only) or runMigrations throws MISSING_MIGRATION_STEP against the new target
   // (same shared-registry hazard as AC2-2 and dispatch-pins.test.mjs M1/M3, see also
@@ -277,6 +277,7 @@ test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 15 and N
   registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
+  registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
 
   const v12Payload = {
     schema_version: 12,
@@ -287,8 +288,8 @@ test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 15 and N
     visual_rounds_total: 0,
   };
   const result = runMigrations("handoff", v12Payload);
-  assert.deepEqual(result.applied, [13, 14, 15], "the v12->v13, v13->v14, AND v14->v15 steps run on a v12 fixture to reach CURRENT");
-  assert.equal(result.payload.schema_version, 15, "on-disk schema_version becomes CURRENT (15)");
+  assert.deepEqual(result.applied, [13, 14, 15, 16], "the v12->v13, v13->v14, AND v14->v15 steps run on a v12 fixture to reach CURRENT");
+  assert.equal(result.payload.schema_version, 16, "on-disk schema_version becomes CURRENT (16)");
   assert.equal(result.payload.evidence_schema, undefined, "the v12->v13 migration MUST NOT seed evidence_schema (D1 — migration invents no pin for historical payloads)");
   assert.equal(result.payload.cut_approved_source, undefined, "the v13->v14 migration MUST NOT seed cut_approved_source (e114-cut-approval-inheritance — migration invents no claim for historical payloads)");
   assert.equal(result.payload.dispatch_mechanism, undefined, "the v14->v15 migration MUST NOT seed dispatch_mechanism (e123a-lane-layout-migration — migration invents no attestation for historical payloads)");
@@ -323,7 +324,7 @@ visual_rounds_total: 0
 `,
   );
   const state = parseHandoff(ws);
-  assert.equal(state.schema_version ?? 15, 15, "sanity: server CURRENT (15) is what a v12 fixture migrates to");
+  assert.equal(state.schema_version ?? 16, 16, "sanity: server CURRENT (16) is what a v12 fixture migrates to");
   assert.equal(state.evidence_schema, undefined, "an absent field stays absent post-migration (D1) — the v12->v13 step invents no pin");
 });
 

@@ -103,7 +103,7 @@ next_role: "sr-engineer"
 test("M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk", async () => {
   // Re-baselined for the lane-layout migration (e123a, qa-owned): CURRENT_VERSIONS.handoff
   // is now 15 (v14→v15 added dispatch_mechanism/dispatch_mechanism_tier,
-  // stamp-only, seeds nothing). A v7 file heals all the way to v15 in one
+  // stamp-only, seeds nothing). A v7 file heals all the way to v16 in one
   // fire-and-forget write-back, seeding hop_count: 0 (DR-3, from the earlier
   // v8→v9 step) AND the three v12 totals: 0 along the way; v9→v10, v10→v11,
   // v12→v13, v13→v14, and v14→v15 add no field default of their own.
@@ -128,25 +128,25 @@ qa_round: 0
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
   const healed = readRaw(ws);
-  assert.match(healed, /schema_version:\s*15/, "fire-and-forget heal lands the file at CURRENT (v15)");
+  assert.match(healed, /schema_version:\s*16/, "fire-and-forget heal lands the file at CURRENT (v16)");
   assert.match(healed, /hop_count:\s*0/, "the v8→v9 step's seeded hop_count: 0 survives the heal write");
   assert.match(healed, /qa_rounds_total:\s*0/, "the v11→v12 step's seeded qa_rounds_total: 0 survives the heal write");
   assert.match(healed, /review_rounds_total:\s*0/, "the v11→v12 step's seeded review_rounds_total: 0 survives the heal write");
   assert.match(healed, /visual_rounds_total:\s*0/, "the v11→v12 step's seeded visual_rounds_total: 0 survives the heal write");
 });
 
-test("M2: future v16 handoff refuses-loud against a v15 server (no silent downgrade)", () => {
+test("M2: future v17 handoff refuses-loud against a v16 server (no silent downgrade)", () => {
   // WHY: forward-compat safety, mirroring the AC-10(g) protocol-fields (c9)
-  // precedent (v7 file against a v6 server; here v16 against v15 — re-baselined
-  // for the lane-layout migration (e123a, qa-owned), since v15 is now CURRENT and no
-  // longer "the future"; was v15-vs-v14 under the cut-approval inheritance change, e114).
+  // precedent (v7 file against a v6 server; here v17 against v16 — re-baselined
+  // for E431 (chain_path/sr_return_count moved CURRENT 15 -> 16), since v16 is now CURRENT and no
+  // longer "the future"; was v16-vs-v15 under the lane-layout migration (e123a), v15-vs-v14 under e114.
   // A handoff written by a newer server must never be silently parsed.
   const ws = mkWs();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 16
+schema_version: 17
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -161,19 +161,19 @@ qa_round: 0
   );
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 16 > server max 15/,
-    "v16 file must refuse-loud against a v15 server",
+    /handoff on-disk version 17 > server max 16/,
+    "v17 file must refuse-loud against a v16 server",
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 16 > server max 15/,
+    /on-disk version 17 > server max 16/,
   );
 });
 
 test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)", () => {
   // WHY: pins the migration steps themselves (schema/migrations-handoff.ts), not just their effect through
   // parseHandoff. Re-baselined for the lane-layout migration (e123a): the chain must reach the current
-  // version (15) or later reads hit a missing migration step. More: specs/e260e-comment-rationale.md (dispatch-pins.test.mjs).
+  // version (16) or later reads hit a missing migration step. More: specs/e260e-comment-rationale.md (dispatch-pins.test.mjs).
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -190,6 +190,7 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
+  registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
 
   const v7Payload = {
     schema_version: 7,
@@ -198,8 +199,8 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
     next_role: "qa-engineer",
   };
   const result = runMigrations("handoff", v7Payload);
-  assert.deepEqual(result.applied, [8, 9, 10, 11, 12, 13, 14, 15], "the v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, AND v14→v15 steps all run when on-disk version is eight behind CURRENT");
-  assert.equal(result.payload.schema_version, 15, "schema_version bumped to CURRENT (15)");
+  assert.deepEqual(result.applied, [8, 9, 10, 11, 12, 13, 14, 15, 16], "the v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, AND v14→v15 steps all run when on-disk version is eight behind CURRENT");
+  assert.equal(result.payload.schema_version, 16, "schema_version bumped to CURRENT (16)");
   assert.equal(result.payload.dispatch_pins, undefined, "v7→v8 seeds no dispatch_pins default (AC-1)");
   assert.equal(result.payload.hop_count, 0, "v8→v9 seeds hop_count: 0 (DR-3)");
   assert.equal(result.payload.dispatched_at, undefined, "v9→v10 seeds no dispatched_at default (d5 DR-7 — absence-is-signal, not hop_count's seed-0)");
@@ -833,14 +834,14 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
   assert.ok(!result.isError, `an empty {} dispatch_pins must not be rejected by zod; got: ${result.content?.[0]?.text}`);
 });
 
-// Sanity: CURRENT_VERSIONS.handoff really is 15 in this build (guards every
+// Sanity: CURRENT_VERSIONS.handoff really is 16 in this build (guards every
 // test above against silently testing the wrong target version).
 // Re-baselined for the lane-layout migration (e123a, qa-owned): bumped 14 -> 15
 // (dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing);
 // was 13 -> 14 under the cut-approval inheritance change, e114 (cut_approved_source,
 // stamp-only, seeds nothing).
-test("sanity: CURRENT_VERSIONS.handoff is 15 (e123a-lane-layout-migration)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 15);
+test("sanity: CURRENT_VERSIONS.handoff is 16 (E431 chain_path/sr_return_count)", () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 16);
 });
 
 // ============================================================================

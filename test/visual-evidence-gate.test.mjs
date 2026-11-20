@@ -619,7 +619,7 @@ test("AC-4: rejection envelope shape — error/attempted/allowed/hint keys prese
   const block = indexTs.slice(indexTs.indexOf('error: "SCOPE_DECISION_REQUIRED"'));
   assert.match(block, /error:\s*"SCOPE_DECISION_REQUIRED"/, "error code token");
   assert.match(block.slice(0, 1200), /attempted:\s*\{/, "attempted tuple");
-  assert.match(block.slice(0, 1200), /allowed:\s*\(ALLOWED_TRANSITIONS\.get\("pm:In_Progress"\)/, "allowed echoes pm:In_Progress edges");
+  assert.match(block.slice(0, 1200), /allowed:\s*allowedSuccessors\("pm:In_Progress"/, "allowed echoes pm:In_Progress edges");
   assert.match(block.slice(0, 1200), /hint,/, "hint field");
   assert.match(block.slice(0, 1600), /isError:\s*true/, "isError:true rejection");
 });
@@ -670,10 +670,10 @@ test("E319 AC-E319-5: backtick-wrapped value with trailing prose (`pdf` — expo
   assert.equal(hasDesignModeRequiringVisual(ws, "feat").mode, "pdf");
 });
 
-test("E319 AC-E319-5: a Mode line naming no known mode still returns mode null", () => {
+test("E319 AC-E319-5: a Mode line naming no known mode returns that token and arms the checks", () => {
   const ws = mkWorkspace();
   writeDesignWithMode(ws, "feat", "# design/feat\n\nmode: freehand\n");
   const r = hasDesignModeRequiringVisual(ws, "feat");
-  assert.equal(r.mode, null);
-  assert.equal(r.required, false);
+  assert.equal(r.mode, "freehand");
+  assert.equal(r.required, true);
 });

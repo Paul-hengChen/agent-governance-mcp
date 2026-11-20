@@ -37,6 +37,7 @@ import type {
   ReviewVerdict,
   DispatchMode,
   DispatchMechanism,
+  ChainPath,
   PendingNotesTruncated,
 } from "./handoff-types.js";
 import { READ_VIEW_MARKER_PREFIX } from "./handoff-types.js";
@@ -295,6 +296,9 @@ const DISPATCH_MODE_VALUES: readonly string[] = ["feature", "bugfix"];
 // Legal dispatch_mechanism values, for the same defensive parse-time
 // filtering as dispatch_mode above. (E99, v15)
 const DISPATCH_MECHANISM_VALUES: readonly string[] = ["task", "switch_role", "inline"];
+// Legal chain_path values: one member, so any other on-disk value is dropped
+// and reads as the old chain. (E431, v16)
+const CHAIN_PATH_VALUES: readonly string[] = ["test-first"];
 // v15 — bound mirrored from the zod boundary (tools/registry.ts
 // dispatch_mechanism_tier .max(40)); parse-time we only need it to drop a
 // grossly malformed hand-edited value, never to reject.
@@ -506,6 +510,17 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     DISPATCH_MECHANISM_VALUES,
   );
   const dispatchMechanismTier = parseDispatchMechanismTier(frontmatter.dispatch_mechanism_tier);
+  // Test-first chain marker: kept only when it equals "test-first", so a
+  // missing or malformed value reads as the old chain (absence is the signal).
+  // (E431, v16)
+  const chainPath = parseEnumField<ChainPath>(frontmatter.chain_path, CHAIN_PATH_VALUES);
+  // sr-engineer -> qa-engineer return counter: kept only when finite and >= 1
+  // (floored); anything else is dropped, so absence means 0. (E431, v16)
+  const srReturnCountRaw = Number(frontmatter.sr_return_count);
+  const srReturnCount =
+    Number.isFinite(srReturnCountRaw) && srReturnCountRaw >= 1
+      ? Math.floor(srReturnCountRaw)
+      : undefined;
   // evidence_schema pin. Defensive positive-integer parse; absent or
   // malformed stays undefined — absence means "feature started before pins
   // existed, use the v2 normalized-contains rules". Never defaulted to 0
@@ -567,6 +582,8 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     ...(cutApprovedSource && { cut_approved_source: cutApprovedSource }),
     ...(dispatchMechanism && { dispatch_mechanism: dispatchMechanism }),
     ...(dispatchMechanismTier && { dispatch_mechanism_tier: dispatchMechanismTier }),
+    ...(chainPath && { chain_path: chainPath }),
+    ...(srReturnCount !== undefined && { sr_return_count: srReturnCount }),
     completed_tasks,
     pending_notes,
     qa_round,
@@ -684,6 +701,11 @@ export function readHandoffState(workspacePath: string): string {
       // re-default it to 0 — harmless for the seed value (0) but lossy for any
       // real accumulated count on a hand-migrated file.
       hopCount: state.hop_count,
+      // v16 — sr_return_count is server-computed and not carried by an
+      // omitting write, so the heal must pass it like hopCount or a real
+      // count would be dropped. chain_path needs nothing: the heal is
+      // same-feature and the write layer carries it. (E431)
+      srReturnCount: state.sr_return_count,
       // v12 — same forward-safety for the three cumulative totals: a future
       // v12→v13 heal must not stamp the new version while dropping real
       // accumulated totals (the v9 hop_count 12th-arg gap, closed at birth).

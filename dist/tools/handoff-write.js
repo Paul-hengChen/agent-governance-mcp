@@ -103,6 +103,10 @@ async function writeHandoffStateCore(opts) {
     // heal-write call site always uses the options object directly; a
     // positional caller always gets a fresh stamp). (E10)
     const preserveLastUpdated = opts.preserveLastUpdated;
+    // v16 — test-first marker (carried by the same-feature preserve clause
+    // below) and the server-computed sr-return counter (never carried).
+    const chainPath = opts.chainPath;
+    const srReturnCount = opts.srReturnCount;
     // Hoist required strings to the names the body below already uses.
     const _activeFeature = activeFeature;
     const _status = status;
@@ -200,6 +204,11 @@ async function writeHandoffStateCore(opts) {
         // re-witnessed on every PM bounce. Absence means non-inherited.
         let effectiveCutApprovedSource = cutApprovedSource;
         const cutApprovedSourceNeedsExisting = cutApprovedSource === undefined;
+        // chain_path: the dispatch_mode rule. The marker is permanent for the
+        // feature (no clearing value), so an omitting write carries it; a feature
+        // change drops it. Absence means the old chain. (E431)
+        let effectiveChainPath = chainPath;
+        const chainPathNeedsExisting = chainPath === undefined;
         // Archive-on-feature-change needs the on-disk active_feature on every
         // write, even when a caller sets all six fields above and does not set
         // preserveLastUpdated, so this flag only forces the read to happen.
@@ -218,6 +227,7 @@ async function writeHandoffStateCore(opts) {
             dispatchModeNeedsExisting ||
             evidenceSchemaNeedsExisting ||
             cutApprovedSourceNeedsExisting ||
+            chainPathNeedsExisting ||
             preserveLastUpdated === true ||
             archiveCheckNeedsExisting) {
             existing = parseHandoff(workspacePath);
@@ -256,6 +266,11 @@ async function writeHandoffStateCore(opts) {
                 // v14 clauses (2)/(3): carry the value forward only within the same feature.
                 effectiveCutApprovedSource =
                     existing?.active_feature === _activeFeature ? existing?.cut_approved_source : undefined;
+            }
+            if (chainPathNeedsExisting) {
+                // v16: carry the marker forward only within the same feature.
+                effectiveChainPath =
+                    existing?.active_feature === _activeFeature ? existing?.chain_path : undefined;
             }
         }
         // completed_tasks ledger (E150). With the orchestrator's carry directive,
@@ -390,6 +405,10 @@ async function writeHandoffStateCore(opts) {
         // (the dispatch_mode / scope_decision absence-is-signal emit posture).
         if (effectiveCutApprovedSource)
             frontmatterData.cut_approved_source = effectiveCutApprovedSource;
+        // v16 — chain_path: emit only on a marked feature. Absence === the old
+        // chain, so an unmarked feature's file never gains the key. (E431)
+        if (effectiveChainPath === "test-first")
+            frontmatterData.chain_path = effectiveChainPath;
         // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
         // semantics). Deliberately NOT joined to the existing-state preserve read
         // above — carrying a stale single-hop directive forward would be a
@@ -452,6 +471,14 @@ async function writeHandoffStateCore(opts) {
             ? Math.floor(visualRoundsTotal)
             : 0;
         frontmatterData.visual_rounds_total = normalisedVisualRoundsTotal;
+        // v16 — sr_return_count: emit only when > 0 (unlike the always-emitted
+        // counters above), so an unmarked feature, which can never make a
+        // test-first return, never carries the key. Falsy input means 0. (E431)
+        const normalisedSrReturnCount = Number.isFinite(srReturnCount) && srReturnCount >= 0
+            ? Math.floor(srReturnCount)
+            : 0;
+        if (normalisedSrReturnCount > 0)
+            frontmatterData.sr_return_count = normalisedSrReturnCount;
         const frontmatter = yaml
             .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
             .trimEnd();

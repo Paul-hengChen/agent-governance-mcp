@@ -299,7 +299,7 @@ next_role: "sr-engineer"
   // (absence-is-signal, same posture as cut_approved_source/evidence_schema
   // above).
   assert.equal(state.dispatch_mechanism, undefined, "v14->v15 must NOT seed dispatch_mechanism (absence-is-signal, e123a-lane-layout-migration)");
-  assert.equal(CURRENT_VERSIONS.handoff, 15, "sanity: this server's CURRENT handoff version is 15");
+  assert.equal(CURRENT_VERSIONS.handoff, 16, "sanity: this server's CURRENT handoff version is 15");
 });
 
 // ============================================================================

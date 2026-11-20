@@ -1,5 +1,5 @@
 import type { AgentName } from "./transitions.js";
-import type { ExternalRef, ResumeOfTarget, ReviewVerdict, DispatchMode, DispatchMechanism } from "./handoff-types.js";
+import type { ExternalRef, ResumeOfTarget, ReviewVerdict, DispatchMode, DispatchMechanism, ChainPath } from "./handoff-types.js";
 /**
  * v3.15.0 options-object shape for writeHandoffState's modern overload.
  * Prefer this form at all new call sites. The legacy positional signature
@@ -37,6 +37,8 @@ export interface WriteHandoffStateOptions {
     cutApprovedSource?: string;
     dispatchMechanism?: DispatchMechanism;
     dispatchMechanismTier?: string;
+    chainPath?: ChainPath;
+    srReturnCount?: number;
     preserveLastUpdated?: boolean;
 }
 /**

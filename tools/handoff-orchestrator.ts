@@ -6,14 +6,19 @@
 // Do not re-indent gate bodies: some tests pin their exact byte shape.
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — check order".
 
+import { z } from "zod";
 import type { ToolResult, UpdateStateInput, WorkspaceOnlyInput } from "./registry.js";
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
 import {
-  requireQaEngineer,
+  requireJudge,
+  judgeFor,
+  PASS_IDENTITY_REFINE_MESSAGE,
   validateTransition,
   computeNewRound,
-  ALLOWED_TRANSITIONS,
+  computeSrReturnCount,
+  allowedSuccessors,
+  isChainPathSetPoint,
   HOP_CAP_EXPORTED,
   type AgentName,
   type StatusName,
@@ -48,6 +53,7 @@ import { emitGateTelemetry, extractGateCodeFromText } from "./telemetry.js";
 import { emitFeatureMetrics } from "./metrics.js";
 import { appendDispatchRecord } from "./dispatch-log.js";
 import { DISPATCH_PIN_TIER_VALUES } from "./handoff-parse.js";
+import type { ChainPath, HandoffState } from "./handoff-types.js";
 import {
   runUpdateStatePipeline,
   type UpdateStateGateContext,
@@ -200,6 +206,68 @@ function composeQaReviewNotes(qaReview: string, suite: QaSuiteResult | undefined
   return `${suiteResultLine(suite)}\n\n${qaReview.trim()}`;
 }
 
+// Persisted test-first marker of `activeFeature` (file mode only). Read-only,
+// never throws: a missing, unparseable or other-feature handoff reads as
+// unmarked, which is the old-path behaviour. With no activeFeature it reads
+// the workspace's current feature. Exported for tools/tasks.ts. (E431)
+export function readPersistedChainPath(
+  workspacePath: string,
+  activeFeature?: string,
+): ChainPath | undefined {
+  const storage = getActiveStorage();
+  if (!(storage instanceof FileHandoffStorage)) return undefined;
+  let state: HandoffState | null;
+  try {
+    state = storage.parse(workspacePath);
+  } catch {
+    return undefined;
+  }
+  if (!state) return undefined;
+  if (activeFeature !== undefined && state.active_feature !== activeFeature) return undefined;
+  return state.chain_path === "test-first" ? "test-first" : undefined;
+}
+
+// The marker this write runs under, file mode only: the feature's persisted
+// marker (same feature), or the incoming one on a set point. Same rule as
+// validateTransition's `marked`; an incoming marker off a set point never
+// gets here (step 1 rejects it). Pure, no I/O. (E431)
+function resolveChainPath(ctx: UpdateStateGateContext): ChainPath | undefined {
+  if (!(ctx.storage instanceof FileHandoffStorage)) return undefined;
+  if (!ctx.feature_changed && ctx.prevState?.chain_path === "test-first") return "test-first";
+  if (ctx.parsed.chain_path === "test-first" && isChainPathSetPoint(ctx.prevTuple, ctx.nextTuple)) {
+    return "test-first";
+  }
+  return undefined;
+}
+
+// The marker that judges the exits out of the previous tuple. Same feature:
+// the persisted marker. On a feature change the new feature starts unmarked,
+// except code-reviewer:PASS keeps its previous feature's marker: that tuple
+// exists only on a marked feature, has no exits without the marker, and the
+// marker closes none there, so this only opens those exits. A write carrying
+// its own chain_path gets no previous marker, so step 1.5 still checks it as
+// a set point. Nothing carries to the new feature. (E431)
+function exitChainPath(
+  prev: TransitionTuple,
+  prevChainPath: ChainPath | undefined,
+  featureChanged: boolean,
+  nextChainPath?: ChainPath,
+): ChainPath | undefined {
+  if (!featureChanged) return prevChainPath;
+  const fromReviewerPass = prev.agent === "code-reviewer" && prev.status === "PASS";
+  return fromReviewerPass && nextChainPath === undefined ? prevChainPath : undefined;
+}
+
+// The extra build-entry target on a test-first feature. The four attestation
+// checks arm on pm:In_Progress -> {architect, sr-engineer}:In_Progress, and on
+// a marked feature also on pm:In_Progress -> qa-engineer:In_Progress, with or
+// without resume_of (human ruling, E431 Open Question 1). An unmarked feature
+// never matches here, so its resume_of hand-back to qa-engineer stays exempt.
+// Each step keeps its own inline pm pin and storage guard. (E431)
+function isTestFirstEntryTarget(next: TransitionTuple, chainPath?: ChainPath): boolean {
+  return chainPath === "test-first" && next.agent === "qa-engineer";
+}
+
 // The tw_update_state gate pipeline: this array IS the frozen, additive check
 // order. Add a gate by inserting a step at its position, never by editing a
 // neighbour's body. One step per gate family; the PASS-path visual sub-gates
@@ -211,6 +279,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: TRANSITION_GATE_CODES,
     run: (ctx) => {
       const { parsed, prevTuple, nextTuple, prev_qa_round, prev_review_round, prev_visual_round, prev_hop_count, feature_changed } = ctx;
+        const fileMode = ctx.storage instanceof FileHandoffStorage;
         const rejection = validateTransition({
           prev: prevTuple,
           next: nextTuple,
@@ -227,6 +296,15 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
           // the (pm, In_Progress) landing; feature_changed=true bypasses.
           prev_hop_count,
           feature_changed,
+          // E431 test-first marker inputs, file mode only (SQLite never
+          // passes them, so it is never marked). exitChainPath limits the
+          // persisted marker on a feature change; validateTransition decides
+          // `marked` and rejects an incoming marker outside a set point.
+          prev_chain_path: fileMode
+            ? exitChainPath(prevTuple, ctx.prevState?.chain_path, feature_changed, parsed.chain_path)
+            : undefined,
+          next_chain_path: fileMode ? parsed.chain_path : undefined,
+          prev_sr_return_count: ctx.prevState?.sr_return_count ?? 0,
         });
         if (rejection) {
           return {
@@ -343,8 +421,10 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
         // (mode != no-design) and no scope decision is recorded. Pinning prev=pm
         // keeps re-entry safe: architect→sr-engineer and the sr-engineer
         // self-loop are never gated. Kept out of transitions.ts, which stays pure.
+        // On a test-first feature pm -> qa-engineer is the build entry (E431).
         if (
-          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+            isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
           nextTuple.status === "In_Progress" &&
           prevTuple.agent === "pm" &&
           prevTuple.status === "In_Progress"
@@ -360,7 +440,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                 new_agent: nextTuple.agent,
                 new_status: nextTuple.status,
               },
-              allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+              allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                 new_agent: c.agent,
                 new_status: c.status,
               })),
@@ -390,7 +470,8 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
         // frontmatter, so under SQLite/HTTP the gate would always fire.
         if (
           getActiveStorage() instanceof FileHandoffStorage &&
-          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+            isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
           nextTuple.status === "In_Progress" &&
           prevTuple.agent === "pm" &&
           prevTuple.status === "In_Progress"
@@ -405,7 +486,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                 new_agent: nextTuple.agent,
                 new_status: nextTuple.status,
               },
-              allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+              allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                 new_agent: c.agent,
                 new_status: c.status,
               })),
@@ -436,7 +517,8 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
         // handoff frontmatter.
         if (
           getActiveStorage() instanceof FileHandoffStorage &&
-          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+            isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
           nextTuple.status === "In_Progress" &&
           prevTuple.agent === "pm" &&
           prevTuple.status === "In_Progress"
@@ -454,7 +536,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                 new_agent: nextTuple.agent,
                 new_status: nextTuple.status,
               },
-              allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+              allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                 new_agent: c.agent,
                 new_status: c.status,
               })),
@@ -484,7 +566,8 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
         // keeps re-entry safe. Independent of the PASS-time baseline-manifest
         // gates: different edge, different check.
         if (
-          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer" ||
+            isTestFirstEntryTarget(nextTuple, resolveChainPath(ctx))) &&
           nextTuple.status === "In_Progress" &&
           prevTuple.agent === "pm" &&
           prevTuple.status === "In_Progress"
@@ -503,7 +586,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                 new_agent: nextTuple.agent,
                 new_status: nextTuple.status,
               },
-              allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+              allowed: allowedSuccessors("pm:In_Progress", resolveChainPath(ctx)).map((c) => ({
                 new_agent: c.agent,
                 new_status: c.status,
               })),
@@ -570,7 +653,10 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
         // in every storage mode.
         if (parsed.agent_id === "code-reviewer" && parsed.review_verdict) {
           const mismatch =
-            (parsed.review_verdict === "APPROVED" && parsed.status !== "In_Progress") ||
+            (parsed.review_verdict === "APPROVED" &&
+              parsed.status !== "In_Progress" &&
+              // A reviewer PASS on a test-first feature is an approval too. (E431)
+              !(parsed.status === "PASS" && resolveChainPath(ctx) === "test-first")) ||
             (parsed.review_verdict === "CHANGES_REQUESTED" && parsed.status !== "FAIL");
           if (mismatch) {
             return {
@@ -632,6 +718,29 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
         // and the claim write has completed_tasks=[]. Reads only the incoming
         // args (every storage mode). The envelope text is published, cited in
         // skill-code-reviewer.md and pinned by a test: keep it byte-identical.
+        // Test-first: code-reviewer is the judge, all others rejected. (E431)
+        const testFirst = resolveChainPath(ctx) === "test-first";
+        if (testFirst) {
+          if (
+            parsed.agent_id &&
+            parsed.agent_id !== "code-reviewer" &&
+            parsed.completed_tasks.length > 0
+          ) {
+            return {
+              content: [{
+                type: "text" as const,
+                text:
+                  `⛔ NON_QA_COMPLETED_TASKS_REJECTED: completed_tasks=` +
+                  `[${parsed.completed_tasks.join(", ")}] on an agent_id=${parsed.agent_id} write ` +
+                  `on a test-first feature (chain_path: test-first). Only agent_id=code-reviewer, ` +
+                  `this feature's judge, may grow completed_tasks (or complete tasks through ` +
+                  `tw_complete_task). Omit completed_tasks (or pass []) on this write.`,
+              }],
+              isError: true,
+            };
+          }
+          return null;
+        }
         if (parsed.agent_id === "code-reviewer" && parsed.completed_tasks.length > 0) {
           return {
             content: [{
@@ -1173,10 +1282,11 @@ function effectiveAllowedSuccessors(
     review_round: number;
     visual_round: number;
     hop_count: number;
+    sr_return_count?: number;
   },
-  options: { assumeResumeOf?: boolean; featureChanged?: boolean } = {},
+  options: { assumeResumeOf?: boolean; featureChanged?: boolean; chainPath?: ChainPath } = {},
 ): Array<{ agent: AgentName; status: StatusName }> {
-  const { assumeResumeOf = true, featureChanged } = options;
+  const { assumeResumeOf = true, featureChanged, chainPath } = options;
   // `featureChanged` lets a caller pin the union to one branch instead of
   // trying both. Used to compute the same-feature-only subset
   // (featureChanged: false) so entries reachable only through the hop-cap
@@ -1200,6 +1310,12 @@ function effectiveAllowedSuccessors(
               assumeResumeOf && (agent === "code-reviewer" || agent === "qa-engineer")
                 ? agent
                 : undefined,
+            // E431: the post-write marker and counter. next_chain_path is
+            // never passed: the lookahead asks what the NEXT write may do on
+            // the state just written. A feature change keeps the marker only
+            // for the exits out of code-reviewer:PASS (exitChainPath).
+            prev_chain_path: exitChainPath(prev, chainPath, feature_changed),
+            prev_sr_return_count: counters.sr_return_count ?? 0,
           }) === null,
       );
       if (accepted) out.push({ agent, status });
@@ -1210,6 +1326,20 @@ function effectiveAllowedSuccessors(
 
 // --- GUARDED: must call tw_get_state first ---
 async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResult> {
+        // The zod refine admits a code-reviewer PASS; only a test-first
+        // feature may keep it. Unmarked (or unreadable, or SQLite): reject
+        // here, before pre-flight, with the refine's own ZodError so the reply
+        // is the same invalid-arguments text as a refine rejection. Read-only
+        // peek; nothing is locked or written. (E431)
+        if (
+          parsed.status === "PASS" &&
+          parsed.agent_id === "code-reviewer" &&
+          readPersistedChainPath(parsed.workspace_path, parsed.active_feature) !== "test-first"
+        ) {
+          throw new z.ZodError([
+            { code: z.ZodIssueCode.custom, path: ["agent_id"], message: PASS_IDENTITY_REFINE_MESSAGE },
+          ]);
+        }
         enforcePreFlight(parsed.workspace_path, "tw_update_state");
         // zod already defaults completed_tasks to []; a direct caller that
         // skips zod may omit it. Normalise once so every gate reads a list
@@ -1217,9 +1347,15 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         parsed = { ...parsed, completed_tasks: parsed.completed_tasks ?? [] };
 
         // Defense-in-depth: zod refine already enforces this on PASS, but a
-        // client that bypasses zod still hits this guard.
+        // client that bypasses zod still hits this guard. The judge comes from
+        // a read-only peek, so an unmarked or unreadable handoff gets the
+        // qa-engineer text before storage.parse, as before. (E431)
         if (parsed.status === "PASS") {
-          const gate = requireQaEngineer(parsed.agent_id, "tw_update_state(status=PASS)");
+          const gate = requireJudge(
+            parsed.agent_id,
+            "tw_update_state(status=PASS)",
+            readPersistedChainPath(parsed.workspace_path, parsed.active_feature),
+          );
           if (!gate.ok) {
             return { content: [{ type: "text" as const, text: gate.message ?? "blocked" }] };
           }
@@ -1292,6 +1428,10 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           evidenceSchemaPin,
           evidenceSchemaLabel,
         };
+        // E431 — the marker this write runs under (file mode only; always
+        // undefined under SQLite). It picks the feature's judge below and is
+        // persisted after the pipeline.
+        const resolvedChainPath = resolveChainPath(ctx);
         // A rejection or a throw means this write does not land, so any
         // evidence QA_REVIEW_RECORD appended is undone first; the rejection
         // envelope and the thrown error pass through unchanged.
@@ -1335,6 +1475,15 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           prev_review_rounds_total,
           prev_visual_rounds_total,
         );
+        // E431 — the sr -> qa return counter, file mode only (an unmarked
+        // feature can never take the return edge, so its count stays 0 and is
+        // never emitted).
+        const new_sr_return_count = computeSrReturnCount(
+          prevState?.sr_return_count ?? 0,
+          prevTuple,
+          nextTuple,
+          feature_changed,
+        );
         const pending = [...parsed.pending_notes];
         // v3.15.0 — symmetric cap-cross predicate fix.
         // v3.14.0 used `=== 4 && === 3` which would skip the sentinel when
@@ -1376,13 +1525,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         // overload remains @deprecated for backwards-compat callers.
         // E150 ledger lifetime, file mode only. Policy lives here (who may
         // shrink, by what key); resolution against the on-disk ledger runs in
-        // writeHandoffState inside the lock. Only a qa-engineer FAIL write
+        // writeHandoffState inside the lock. Only the judge's FAIL write
+        // (qa-engineer; code-reviewer on a test-first feature, E431)
         // with non-empty review_task_ids removes ids; every other file-mode
         // write keeps the same-feature ledger and adds its incoming ids
         // (which only qa can carry past the unchanged gates). SQLite never
         // gets the directive and stores completed_tasks as given.
         const ledgerRemove: readonly string[] =
-          parsed.agent_id === "qa-engineer" &&
+          parsed.agent_id === judgeFor(resolvedChainPath) &&
           parsed.status === "FAIL" &&
           parsed.review_task_ids !== undefined &&
           parsed.review_task_ids.length > 0
@@ -1458,6 +1608,13 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           // SqliteHandoffStorage.writeState ignores both. (E99, v15)
           dispatchMechanism: parsed.dispatch_mechanism,
           dispatchMechanismTier: parsed.dispatch_mechanism_tier,
+          // chain_path / sr_return_count (E431, v16). chainPath is the
+          // resolved marker: feature-scoped carry in writeHandoffState,
+          // undefined on an unmarked feature. srReturnCount is
+          // server-computed and written only when > 0. File mode only:
+          // SqliteHandoffStorage.writeState ignores both.
+          chainPath: resolvedChainPath,
+          srReturnCount: new_sr_return_count,
         }));
 
         // Append one line per hop to the dispatch-mechanism sidecar so the
@@ -1480,7 +1637,7 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         // Best-effort: a failure here MUST NOT undo the successful state write.
         if (
           parsed.status === "PASS" &&
-          parsed.agent_id === "qa-engineer" &&
+          parsed.agent_id === judgeFor(resolvedChainPath) &&
           "deletePrdChunks" in storage &&
           typeof (storage as Record<string, unknown>).deletePrdChunks === "function"
         ) {
@@ -1564,8 +1721,10 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             review_round: new_review_round,
             visual_round: new_visual_round,
             hop_count: new_hop_count,
+            sr_return_count: new_sr_return_count,
           };
-          const effective = effectiveAllowedSuccessors(nextTuple, counters);
+          const lookahead = { chainPath: resolvedChainPath };
+          const effective = effectiveAllowedSuccessors(nextTuple, counters, lookahead);
           const isLegalSuccessor = effective.some((e) => e.agent === parsed.next_role);
           if (!isLegalSuccessor) {
             // The remedy list prints `agent:status` pairs and excludes only the
@@ -1574,6 +1733,7 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             // successors. Edges legal only with resume_of are marked, not
             // offered as unconditional advice.
             const strict = effectiveAllowedSuccessors(nextTuple, counters, {
+              ...lookahead,
               assumeResumeOf: false,
             });
             const strictKeys = new Set(strict.map((e) => `${e.agent}:${e.status}`));
@@ -1582,6 +1742,7 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             // featureChanged pinned to false isolates the same-feature subset;
             // below the cap the two sets match, so nothing is annotated there.
             const sameFeatureOnly = effectiveAllowedSuccessors(nextTuple, counters, {
+              ...lookahead,
               featureChanged: false,
             });
             const sameFeatureKeys = new Set(sameFeatureOnly.map((e) => `${e.agent}:${e.status}`));
