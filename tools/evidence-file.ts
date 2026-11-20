@@ -3,11 +3,40 @@
 // section slicing, table-cell splitting, the checkbox / assertion /
 // region-diff / status cell parsers, and the `covers:` label-line coverage
 // used by gates/qa-review.ts and gates/code-review.ts. The gate predicates
-// live in gates/. This module imports nothing from gates/, keeping the
-// import graph acyclic.
+// live in gates/. It imports nothing from gates/ directly; its one runtime
+// tools/ import, transitions.js (for judgeFor), depends only on
+// gates/registry.ts, which imports nothing, so the import graph stays acyclic.
 
 import * as fs from "fs";
 import * as path from "path";
+import type { ChainPath } from "./handoff-types.js";
+import { judgeFor } from "./transitions.js";
+
+// ---------- judge report (E432) ----------
+// The per-task report a feature's judge writes and the PASS-time checks read:
+// qa_reports/review_<encodeEvidenceId(id)>.md on both chain paths, with the same
+// sections and covers: rule. Only the judge differs: qa-engineer, or
+// code-reviewer on a test-first feature (chain_path: test-first). Every evidence
+// check and reader takes the judge and the directory from resolveJudgeReport;
+// the per-id stem stays with encodeEvidenceId.
+export type JudgeIdentity = ReturnType<typeof judgeFor>;
+
+export interface JudgeReport {
+  readonly judge: JudgeIdentity;
+  readonly dir: string; // absolute: <workspacePath>/qa_reports
+}
+
+const JUDGE_REPORT_DIRNAME = "qa_reports";
+
+// Pure, no I/O, never throws. chainPath undefined (unmarked, SQLite, or a
+// reader that sees several features) -> qa-engineer.
+export function resolveJudgeReport(workspacePath: string, chainPath?: ChainPath): JudgeReport {
+  return { judge: judgeFor(chainPath), dir: path.join(workspacePath, JUDGE_REPORT_DIRNAME) };
+}
+
+// Every identity that can judge a feature. For readers that see reports of
+// several features (lane-status), which cannot pick one by a single marker.
+export const JUDGE_IDENTITIES: readonly JudgeIdentity[] = [judgeFor(undefined), judgeFor("test-first")];
 
 // ---------- task-id → evidence filename stem ----------
 // Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its

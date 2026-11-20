@@ -6,15 +6,15 @@
 // Design: specs/e3-outcome-shaped-acceptance-architecture.md.
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
+import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
 // The H2 heading qa-engineer's Phase 3.5 writes (skill-qa-engineer SOP 6a).
 const DISPOSITION_HEADING = "AC Execution Log";
 // Arm regex: a line whose first non-whitespace token is `proof:` (case-insensitive,
 // whitespace allowed around the colon). Per-line anchor with newline-free
 // whitespace classes, so mid-line "proof:" prose never arms.
 const PROOF_LINE_RE = /^[^\S\n]*proof[^\S\n]*:/im;
-function qaReportsDir(workspacePath) {
-    return path.join(workspacePath, "qa_reports");
+function judgeReportDir(workspacePath) {
+    return resolveJudgeReport(workspacePath).dir;
 }
 // Same sanitiser as expectedRedManifestPath: replace disallowed chars and collapse
 // `..` runs to `_`, so a hostile feature name cannot form a traversal path.
@@ -26,7 +26,7 @@ export function specFilePath(workspacePath, activeFeature) {
 }
 // Mirrors gates/qa-review.ts evidencePath (same dir, same encodeEvidenceId stem).
 function reviewPath(workspacePath, taskId) {
-    return path.join(qaReportsDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
+    return path.join(judgeReportDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
 // Arm check: armed iff specs/<feature>.md exists and has >= 1 proof: line; a
 // missing file or no proof: line leaves it dormant (absence is non-blocking).
@@ -49,7 +49,7 @@ export function hasProofAnnotatedAC(workspacePath, activeFeature) {
 // `covers:` file when the direct one is missing or lacks the H2 (index built
 // lazily, once per call). Never throws. Same traversal as expected-red.
 export function hasAcExecutionLogDisposition(workspacePath, taskIds, evidenceSchema) {
-    const dir = qaReportsDir(workspacePath);
+    const dir = judgeReportDir(workspacePath);
     let coverage = null;
     const checked = new Set();
     const checkedPaths = [];
