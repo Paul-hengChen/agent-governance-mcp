@@ -440,18 +440,23 @@ function runInit(cwd, argv = []) {
   }
 
   // Where CLAUDE.md's agc block goes. An explicit --adapter wins. Otherwise
-  // "local" only on a first install into a team file: inside git, CLAUDE.md
-  // tracked, artifacts mode "local", and no block in CLAUDE.md yet. Every
-  // other case is "shared", so a workspace whose CLAUDE.md already holds the
-  // block re-runs exactly as before.
+  // a re-run keeps the block where it already is: "local" when only
+  // CLAUDE.local.md holds it, in any artifacts mode and git state. Failing
+  // that, "local" only on a first install into a team file: inside git,
+  // CLAUDE.md tracked, artifacts mode "local", and no block in CLAUDE.md yet.
+  // Every other case is "shared", so a workspace whose CLAUDE.md holds the
+  // block (alone or beside CLAUDE.local.md) re-runs exactly as before.
   const claudeTracked = isWorkspaceFileTracked({ repoRoot, workspace }, "CLAUDE.md");
   const claudeHoldsBlock = fileHoldsClaudeBlock(path.join(cwd, "CLAUDE.md"));
+  const localHoldsBlock = fileHoldsClaudeBlock(path.join(cwd, ADAPTER_PLACEMENTS.local));
   const adapter =
     requestedAdapter !== undefined
       ? requestedAdapter
-      : claudeTracked && mode === "local" && !claudeHoldsBlock
+      : localHoldsBlock && !claudeHoldsBlock
         ? "local"
-        : "shared";
+        : claudeTracked && mode === "local" && !claudeHoldsBlock
+          ? "local"
+          : "shared";
 
   // Same refusal as local artifacts: the CLAUDE.local.md exclude rule is
   // built from the workspace prefix, so an unsafe segment cannot be anchored.
