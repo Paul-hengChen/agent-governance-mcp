@@ -4,10 +4,10 @@ This file is auto-loaded by Claude Code when working **inside this repo**. It
 describes the project itself (an MCP server). The *rules of conduct* enforced
 by this server live in `content/const-*.md` (15 ordered fragments, composed by dispatch mode per `prompts/constitution-manifest.ts`), the `content/coord-*.md`
 fragments (coordinator SOP), and the `content/skill-*.md` files. They are loaded
-into a workspace by invoking one of the 12 registered role prompts (`teamwork`,
+into a workspace by invoking one of the 13 registered role prompts (`teamwork`,
 `teamwork-lite`, `pm`, `architect`, `researcher`, `design-auditor`,
 `sr-engineer`, `code-reviewer`, `qa-engineer`, `doc-writer`,
-`release-engineer`, `integrator`) or, if you opt in, the SessionStart hook.
+`release-engineer`, `integrator`, `spec-workshop`) or, if you opt in, the SessionStart hook.
 
 This repo is both the server's own source **and** a managed workspace — it
 dogfoods itself (`.current/_primary/handoff.md` and `tasks.md` exist), so the
@@ -30,16 +30,16 @@ workspace path, and picks a transport. The layers themselves live elsewhere:
    handoff state. The bundle is context-frugal: `build.ts` composes constitution fragments
    per dispatch mode (lite vs chain, design-armed vs non-design), then applies text-transform passes
    (`stripOriginTags` always, `stripRationale` for non-`fullDetail`) for size efficiency.
-   Twelve prompts are registered. `teamwork` serves the full Coordinator
+   Thirteen prompts are registered. `teamwork` serves the full Coordinator
    (`prompts/coordinator.ts` + the `content/coord-01..07-*.md` fragments composed
    per `prompts/skill-manifest.ts`); `teamwork-lite` serves the solo-dev
    lite mode (`prompts/coordinator-lite.ts` +
    `content/skill-coordinator-lite.md`, v3.6.0+) — server-read-only by
-   design, no `agent_id` in the routing chain; the other ten
+   design, no `agent_id` in the routing chain; the other eleven
    (`pm`, `architect`, `researcher`, `design-auditor`, `sr-engineer`,
    `code-reviewer`, `qa-engineer`, `doc-writer`, `release-engineer`,
-   `integrator`) use matching `content/skill-<role>.md` file names
-   (`integrator` is prompt-only — not a `tw_switch_role` / `agent_id` role).
+   `integrator`, `spec-workshop`) use matching `content/skill-<role>.md` file names
+   (`integrator` and `spec-workshop` are prompt-only — not `tw_switch_role` / `agent_id` roles).
 2. **Tools** — thirteen `tw_*` tools, each one entry in `tools/registry.ts`, that
    read/write `.current/<lane>/handoff.md`, `tasks.md`, and (in HTTP/SQLite mode)
    PRD-derived RAG chunks in target workspaces. `tw_update_state` / `tw_get_state`
@@ -119,7 +119,7 @@ prompts/partials-manifest.ts  shared prompt partials (content/partial-*.md)
 prompts/coordinator.ts       coordinator role (prompt id is "teamwork" for backwards compat)
 prompts/coordinator-lite.ts  coordinator-lite role (prompt id "teamwork-lite", v3.6.0)
 prompts/{pm,architect,researcher,design-auditor,sr-engineer,code-reviewer,
-         qa-engineer,doc-writer,release-engineer,integrator}.ts   the other ten role prompts
+         qa-engineer,doc-writer,release-engineer,integrator,spec-workshop}.ts   the other eleven role prompts
 bin/agc-init.mjs          `agc init` / `agc check` — workspace scaffold + adapter stamps
 bin/agent-governance-context.mjs  SessionStart hook helper (emits additionalContext; imports manifest for composition)
 bin/agent-governance-usage-hook.mjs  PostToolUse token-usage sidecar hook (opt-in)
@@ -127,7 +127,7 @@ content/const-*.md (15 fragments)  the rules agents must follow, composed by dis
 content/constitution-rationale.md  non-normative "why" behind §1/§3.1/§3.2/§5/§7 (one-way refs into constitution; v3.32.0)
 content/coord-01..07-*.md  coordinator SOP, 7 fragments (there is NO skill-coordinator.md)
 content/skill-coordinator-lite.md  solo-dev lite-mode SOP (v3.6.0)
-content/skill-*.md        the other 11 role SOPs, one file per role
+content/skill-*.md        the other 12 role SOPs, one file per role
 templates/agent-adapters/     CLAUDE.md / AGENTS.md / .antigravityrules stubs for `agc init`
 templates/claude-code-agents/ 12 model-pinned Claude Code subagent templates
 specs/                    design docs (qa-flow, rag-lifecycle, schema-versioning, etc.)

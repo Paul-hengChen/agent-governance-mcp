@@ -15,10 +15,10 @@ How the three layers fit together, what gates a state write, and how the routing
 │  + .current/<lane>/handoff.md state                        │
 │  (Fragment selection per dispatch mode via manifest)       │
 │                                                            │
-│  12 registered prompts (tools/registry.ts):                │
+│  13 registered prompts (tools/registry.ts):                │
 │    teamwork, teamwork-lite, pm, architect, researcher,     │
-│    design-auditor, sr-engineer, code-reviewer,             │
-│    qa-engineer, doc-writer, release-engineer, integrator   │
+│    design-auditor, sr-engineer, code-reviewer, qa-engineer,│
+│    doc-writer, release-engineer, integrator, spec-workshop │
 ├── Layer 2: Tools (12 tw_* MCP tools) ──────────────────────┤
 │  tw_get_state           tw_update_state                    │
 │  tw_get_next_task       tw_add_task                        │
