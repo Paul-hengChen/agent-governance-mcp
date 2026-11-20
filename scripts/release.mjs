@@ -298,11 +298,17 @@ async function readState(ctx) {
   if (text.replace(/^\uFEFF/, "").startsWith("---")) return parseHandoffCopy(ctx, text);
   try { return JSON.parse(text); } catch (e) { throw usage(`--state is neither a handoff copy nor JSON: ${e.message}`); }
 }
+// The release gate's judge: code-reviewer on a test-first feature
+// (chain_path: test-first), else qa-engineer. Mirrors judgeFor in
+// tools/transitions.ts; kept local because each dist module this script loads
+// is an injected dependency in the release tests.
+const releaseJudge = (state) => (state?.chain_path === "test-first" ? "code-reviewer" : "qa-engineer");
 async function preInputs(ctx) {
   const { opts, root } = ctx;
   const state = await readState(ctx);
-  const pass = state?.last_agent === "qa-engineer" && state.status === "PASS" && typeof state.active_feature === "string" && state.active_feature;
-  if (!pass) throw usage(`--state must be a (qa-engineer, PASS) snapshot with an active_feature (got ${state?.last_agent}, ${state?.status})`);
+  const judge = releaseJudge(state);
+  const pass = state?.last_agent === judge && state.status === "PASS" && typeof state.active_feature === "string" && state.active_feature;
+  if (!pass) throw usage(`--state must be a (${judge}, PASS) snapshot with an active_feature (got ${state?.last_agent}, ${state?.status})`);
   if (readViewTruncated(state)) throw usage("--state is a truncated read view (notes or task ids were omitted, so a release-scope note may be hidden) — pass a copy of the lane's handoff.md taken before the opening write");
   if (!safeSegment(state.active_feature)) throw usage(`--state active_feature ${JSON.stringify(state.active_feature)} cannot name an archive directory`);
   const message = readInput(root, opts.messageFile, "--message-file");
@@ -1222,12 +1228,13 @@ function preStart(ctx) {
   const up = gitOut(ctx.runner, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], "pre-3");
   if (up !== "origin/main") throw new ReleaseStop("WRONG_BRANCH", `main tracks ${up || "no upstream"}, expected origin/main`);
 }
-// s1: the release gate is the checkout's own lane handoff at (qa-engineer, PASS).
+// s1: the release gate is the checkout's own lane handoff at (judge, PASS):
+// (qa-engineer, PASS), or (code-reviewer, PASS) on a test-first feature.
 // Nothing is written before that holds; then the handoff is copied byte for
 // byte to <work-dir>/state.md, which prepare reads as --state.
 async function stepPrecondition(ctx) {
   const handoff = `${await laneDir(ctx, "s1")}/handoff.md`, abs = path.join(ctx.root, handoff);
-  const notPass = (why) => new ReleaseStop("PRECONDITION_NOT_PASS", `${handoff} ${why} — commit the release gate's (qa-engineer, PASS) write to main first`);
+  const notPass = (why, judge = "qa-engineer") => new ReleaseStop("PRECONDITION_NOT_PASS", `${handoff} ${why} — commit the release gate's (${judge}, PASS) write to main first`);
   if (!existsSync(abs)) throw notPass("does not exist");
   const bytes = readFileSync(abs);
   let state;
@@ -1235,7 +1242,8 @@ async function stepPrecondition(ctx) {
     if (e instanceof ReleaseStop) throw notPass(`cannot be parsed (${e.detail})`);
     throw e;
   }
-  if (state.last_agent !== "qa-engineer" || state.status !== "PASS") throw notPass(`is (${state.last_agent ?? "absent"}, ${state.status ?? "absent"}), expected (qa-engineer, PASS)`);
+  const judge = releaseJudge(state);
+  if (state.last_agent !== judge || state.status !== "PASS") throw notPass(`is (${state.last_agent ?? "absent"}, ${state.status ?? "absent"}), expected (${judge}, PASS)`, judge);
   if (!safeSegment(state.active_feature)) throw notPass(`active_feature ${JSON.stringify(state.active_feature ?? null)} cannot name an archive directory`);
   writeWorkFile(ctx, "s1", "state.md", bytes);
   ctx.state = state;
@@ -1518,15 +1526,15 @@ function stepDoneMark(ctx) {
 }
 // <summary> is the active feature, followed by the ticket ids when there are
 // any; the same text later titles the tag and the GitHub release. No trailer.
-export function commitMessage({ version, oldVersion, bump, activeFeature, tickets }) {
+export function commitMessage({ version, oldVersion, bump, activeFeature, tickets, judge = "qa-engineer" }) {
   const ids = Array.isArray(tickets) && tickets.length > 0 ? tickets.join(", ") : null;
   return [`chore(release): v${version} — ${activeFeature}${ids ? ` (${ids})` : ""}`, "",
-    `Release gate: ${activeFeature} (qa-engineer PASS committed to main).`, `Tickets: ${ids ?? "none"}.`, `Bump: ${bump} from v${oldVersion}.`, ""].join("\n");
+    `Release gate: ${activeFeature} (${judge} PASS committed to main).`, `Tickets: ${ids ?? "none"}.`, `Bump: ${bump} from v${oldVersion}.`, ""].join("\n");
 }
 // s11: the message file prepare reads, then the version file, start's last write.
 function stepMessage(ctx) {
   const { opts } = ctx, v = opts.version;
-  writeWorkFile(ctx, "s11", "message.txt", commitMessage({ version: v, oldVersion: ctx.oldVersion, bump: opts.bump, activeFeature: ctx.state.active_feature, tickets: opts.tickets }));
+  writeWorkFile(ctx, "s11", "message.txt", commitMessage({ version: v, oldVersion: ctx.oldVersion, bump: opts.bump, activeFeature: ctx.state.active_feature, tickets: opts.tickets, judge: releaseJudge(ctx.state) }));
   writeWorkFile(ctx, "s11", "version", `${v}\n`);
   ctx.okSuffix = ` — release/v${v} bumped, built and tested`;
 }

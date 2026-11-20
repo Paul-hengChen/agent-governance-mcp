@@ -1,0 +1,14 @@
+# e432-judge-report-checks — intentional reds left by sr-engineer (T-E432-02).
+# REPRO_MANIFEST_MISSING now also arms on the test-first hand-off
+# qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress (AC5): a marked
+# feature needs qa_reports/expected-red_<feature>.txt or
+# qa_reports/no-new-test_<feature>.txt before qa hands to sr. Each test below
+# hands a marked feature qa -> sr in a fresh workspace with neither file, so the
+# hand-off is now rejected. Intended behaviour change, not a regression.
+# Re-pin (qa-owned T-E432-06): write qa_reports/no-new-test_<feature>.txt in
+# each fixture before the qa -> sr write; assertions unchanged.
+test/e431-test-first-server-path.test.mjs | AC1: marked pm -> qa-engineer (no resume_of) then qa-engineer -> sr-engineer both accepted, marker persisted
+test/e431-test-first-server-path.test.mjs | AC5: after code-reviewer FAIL -> qa, qa straight back to code-reviewer is rejected; qa -> sr -> code-reviewer accepted
+test/e431-test-first-server-path.test.mjs | AC6: third sr -> qa return rejected SR_RETURN_CAP_EXCEEDED routing to pm; pm resets; other writes not blocked
+test/e431-test-first-server-path.test.mjs | AC7: code-reviewer rejections to qa and to sr together reach review_round 4; next non-pm write REVIEW_ROUND_EXCEEDED
+test/e431-test-first-server-path.test.mjs | AC10: marker survives omitting writes and is dropped on active_feature change

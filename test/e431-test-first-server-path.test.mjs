@@ -100,12 +100,21 @@ function envelope(r) {
 }
 
 const F = "e431-feat";
+
+// E432: a marked qa-engineer -> sr-engineer hand-off needs the red-test manifest or the no-new-test record
+// (qa_reports/no-new-test_<feature>.txt, existence only). These scenarios exercise routing, counters and
+// markers, not the manifest rule (test/e432-judge-report-checks.test.mjs owns that), so they record "no new test".
+function recordNoNewTest(ws) {
+  fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "qa_reports", `no-new-test_${F}.txt`), "routing scenario, no new test\n");
+}
 const w = (agent, status, extra = {}) => ({ active_feature: F, status, agent_id: agent, ...extra });
 
 // ---------------------------------------------------------------- AC1
 
 test("AC1: marked pm -> qa-engineer (no resume_of) then qa-engineer -> sr-engineer both accepted, marker persisted", async () => {
   const ws = mkWs("e431-ac1-");
+  recordNoNewTest(ws);
   await seed(ws, F, "pm", "In_Progress");
   const r1 = await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first" }));
   assert.ok(!rejected(r1), `pm -> qa with the marker on the entry write must be accepted: ${text(r1)}`);
@@ -191,6 +200,7 @@ test("AC5: after code-reviewer FAIL -> qa, qa straight back to code-reviewer is 
   assert.ok(!rejected(q), `code-reviewer FAIL -> qa accepted: ${text(q)}`);
 
   const ws2 = mkWs("e431-ac5b-");
+  recordNoNewTest(ws2);
   await seed(ws2, F, "qa-engineer", "In_Progress", { chainPath: "test-first", reviewRound: 1 });
   const before = handoffBytes(ws2);
   const bad = await upd(ws2, w("code-reviewer", "In_Progress"));
@@ -209,6 +219,7 @@ test("AC5: after code-reviewer FAIL -> qa, qa straight back to code-reviewer is 
 test("AC6: third sr -> qa return rejected SR_RETURN_CAP_EXCEEDED routing to pm; pm resets; other writes not blocked", async () => {
   assert.equal(SR_RETURN_CAP_EXPORTED, 2);
   const ws = mkWs("e431-ac6-");
+  recordNoNewTest(ws);
   await seed(ws, F, "sr-engineer", "In_Progress", { chainPath: "test-first" });
   for (const expected of [1, 2]) {
     const back = await upd(ws, w("qa-engineer", "In_Progress"));
@@ -244,6 +255,7 @@ test("AC6: third sr -> qa return rejected SR_RETURN_CAP_EXCEEDED routing to pm; 
 
 test("AC7: code-reviewer rejections to qa and to sr together reach review_round 4; next non-pm write REVIEW_ROUND_EXCEEDED", async () => {
   const ws = mkWs("e431-ac7-");
+  recordNoNewTest(ws);
   await seed(ws, F, "code-reviewer", "In_Progress", { chainPath: "test-first" });
   const fail = () => upd(ws, w("code-reviewer", "FAIL", { review_verdict: "CHANGES_REQUESTED", blocking_reason: "no" }));
   const hop = async (agent) => {
@@ -358,6 +370,7 @@ test("AC9: on a marked feature a later pm -> qa write needs no resume_of", async
 
 test("AC10: marker survives omitting writes and is dropped on active_feature change", async () => {
   const ws = mkWs("e431-ac10-");
+  recordNoNewTest(ws);
   await seed(ws, F, "pm", "In_Progress");
   assert.ok(!rejected(await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first" }))));
   assert.ok(!rejected(await upd(ws, w("qa-engineer", "In_Progress", { pending_notes: ["still here"] }))));
