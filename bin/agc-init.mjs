@@ -449,10 +449,11 @@ function runInit(cwd, argv = []) {
   const claudeTracked = isWorkspaceFileTracked({ repoRoot, workspace }, "CLAUDE.md");
   const claudeHoldsBlock = fileHoldsClaudeBlock(path.join(cwd, "CLAUDE.md"));
   const localHoldsBlock = fileHoldsClaudeBlock(path.join(cwd, ADAPTER_PLACEMENTS.local));
+  const keepsLocalBlock = requestedAdapter === undefined && localHoldsBlock && !claudeHoldsBlock;
   const adapter =
     requestedAdapter !== undefined
       ? requestedAdapter
-      : localHoldsBlock && !claudeHoldsBlock
+      : keepsLocalBlock
         ? "local"
         : claudeTracked && mode === "local" && !claudeHoldsBlock
           ? "local"
@@ -460,7 +461,19 @@ function runInit(cwd, argv = []) {
 
   // Same refusal as local artifacts: the CLAUDE.local.md exclude rule is
   // built from the workspace prefix, so an unsafe segment cannot be anchored.
+  // When no --adapter was given, the message names why "local" was picked
+  // instead of blaming a flag the user never passed.
   if (adapter === "local" && workspace !== null && workspace.unsafeSegment !== null) {
+    if (keepsLocalBlock) {
+      throw usageError(
+        `agc init: refusing to update the agc block in CLAUDE.local.md — no --adapter was given, so local placement ` +
+          `was picked because CLAUDE.local.md already holds the agc block, but workspace path segment ` +
+          `"${escapeSegmentForDisplay(workspace.unsafeSegment)}" contains a character unsafe for a gitignore exclude rule ` +
+          `(a wildcard, a backslash, or a control character), so the CLAUDE.local.md exclude rule agc would write ` +
+          `could match unintended files or be split across lines. Rename the directory, or move the agc block ` +
+          `from CLAUDE.local.md into CLAUDE.md and re-run.`
+      );
+    }
     throw usageError(
       `agc init: refusing --adapter=local — workspace path segment "${escapeSegmentForDisplay(workspace.unsafeSegment)}" ` +
         `contains a character unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character), ` +
@@ -4027,8 +4040,7 @@ function planHostTraceEntries(ctx) {
     const e = planAdapterFileEntry(ctx, rel, tpl);
     if (e !== null) entries.push(e);
   }
-  const exclude = planExcludeEntry(ctx);
-  if (exclude !== null) entries.push(exclude);
+  entries.push(...planExcludeEntries(ctx));
   return entries;
 }
 
@@ -4044,6 +4056,26 @@ function isWorkspaceFileTracked(ctx, rel) {
   return trackedArtifactPaths(ctx.repoRoot, [{ display: target, target }]).length > 0;
 }
 
+// What removing the agc block would leave of file `abs`: null when the file
+// is absent, { rest: null } when it holds no well-formed BEGIN..END pair (eject
+// leaves it untouched), else { rest } with every byte outside the first block.
+function claudeBlockRemoval(abs) {
+  if (!fs.existsSync(abs)) return null;
+  const existing = fs.readFileSync(abs, "utf-8");
+  const beginIdx = existing.indexOf(CLAUDE_BEGIN);
+  const endIdx = existing.indexOf(CLAUDE_END);
+  if (beginIdx === -1 || endIdx === -1 || endIdx < beginIdx) return { rest: null };
+  return { rest: existing.slice(0, beginIdx) + existing.slice(endIdx + CLAUDE_END.length) };
+}
+
+// Whether this workspace's CLAUDE.local.md is still on disk after eject: it
+// is kept when it holds no agc block (eject leaves it alone) or holds content
+// beside the block (only the block is removed).
+function localAdapterFileSurvivesEject(ctx) {
+  const removal = claudeBlockRemoval(path.join(ctx.cwd, ADAPTER_PLACEMENTS.local));
+  return removal !== null && (removal.rest === null || removal.rest.trim() !== "");
+}
+
 // Reverse of writeClaudeBlock for `rel` (CLAUDE.md or CLAUDE.local.md): drop
 // the first BEGIN..END block, markers inclusive, keeping every byte outside
 // it. When what remains is only whitespace the file held nothing but the
@@ -4053,17 +4085,15 @@ function isWorkspaceFileTracked(ctx, rel) {
 // reported and left alone.
 function planClaudeBlockEntry(ctx, rel) {
   const abs = path.join(ctx.cwd, rel);
-  if (!fs.existsSync(abs)) return null;
+  const removal = claudeBlockRemoval(abs);
+  if (removal === null) return null;
   const display = workspaceDisplay(ctx.workspace, rel);
   const label = `(iii) host traces — ${escapeSegmentForDisplay(display)}`;
-  const existing = fs.readFileSync(abs, "utf-8");
-  const beginIdx = existing.indexOf(CLAUDE_BEGIN);
-  const endIdx = existing.indexOf(CLAUDE_END);
-  if (beginIdx === -1 || endIdx === -1 || endIdx < beginIdx) {
+  if (removal.rest === null) {
     const line = `${label}: no adapter block found — nothing to do`;
     return { line: () => line, apply: null, untrackedDelete: false };
   }
-  const rest = existing.slice(0, beginIdx) + existing.slice(endIdx + CLAUDE_END.length);
+  const { rest } = removal;
   const tracked = isWorkspaceFileTracked(ctx, rel);
   if (rest.trim() === "") {
     return {
@@ -4132,15 +4162,20 @@ function planAdapterFileEntry(ctx, rel, tpl) {
 // rules, the adopter's own — keeps its exact bytes and position. A workspace
 // whose path holds a character unsafe for an exclude rule never had rules
 // written (init refuses local mode there), so there is nothing to look for.
-function planExcludeEntry(ctx) {
+// The CLAUDE.local.md rule is kept while that file stays on disk (it still
+// holds the user's own notes, with or without an agc block): dropping it would
+// leave the notes untracked, one `git add -A` away from the team's history.
+// A kept rule adds a report-only advisory line naming it.
+function planExcludeEntries(ctx) {
   const label = "(iii) host traces — .git/info/exclude";
   if (ctx.repoRoot === null) {
     const line = `${label}: skipped (not inside a git repository)`;
-    return { line: () => line, apply: null, untrackedDelete: false };
+    return [{ line: () => line, apply: null, untrackedDelete: false }];
   }
-  if (ctx.workspace.unsafeSegment !== null) return null;
+  if (ctx.workspace.unsafeSegment !== null) return [];
   const rules = new Set(artifactExcludeRulesForPrefix(ctx.workspace.prefix));
   const [adapterRule] = artifactExcludeRulesForPrefix(ctx.workspace.prefix, ADAPTER_LOCAL_EXCLUDE_RULES);
+  const keepAdapterRule = localAdapterFileSurvivesEject(ctx);
   const { excludePath, existing, exists } = readSharedExclude(ctx.repoRoot);
   // Each line with its own terminator, so joining the survivors reproduces
   // their bytes exactly, including a missing final newline.
@@ -4155,25 +4190,42 @@ function planExcludeEntry(ctx) {
     }
     if (rule === adapterRule) {
       adapterHit = true;
-      return false;
+      return keepAdapterRule;
     }
     return true;
   });
-  if (n === 0 && !adapterHit) {
+  const removeAdapter = adapterHit && !keepAdapterRule;
+  const entries = [];
+  if (n === 0 && !removeAdapter) {
     const line = `${label}: nothing to remove`;
-    return { line: () => line, apply: null, untrackedDelete: false };
+    entries.push({ line: () => line, apply: null, untrackedDelete: false });
+  } else {
+    // Without the adapter rule removed the wording is the artifacts-only line as before.
+    const what = !removeAdapter
+      ? `${n} artifact exclude line(s)`
+      : n === 0
+        ? `the ${adapterRule} line`
+        : `${n} artifact exclude line(s) and the ${adapterRule} line`;
+    entries.push({
+      line: (applied) => (applied ? `${label}: removed ${what}` : `${label}: REMOVE ${what}`),
+      apply: () => atomicWriteFile(excludePath, kept.join("")),
+      untrackedDelete: false,
+    });
   }
-  // Without the adapter rule the wording is the artifacts-only line as before.
-  const what = !adapterHit
-    ? `${n} artifact exclude line(s)`
-    : n === 0
-      ? `the ${adapterRule} line`
-      : `${n} artifact exclude line(s) and the ${adapterRule} line`;
-  return {
-    line: (applied) => (applied ? `${label}: removed ${what}` : `${label}: REMOVE ${what}`),
-    apply: () => atomicWriteFile(excludePath, kept.join("")),
-    untrackedDelete: false,
-  };
+  if (adapterHit && keepAdapterRule) {
+    const file = escapeSegmentForDisplay(workspaceDisplay(ctx.workspace, ADAPTER_PLACEMENTS.local));
+    const why =
+      `${file} stays on disk because it still holds your own notes, and the line keeps it out of git; ` +
+      `remove the line by hand from the shared info/exclude once you no longer need it`;
+    entries.push({
+      line: (applied) =>
+        applied ? `${label}: kept the ${adapterRule} line — ${why}` : `${label}: the ${adapterRule} line will be kept — ${why}`,
+      apply: null,
+      untrackedDelete: false,
+      advisory: true,
+    });
+  }
+  return entries;
 }
 
 // The class (i)/(ii-b)/(ii-a) paths for this workspace, prefix-anchored.
