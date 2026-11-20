@@ -86,7 +86,7 @@ qa_round: 0
   const report = JSON.parse(detectDrift(ws));
   assert.equal(report.driftDetected, true);
   assert.ok(
-    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v15/.test(d)),
+    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v16/.test(d)),
     `expected handoff skew reason in ${JSON.stringify(report.details)}`,
   );
 });
@@ -229,7 +229,7 @@ qa_round: 0
   }, "the unmigrated-flat-workspace skew precheck must no longer throw the raw parser refusal");
   assert.equal(report.driftDetected, true);
   assert.ok(
-    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v15/.test(d)),
+    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v16/.test(d)),
     `expected a graceful handoff skew reason in ${JSON.stringify(report.details)}`,
   );
 });

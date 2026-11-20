@@ -115,18 +115,18 @@ function fmt(codeMap, codes) {
     .join("; ");
 }
 
-// GATE_REGISTRY is the single source of truth. The entry count (34) is pinned so adding or
+// GATE_REGISTRY is the single source of truth. The entry count (35) is pinned so adding or
 // dropping a gate is a deliberate, visible change here. (AC-1, AC-5, E40)
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 34 entries (34 in, 34 out — e247 added PASS_TASKS_INCOMPLETE; before it e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 35 entries (35 in, 35 out — e431 added SR_RETURN_CAP_EXCEEDED; before it e247 added PASS_TASKS_INCOMPLETE; before it e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    34,
-    `expected exactly 34 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    35,
+    `expected exactly 35 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    34,
+    35,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -238,11 +238,11 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
 
 // TransitionRejection["error"] (tools/transitions.ts) is a hand-written union, not generated from
 // the registry: it mixes validateTransition codes with handler-side codes kept for type narrowing.
-// Drift is caught by pinning it at 16 members and requiring it to be a subset of ALL_GATE_CODES.
+// Drift is caught by pinning it at 17 members and requiring it to be a subset of ALL_GATE_CODES.
 // Plain-text orchestrator codes (for example AC_EXECUTION_LOG_MISSING) stay out of both the union
 // and TRANSITION_GATE_CODES. (DR-8, DR-9)
 
-test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 16 members, all ⊆ ALL_GATE_CODES", () => {
+test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 17 members, all ⊆ ALL_GATE_CODES", () => {
   const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
   const unionMatch = transitionsSrc.match(
     /export interface TransitionRejection \{\s*error:\s*([\s\S]*?);\s*\n\s*attempted:/,
@@ -256,12 +256,12 @@ test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 16 memb
 
   assert.equal(
     members.length,
-    16,
-    `TransitionRejection["error"] must stay byte-identical at 16 members (DR-8, e4-design-source-credibility-gate re-baseline) — found ${members.length}: ${members.join(", ")}`,
+    17,
+    `TransitionRejection["error"] must stay byte-identical at 17 members (DR-8, e4-design-source-credibility-gate re-baseline; E431 added SR_RETURN_CAP_EXCEEDED) — found ${members.length}: ${members.join(", ")}`,
   );
   assert.equal(
     new Set(members).size,
-    16,
+    17,
     "TransitionRejection[\"error\"] union members must be unique",
   );
 
@@ -502,8 +502,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    34,
-    `expected the mapping comment to list all 34 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    35,
+    `expected the mapping comment to list all 35 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -591,6 +591,10 @@ const FREE_TEXT_ALLOWLIST = [
   // UPDATE_STATE_GATE_PIPELINE — there is no transition edge, and the arm condition is the zod enum itself.
   { code: "DISPATCH_PIN_TIER_REJECTED", field: "triggerEdge", reason: "tool-boundary zod rejection, no role:Status edge pair and no cap literal — it fires before any transition is evaluated" },
   { code: "DISPATCH_PIN_TIER_REJECTED", field: "armCondition", reason: "tool-boundary zod rejection: the arm condition is the z.enum on each dispatch_pins value, not a camelCase predicate/function-call literal in the orchestrator" },
+  // SR_RETURN_CAP_EXCEEDED (E431): an opt-in counter cap on one edge. armCondition has the same shape as
+  // HOP_CAP_EXCEEDED's (free English over a handoff counter); triggerEdge is prose around a counter comparison.
+  { code: "SR_RETURN_CAP_EXCEEDED", field: "triggerEdge", reason: "free English: a prev_sr_return_count comparison on one edge pair plus marker/bypass prose; no checkable cap or camelCase predicate literal" },
+  { code: "SR_RETURN_CAP_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present; marked feature only)\": free English; the sr_return_count counter is a handoff field, not a named predicate/function call, same reasoning as HOP_CAP_EXCEEDED" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {
@@ -651,7 +655,7 @@ test("E300: SUFFIX_RE classifies DISPATCH_PIN_TIER_REJECTED as a gate-shaped cod
   assert.ok(SUFFIX_RE.test("DISPATCH_PIN_TIER_REJECTED"));
 });
 
-test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 34 codes", async () => {
+test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 35 codes", async () => {
   // WHY: tools/registry.ts composes its hint from MODEL_TIERS while gates/registry.ts
   // keeps hintStatic as a literal (import-free leaf). This is the only check that the
   // two renderings cannot drift apart.
@@ -675,6 +679,6 @@ test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `D
   const g = GATE_REGISTRY.find((e) => e.errorCode === "DISPATCH_PIN_TIER_REJECTED");
   assert.equal(issues[0].message, `DISPATCH_PIN_TIER_REJECTED: "${echo}" ` + g.hintStatic);
   assert.equal(g.hintStatic, "is not a model tier; allowed: opus, sonnet, haiku, fable");
-  assert.equal(GATE_REGISTRY.length, 34);
-  assert.equal(ALL_GATE_CODES.length, 34);
+  assert.equal(GATE_REGISTRY.length, 35);
+  assert.equal(ALL_GATE_CODES.length, 35);
 });

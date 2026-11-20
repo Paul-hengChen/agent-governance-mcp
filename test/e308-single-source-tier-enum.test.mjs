@@ -69,9 +69,10 @@ test("E308-AC6: stale 'no gate' wording is gone from the dispatch_pins zod comme
   assert.ok(count(REGISTRY, "DISPATCH_PIN_TIER_REJECTED") >= 3);
 });
 
-test("E303-AC11a: gates/registry.ts keeps the mapping line exactly once and no '(none)' (NON_REVIEWER_VERDICT_REJECTED now mapped, E365)", () => {
+test("E303-AC11a: gates/registry.ts keeps the mapping line exactly once and no '(none)' (NON_REVIEWER_VERDICT_REJECTED now mapped, E365; the one is SR_RETURN_CAP_EXCEEDED, E431, until E433 quotes it in prose)", () => {
   assert.equal(count(GATES, "DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md"), 1);
-  assert.equal(count(GATES, "(none)"), 0);
+  assert.equal(count(GATES, "(none)"), 1);
+  assert.equal(count(GATES, "SR_RETURN_CAP_EXCEEDED          (none)"), 1);
   assert.equal(count(GATES, 'hintStatic: "is not a model tier; allowed: opus, sonnet, haiku, fable"'), 1);
 });
 
@@ -88,9 +89,9 @@ test("E303-AC11c: index.ts carries no zod-telemetry emission; it lives in tools/
   assert.ok(REGISTRY.includes("emitZodGateTelemetry"));
 });
 
-test("E303-AC12: no new gate code beyond E139 (34 entries) and DISPATCH_PIN_TIER_REJECTED is the only tool-boundary producer", async () => {
+test("E303-AC12: no new gate code beyond E431 (35 entries) and DISPATCH_PIN_TIER_REJECTED is the only tool-boundary producer", async () => {
   const { GATE_REGISTRY } = await import("../dist/gates/registry.js");
-  assert.equal(GATE_REGISTRY.length, 34);
+  assert.equal(GATE_REGISTRY.length, 35);
   const tb = GATE_REGISTRY.filter((g) => g.producer === "tool-boundary").map((g) => g.errorCode);
   assert.deepEqual(tb, ["DISPATCH_PIN_TIER_REJECTED"]);
 });
