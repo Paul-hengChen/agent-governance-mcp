@@ -2,3 +2,4 @@
 {"ts":"2026-11-20T04:33:22.951Z","feature":"e431-test-first-server-path","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-20T04:51:15.446Z","feature":"e431-test-first-server-path","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-20T05:03:42.415Z","feature":"e431-test-first-server-path","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-20T05:41:30.834Z","feature":"e431-test-first-server-path","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

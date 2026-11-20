@@ -2,8 +2,8 @@
 schema_version: 15
 active_feature: "e431-test-first-server-path"
 status: "In_Progress"
-last_updated: "2026-11-20T05:03:42.413Z"
-last_agent: "architect"
+last_updated: "2026-11-20T05:41:30.830Z"
+last_agent: "sr-engineer"
 prd_path: "specs/e431-test-first-server-path.md"
 scope_decision: "single-feature"
 scope_decision_why: "One ticket in one lane: the integrator-approved fan-out plan (specs/fanout-v5-w2.md, human-approved 2026-11-20) cuts E431 as a single lane. Its parts (marker, matrix, judge identity, counters, schema) share tools/transitions.ts and tools/handoff-orchestrator.ts, so splitting them would mean shared files across tickets. No design surface."
@@ -16,13 +16,13 @@ dispatch_pins:
   qa-engineer: "sonnet"
 evidence_schema: 2
 next_role: "sr-engineer"
-dispatched_at: "2026-11-20T05:03:42.413Z"
+dispatched_at: "2026-11-20T05:41:30.830Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -33,11 +33,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Architecture ready: specs/e431-test-first-server-path-architecture.md. Open Questions (9) are all architect defaults, none needs a human ruling; per docs/lane-protocol.md they go to the integrator mailbox for a second pre-review BEFORE sr-engineer is dispatched.
-- Design: ALLOWED_TRANSITIONS untouched; exported TEST_FIRST_OVERLAY (opens/closes) applied inside validateTransition only when TransitionRequest.prev_chain_path / next_chain_path mark the feature; prev_sr_return_count feeds new step 2.6 SR_RETURN_CAP_EXCEEDED (registry entry 35, after HOP_CAP_EXCEEDED, TRANSITION_GATE_CODES +1). Pipeline stays 17 steps; no new tools/*.ts or gates/*.ts; gates/pipeline.ts not touched.
-- Confirmed: D5 (set points = any pm write, or entry write pm/architect -> qa-engineer:In_Progress; immutable; dropped on feature change), D6 (edge table in the doc), D7 (sr_return_count via new computeSrReturnCount, NOT a new computeNewRound key; review_round resets on code-reviewer:PASS). AC10 code = TRANSITION_REJECTED.
-- PASS refine is relaxed to admit code-reviewer (not removed); unmarked code-reviewer PASS is rejected before enforcePreFlight by a read-only peek that throws the same ZodError, so the old text/order is kept.
-- sr execution order: T-E431-01, T-03, T-02 (imports PASS_IDENTITY_REFINE_MESSAGE from transitions.ts), T-04, T-05 (writes the expected-red manifest), T-06 (adds docs/schema-versions.md v16 row; 5 docs files). Expected-red predictions are in the Task Budget Map section.
+- sr-engineer session 1: T-E431-01 landed f273aac (handoff-types ChainPath + chain_path/sr_return_count, parse defensively, write: chainPath feature-scoped carry emitted only when test-first, srReturnCount emitted only when > 0 and passed through the heal-write; CURRENT_VERSIONS.handoff 16, sqlite 2; v15->v16 stamp-only migration). T-E431-03 landed e4feaa6 (transitions.ts overlay/step 1.5/step 2.6/allowedSuccessors/isChainPathSetPoint/computeSrReturnCount/PASS_IDENTITY_REFINE_MESSAGE/SR_RETURN_CAP_EXPORTED, review_round reset on code-reviewer:PASS, AC9 hint, hop-cap comment; gates/registry.ts entry 35 after HOP_CAP_EXCEEDED, documentedInProse false, mapping row (none), TRANSITION_GATE_CODES 7). ALLOWED_TRANSITIONS untouched; check:transitions-sync OK.
+- Verification: npm run build exit 0 (tsc clean), npm audit --audit-level=high exit 0. Scratch invariant run vs the pre-T-03 dist: I1 deep-equal; I2 83160 validateTransition requests deep-equal except the sanctioned pm:In_Progress -> qa-engineer:In_Progress hint suffix (24 cases); I3 computeNewRound identical for every next != code-reviewer:PASS; I4 caps unchanged; marked-path spot checks for AC1-AC11 edges, AC6 cap envelope, AC10 illegal set all as blueprinted.
+- Reds seen, all expected (Probe groups): registry 34->35 / union 16->17 in error-code-contract (incl. c12 mapping count and AC3 allowlist for SR_RETURN_CAP_EXCEEDED triggerEdge/armCondition), e26-gate-stats, e308-single-source-tier-enum (:72 '(none)' count too), e419; e151 :60 AC11 test (AC9 suffix also appended on wrong-role resume_of, per blueprint 'role === qa-engineer'); schema 15->16 group (cut-approval-gate, dispatch-pins, handoff-versioning, handoff-migration, schema-versions, success-metrics manual-chain tests). ONE unlisted red: test/e295-hop-cap-and-sop-halves.test.mjs:122 asserts count(gates/registry.ts, '(none)') === 0 -- caused by the AC17-mandated mapping row; qa re-pin needed (add to manifest in T-05). No unexpected old-path behaviour change.
+- For T-02: import PASS_IDENTITY_REFINE_MESSAGE from ./transitions.js (text byte-identical to today's refine). For T-04: TransitionRequest takes prev_chain_path / next_chain_path / prev_sr_return_count; use allowedSuccessors(key, chainPath) and isChainPathSetPoint; computeSrReturnCount(prev, prevTuple, nextTuple, feature_changed); writeState options chainPath / srReturnCount exist (SQLite ignores). AllowedNext is now exported as a type. judgeFor/requireJudge NOT added yet (T-05).
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
