@@ -5,7 +5,8 @@
 // by FileHandoffStorage so callers never depend on filesystem layout directly.
 import { getActiveStorage } from "./storage.js";
 import { enforcePreFlight } from "../guards/session.js";
-import { requireQaEngineer } from "./transitions.js";
+import { requireQaEngineer, requireJudge } from "./transitions.js";
+import { readPersistedChainPath } from "./handoff-orchestrator.js";
 export function getNextTask(workspacePath) {
     return getActiveStorage().getNextTask(workspacePath);
 }
@@ -35,7 +36,12 @@ export async function handleGetNextTask(args) {
 }
 export async function handleCompleteTask(parsed) {
     enforcePreFlight(parsed.workspace_path, "tw_complete_task");
-    const gate = requireQaEngineer(parsed.agent_id, "tw_complete_task");
+    // The judge follows the current feature's marker (no active_feature here).
+    // Unmarked, unreadable handoff or SQLite: qa-engineer, as before. (E431)
+    const chainPath = readPersistedChainPath(parsed.workspace_path);
+    const gate = chainPath === "test-first"
+        ? requireJudge(parsed.agent_id, "tw_complete_task", chainPath)
+        : requireQaEngineer(parsed.agent_id, "tw_complete_task");
     if (!gate.ok) {
         return { content: [{ type: "text", text: gate.message ?? "blocked" }] };
     }

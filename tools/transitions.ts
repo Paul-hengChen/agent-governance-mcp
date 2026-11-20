@@ -174,6 +174,33 @@ export function requireQaEngineer(
   };
 }
 
+/** The role that judges a feature: code-reviewer on a test-first feature, else qa-engineer. (E431) */
+export function judgeFor(chainPath?: ChainPath): "qa-engineer" | "code-reviewer" {
+  return chainPath === "test-first" ? "code-reviewer" : "qa-engineer";
+}
+
+/**
+ * Judge gate per marker. Unmarked: requireQaEngineer, byte-identical. On a
+ * test-first feature only code-reviewer passes; the message mirrors the
+ * qa-engineer one. (E431)
+ */
+export function requireJudge(
+  agentId: string | undefined,
+  toolName: string,
+  chainPath?: ChainPath,
+): AgentGateResult {
+  if (chainPath !== "test-first") return requireQaEngineer(agentId, toolName);
+  if (agentId === "code-reviewer") return { ok: true };
+  const who = agentId ? `"${agentId}"` : "unidentified agent (agent_id not set)";
+  return {
+    ok: false,
+    message:
+      `⛔ BLOCKED: ${toolName} is reserved for code-reviewer on a test-first feature ` +
+      `(chain_path: test-first). Called by ${who}. ` +
+      `Hand off to code-reviewer and pass agent_id="code-reviewer".`,
+  };
+}
+
 // ----- transition matrix -----
 
 export type AllowedNext = ReadonlyArray<{ agent: AgentName; status: StatusName }>;

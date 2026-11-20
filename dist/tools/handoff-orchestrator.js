@@ -5,9 +5,10 @@
 // the order, and a test pins it. Insert new checks; never reorder or merge.
 // Do not re-indent gate bodies: some tests pin their exact byte shape.
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — check order".
+import { z } from "zod";
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
-import { requireQaEngineer, validateTransition, computeNewRound, computeSrReturnCount, allowedSuccessors, isChainPathSetPoint, HOP_CAP_EXPORTED, } from "./transitions.js";
+import { requireJudge, judgeFor, PASS_IDENTITY_REFINE_MESSAGE, validateTransition, computeNewRound, computeSrReturnCount, allowedSuccessors, isChainPathSetPoint, HOP_CAP_EXPORTED, } from "./transitions.js";
 import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, visualEvidencePath, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, checkSourceCredibility, } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
@@ -579,7 +580,10 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // TransitionRejection union. Reads only the incoming args, so it works
             // in every storage mode.
             if (parsed.agent_id === "code-reviewer" && parsed.review_verdict) {
-                const mismatch = (parsed.review_verdict === "APPROVED" && parsed.status !== "In_Progress") ||
+                const mismatch = (parsed.review_verdict === "APPROVED" &&
+                    parsed.status !== "In_Progress" &&
+                    // A reviewer PASS on a test-first feature is an approval too. (E431)
+                    !(parsed.status === "PASS" && resolveChainPath(ctx) === "test-first")) ||
                     (parsed.review_verdict === "CHANGES_REQUESTED" && parsed.status !== "FAIL");
                 if (mismatch) {
                     return {
@@ -636,6 +640,27 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // and the claim write has completed_tasks=[]. Reads only the incoming
             // args (every storage mode). The envelope text is published, cited in
             // skill-code-reviewer.md and pinned by a test: keep it byte-identical.
+            // On a test-first feature the judge is code-reviewer and every other
+            // identity, qa-engineer included, is rejected below. (E431)
+            const testFirst = resolveChainPath(ctx) === "test-first";
+            if (testFirst) {
+                if (parsed.agent_id &&
+                    parsed.agent_id !== "code-reviewer" &&
+                    parsed.completed_tasks.length > 0) {
+                    return {
+                        content: [{
+                                type: "text",
+                                text: `⛔ NON_QA_COMPLETED_TASKS_REJECTED: completed_tasks=` +
+                                    `[${parsed.completed_tasks.join(", ")}] on an agent_id=${parsed.agent_id} write ` +
+                                    `on a test-first feature (chain_path: test-first). Only agent_id=code-reviewer, ` +
+                                    `this feature's judge, may grow completed_tasks (or complete tasks through ` +
+                                    `tw_complete_task). Omit completed_tasks (or pass []) on this write.`,
+                            }],
+                        isError: true,
+                    };
+                }
+                return null;
+            }
             if (parsed.agent_id === "code-reviewer" && parsed.completed_tasks.length > 0) {
                 return {
                     content: [{
@@ -1166,19 +1191,23 @@ function effectiveAllowedSuccessors(prev, counters, options = {}) {
 }
 // --- GUARDED: must call tw_get_state first ---
 async function handleUpdateStateCore(parsed) {
+    // The zod refine admits a code-reviewer PASS; only a test-first
+    // feature may keep it. Unmarked (or unreadable, or SQLite): reject
+    // here, before pre-flight, with the refine's own ZodError so the reply
+    // is the same invalid-arguments text as a refine rejection. Read-only
+    // peek; nothing is locked or written. (E431)
+    if (parsed.status === "PASS" &&
+        parsed.agent_id === "code-reviewer" &&
+        readPersistedChainPath(parsed.workspace_path, parsed.active_feature) !== "test-first") {
+        throw new z.ZodError([
+            { code: z.ZodIssueCode.custom, path: ["agent_id"], message: PASS_IDENTITY_REFINE_MESSAGE },
+        ]);
+    }
     enforcePreFlight(parsed.workspace_path, "tw_update_state");
     // zod already defaults completed_tasks to []; a direct caller that
     // skips zod may omit it. Normalise once so every gate reads a list
     // and omission and [] stay one input class. (E150)
     parsed = { ...parsed, completed_tasks: parsed.completed_tasks ?? [] };
-    // Defense-in-depth: zod refine already enforces this on PASS, but a
-    // client that bypasses zod still hits this guard.
-    if (parsed.status === "PASS") {
-        const gate = requireQaEngineer(parsed.agent_id, "tw_update_state(status=PASS)");
-        if (!gate.ok) {
-            return { content: [{ type: "text", text: gate.message ?? "blocked" }] };
-        }
-    }
     const storage = getActiveStorage();
     const prevState = storage.parse(parsed.workspace_path);
     const prev_qa_round = prevState?.qa_round ?? 0;
@@ -1244,6 +1273,20 @@ async function handleUpdateStateCore(parsed) {
         evidenceSchemaPin,
         evidenceSchemaLabel,
     };
+    // E431 — the marker this write runs under (file mode only; always
+    // undefined under SQLite). It picks the feature's judge below and is
+    // persisted after the pipeline.
+    const resolvedChainPath = resolveChainPath(ctx);
+    // PASS judge guard. The zod refine already rejects most wrong-agent
+    // PASS writes, but a client that bypasses zod still hits this, and a
+    // qa-engineer PASS on a test-first feature is rejected only here.
+    // Unmarked: the qa-engineer text, as before. (E431)
+    if (parsed.status === "PASS") {
+        const gate = requireJudge(parsed.agent_id, "tw_update_state(status=PASS)", resolvedChainPath);
+        if (!gate.ok) {
+            return { content: [{ type: "text", text: gate.message ?? "blocked" }] };
+        }
+    }
     // A rejection or a throw means this write does not land, so any
     // evidence QA_REVIEW_RECORD appended is undone first; the rejection
     // envelope and the thrown error pass through unchanged.
@@ -1269,11 +1312,9 @@ async function handleUpdateStateCore(parsed) {
     // feature change (the same rule as hop_count). Persisted via
     // storage.writeState below (file-mode frontmatter only). (E8, v12)
     qa_rounds_total: new_qa_rounds_total, review_rounds_total: new_review_rounds_total, visual_rounds_total: new_visual_rounds_total, } = computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, nextTuple, prevTuple, parsed.pending_notes, prev_hop_count, feature_changed, prev_qa_rounds_total, prev_review_rounds_total, prev_visual_rounds_total);
-    // E431 — the marker this write runs under and the sr -> qa return
-    // counter, both file mode only (resolvedChainPath is always undefined
-    // under SQLite, and an unmarked feature can never take the return
-    // edge, so its count stays 0 and is never emitted).
-    const resolvedChainPath = resolveChainPath(ctx);
+    // E431 — the sr -> qa return counter, file mode only (an unmarked
+    // feature can never take the return edge, so its count stays 0 and is
+    // never emitted).
     const new_sr_return_count = computeSrReturnCount(prevState?.sr_return_count ?? 0, prevTuple, nextTuple, feature_changed);
     const pending = [...parsed.pending_notes];
     // v3.15.0 — symmetric cap-cross predicate fix.
@@ -1313,12 +1354,13 @@ async function handleUpdateStateCore(parsed) {
     // overload remains @deprecated for backwards-compat callers.
     // E150 ledger lifetime, file mode only. Policy lives here (who may
     // shrink, by what key); resolution against the on-disk ledger runs in
-    // writeHandoffState inside the lock. Only a qa-engineer FAIL write
+    // writeHandoffState inside the lock. Only the judge's FAIL write
+    // (qa-engineer; code-reviewer on a test-first feature, E431)
     // with non-empty review_task_ids removes ids; every other file-mode
     // write keeps the same-feature ledger and adds its incoming ids
     // (which only qa can carry past the unchanged gates). SQLite never
     // gets the directive and stores completed_tasks as given.
-    const ledgerRemove = parsed.agent_id === "qa-engineer" &&
+    const ledgerRemove = parsed.agent_id === judgeFor(resolvedChainPath) &&
         parsed.status === "FAIL" &&
         parsed.review_task_ids !== undefined &&
         parsed.review_task_ids.length > 0
@@ -1420,7 +1462,7 @@ async function handleUpdateStateCore(parsed) {
     // reindex first so DELETE cannot race with INSERT.
     // Best-effort: a failure here MUST NOT undo the successful state write.
     if (parsed.status === "PASS" &&
-        parsed.agent_id === "qa-engineer" &&
+        parsed.agent_id === judgeFor(resolvedChainPath) &&
         "deletePrdChunks" in storage &&
         typeof storage.deletePrdChunks === "function") {
         try {

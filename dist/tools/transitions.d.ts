@@ -42,6 +42,14 @@ export interface TransitionRejection {
     hint: string;
 }
 export declare function requireQaEngineer(agentId: string | undefined, toolName: string): AgentGateResult;
+/** The role that judges a feature: code-reviewer on a test-first feature, else qa-engineer. (E431) */
+export declare function judgeFor(chainPath?: ChainPath): "qa-engineer" | "code-reviewer";
+/**
+ * Judge gate per marker. Unmarked: requireQaEngineer, byte-identical. On a
+ * test-first feature only code-reviewer passes; the message mirrors the
+ * qa-engineer one. (E431)
+ */
+export declare function requireJudge(agentId: string | undefined, toolName: string, chainPath?: ChainPath): AgentGateResult;
 export type AllowedNext = ReadonlyArray<{
     agent: AgentName;
     status: StatusName;
