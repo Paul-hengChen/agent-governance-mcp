@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e433-test-first-rules"
 status: "In_Progress"
-last_updated: "2026-11-23T06:05:35.206Z"
+last_updated: "2026-11-23T06:10:06.366Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e433-test-first-rules.md"
 scope_decision: "single-feature"
@@ -15,8 +15,8 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-11-23T06:05:35.206Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-11-23T06:10:06.366Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -33,8 +33,9 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E433-07 STOPPED before manifest closure / hand-off — one red outside the Probe table and the D16/D17 re-assigned lists: test/e308-single-source-tier-enum.test.mjs 'E303-AC11a: gates/registry.ts keeps the mapping line exactly once and no '(none)' ...' (asserts count('(none)') == 1 and the 'SR_RETURN_CAP_EXCEEDED          (none)' row; its title says 'until E433 quotes it in prose'). Direct consequence of D16 ruling B, same assertion as the re-assigned e295 ruling-5a row. Needs a ruling: re-assign e308 E303-AC11a to e433 (qa re-pins) — recommended.
-- sr-engineer: T-E433-07 implementation committed (gate hints, mapping comment, README / architecture / release-cd); suite after commit 4436/4497 pass, 59 fail, 2 skipped; npm audit exit 0; agc check exit 0. Manifest NOT yet closed: pending diff = +5 (e295 AC11, e431 AC17, e432 AC11 x2, e308 E303-AC11a) / -1 (error-code-contract doc-file mapping, now green) -> 59 entries. e405-release-docs stays green (both tuples keep the item-0 regex).
+- sr-engineer: build complete T-E433-01..07, T-E433-11 — HEAD dae6294 (T-07 impl 288ed02, manifest closure dae6294); ready for code review
+- expected-red manifest closed: 59 reds, all e433-owned qa re-pins (qa_reports/expected-red_e433-test-first-rules.txt); spec D16-D18 re-assignments. Post-commit suite (clean tree, node scripts/test-lock.mjs -- npm test): 4436/4497 pass, 59 fail, 2 skipped; manifest set == not-ok set. npm audit --audit-level=high exit 0; agc check exit 0; dist/ diff vs base = dist/gates/registry.*, dist/tools/registry.*, dist/tools/fanout-manifest.* only.
+- sr-engineer: T-07 — mapping comment recomputed row by row with grep -l over content/*.md (changed: TRANSITION_REJECTED +skill-qa-engineer; SR_RETURN_CAP_EXCEEDED -> skill-qa-engineer, skill-sr-engineer; MISSING_EVIDENCE / EXPECTED_RED_DIFF_MISSING / QA_REVIEW_TARGET_REQUIRED / AC_EXECUTION_LOG_MISSING / PASS_TASKS_INCOMPLETE -> skill-code-reviewer; MISSING_REVIEW_EVIDENCE / REVIEWER_COMPLETED_TASKS_REJECTED drop const-08; REPRO_MANIFEST_MISSING +skill-qa-engineer; VISUAL_EVIDENCE_MISSING drops skill-qa-engineer). e405-release-docs stays green (release-cd names both tuples).
 - sr-engineer: T-05 wording — sr 4c return route 1 `sr-engineer:In_Progress → qa-engineer:In_Progress`; pm amend path writes `resume_of` as `"code-reviewer"` (quoted). coord-03 Amend-Resume relay row avoids the colon form `resume_of: <role>`; keep that for later SOP edits too.
 - sr-engineer: code-reviewer SOP rejection rows: 'test defect' → qa-engineer, 'implementation only' → sr-engineer, 'scenario defect' → pm, contract defect Blocked → pm.
 
