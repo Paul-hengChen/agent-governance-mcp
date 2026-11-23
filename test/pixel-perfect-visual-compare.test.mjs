@@ -42,20 +42,13 @@ test("AC-1: design-auditor Artifact Schema declares Visual Baselines H2 with 4-c
   assert.match(body, /VISUAL_BASELINES_REQUIRED/i, "server blocks PASS with VISUAL_BASELINES_REQUIRED when baselines absent and mode != no-design");
 });
 
-test("AC-2: QA Phase 1.5 skips silently when Visual Baselines absent (v3.14.0 upgrade)", () => {
-  // v3.14.0: the skip-if-absent contract is preserved AND upgraded to
-  // "lazy-load + PASS-gated" when baselines ARE present. Absent branch
-  // still pays zero overhead.
+test("AC-2: QA SOP carries no Phase 1.5 visual step, so non-UI and UI workspaces alike pay no overhead in it (E433 re-pin)", () => {
+  // E433: qa-engineer became the test author; the visual compare (formerly Phase 1.5, lazy-loaded when
+  // Visual Baselines are present) left its SOP and the visual judge is E434's. What stays true is the
+  // intent of the old assertion: the qa SOP never pulls the visual sub-skill into a non-UI run.
   const body = fs.readFileSync(QA_PATH, "utf-8");
-
-  // Phase 1.5 step exists
-  assert.match(body, /\*\*Phase 1\.5\s*—\s*Visual Compare\*\*/, "Phase 1.5 step must be named");
-  // v3.14.0 label includes PASS-gated
-  assert.match(body, /lazy-load \+ PASS-gated/i, "v3.14.0 label must declare PASS-gated");
-  // Absent branch: explicit log + proceed to Phase 2
-  assert.match(body, /Absent.*log.*skipped.*proceed to Phase 2/is, "absent branch must log skip and proceed to Phase 2");
-  // Non-UI overhead claim
-  assert.match(body, /zero overhead/i, "absent branch must promise zero overhead");
+  assert.doesNotMatch(body, /Phase 1\.5/, "no Phase 1.5 step in the qa SOP");
+  assert.doesNotMatch(body, /skill-qa-visual/, "the qa SOP does not lazy-load the visual sub-skill");
 });
 
 test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff (v3.14.0: into visual_<task-id>.md under Pixel Diff)", () => {
@@ -125,18 +118,13 @@ test("AC-5: gating logic is source-agnostic (no Figma-only assumptions) — pres
   assert.match(qaVisual, /multimodal vision against a user-supplied baseline/i, "qa-visual must declare multimodal vision contract");
 });
 
-test("AC-6: backwards-compat — v3.8.1 audits + non-UI workspaces still skip silently in v3.14.0", () => {
-  // v3.14.0 preserves the absent-branch contract. The skip-if-absent
-  // labelling is replaced by "lazy-load + PASS-gated when Visual Baselines
-  // present" — same skip-on-absent semantics, just with a clearer name.
+test("AC-6: backwards-compat — the qa SOP has no visual arm at all, so v3.8.1 audits + non-UI workspaces still skip silently (E433 re-pin)", () => {
+  // Was: Absent branch precedes Present branch inside Phase 1.5. Phase 1.5 is gone from the qa SOP (E433),
+  // so neither branch exists there; the visual sub-skill file itself is untouched.
   const qaBody = fs.readFileSync(QA_PATH, "utf-8");
-
-  // v3.14.0 labelling
-  assert.match(qaBody, /lazy-load \+ PASS-gated/i, "v3.14.0 label must describe both arms");
-  // Absent branch comes BEFORE Present branch (safety default)
-  const absentIdx = qaBody.search(/-\s*\*\*Absent\*\*/);
-  const presentIdx = qaBody.search(/-\s*\*\*Present\*\*/);
-  assert.ok(absentIdx > 0 && presentIdx > absentIdx, "Absent branch must precede Present branch (safety default)");
+  assert.doesNotMatch(qaBody, /lazy-load \+ PASS-gated/i, "no lazy-load arm in the qa SOP");
+  assert.doesNotMatch(qaBody, /-\s*\*\*(Absent|Present)\*\*/, "no Absent/Present visual branches in the qa SOP");
+  assert.ok(fs.existsSync(QA_VISUAL_PATH), "the visual sub-skill file stays for E434");
 });
 
 test("AC-7: v3.8.2 release entry is preserved in CHANGELOG (regression guard)", () => {
@@ -148,7 +136,7 @@ test("AC-7: v3.8.2 release entry is preserved in CHANGELOG (regression guard)", 
   assert.match(changelog, /^##\s*\[3\.8\.2\]/m, "CHANGELOG must retain [3.8.2] release section");
 });
 
-test("regression: QA SOP step numbering is sequential 1..7 with no duplicates", () => {
+test("regression: QA SOP step numbering is sequential 1..8 with no duplicates", () => {
   // Why: inserting Phase 1.5 as new step 4 required renumbering old 4→5/5→6/
   // 6→7. Mid-implementation we caught a stale "6. Phase 4" that should have
   // been "7. Phase 4". This test guards against the next person making the
@@ -163,6 +151,6 @@ test("regression: QA SOP step numbering is sequential 1..7 with no duplicates", 
   const sopBody = body.slice(sopStart);
   const sopMatches = [...sopBody.matchAll(/^(\d+)\.\s+[`*]/gm)].map((m) => Number(m[1]));
 
-  // Expect exactly 1..7 in order (Phase 0 + Phase 1 + Phase 1.5 + Phase 2 + Phase 3 + Phase 4, plus the leading pre-flight step = 7 steps)
-  assert.deepEqual(sopMatches, [1, 2, 3, 4, 5, 6, 7], `SOP steps must be sequential 1..7 (got ${sopMatches.join(",")})`);
+  // Expect exactly 1..8 in order (E433 test-author SOP: pre-flight, claim, read, write, run, record, hand off, return loops)
+  assert.deepEqual(sopMatches, [1, 2, 3, 4, 5, 6, 7, 8], `SOP steps must be sequential 1..8 (got ${sopMatches.join(",")})`);
 });

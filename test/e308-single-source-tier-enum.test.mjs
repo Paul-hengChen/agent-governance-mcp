@@ -69,10 +69,11 @@ test("E308-AC6: stale 'no gate' wording is gone from the dispatch_pins zod comme
   assert.ok(count(REGISTRY, "DISPATCH_PIN_TIER_REJECTED") >= 3);
 });
 
-test("E303-AC11a: gates/registry.ts keeps the mapping line exactly once and no '(none)' (NON_REVIEWER_VERDICT_REJECTED now mapped, E365; the one is SR_RETURN_CAP_EXCEEDED, E431, until E433 quotes it in prose)", () => {
+test("E303-AC11a: gates/registry.ts keeps the mapping line exactly once and no '(none)' (NON_REVIEWER_VERDICT_REJECTED mapped, E365; SR_RETURN_CAP_EXCEEDED mapped to its quote sites, E433)", () => {
   assert.equal(count(GATES, "DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md"), 1);
-  assert.equal(count(GATES, "(none)"), 1);
-  assert.equal(count(GATES, "SR_RETURN_CAP_EXCEEDED          (none)"), 1);
+  assert.equal(count(GATES, "(none)"), 0);
+  assert.equal(count(GATES, "SR_RETURN_CAP_EXCEEDED          (none)"), 0);
+  assert.equal(count(GATES, "SR_RETURN_CAP_EXCEEDED          skill-qa-engineer.md, skill-sr-engineer.md"), 1);
   assert.equal(count(GATES, 'hintStatic: "is not a model tier; allowed: opus, sonnet, haiku, fable"'), 1);
 });
 

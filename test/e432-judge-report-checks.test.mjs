@@ -556,6 +556,8 @@ const SCENARIOS = {
   },
 };
 
+const REWRITTEN_HINT_CODES = ["EXPECTED_RED_DIFF_MISSING", "AC_EXECUTION_LOG_MISSING"];
+
 for (const [name, fn] of Object.entries(SCENARIOS)) {
   test(`AC11: unmarked ${name} outcome is identical on the base commit and this branch`, async (t) => {
     if (!BASE) return t.skip(baseSkipReason);
@@ -563,8 +565,18 @@ for (const [name, fn] of Object.entries(SCENARIOS)) {
     const wsB = mkWs("e432-ac11b-");
     const a = await fn(H, wsA);
     const b = await fn(HB, wsB);
+    // E433 (D1): normalise exactly the two deliberately rewritten hintStatic texts (hint.expected_red,
+    // hint.ac_log), each side through its own module set, so only an unintended difference still fails.
+    const normHints = (s, h) => {
+      let out = s;
+      for (const code of REWRITTEN_HINT_CODES) {
+        const g = h.m.gates.GATE_REGISTRY.find((e) => e.errorCode === code);
+        if (g) out = out.split(g.hintStatic).join(`<HINT:${code}>`);
+      }
+      return out;
+    };
     const snap = (tr, ws, h) => JSON.stringify({
-      tr: tr.map((x) => ({ ...x, text: norm(x.text, ws) })),
+      tr: tr.map((x) => ({ ...x, text: normHints(norm(x.text, ws), h) })),
       handoff: norm(handoffBytes(ws), ws),
       evidence: evidenceDump(ws),
     });

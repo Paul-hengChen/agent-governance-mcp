@@ -111,7 +111,7 @@ test("AC-P3 phases and dry-run named", () => {
   assert.match(SOP, /`node scripts\/release\.mjs close-out --version X\.Y\.Z --dry-run`, then without/);
   // The steps that stay prose before `prepare`.
   const sop = section("SOP");
-  for (const re of [/tw_get_state/, /tw_detect_drift/, /\(qa-engineer, PASS\)/, /Opening write/, /verify-release\.mjs --ci-check/, /git fetch origin/, /pull --ff-only/, /git switch -c release\/vX\.Y\.Z/, /package\.json/, /npx tsc/, /node scripts\/check-version\.mjs/, /npm test/]) {
+  for (const re of [/tw_get_state/, /tw_detect_drift/, /\(code-reviewer, PASS\)/, /Opening write/, /verify-release\.mjs --ci-check/, /git fetch origin/, /pull --ff-only/, /git switch -c release\/vX\.Y\.Z/, /package\.json/, /npx tsc/, /node scripts\/check-version\.mjs/, /npm test/]) {
     assert.match(sop.slice(0, sop.indexOf("node scripts/release.mjs")), re, String(re));
   }
   assert.match(SOP, /check:bookkeeping/, "the bookkeeping check is named (e295 pins it)");
@@ -174,7 +174,7 @@ test("AC-P5 closing triple, read-back, intake", () => {
 test("AC-P6 hard rules present", () => {
   const h = section("Hard rules");
   for (const [name, re] of [
-    ["PASS precondition", /PASS precondition[^\n]*\(qa-engineer, PASS\)/],
+    ["PASS precondition", /PASS precondition[^\n]*\(code-reviewer, PASS\)/],
     ["major-bump opt-in", /`major`[^\n]*explicit opt-in/],
     ["no force push", /Never force-push/],
     ["tags immutable", /tags are immutable/],

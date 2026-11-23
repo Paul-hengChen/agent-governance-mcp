@@ -69,27 +69,18 @@ test("AC-2: the v3.8.2 inline Phase 1.5 block is removed from skill-qa-engineer.
   assert.doesNotMatch(body, /literal Visual Audit Gate.*only catches drift on tokens the spec enumerated/is, "rationale paragraph must NOT remain inline");
 });
 
-test("AC-3: lazy-load hook has both Absent and Present branches with correct contracts (v3.14.0 PASS-gated)", () => {
-  // v3.14.0: hook upgraded — Present branch now references the PASS gate
-  // and the VISUAL_EVIDENCE_MISSING server error. Absent branch still
-  // pays zero overhead.
+test("AC-3: the qa SOP no longer carries the lazy-load hook; the sub-skill keeps the PASS-gate contract (E433 re-pin)", () => {
+  // E433: qa-engineer is the test author, so the Phase 1.5 hook (Absent / Present branches, "Do NOT Read",
+  // PASS GATE) left its SOP; the visual judge is E434's. The sub-skill file stays and still names the
+  // server error code and the PASS gate, which is what the old Present branch pointed at.
   const body = fs.readFileSync(QA_PATH, "utf-8");
-
-  // The hook lives in SOP step 4 — v3.14.0 label is "lazy-load + PASS-gated"
-  assert.match(body, /4\.\s+\*\*Phase 1\.5\s*—\s*Visual Compare\*\*\s*\((?:<!-- origin:start -->v3\.14\.0:?\s*<!-- origin:end -->)?lazy-load/, "step 4 must be the lazy-load + PASS-gated hook (v3.14.0 label origin-fenced since E438)");
-
-  // Absent branch: skip + log + proceed + explicit "Do NOT Read"
-  assert.match(body, /Absent[^\n]*log[^\n]*skipped/is, "Absent branch must log skip");
-  assert.match(body, /Absent[^\n]*proceed to Phase 2/is, "Absent branch must proceed to Phase 2");
-  assert.match(body, /Do NOT Read.*skill-qa-visual\.md/is, "Absent branch must explicitly forbid Reading the sub-skill");
-
-  // Present branch: Read the sub-skill via the Read tool + name the gate
-  assert.match(body, /Present[^\n]*Read\s+`?(?:<agc install>\/)?content\/skill-qa-visual\.md`?[^\n]*Read tool/is, "Present branch must Read the sub-skill via the Read tool");
-  assert.match(body, /VISUAL_EVIDENCE_MISSING/, "Present branch must name the server error code");
-  assert.match(body, /PASS GATE(?:<!-- origin:start --> \(v3\.14\.0\)<!-- origin:end -->)?\*\*:/i, "Present branch must declare the PASS gate (v3.14.0 label origin-fenced since E438)");
+  assert.doesNotMatch(body, /Phase 1\.5/, "no Phase 1.5 hook in the qa SOP");
+  assert.doesNotMatch(body, /skill-qa-visual\.md/, "the qa SOP does not name the sub-skill any more");
+  const visual = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
+  assert.match(visual, /VISUAL_EVIDENCE_MISSING/, "sub-skill names the server error code");
 });
 
-test("AC-4: SOP step numbering 1..7 sequential with no duplicates", () => {
+test("AC-4: SOP step numbering 1..8 sequential with no duplicates", () => {
   // Why: the trim must not have damaged step numbering. The earlier
   // regression test (in pixel-perfect-visual-compare.test.mjs) catches
   // the same invariant for v3.8.2; we keep a parallel check here so the
@@ -99,7 +90,7 @@ test("AC-4: SOP step numbering 1..7 sequential with no duplicates", () => {
   assert.ok(sopStart > 0, "## SOP section must exist");
   const sopBody = body.slice(sopStart);
   const sopMatches = [...sopBody.matchAll(/^(\d+)\.\s+[`*]/gm)].map((m) => Number(m[1]));
-  assert.deepEqual(sopMatches, [1, 2, 3, 4, 5, 6, 7], `SOP steps must be 1..7 (got ${sopMatches.join(",")})`);
+  assert.deepEqual(sopMatches, [1, 2, 3, 4, 5, 6, 7, 8], `SOP steps must be 1..8 (got ${sopMatches.join(",")})`);
 });
 
 test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant vs v3.8.2 baseline)", () => {
@@ -120,7 +111,7 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   assert.ok(qaVisualSize <= 20700, `qa-visual.md must be <= 20700 bytes (got ${qaVisualSize})`);
 });
 
-test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)", () => {
+test("AC-6: the visual contract (per-row paths, 6 categories, routes, v3.14.0 additions) stays reachable in the sub-skill (E433 re-pin)", () => {
   // v3.14.0: the v3.8.2 contract (gate + per-row + 6 categories + 3 routes
   // + PASS) is preserved unchanged for v3.8.2 audit consumers, AND extended
   // with widget-shape verification + visual_fail tokens. Combined surface
@@ -128,8 +119,7 @@ test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (comb
   // remain reachable.
   const combined = fs.readFileSync(QA_PATH, "utf-8") + "\n" + fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
-  // Gate (in qa-engineer hook) — v3.8.2 contract preserved
-  assert.match(combined, /Phase 1\.5: skipped \(no Visual Baselines declared\)/, "skip log line must be reachable");
+  // E433: the qa-engineer hook and its skip log line are gone; the rest of the contract lives in qa-visual.
   // Per-row mechanics (in qa-visual) — v3.8.2 contract preserved
   assert.match(combined, /baseline path.*impl path/is, "per-row paths must be named");
   // All 6 categories — v3.8.2 contract preserved

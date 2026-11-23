@@ -374,43 +374,45 @@ test("I5b: source pins the guard — the hasProofAnnotatedAC call site is FileHa
 // Skill-content assertions (architecture Test Specification §2, spec AC2/AC3/AC6)
 // ============================================================================
 
-test("AC3: skill-qa-engineer.md contains the exact new phase heading verbatim", () => {
+// E433 re-pin: the AC Execution step moved from the qa SOP (Phase 3.5) to the
+// code-reviewer SOP (the chain's judge, step 8); the same three contracts hold there.
+test("AC3: skill-code-reviewer.md contains the exact AC Execution step heading verbatim", () => {
   const root = path.resolve(import.meta.dirname, "..");
-  const body = fs.readFileSync(path.join(root, "content", "skill-qa-engineer.md"), "utf-8");
+  const body = fs.readFileSync(path.join(root, "content", "skill-code-reviewer.md"), "utf-8");
   assert.ok(
-    body.includes("**Phase 3.5 — AC Execution**"),
-    "skill-qa-engineer.md must contain the literal heading '**Phase 3.5 — AC Execution**' (AC3, test-asserted verbatim)",
+    body.includes("**AC Execution**"),
+    "skill-code-reviewer.md must contain the literal step heading '**AC Execution**' (AC3, test-asserted verbatim)",
   );
 });
 
-test("AC3/AC4: skill-qa-engineer.md contains the ## AC Execution Log H2 token (the disposition heading the gate keys on)", () => {
+test("AC3/AC4: skill-code-reviewer.md contains the ## AC Execution Log H2 token (the disposition heading the gate keys on)", () => {
   const root = path.resolve(import.meta.dirname, "..");
-  const body = fs.readFileSync(path.join(root, "content", "skill-qa-engineer.md"), "utf-8");
+  const body = fs.readFileSync(path.join(root, "content", "skill-code-reviewer.md"), "utf-8");
   assert.ok(
     body.includes("## AC Execution Log"),
-    "skill-qa-engineer.md must document the exact '## AC Execution Log' H2 token, matching gates/ac-execution.ts's DISPOSITION_HEADING",
+    "skill-code-reviewer.md must document the exact '## AC Execution Log' H2 token, matching gates/ac-execution.ts's DISPOSITION_HEADING",
   );
 });
 
-test("AC6: new Phase 3.5 references the existing Phase 4 FAIL escalation route and introduces NO new escalation-table row", () => {
+test("AC6: AC Execution step routes a failed proof into the rejection rows and introduces NO new escalation-table row", () => {
   const root = path.resolve(import.meta.dirname, "..");
-  const body = fs.readFileSync(path.join(root, "content", "skill-qa-engineer.md"), "utf-8");
+  const body = fs.readFileSync(path.join(root, "content", "skill-code-reviewer.md"), "utf-8");
   assert.match(
     body,
-    /Phase 3\.5[\s\S]*?Phase 4 FAIL/,
-    "Phase 3.5 text must cross-reference the existing 'Phase 4 FAIL' escalation route",
+    /\*\*AC Execution\*\*[^\n]*Any fail is a rejection/,
+    "the AC Execution step must say a failed scenario/proof is a rejection (the existing rejection route, no new outcome type)",
   );
-  // The Escalation Routes table is pinned at its current row count (7) so an accidental
-  // add or removal fails this test; bump it with a comment on the next genuine addition.
-  // AC6 adds no row for AC-execution failures (they reuse the Phase 4 FAIL route above).
+  // The Escalation Routes table is pinned at its current row count (5: PASS, test defect,
+  // implementation only, scenario defect, contract defect) so an accidental add or removal
+  // fails this test; AC execution failures add no row of their own.
   const tableStart = body.indexOf("## Escalation Routes");
   assert.ok(tableStart > 0, "## Escalation Routes section must exist");
   const tableBody = body.slice(tableStart);
   const rows = tableBody.split("\n").filter((l) => l.startsWith("|") && !l.includes("---") && !l.includes("situation"));
   assert.equal(
     rows.length,
-    7,
-    `Escalation Routes table must stay at 7 data rows (AC6: no new row added for AC-execution failures; the 7th row is E46's unrelated contract-defect route), got ${rows.length}:\n${rows.join("\n")}`,
+    5,
+    `Escalation Routes table must stay at 5 data rows (no new row for AC-execution failures), got ${rows.length}:\n${rows.join("\n")}`,
   );
 });
 
