@@ -59,3 +59,8 @@ test/e235b-relative-worktree.test.mjs | R3 AC2 golden
 test/e289-render-addendum.test.mjs | AC-E289-4 the template has exactly one EnterWorktree line, right after the 先完整讀 line
 test/e394-release-sop.test.mjs | AC-P3 phases and dry-run named
 test/e394-release-sop.test.mjs | AC-P6 hard rules present
+
+# T-E433-05 — sr / pm / architect SOPs route the test-first chain (AC4, AC6, D4): sr 'QA Round Reply' section removed (AC4) and both SOPs grow with the return routes / marker / counters; context-budget AC9 sr marker + pm / sr stripped caps are Probe-table owned (qa re-pins). Compose goldens already listed under T-E433-01.
+test/context-budget.test.mjs | AC9: every operative rule/gate/SOP marker survives stripRationale in skill-sr-engineer.md
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4791 cap
+test/context-budget.test.mjs | AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2805 cap
