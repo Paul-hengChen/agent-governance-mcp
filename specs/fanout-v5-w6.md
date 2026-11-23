@@ -2,7 +2,7 @@
 base: 69714ba    integration branch: integ/v5-w6
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-11-23，派工中。**
+**狀態：已結案 2026-11-23。** e445 已合併進 `integ/v5-w6`（merge `059eced`，零衝突、無實質解衝突）、finish、拆除；派工 base `b3ac374`（清單 PR #170 merge），integ 自 `main` @ `b3ac374` 開出；merge 後 build 無 `dist/` 差異、audit 通過、`agc check` exit 0、`CLAUDE.md` 250 行；本波以一個 PR 合進 `main`，不發版（16.1 裁定 18）。lane 層 CI：run 45188303866 @ `bdc38ce` 綠（Node 20、22）。Roll-up：e445 tickets 4、hop 6/14、review 退回 0、qa 退回 0、sr 退回 1/2（R3 (b) 計畫性退回，重量 AC21）；證據 4/4。預算（~tok）：skill-spec-workshop stripped 1092→1415（+323），其他上限與 12 個 golden 不變。波中人類裁定見 Decisions（清單核准含 R3 (b) 與 pins、cut 在 lane session 核准、hop 上限續跑指示）。
 
 範圍由人類指定（integrator prompt「fan-out v5.0.0 里程碑的下一波（第 6 波）」，2026-11-23）：下一張是 E445，並依 `docs/backlog.md` 的相依找出剩下的票裡能與它同時跑的；另看 E447 的相依與佇列位置。順序依 `docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 17.1 裁定 4 修訂後的版本（E422 → E423 → E419 → E431 → E432 → E433 → E434 → E445 → E435 → 其餘照 16.1 裁定 17）。依 16.1 裁定 18，合進 `main` 但不發版，與 E435 一起發 v5.0.0。
 
@@ -96,3 +96,31 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-23 | 人類 | 開 v5.0.0 里程碑第 6 波：下一張是 E445，依 backlog 相依找出能並行的票，並看 E447 的相依與佇列位置；順序依 17.1 裁定 4 修訂版；合進 `main` 不發版（16.1 裁定 18）；dispatch pins 在 Stage 2 問 | integrator prompt「fan-out v5.0.0 里程碑的下一波（第 6 波）」；`docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 16.1、17.1 |
 | 2026-11-23 | 整合者 | Stage 1 核對：剩下的里程碑票中相依已滿足且依順序可做的只有 E445；E435 依 17.1 裁定 4 在 E445 之後，E420 排最後，其餘等 E435；E447、E446 排在里程碑之後且撞共用生成物。本波單一 lane e445；共用生成物只歸 `content/skill-spec-workshop.md` 與 `test/context-budget.test.mjs` AC21；`e423` 四段預先劃進；第 5 波交接 `handoff --check` exit 0（只有 `MOVED`） | 本檔 |
 | 2026-11-23 | 人類 | 核准本清單（單一 lane e445；沒有票與 E445 並行），含所有權重劃（`content/**` 只限 `content/skill-spec-workshop.md`；`test/context-budget.test.mjs` 只限 AC21；`test/e423-spec-workshop.test.mjs` 只限 AC6、AC9、AC10、AC11，預期不改；新檔 `test/e445-spec-workshop-questioning.test.mjs`）與交給 lane PM 的 cut 事項；AC21 快照照第 5 波 R3 (b)（sr 做完最後一個實作 task 後計畫性退回 qa 一次，用 1 次 `sr_return`，qa 量測調上限後經 sr 回 code-reviewer）；Dispatch pins：pm、sr-engineer、code-reviewer、qa-engineer 全部 opus；本波結束不發版；寫進 lane 的 spec，lane 不再問 | 整合者 session（回覆「approve」，再確認「都照建議」） |
+| 2026-11-23 | 整合者 | e445 cut 預審（to-integrator#1，spec `specs/e445-spec-workshop-questioning.md` @ `d7a1b22`）：範圍、八點與 Copy / Strings、AC → 實作 task 對應、檔案邊界（`check --cut` 0 out of bounds）與完成定義相符；PM 完整套件 probe（base 4525 tests／4523 pass／0 fail／2 skip）無紅檔；回 close（to-lane#1），附一則非阻擋建議（凍結原文的說明行）。qa 對 AC10「新增文字無行首 `\d. **`」讀成「不新增步驟」，整合者確認符合清單本意（to-lane#2） | 本檔；e445 信箱 to-integrator#1、#3 |
+| 2026-11-23 | 人類 | e445 cut 核准，在 lane session 親手打字；只影響 e445、內容寫在人類核准的 cut（`specs/e445-spec-workshop-questioning.md`）、lane 分支 commit `d7a1b22` 可見 | lane session（e445），spec @ `d7a1b22`；e445 信箱 to-integrator#2 |
+| 2026-11-23 | 人類 | e445 若撞到 hop 上限，就在新的 lane session 續跑（本波實際只用到 hop 6/14，未觸發） | 整合者 session（回覆「如果 hop 撞到上限就再續一波」） |
+| 2026-11-23 | 整合者 | e445 lane 報告（to-integrator#8）驗證通過：HEAD `bdc38ce`（8 commits）、14 檔 0 out of bounds、證據 4/4（`review_reports/review_T-E445-01.md` APPROVED covers T-E445-01..04；`qa_reports/review_T-E445-01..04.md`）、工作樹乾淨、無新發現；lane 層 CI run 45188303866 @ `bdc38ce` 綠（Node 20、22）；回 close（to-lane#5）。波中 qa 兩次全套被主機高負載拖慢（無關測試逾時、`test/lane-migrate.test.mjs` 卡住），之後三次獨自在 lock 下全套 0 fail；`lane-migrate` 不歸本 lane、未修改。reviewer 的 optional 列進波次報告，不開票 | 本檔；e445 信箱 to-integrator#5、#8 |
+| 2026-11-23 | 整合者 | `integ/v5-w6` 自 `main` @ `b3ac374` 開出；← `--no-ff` e445（merge `059eced`），零衝突、無實質解衝突；merge-invariants PASS；build 後 `dist/` 無差異、audit exit 0、`agc check` exit 0、`CLAUDE.md` 250 行；E445 done-mark（backlog 列與佇列新增第 `247a` 號列）、`check:bookkeeping` exit 0 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ b3ac374
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/v5-w6 @ 0bcf03d）
+- lane-status：primary（main ← integ/v5-w6 @ 0bcf03d）release-cd-v4.22.0／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 1 條 lane、1 張票（E445）code-reviewer PASS、合併、finish、拆除；not yet released——依 16.1 裁定 18 與 E435 一起隨 v5.0.0 發出（v5.0.0 發版驗證涵蓋九張：E422、E423、E419、E431–E434、E445、E435）。lane 紀錄在 `.current/history/2026-11/e445/`；裁定與驗證細節在本檔 Decisions 與狀態行。新發現：無（lane 沒有 `pending-tickets.md`，finish 沒有配號）。E445 補進佇列檔第 `247a` 號列。
+- code-reviewer 的 optional（不開票，列在這裡）：`test/e445-spec-workshop-questioning.test.mjs` 開頭註解 8 行，`agc check` 建議上限 7（含作者行與重釘提醒，裁判保留）；`test/context-budget.test.mjs` 註解比例警告是 base 既有。
+- 注意：`test/e445-spec-workshop-questioning.test.mjs` 把 `content/skill-spec-workshop.md` 步驟 2–5 以外的文字凍結成 `b3ac374` 的原文（`BASE_SOP`）；之後改同檔的票（E428 tracker 鏡射）要重釘，測試檔開頭與 tests 報告已寫明。
+- 環境：本波 qa 兩次全套在主機高負載下有無關測試逾時、`test/lane-migrate.test.mjs` 卡住；獨自在 lock 下重跑都 0 fail。
+### 待人類決定
+- 新鏈上「只有實作完才擷取得到的快照測試」（compose golden、預算上限）沒有規則處理：第 5、6 波都靠 R3 (b) 計畫性退回 qa 一次。E435 會再遇到；要再裁一次，還是開票寫進 sr／qa SOP，由人類決定（整合者建議開票）。
+- SQLite／HTTP 模式設不了 `chain_path`（第 4 波留下）：整合者建議在 E435 的 cut 寫明不靠標記也走新鏈，並列一條驗收，不另開票。
+- 使用者層級已安裝的 subagent 範本要不要重裝（舊 `qa-visual.md` 會留下，新 `reviewer-visual.md` 是 opus）。
+- 遠端分支 `origin/docs/2026-11-20-file-e445` 已合併、未刪，要不要刪。
+- E447 的排序寫法不一致：backlog depends_on 欄寫「none (ordered after E435)」，票面 Ordering 段與佇列第 258 號列寫「排在 v5.0.0 里程碑與 E446 之後」，要不要統一。
+- 是否發版、是否開下一波：依裁定 18 本波不發版；v5.0.0 里程碑順序的下一張是 E435（相依 E434 ✓，切 v5.0.0）。
+### 進行中的背景工作
+無

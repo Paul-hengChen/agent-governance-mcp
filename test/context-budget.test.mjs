@@ -497,7 +497,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4999 cap", () => {
   assert.ok(toks <= 4999, `skill-pm stripped body (${toks} ~tok) must be ≤ 4999 (AC9, E434 re-baseline, zero headroom)`);
 });
 
-test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1092 cap", () => {
+test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1415 cap", () => {
   // WHY: the spec-workshop prompt is prompt-only and human-started, but its SOP body still loads in full
   // on every invocation; a cap stops it growing unnoticed. Same measurement as the pm cap: the body is
   // measured as production composes it, stripRationale(stripOriginTags(expandSkill(body))), frontmatter
@@ -509,7 +509,8 @@ test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
   // E423 baseline: new SOP, measured 1092 ~tok, zero headroom.
-  assert.ok(toks <= 1092, `skill-spec-workshop stripped body (${toks} ~tok) must be ≤ 1092 (AC21, E423 baseline, zero headroom)`);
+  // E445 re-baseline: spec-workshop questioning rules in steps 2–5, +323 ~tok (measured 1415); was 1092, zero headroom.
+  assert.ok(toks <= 1415, `skill-spec-workshop stripped body (${toks} ~tok) must be ≤ 1415 (AC21, E445 re-baseline, zero headroom)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3285 cap", () => {
