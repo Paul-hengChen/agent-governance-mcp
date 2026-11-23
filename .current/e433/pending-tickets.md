@@ -1,5 +1,7 @@
 # Pending tickets — lane e433
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E433-NEW-1
 title: doc-writer SOP's closing state write is rejected by the server after a PASS
@@ -17,5 +19,3 @@ body: |
   (for example, no state write at all, or a same-tuple PASS amendment if the server allows
   it), and pin it with a test.
 ```
-
-## Applied
