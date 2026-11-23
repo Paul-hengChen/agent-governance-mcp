@@ -60,7 +60,7 @@ See Constitution §3.1.
 The retrospective's decisive lesson (taxonomy B1/B6) is that **prompt-advisory rules are
 insufficient** when the same orchestration can ignore them. A coordinator-authored
 accept-policy pre-excused the exact visual defect, and the first "PASS" ran no visual
-check at all (`visual_round=0`). The conclusion: the rules that matter must be enforced
+check at all (no visual round had run). The conclusion: the rules that matter must be enforced
 at the storage boundary, where no client prompt can route around them. The §3.1 gates
 are that enforcement.
 
@@ -132,22 +132,23 @@ token volume AND shipped a UI far from the Figma design while reporting a PASS"
 (retrospective header). The §3.2 rules are the governance fixes for that specific event.
 
 **The war-story (taxonomy B1 — the single decisive cause).** A hand-written *accept-policy*
-in the qa-visual subagent prompt — authored by the **coordinator**, not qa — pre-classified
+in the visual-judge subagent prompt — authored by the **coordinator**, not qa — pre-classified
 "selection state" and "scroll offset" as accepted differences. Those were exactly the
 defects on the Language screen: no `#3C5AAA` selection bar rendered, and the impl was
 captured at an arbitrary scroll/selection state instead of the baseline's. By pre-excusing
 them, the coordinator's policy turned real structural misses into "allowed diffs", and the
 chain stamped a PASS. The human caught it, not the system.
 
-**Why "visual verdict is qa-visual-owned" (the fix).** ONLY qa-visual may define visual
-PASS criteria, diff tolerance, or pre-excused divergence classes — and only inside the
-`## Allowed Differences` section of `qa_reports/visual_<id>.md`. Every non-qa role
-(including the coordinator) MAY pass context — baseline paths, Figma node ids, route,
-canonical-state setup — but MUST NOT define, relax, or pre-accept any visual difference.
-The enforcement is structural rather than content-sniffing: the visual report is consulted
-only on a qa-engineer PASS, and `status=PASS` is server-restricted to
-`agent_id="qa-engineer"`, so the report and its `## Allowed Differences` are owned by the
-qa chain at PASS time by construction. A coordinator-authored accept-policy injected into a
+**Why "visual verdict is reviewer-visual-owned" (the fix).** ONLY `reviewer-visual`, the
+judge's visual sub-skill, may define visual PASS criteria, diff tolerance, or pre-excused
+divergence classes — and only inside the `## Allowed Differences` section of
+`qa_reports/visual_<id>.md`. Every other role (including the coordinator and the test
+author) MAY pass context — baseline paths, Figma node ids, route, canonical-state setup —
+but MUST NOT define, relax, or pre-accept any visual difference. The enforcement is
+structural rather than content-sniffing: the visual report is consulted only on the judge's
+PASS, and on the test-first chain `status=PASS` is server-restricted to
+`agent_id="code-reviewer"`, so the report and its `## Allowed Differences` are owned by the
+judge at PASS time by construction. A coordinator-authored accept-policy injected into a
 dispatch prompt is **void**.
 
 **Why "builder ≠ judge" (role-collapse guard).** Retrospective D2/C5: under subagent rate
@@ -201,9 +202,7 @@ round alone idled overnight (~15.6h wall-clock) before producing a FAIL (§Summa
 That is what unbounded iteration costs. The circuit breaker forces an early, loud stop:
 on limit, stop tool use immediately, report what is missing, and wait for a human. Per
 §Document Priority, when §5 trips the hand-back is Blocked/FAIL — never an error-laden PASS,
-and never an extended loop. The `visual_round` split-escalation hatch (§3.1) is the
-same philosophy applied to pixel iteration: from the `visual_split` threshold on, prefer
-splitting the oversized widget over grinding the remaining rounds toward threshold renegotiation.
+and never an extended loop. The same philosophy applies to pixel iteration: a difference that shrinks on every try is progress; tries that stop shrinking it run into the `fix_try` cap.
 
 ---
 

@@ -6,14 +6,12 @@ restate these rules.
 
 ## Limits
 
-Sole authoritative definition of every named numeric limit. Body text (constitution and skills) references these by **name** (e.g. "the `visual_round` cap") — never by restating the bare number.
+Sole authoritative definition of every named numeric limit. Body text (constitution and skills) references these by **name** (e.g. "the `review_round` cap") — never by restating the bare number.
 
 | name | value | meaning |
 |---|---|---|
 | `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
 | `sr_return` cap | 2 | Max sr-engineer returns of one feature to qa-engineer before routing locks to pm. |
-| `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
-| `visual_split` threshold | 3 | `visual_round` from which sr-engineer MAY request a split. |
 | `hop` cap | 14 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
 | `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
 | `read` cap | 3 | Max file reads per target (§5 anti-loop). |
