@@ -19,3 +19,10 @@ test/e16-judge-dispatch-charter.test.mjs | E16-02: const-08 §3.1 charter names 
 test/e16-judge-dispatch-charter.test.mjs | E16-04: const-08 §3.1 charter states judge roles only — no edge opened to any build role
 test/e393-builder-judge-core.test.mjs | AC-C: named sites restate no bare round number
 test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+
+# T-E433-02 — §4 diagram + loop sentences reworded (const-12: chain.main, review_round / sr_return loops, qa_round loop removed, D10); coord-03 relay row = code-reviewer only (D11); coord-07 hard floor names the bug-ticket test exception; coordinator golden moves with coord-01/03/07 (compose goldens + context-budget caps already listed under T-E433-01)
+test/context-budget.test.mjs | AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)
+test/context-budget.test.mjs | AC-P2-6: non-visual §4 (DIAGRAM/S1/S2/S6) + §1 (L15/L18) survive byte-for-byte on BOTH arms
+test/e16-judge-dispatch-charter.test.mjs | E16-06: coord-03 Amend-Resume relay escalation row points to the Constitution §3.1 charter (pointer-only, no duplicated mechanism)
+test/e5-intake-tiering.test.mjs | T-E5-03 content: coord-07 step 4a states the §2/§3 builder ≠ judge hard floor is never bypassed by any classification
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte

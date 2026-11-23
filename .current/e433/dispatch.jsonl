@@ -1,2 +1,6 @@
 {"ts":"2026-11-23T03:55:57.975Z","feature":"e433-test-first-rules","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-23T04:04:09.617Z","feature":"e433-test-first-rules","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T04:07:41.562Z","feature":"e433-test-first-rules","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T04:12:55.863Z","feature":"e433-test-first-rules","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T04:20:53.062Z","feature":"e433-test-first-rules","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T04:24:40.356Z","feature":"e433-test-first-rules","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

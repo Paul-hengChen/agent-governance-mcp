@@ -19,8 +19,8 @@ Trigger phrase → candidate role. **Scope gate (below) overrides** — if all g
 | plan, spec, break down, create tasks | `pm` |
 | design, architecture, interface contract | `architect` |
 | implement, fix, refactor, add feature | `sr-engineer` |
-| review, code review, judge diff | `code-reviewer` |
-| test, verify, validate, rollback | `qa-engineer` |
+| review, code review, judge diff, verify, validate, rollback | `code-reviewer` |
+| test, write tests, test authoring | `qa-engineer` |
 | Q&A, status check, doc tweak | execute directly |
 
 ## Complexity Scope Gate
@@ -28,7 +28,7 @@ Trigger phrase → candidate role. **Scope gate (below) overrides** — if all g
 Switch to a role only if **any one** of these is true:
 
 - Touches ≥ 2 source files, **or** adds a new public interface/export.
-- Requires writing or updating tests (only qa-engineer may author tests — §2).
+- Requires writing or updating tests (qa-engineer authors tests; on a bug ticket where qa-engineer recorded no new test, sr-engineer writes the reproduction test — §2).
 - Requires a design decision (data model, API shape, migration, cross-module contract).
 - User explicitly says `plan` / `design` / `spec` / `feature` / `architecture`.
 - Estimated > ~50 LoC net change, or spans multiple commits.
@@ -74,6 +74,8 @@ Match any of:
 If ≥ 1 hit → route to `design-auditor` *before* PM. The auditor produces `design/<feature>.md`, PM copies its tables into `specs/<feature>.md`. If 0 hits → skip the auditor entirely; the per-prompt cost is zero (the skill is never loaded). This is the token-frugal default.
 
 A local prototype export with no ticket file → reply only with "No ticket file for this design prototype — start the `spec-workshop` prompt first." and stop (no chain). With a ticket file → route to `design-auditor` as above. A ticket file is a Markdown file in the ticket format, by default under `docs/tickets/` (`ticketDir` in `.current/.config.json`).
+
+A tracker number (an issue or work-item id) with no ticket file → reply only with "No ticket file for <tracker id> — start the `spec-workshop` prompt first." and stop (no chain); never write the ticket's scenarios yourself.
 
 ## Auto-Routing
 
