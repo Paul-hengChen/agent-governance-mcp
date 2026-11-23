@@ -22,3 +22,5 @@
 {"ts":"2026-11-23T06:23:53.937Z","feature":"e433-test-first-rules","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-23T06:25:59.371Z","feature":"e433-test-first-rules","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-23T06:33:29.020Z","feature":"e433-test-first-rules","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T06:34:11.293Z","feature":"e433-test-first-rules","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T06:41:36.727Z","feature":"e433-test-first-rules","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
