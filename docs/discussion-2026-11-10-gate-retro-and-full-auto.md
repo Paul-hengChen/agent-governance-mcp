@@ -602,3 +602,20 @@ lane 協定與 §3.1 的文字（E425 的範圍），不是這道檢查。
 
 不變：11.4 裁定 1（討論階段不必問到滴水不漏）與裁定 3（完成條件三條）照舊——八點只改提問方式，不改完成條件；
 每批最多 4 題的上限保留，題目只從前提已裁定的範圍挑。
+
+## 18. v5.0.0 之前的 v4.x 發版做法（2026-11-23）
+
+起因：E444（`CLAUDE.local.md` 放置 adapter 區塊）在 v5.0.0 第 3 波合進 `main`，但 16.1 裁定 18 規定 E422 合併到 E435
+發版之間不從 `main` 發版，v4.x 的修正「從 v4.22.0 的 tag 另開分支處理，做法屆時決定」。操作者要先把 E444 發成
+v4.23.0，本節定下那個做法。`Release` workflow 只接受從 `main` 觸發，所以這條路走手動流程。
+
+### 18.1 裁定（2026-11-23）
+
+| # | 題目 | 裁定 | 依據 |
+|---|---|---|---|
+| 1 | E444 何時發 | 先發，v4.23.0（MINOR：`agc init` 多了 `--adapter` 與新的首次安裝預設），不等 v5.0.0 | 操作者選定 |
+| 2 | 分支與內容 | 從 `v4.22.0` tag 開 `release/v4.23.0`，只放該票的程式、文件與測試（取自 `main` 上的 lane merge），加上升版與 CHANGELOG；不帶 lane 紀錄、spec，也不帶 `main` 上任何其他票。升版、build、完整測試與 CI 照 release-engineer SOP 的步驟手動做；tag 與 GitHub release 打在該分支的 head，分支永不合回 `main` | integrator 提案，操作者選定 |
+| 3 | `main` 怎麼記這一版 | 另開 docs pull request：`main` 的版號同步改為 4.23.0（`package.json`、lock、`index.ts`、`dist/`、三個 agc-version 標記、README 的 tag 釘選），補上同一段 `[4.23.0]` CHANGELOG，E444 的 done-mark 改為已發版。`main` 不打 tag，所以不算從 `main` 發版，裁定 18 不變；`check-version` 比對 `package.json` 與最新的 CHANGELOG 標題，兩者因此一致 | integrator 提案，操作者選定 |
+
+不變：16.1 裁定 18 的其餘部分照舊，v5.0.0 仍與 E435 一起發。之後若還要發 v4.x，照本表裁定 2、3，從最新的 v4.x tag
+開分支。
