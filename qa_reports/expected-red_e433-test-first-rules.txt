@@ -1,4 +1,4 @@
-# T-E433-01 — constitution fragments (const-01/05/06/08, constitution-rationale): compose goldens + context-budget caps move with the text; e16 charter + e393 C02 pin the old qa judge / qa_round cap (D10, D11); doc-file mapping comment loses const-08 for MISSING_REVIEW_EVIDENCE and REVIEWER_COMPLETED_TASKS_REJECTED (old APPROVED-to-qa row removed; comment fixed by T-E433-07)
+# T-E433-13 (golden/budget, carried from T-E433-08/09) — compose goldens, the coordinator golden and context-budget caps move with any content change; qa re-captures them once in T-E433-10
 test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
 test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
 test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
@@ -11,62 +11,14 @@ test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite
 test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
 test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
 test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 5761 ~tok)
-test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8840 ~tok)
-test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18614 ~tok)
-test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6937 ~tok)
-test/e16-judge-dispatch-charter.test.mjs | E16-01: const-08 §3.1 Single-role judge dispatch charter is appended to the Amend-Resume Edge bullet, resume_of is still required
-test/e16-judge-dispatch-charter.test.mjs | E16-02: const-08 §3.1 charter names a FRESH judge dispatch as sanctioned, not only a mid-chain resume
-test/e16-judge-dispatch-charter.test.mjs | E16-04: const-08 §3.1 charter states judge roles only — no edge opened to any build role
-test/e393-builder-judge-core.test.mjs | AC-C: named sites restate no bare round number
-
-# T-E433-02 — §4 diagram + loop sentences reworded (const-12: chain.main, review_round / sr_return loops, qa_round loop removed, D10); coord-03 relay row = code-reviewer only (D11); coord-07 hard floor names the bug-ticket test exception; coordinator golden moves with coord-01/03/07 (compose goldens + context-budget caps already listed under T-E433-01)
-test/context-budget.test.mjs | AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)
-test/context-budget.test.mjs | AC-P2-6: non-visual §4 (DIAGRAM/S1/S2/S6) + §1 (L15/L18) survive byte-for-byte on BOTH arms
-test/e16-judge-dispatch-charter.test.mjs | E16-06: coord-03 Amend-Resume relay escalation row points to the Constitution §3.1 charter (pointer-only, no duplicated mechanism)
-test/e5-intake-tiering.test.mjs | T-E5-03 content: coord-07 step 4a states the §2/§3 builder ≠ judge hard floor is never bypassed by any classification
-test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
-
-# T-E433-03 — qa SOP rewritten as the test author (AC3, D7, D15): judge phases (0.5 / 1 / 1.5 / 3.5 / 4), the PASS line, the ownership Hard rule, Phase 1.5 and every skill-qa-visual cite removed; 'Project build: ZERO errors' dropped for qa's own hand-off per R1 = (a). Re-pinned by qa (Probe table). Compose goldens + context-budget caps already listed under T-E433-01.
-test/ac-execution.test.mjs | AC3: skill-qa-engineer.md contains the exact new phase heading verbatim
-test/ac-execution.test.mjs | AC6: new Phase 3.5 references the existing Phase 4 FAIL escalation route and introduces NO new escalation-table row
-test/e20-e21-crash-resilience.test.mjs | QA-E21-3: skill-qa-engineer.md's crash-checkpoint bullet appears strictly before the 'Project build: ZERO errors' line in Phase 4
-test/e380-qa-suite-result-sop.test.mjs | AC9: skill-qa-engineer.md line 90 equals qa.pass-write byte for byte
-test/e380-qa-suite-result-sop.test.mjs | AC9: the PASS line lists every feature task and quotes PASS_TASKS_INCOMPLETE
-test/e380-qa-suite-result-sop.test.mjs | AC13: the PASS line tells qa to fill qa_suite_result from the full suite, on FAIL too
-test/e391-prompt-audit-stale-facts.test.mjs | AC-G2-12: QA skills reference each other as <agc install>/content/...
-test/e407-restatement-citations.test.mjs | AC6: qa ownership bullet is first in Hard rules and the cited bullet exists in every composition
-test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 35: skill-qa-engineer.md label "v3.14.0:" is origin-fenced in source and absent from the dispatch bundle
-test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 35: Phase 1.5 keeps '(lazy-load + PASS-gated when Visual Baselines present)' after the strip
-test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 36: skill-qa-engineer drops 'v3.14.0 ' before 'Visual Widgets shape checklist' (deletion, nothing fenced)
-test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 45: skill-qa-engineer drops '(pre-E3)' from 'Specs without proof annotations pay zero overhead'
-test/e440-current-rule-wording.test.mjs | AC-E440-1 site 1: skill-qa-engineer Phase 1.5 states the rule as 'No `pending_notes` deferral substitutes for it', not 'is REMOVED'
-test/pixel-perfect-visual-compare.test.mjs | AC-2: QA Phase 1.5 skips silently when Visual Baselines absent (v3.14.0 upgrade)
-test/pixel-perfect-visual-compare.test.mjs | AC-6: backwards-compat — v3.8.1 audits + non-UI workspaces still skip silently in v3.14.0
-test/pixel-perfect-visual-compare.test.mjs | regression: QA SOP step numbering is sequential 1..7 with no duplicates
-test/qa-visual-skill-split.test.mjs | AC-3: lazy-load hook has both Absent and Present branches with correct contracts (v3.14.0 PASS-gated)
-test/qa-visual-skill-split.test.mjs | AC-4: SOP step numbering 1..7 sequential with no duplicates
-test/qa-visual-skill-split.test.mjs | AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)
-test/repro-first-gate.test.mjs | S3: content/skill-qa-engineer.md carries the bugfix-mode Phase 0.5 branch making the Expected-Red Diff disposition load-bearing for PASS
-
-# T-E433-04 — code-reviewer SOP absorbs the judge steps (tests-vs-scenarios review, full suite, Expected-Red Diff incl. bugfix branch, AC Execution per scenario, copy / visual-token audits + contract-defect test, PASS / rejection rows); 12691 bytes vs the 10725 cap (Probe table: qa re-pins the cap)
-test/e118-reviewer-ac-completeness.test.mjs | AC7 - token discipline: file grows by at most 1200 bytes over BASE (9525 bytes)
-
-# T-E433-06 — side-channel SOPs name the chain's judge (release-engineer PASS precondition / step 1 / refusal row now `(code-reviewer, PASS)`); PROMPT_TEMPLATE_3B scope line = tpl.scope_line (render golden re-captured by qa); PROMPT_REGISTRY qa-engineer / code-reviewer descriptions = desc.qa / desc.code_reviewer. All in the Probe table (owned / re-assigned).
-test/e177a-manifest.test.mjs | AC6 render e177a
-test/e178a-integrator-role.test.mjs | AC3: `integrator` MCP prompt registered as PROMPT_REGISTRY entry 12 (13th is spec-workshop, e423); prompts/integrator.ts matches the pm.ts pattern
-test/e235b-relative-worktree.test.mjs | R3 AC2 golden
-test/e289-render-addendum.test.mjs | AC-E289-4 the template has exactly one EnterWorktree line, right after the 先完整讀 line
-test/e394-release-sop.test.mjs | AC-P3 phases and dry-run named
-test/e394-release-sop.test.mjs | AC-P6 hard rules present
-
-# T-E433-05 — sr / pm / architect SOPs route the test-first chain (AC4, AC6, D4): sr 'QA Round Reply' section removed (AC4) and both SOPs grow with the return routes / marker / counters; context-budget AC9 sr marker + pm / sr stripped caps are Probe-table owned (qa re-pins). Compose goldens already listed under T-E433-01.
 test/context-budget.test.mjs | AC9: every operative rule/gate/SOP marker survives stripRationale in skill-sr-engineer.md
 test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4791 cap
 test/context-budget.test.mjs | AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2805 cap
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8840 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18614 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6937 ~tok)
+test/context-budget.test.mjs | AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)
+test/context-budget.test.mjs | AC-P2-6: non-visual §4 (DIAGRAM/S1/S2/S6) + §1 (L15/L18) survive byte-for-byte on BOTH arms
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
 
-# T-E433-07 — gates/registry.ts: SR_RETURN_CAP_EXCEEDED documentedInProse true and its mapping row names its quote sites, so no '(none)' row remains (D16: e295 ruling 5a, e431 AC17; D18: e308 E303-AC11a); EXPECTED_RED_DIFF_MISSING / AC_EXECUTION_LOG_MISSING hints rewritten (D1), so the unmarked base-vs-branch outcomes differ until qa normalises the two hintStatic strings (Probe table: e432 AC11). The error-code-contract doc-file mapping test is green again (removed from the T-E433-01 block).
-test/e295-hop-cap-and-sop-halves.test.mjs | AC11: coord-02 names the four tiers, the code and the advisory; registry row flipped to documentedInProse true
-test/e308-single-source-tier-enum.test.mjs | E303-AC11a: gates/registry.ts keeps the mapping line exactly once and no '(none)' (NON_REVIEWER_VERDICT_REJECTED now mapped, E365; the one is SR_RETURN_CAP_EXCEEDED, E431, until E433 quotes it in prose)
-test/e431-test-first-server-path.test.mjs | AC17: registry has 35 entries incl. SR_RETURN_CAP_EXCEEDED (shape pinned); pipeline 17 steps; HOP_CAP 14; comment fixed
-test/e432-judge-report-checks.test.mjs | AC11: unmarked acLogMissing outcome is identical on the base commit and this branch
-test/e432-judge-report-checks.test.mjs | AC11: unmarked expectedRedMissing outcome is identical on the base commit and this branch
+# T-E433-13 (new) — none: const-05 keeps 23 lines and every const-05 wording pin (e433 AC2 (c)/(f), e393, e440, e43, e410, e340, e24) stays green
