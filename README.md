@@ -104,7 +104,7 @@ Every role SOP declares a `recommended_model` in its YAML frontmatter — in `co
 | coordinator      | medium | `sonnet`          | Triage + routing; structured decisions but not deep reasoning.       |
 | pm               | medium | `sonnet`          | Spec drafting; structured output, bounded scope per call.            |
 | qa-engineer      | high   | `opus`            | Writes every scenario test first; sr-engineer cannot edit them.      |
-| qa-visual        | medium | `sonnet`          | Lazy sub-mode of qa-engineer; inherits its tier.                     |
+| reviewer-visual  | high   | `opus`            | code-reviewer's visual sub-skill; reads images only over threshold.  |
 | coordinator-lite | low    | `haiku`           | Single-file doer; no chain, no design decisions.                     |
 | doc-writer       | low    | `haiku`           | Doc-only side-channel; deterministic formatting.                     |
 | release-engineer | low    | `haiku`           | Mechanical release packaging; no novel reasoning.                    |
