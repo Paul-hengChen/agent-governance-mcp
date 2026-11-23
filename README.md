@@ -68,7 +68,7 @@ Then `claude mcp list` should show `✓ Connected`. Governance context is invoca
 
 Every `tw_update_state` runs pre-flight → file lock → freshness check → a **17-step gate pipeline** (`UPDATE_STATE_GATE_PIPELINE` in `tools/handoff-orchestrator.ts`) → round accounting → atomic write, all before disk is touched. A rejected write returns `{ error, attempted, allowed, hint }` so the AI can self-correct or escalate. Full pipeline diagram: [docs/architecture.md](docs/architecture.md).
 
-**Routing chain** (full mode): `researcher? → design-auditor? → pm → architect? → sr-engineer ↔ code-reviewer → qa-engineer → PASS`. Lite mode (`/teamwork-lite`) bypasses the chain for solo 1-file edits — server-read-only, no state writes.
+**Routing chain** (full mode): `researcher? → design-auditor? → pm → architect? → qa-engineer → sr-engineer → code-reviewer → PASS`. Lite mode (`/teamwork-lite`) bypasses the chain for solo 1-file edits — server-read-only, no state writes.
 
 ---
 
@@ -96,14 +96,14 @@ Every role SOP declares a `recommended_model` in its YAML frontmatter — in `co
 | ---------------- | ------ | ----------------- | -------------------------------------------------------------------- |
 | researcher       | high   | `opus`            | Heavy reasoning, long-context synthesis.                             |
 | architect        | high   | `opus`            | Cross-module design decisions; subtle interface trade-offs.          |
-| code-reviewer    | high   | `opus`            | Detail sensitivity; correctness gate before QA.                      |
+| code-reviewer    | high   | `opus`            | Detail sensitivity; the chain's judge — reviews tests and code, writes PASS. |
 | design-auditor   | high   | `opus`            | Verbatim copy/tokens extraction; precision on visual contracts.      |
 | sr-engineer      | high   | `opus`            | Hot path — every FAIL re-runs the whole chain; quality > cost.       |
 | integrator       | high   | `opus`            | Cross-lane fan-out and fan-in; prompt-only.                          |
 | spec-workshop    | high   | `opus`            | Rounds of rulings with the human; prompt-only.                       |
 | coordinator      | medium | `sonnet`          | Triage + routing; structured decisions but not deep reasoning.       |
 | pm               | medium | `sonnet`          | Spec drafting; structured output, bounded scope per call.            |
-| qa-engineer      | medium | `sonnet`          | Test execution & evidence; high determinism.                         |
+| qa-engineer      | high   | `opus`            | Writes every scenario test first; sr-engineer cannot edit them.      |
 | qa-visual        | medium | `sonnet`          | Lazy sub-mode of qa-engineer; inherits its tier.                     |
 | coordinator-lite | low    | `haiku`           | Single-file doer; no chain, no design decisions.                     |
 | doc-writer       | low    | `haiku`           | Doc-only side-channel; deterministic formatting.                     |
@@ -122,7 +122,7 @@ description: Implements PM spec + architecture per agent-governance-mcp constitu
 or paste a one-line reminder to call /sr-engineer.)
 ```
 
-Repeat with `model: sonnet` for pm / qa-engineer / coordinator and `model: haiku` for coordinator-lite / doc-writer / release-engineer. `tw_switch_role` returns the same tier in its `recommended_model` field, and the SessionStart hook prints `Recommended model: <model> (tier <tier>)` in its banner — wrappers can read either to set `--model` automatically.
+Repeat with `model: sonnet` for pm / coordinator and `model: haiku` for coordinator-lite / doc-writer / release-engineer. `tw_switch_role` returns the same tier in its `recommended_model` field, and the SessionStart hook prints `Recommended model: <model> (tier <tier>)` in its banner — wrappers can read either to set `--model` automatically.
 
 The hint is the only enforcement — see [specs/model-routing.md](specs/model-routing.md) for the full design and out-of-scope list.
 

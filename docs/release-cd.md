@@ -60,13 +60,13 @@ A missing or expired secret fails the run at checkout. The failure issue then ha
 
 The run makes no human decision; every decision is committed to `main` first. Check each item:
 
-- [ ] One `docs/*` pull request, merged to `main`, carries both the release gate feature's `(qa-engineer, PASS)` state write (`.current/_primary/handoff.md`) and the release's CHANGELOG entry under `## [Unreleased]`.
+- [ ] One `docs/*` pull request, merged to `main`, carries both the release gate feature's PASS state write from its judge (`.current/_primary/handoff.md`) — `(code-reviewer, PASS)` on a feature marked `chain_path: test-first`, `(qa-engineer, PASS)` on an unmarked one — and the release's CHANGELOG entry under `## [Unreleased]`.
 - [ ] Each HIGH or CRITICAL `npm audit --audit-level=high` advisory has its row in `docs/dependency-advisories.md`, and no row's re-review trigger has fired. The runner only matches advisory ids; whether a trigger fired is a human check.
 - [ ] Each backlog row named in `tickets` starts `**DONE` and carries the `not yet released` pre-mark.
 - [ ] No `release/vX.Y.Z` branch is left over, locally or on `origin`, for the version this bump derives.
 - [ ] A dry run with the same `bump` and `tickets` passed (`release: start DRY-RUN OK (vX.Y.Z) — nothing changed`). It covers `start` only (see *Inputs*).
 
-After a successful release, `main`'s handoff is no longer `(qa-engineer, PASS)` and `## [Unreleased]` is empty, so dispatching again by mistake stops at once (`PRECONDITION_NOT_PASS` or `CHANGELOG_ENTRY_MISSING`) instead of releasing twice.
+After a successful release, `main`'s handoff is no longer the judge's PASS — `(code-reviewer, PASS)` on a feature marked `chain_path: test-first`, `(qa-engineer, PASS)` on an unmarked one — and `## [Unreleased]` is empty, so dispatching again by mistake stops at once (`PRECONDITION_NOT_PASS` or `CHANGELOG_ENTRY_MISSING`) instead of releasing twice.
 
 ## When a run fails
 
@@ -92,7 +92,7 @@ Phase: <start|prepare|publish|record|close-out|setup>
 
 | code | class | phase | meaning | what to do |
 |---|---|---|---|---|
-| 60 | PRECONDITION_NOT_PASS | start | `.current/_primary/handoff.md` on `main` is not `(qa-engineer, PASS)`, has no usable `active_feature`, or cannot be parsed; the detail names the tuple | merge the release gate's PASS write to `main` (see *Before you trigger*), then dispatch again |
+| 60 | PRECONDITION_NOT_PASS | start | `.current/_primary/handoff.md` on `main` is not the judge's PASS — `(code-reviewer, PASS)` on a feature marked `chain_path: test-first`, `(qa-engineer, PASS)` on an unmarked one — has no usable `active_feature`, or cannot be parsed; the detail names the tuple | merge the release gate's PASS write to `main` (see *Before you trigger*), then dispatch again |
 | 61 | STATE_WRITE_REJECTED | start, record | the state server could not be loaded from `dist/`, or a state read or write threw or was rejected; the detail is the server's first line and carries the gate code | `start`: fix what the gate code names on `main`, dispatch again. `record`: the tag exists; resume by hand from SOP step 14 |
 | 62 | READBACK_MISMATCH | record | the read-back after the closing write differs from it in `last_agent`, `status`, `next_role` or `pending_notes` | do not run close-out; resume by hand from SOP step 14 |
 | 63 | PREFLIGHT_CI_RED | start | the lenient pre-flight CI check found a completed red run for `main`'s head | make `main` green through a pull request, then dispatch again |
