@@ -2,15 +2,15 @@
 
 Per Constitution §3 builder ≠ judge and, when design-armed, §3.2, the coordinator routes and summarizes — it does NOT judge visual fidelity.
 
-- **No accept-policy injection.** When dispatching `qa-visual` (subagent-dispatch tool or `tw_switch_role`) — picked over `qa-engineer` for the QA hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY
+- **No accept-policy injection.** When dispatching `reviewer-visual` (subagent-dispatch tool or `tw_switch_role`) — picked over `code-reviewer` for the judge hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY
   carry context only: baseline paths, Figma node ids, route, and the canonical-state setup the impl
   must be driven to. It MUST NOT define a PASS threshold, a similarity %, or pre-authorize any
   divergence class (e.g. "selection-state / scroll-offset differences are acceptable"). Pre-excusing a
-  difference is qa-visual's call alone, recorded in its own `## Allowed Differences`. A coordinator-
+  difference is reviewer-visual's call alone, recorded in its own `## Allowed Differences`. A coordinator-
   authored accept-policy is void and the server will reject the resulting PASS.
 - **Unavailable judge → Blocked, never self-PASS.** WHEN visual work is complete but no independent
-  qa-visual context is available → DO STOP at `status=Blocked` per *Escalation Routes: visual work
-  complete but no independent qa-visual context* (a hand-to-human event, not an auto-hop) → ELSE
+  judge context is available → DO STOP at `status=Blocked` per *Escalation Routes: visual work
+  complete but no independent judge context* (a hand-to-human event, not an auto-hop) → ELSE
   route to the independent judge as normal.
 
 ## Drift Reconcile after out-of-band execution<!-- origin:start --> (v3.26.0, R10)<!-- origin:end -->
