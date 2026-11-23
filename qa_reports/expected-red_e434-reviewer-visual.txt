@@ -72,6 +72,8 @@ test/e308-single-source-tier-enum.test.mjs | E303-AC11a: gates/registry.ts keeps
 # goldens, the coordinator-monolith golden read by skill-manifest, and the context-budget caps / sentinels the content
 # edits moved (skill-pm cap; design-arm sentinels naming the old const-11 / const-13 / const-09 text). qa re-captures
 # them in T-E434-08; no other red remains.
+# RESOLVED (qa-engineer, T-E434-08): goldens re-captured with scripts/capture-constitution-golden.mjs and the context-budget
+# caps / sentinels re-baselined; all 17 entries below are green.
 test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
 test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
 test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
@@ -85,7 +87,10 @@ test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_
 test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
 test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
 test/context-budget.test.mjs | T-GTS-07/AC1/AC2: mixed-content site survives end-to-end through buildPromptForRole (design arm)
-test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4998 cap
+# (title re-pinned in T-E434-08: the cap moved 4998 -> 4999)
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4999 cap
 test/context-budget.test.mjs | AC2: chain-role build on a DESIGN-armed workspace LOADS the full §3.2 + visual §3.1
 test/context-budget.test.mjs | AC-P2-2: §4 visual block (S3/S4/S5 + design-auditor) is PRESENT on the design arm
 test/context-budget.test.mjs | AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)
+
+# State after T-E434-08 (qa-engineer): every entry in this manifest is green; no expected red remains for this feature.

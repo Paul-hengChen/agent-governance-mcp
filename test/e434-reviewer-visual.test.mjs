@@ -131,7 +131,7 @@ const BASE_CURRENT_VERSIONS = { handoff: 16, tasks: 2, sqlite: 2, config: 2 };
 
 // null while the lane builds: the digest checks read the live tree. T-E434-08 sets it to the lane's last
 // content commit, after which they read that fixed commit (closed range) and skip loudly if it is unreachable.
-const LANE_END_SHA = null;
+const LANE_END_SHA = "11073f3d67fb5c2d62af4f0e5cd2000016a495d1"; // T-E434-08: sr-engineer's last source commit (T-E434-07)
 
 // ------------------------------------------------------------------ git helpers (no `git show`)
 

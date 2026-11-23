@@ -99,3 +99,70 @@ CI runnability: headless, no network (the AC13 `agc check` reads local files), N
 ## Spec problems for pm
 
 - **AC2 last clause vs AC9 / D16.** "the code-reviewer composed prompt on a non-design workspace … is unchanged except step 6a" cannot hold for the whole prompt: const-01 (Limits rows, example) and const-05:19 are core fragments in every composition, and AC9 / D16 change them. Tested as the SOP part only (Open Interface Details 5); pm may want to reword AC2.
+
+## T-E434-08 — snapshot re-capture (AC12) and hygiene run (AC13)
+
+Planned sr → qa return per ruling R3 (b). Placement branch: dispatch brief `Test-file placement` line (`test/fixtures/compose-golden/**`, `test/context-budget.test.mjs` moved caps / sentinels only, `test/e434-reviewer-visual.test.mjs` `LANE_END_SHA` only). No `content/**`, source, template or doc edit.
+
+### Goldens (12) — re-captured by tool
+
+`node scripts/capture-constitution-golden.mjs` (dist current at 11073f3; the script also runs the E90 completeness guard: 12 written, 0 uncovered). The diff was reviewed before keeping it: every hunk is an E434 content move (const-01 Limits `visual_round` / `visual_split` rows and the example, const-05 `visual_fail:` token, const-07 visual evidence gate names `reviewer-visual`, const-09 bullet, const-11 `const11.head` / `const11.measure` / enforcement names the judge, const-13 S3 sentence, coord-03 / coord-05 dispatch and Blocked row, coord `hop_count` sibling list). No content defect found, so nothing was held back.
+
+Per-site token delta (chars / 4, ceil; before = HEAD fixture, after = re-captured):
+
+| golden | before | after | delta |
+|---|---|---|---|
+| build-full-design-fd.txt | 9338 | 9292 | -46 |
+| build-full-design.txt | 9265 | 9219 | -46 |
+| build-full-nondesign-fd.txt | 7387 | 7326 | -61 |
+| build-full-nondesign.txt | 7363 | 7301 | -62 |
+| build-lite-design-fd.txt | 4977 | 4916 | -61 |
+| build-lite-design.txt | 4905 | 4843 | -62 |
+| build-lite-nondesign-fd.txt | 4531 | 4469 | -62 |
+| build-lite-nondesign.txt | 4506 | 4444 | -62 |
+| constitution-monolith.txt | 9681 | 9610 | -71 |
+| hook-full.txt | 9681 | 9610 | -71 |
+| hook-lite.txt | 5053 | 4991 | -62 |
+| skill-coordinator-monolith.txt | 10344 | 10343 | -1 |
+
+### `test/context-budget.test.mjs` — caps (zero-headroom convention: cap = measured value)
+
+Measured with the file's own composition at base e5ccda0 (each value equals the base cap exactly, which validates the measure) and on this branch:
+
+| site (test title) | before | after | delta |
+|---|---|---|---|
+| AC2 lean always-on bundle (`<= N`) | 6029 | 5969 | -60 |
+| AC1/AC2 skill-pm stripped body (`≤ N`) | 4998 | 4999 | +1 |
+| AC1/AC2 skill-sr-engineer stripped body (`≤ N`) | 3335 | 3285 | -50 |
+| AC8/AC-P2-7 design-arm stripped constitution (`≤ N`) | 9265 | 9219 | -46 |
+| AC8/AC-P2-7 teamwork coordinator bundle (`≤ N`) | 19155 | 19108 | -47 |
+| AC8/AC-P2-7 non-design constitution (`≤ N`) | 7363 | 7301 | -62 |
+| design-only strip saving floor (`>= N`, measured-min) | 1902 | 1918 | +16 |
+| skill-spec-workshop (`≤ 1092`) | 1092 | 1092 | 0 (not moved) |
+| rationale+origin saving floor (`>= 240`, slack floor) | 416 | 391 | -25 (floor has slack; not moved) |
+| non-design bundle saving (`>= 1830`), dual-injection (`>= 1200`) | — | pass | slack floors; not moved |
+
+Each moved cap carries one `// E434 re-baseline: …` line; titles re-synced (E274 title check green).
+
+### `test/context-budget.test.mjs` — sentinels (design arm names `const11.head`)
+
+- `DESIGN_ONLY_SENTINELS`: `` "`visual_round` sub-loop" `` → `"Visual rejections are review rounds"`; `` "Split escalation (`visual_split`)" `` (bullet deleted) → `"there is no separate visual counter, cap or split threshold"` (same §3.1 fence); `"Visual verdict is qa-visual-owned"` → `"**Visual verdict is reviewer-visual-owned.**"` (`const11.head`). The AC2 design-arm test's explicit §3.2 assertion re-pinned to `const11.head` too.
+- `P2_S4_VISUAL_SENTINELS`: `"A third counter"` → `"Visual checks arm only when the workspace has a"` (S3 opener).
+- AC-P2-5: the S3 anchor is the new const-13 sentence (raw, origin fence included) and the §4 visual block slice starts at `Visual checks arm only when`; re-pin note says S3 was reworded by the E434 content edit, not by the reflow.
+- T-GTS-07/AC1/AC2 (design arm, mixed-content site): the `` `visual_round` (v3.14.0, §3.1) `` site is gone; re-pinned to the next mixed site in the same §4 block, `(the<origin> v3.16.0</origin>\nself-arming signal)`, asserting the built prompt keeps the parenthetical text with the `(§3.1)` cross-reference and drops `(the v3.16.0`.
+
+### `LANE_END_SHA`
+
+`test/e434-reviewer-visual.test.mjs`: `LANE_END_SHA = "11073f3d67fb5c2d62af4f0e5cd2000016a495d1"` — sr-engineer's last source commit (T-E434-07 field comment + dist maps); the only later lane commit before this hop (94aea34) touches `.current/e434/` only. With it set, the D21 registry digest, frozen-path blobs and dist-scope checks read that commit (closed range) and skip loudly when it is unreachable. e434 file: 12 / 12 pass.
+
+### Expected-red manifest
+
+The 17-entry snapshot block is marked RESOLVED (entries kept as history; the pm-cap entry renamed to its new title `≤ 4999`); a closing line records that no expected red remains for this feature.
+
+### Hygiene run (AC13)
+
+- `CLAUDE.md`: 250 lines (byte-identical to base per e434 AC13).
+- `node bin/agc-init.mjs check`: exit 0 (`OK (4.23.0)`). Advisory comment warnings only; the three `test/context-budget.test.mjs` long-block warnings at the design-arm / teamwork / non-design cap sites come from the cap-history comment runs, each now one `E434 re-baseline` line longer (the file's existing convention); advisory, exit code unchanged.
+- `dist/` vs e5ccda0: only `dist/gates/registry.*`, `dist/gates/visual.*`, `dist/tools/evidence-file.*`, `dist/tools/handoff-orchestrator.*`.
+- `npm audit --audit-level=high`: exit 0.
+- Full suite after the commit, clean tree: see the hand-off note (`node scripts/test-lock.mjs -- npm test`).

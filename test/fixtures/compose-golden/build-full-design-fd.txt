@@ -6,14 +6,12 @@ restate these rules.
 
 ## Limits
 
-Sole authoritative definition of every named numeric limit. Body text (constitution and skills) references these by **name** (e.g. "the `visual_round` cap") — never by restating the bare number.
+Sole authoritative definition of every named numeric limit. Body text (constitution and skills) references these by **name** (e.g. "the `review_round` cap") — never by restating the bare number.
 
 | name | value | meaning |
 |---|---|---|
 | `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
 | `sr_return` cap | 2 | Max sr-engineer returns of one feature to qa-engineer before routing locks to pm. |
-| `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
-| `visual_split` threshold | 3 | `visual_round` from which sr-engineer MAY request a split. |
 | `hop` cap | 14 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
 | `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
 | `read` cap | 3 | Max file reads per target (§5 anti-loop). |
@@ -61,7 +59,7 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 - **State update**: At the end of any state-modifying execution, call `tw_update_state`. On crash/failure, still call it with the failure summary in `pending_notes`. When the server accepts no write from the acting role, that role stops and reports instead, and a role that can write takes over.
 - **Task list edits go through tools**: Use `tw_add_task` to append, `tw_complete_task` to mark `[x]`, `tw_rollback_task` to revert. Do NOT hand-edit the task-list file from a role, except: the role amending the cut (pm, or the coordinator for it) may edit an unchecked, non-voided task's description and `depends_on` in place, disclosed in `pending_notes` — never ids, checkboxes or voided rows; anything else is `tw_void_task` + `tw_add_task`. `tw_sync` is the only sanctioned ledger→tasks.md reconcile operation (mirrors handoff.completed_tasks onto tasks.md; never promotes a tasks.md-only [x]).
 - **`tw_complete_task` ownership**: ONLY the chain's judge, code-reviewer, flips the final `[x]` (after its PASS). qa-engineer and sr-engineer signal their hand-offs via `pending_notes` in `tw_update_state`. This prevents double-completion races.
-- **Escalation call format**: every escalation state write uses one canonical shape — `tw_update_state(status=<Blocked|FAIL>, agent_id=<role>, next_role=<role>, pending_notes=["<Role>: <situation> — <detail>"])`. `next_role`, `resume_of`, and `review_verdict` are first-class handoff fields (schema v7, c9-protocol-fields), enum-validated by the server at the tool boundary — NOT `pending_notes` tokens; `pending_notes` is free text for humans (situation description, rationale) and carries no routing. A code-reviewer verdict is recorded via the `review_verdict` field (`APPROVED` / `CHANGES_REQUESTED`); the server rejects a verdict that disagrees with `status` with `REVIEW_VERDICT_STATUS_MISMATCH` (`APPROVED` requires `status=PASS` on the judge's PASS write, or `status=In_Progress`; `CHANGES_REQUESTED` requires `status=FAIL`; an absent verdict never fires the gate). Skill SOPs list their escalation sites as rows of an `## Escalation Routes` table (columns `situation | status | pending note | next_role` — the `next_role` column names the value for the `next_role` field; `human` in that column means OMIT the field — the enum has no `human` value, and the escalation `status` plus the field's absence is what halts auto-routing to the human) and reference rows by situation name instead of restating the call. Note tokens that remain keep their existing owning-site definitions and are NOT redefined here: `visual_fail:` (§3.1 / skill-qa-visual), `scope_decision_why` (PM scope attestation), `covers:` (batched evidence manifests).
+- **Escalation call format**: every escalation state write uses one canonical shape — `tw_update_state(status=<Blocked|FAIL>, agent_id=<role>, next_role=<role>, pending_notes=["<Role>: <situation> — <detail>"])`. `next_role`, `resume_of`, and `review_verdict` are first-class handoff fields (schema v7, c9-protocol-fields), enum-validated by the server at the tool boundary — NOT `pending_notes` tokens; `pending_notes` is free text for humans (situation description, rationale) and carries no routing. A code-reviewer verdict is recorded via the `review_verdict` field (`APPROVED` / `CHANGES_REQUESTED`); the server rejects a verdict that disagrees with `status` with `REVIEW_VERDICT_STATUS_MISMATCH` (`APPROVED` requires `status=PASS` on the judge's PASS write, or `status=In_Progress`; `CHANGES_REQUESTED` requires `status=FAIL`; an absent verdict never fires the gate). Skill SOPs list their escalation sites as rows of an `## Escalation Routes` table (columns `situation | status | pending note | next_role` — the `next_role` column names the value for the `next_role` field; `human` in that column means OMIT the field — the enum has no `human` value, and the escalation `status` plus the field's absence is what halts auto-routing to the human) and reference rows by situation name instead of restating the call. Note tokens that remain keep their existing owning-site definitions and are NOT redefined here: `scope_decision_why` (PM scope attestation), `covers:` (batched evidence manifests).
 - **Rule grammar (WHEN/DO/ELSE)**: a normative gate rule reads WHEN `<trigger>` → DO `<action>` → ELSE `<escape>` — either as literal prose in that shape, or as one Escalation Routes table row (a row is the same triple collapsed to columns).
 - **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed verdict.
 
@@ -75,7 +73,7 @@ The routing chain is **server-enforced**, not advisory. Invalid
 - Each code-reviewer rejection counts once in `review_round`, whichever role it routes to; each `(sr-engineer, In_Progress) → (qa-engineer, In_Progress)` return counts toward the `sr_return` cap, past which that return is rejected and only `(pm, In_Progress)` may take the feature.
 - PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
 <!-- design-only:start -->
-- **Visual evidence gate**: the gate arms whenever `design/<active_feature>.md` exists with a `## Mode` ≠ `no-design` (not on `## Visual Baselines` H2 presence). When armed: if the design file lacks a `## Visual Baselines` H2, PASS is blocked with `VISUAL_BASELINES_REQUIRED` (the design-auditor must add the section — it is NOT a silent pass-through). When the `## Visual Baselines` H2 IS present, PASS additionally requires `qa_reports/visual_<task-id>.md` for every task id in the round; missing → `VISUAL_EVIDENCE_MISSING`. The two checks are mutually exclusive: the missing-baselines block fires first and short-circuits the evidence-file lookup. No design file, or `## Mode` = `no-design` (or unparseable mode), → gate is silent and pass-through. Backwards-compatible for non-UI workspaces.
+- **Visual evidence gate**: the gate arms whenever `design/<active_feature>.md` exists with a `## Mode` ≠ `no-design` (not on `## Visual Baselines` H2 presence). When armed: if the design file lacks a `## Visual Baselines` H2, PASS is blocked with `VISUAL_BASELINES_REQUIRED` (the design-auditor must add the section — it is NOT a silent pass-through). When the `## Visual Baselines` H2 IS present, PASS additionally requires `qa_reports/visual_<task-id>.md` (written by `reviewer-visual`, code-reviewer's visual sub-skill) for every task id in the round; missing → `VISUAL_EVIDENCE_MISSING`. The two checks are mutually exclusive: the missing-baselines block fires first and short-circuits the evidence-file lookup. No design file, or `## Mode` = `no-design` (or unparseable mode), → gate is silent and pass-through. Backwards-compatible for non-UI workspaces.
 - **Visual report schema gate**: when the design declares `## Visual Structural Assertions`, PASS additionally validates `qa_reports/visual_<id>.md` against `REQUIRED_VISUAL_SECTIONS`. A missing section, failed/unverified canonical-state or structural row, or a non-PASS verdict returns `VISUAL_REPORT_INCOMPLETE`. If the gate is armed (mode != no-design) but the design omits `## Visual Structural Assertions`, PASS returns `VISUAL_ASSERTIONS_REQUIRED` — a hard error, not a silent fallback. Required sections (verbatim): Widget Shape Verification, Canonical State Verification, Structural Assertions, Region Diff, Allowed Differences, Verdict.
 - **Baseline manifest gate**: SIXTH and last visual sub-gate (after the provenance gate). When `design/<active_feature>.md` is armed (`## Mode` ≠ `no-design`) and present with a `## Source` manifest, PASS additionally requires ≥1 audited baseline row (frozen node-id, `status: audited`); zero audited rows → `BASELINE_MANIFEST_MISSING`. Multi-surface manifests (≥2 audited rows) additionally require a `## Baseline Selection Provenance` section carrying both a `filter-conditions:` line and an `exclusion-reasons:` line → else `BASELINE_PROVENANCE_INCOMPLETE`. Opt-in: dormant when `## Source` is absent (pre-v3.40 designs, never retro-blocked); single-surface (exactly 1 audited row) is exempt from the provenance requirement. Enforces design-auditor SOP step 2c (mechanical baseline freeze) so an eyeball-pick or post-hoc/re-derived manifest cannot silently PASS.
 <!-- design-only:end -->
@@ -90,8 +88,7 @@ The routing chain is **server-enforced**, not advisory. Invalid
 - Code-reviewer is the chain's judge: approval is the `(code-reviewer, In_Progress) → (code-reviewer, PASS)` write with the first-class `review_verdict` field set to `APPROVED`, a `review_reports/review_<task-id>.md` evidence file and the PASS evidence above; a rejection sets `review_verdict=CHANGES_REQUESTED` on the `(code-reviewer, FAIL)` write and routes to qa-engineer (test defect), sr-engineer (implementation only) or pm (scenario defect). The server enforces verdict⟺status consistency (`REVIEW_VERDICT_STATUS_MISMATCH`). Only the code-reviewer may carry `review_verdict`: any other `agent_id` carrying it is rejected with `NON_REVIEWER_VERDICT_REJECTED`; file mode only.
 - After the `review_round` cap of code-reviewer FAILs is exhausted, only `(pm, In_Progress)` is accepted.
 <!-- design-only:start -->
-- **`visual_round` sub-loop**: independent of `qa_round` and `review_round`. Bumps on `(qa-engineer, FAIL)` with `pending_notes` containing `visual_fail:` (a structural pixel/widget miss, distinct from test-logic FAIL). Capped by the `visual_round` cap; any round past it locks to `(pm, In_Progress)` only — symmetric to the `qa_round` circuit breaker.
-  - **Split escalation (`visual_split`)**: once `visual_round` reaches the `visual_split` threshold, sr-engineer MAY transition `(sr-engineer, In_Progress) → (pm, In_Progress)` with `pending_notes` containing `visual_split_requested: <reason>`. This is an **early** escape hatch — instead of grinding the remaining rounds toward threshold renegotiation, the team splits the oversized widget into sub-tasks. Available from the `visual_split` threshold through the `visual_round` cap; mandatory route past the cap.
+- **Visual rejections are review rounds**: a `reviewer-visual` rejection is a code-reviewer `CHANGES_REQUESTED` (`status=FAIL`) and counts once in `review_round`, like any other code-reviewer rejection; there is no separate visual counter, cap or split threshold. A pixel difference that shrinks on every try is progress, not the same failure; at the `fix_try` cap of tries that do not shrink it, sr-engineer stops fixing that surface and hands it to the judge — a baseline comparison never stops a ticket.
 <!-- design-only:end -->
 
 On rejection the server returns `{ error, attempted, allowed, hint }` —
@@ -100,21 +97,26 @@ read it and self-correct.
 <!-- design-only:start -->
 ### 3.2 Visual Verdict Authority & Separation of Duties
 
-- **Visual verdict is qa-visual-owned.** ONLY qa-visual may define visual PASS criteria, accepted-diff
-  tolerance, or pre-excused divergence classes — and only inside the `## Allowed Differences` section
-  of `qa_reports/visual_<task-id>.md` (or PM/spec, before implementation). The coordinator and every
-  non-qa role MAY pass context (baseline paths, Figma node ids, route, canonical-state setup) but MUST
-  NOT define, override, relax, or pre-accept any visual difference. **Enforcement:** allowed-diffs are
-  qa-owned *by construction* — the visual report is consulted only on a qa-engineer PASS, and
-  `status=PASS` is server-restricted to `agent_id="qa-engineer"`, so the report (incl. its
-  `## Allowed Differences`) is accepted and owned by the qa chain at PASS time (server validates report schema, not file authorship), not the coordinator. The server validates
-  that the report SCHEMA is complete (`## Allowed Differences` is a required section) but does NOT
-  inspect prose for authorship — authorship is enforced by the chain (PASS is qa-exclusive), not by
-  content-sniffing. A coordinator-authored accept-policy injected into a dispatch prompt is **void**
-  by this rule (prompt-governed; see skill-coordinator).
+- **Visual verdict is reviewer-visual-owned.** ONLY `reviewer-visual`, code-reviewer's visual sub-skill, may define
+  visual PASS criteria, accepted-diff tolerance, or pre-excused divergence classes — and only inside the
+  `## Allowed Differences` section of `qa_reports/visual_<task-id>.md` (or PM/spec, before implementation).
+  The coordinator and every other role MAY pass context (baseline paths, Figma node ids, route,
+  canonical-state setup) but MUST NOT define, override, relax, or pre-accept any visual difference.
+  **Enforcement:** allowed-diffs are the judge's *by construction* — the visual report is consulted only on
+  the judge's PASS, and on the test-first chain `status=PASS` is server-restricted to
+  `agent_id="code-reviewer"`, so the report (incl. its `## Allowed Differences`) is accepted and owned by
+  code-reviewer at PASS time (server validates report schema, not file authorship), not the coordinator.
+  The server validates that the report SCHEMA is complete (`## Allowed Differences` is a required section)
+  but does NOT inspect prose for authorship — authorship is enforced by the chain (PASS is the judge's
+  alone), not by content-sniffing. A coordinator-authored accept-policy injected into a dispatch prompt is
+  **void** by this rule (prompt-governed; see skill-coordinator).
+- **Measure first, judge over threshold.** Capture and pixel difference are executable checks the test
+  author writes and sr-engineer passes before hand-off; `reviewer-visual` reads the baseline and impl
+  images only for a surface over its threshold, and lists an over-threshold difference it accepts under
+  `## Allowed Differences` with its reason — no human stop.
 - **No global-frame metric.** Whole-frame pixel-percentage MUST NOT be the visual PASS metric; a
   sparse canvas dilutes localized structural errors. Comparison is per-surface / region-weighted with
-  explicit structural assertions and canonical-state parity (see `skill-qa-visual`).
+  explicit structural assertions and canonical-state parity (see `skill-reviewer-visual`).
 <!-- design-only:end -->
 - **Sequential-context assumption + reconcile.** The chain assumes sequential single-context
   handoffs. Background/parallel subagents and inline-coordinator execution can desync `tasks.md`
@@ -138,12 +140,9 @@ Each sr-engineer return to qa-engineer counts toward the `sr_return` cap, past w
 Each role finishes with `tw_update_state` whose first-class `next_role` field names the successor role so the coordinator (or human) knows where to route (`pending_notes` stays free-text prose for the next reader — it carries no routing token).
 
 <!-- design-only:start -->
-A third counter
-`visual_round` (§3.1) tracks pixel-fidelity iterations
-separately from test-logic failures; it only ticks when `pending_notes`
-contains `visual_fail:` and only fires when the workspace has a
+Visual checks arm only when the workspace has a
 `design/<active_feature>.md` whose `## Mode` is ≠ `no-design` (the
-self-arming signal). An armed workspace missing the `## Visual Baselines`
+self-arming signal), and a visual rejection counts in `review_round` (§3.1). An armed workspace missing the `## Visual Baselines`
 section is blocked at PASS with `VISUAL_BASELINES_REQUIRED` rather than
 silently passing through. Beyond `VISUAL_BASELINES_REQUIRED`, an armed
 workspace also rejects PASS with `VISUAL_ASSERTIONS_REQUIRED` (design omits
