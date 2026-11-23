@@ -169,7 +169,7 @@ for (const role of Object.keys(FIVE)) {
 
 // ------------------------------------------------------------------ AC2
 
-test("AC2: constitution fragments — judge clause (a), test ownership (b), builder ≠ judge unchanged (c), Limits (d), ownership + disclosure (e), build gate (f)", () => {
+test("AC2: constitution fragments — judge clause (a), test ownership (b), builder ≠ judge unchanged (c), Limits (d), ownership + disclosure (e), build gate (f), state update (g)", () => {
   const c06 = content("const-06-chain-31-head.md");
   const c05 = content("const-05-core-standards.md");
   const c01 = content("const-01-core-head.md");
@@ -217,6 +217,24 @@ test("AC2: constitution fragments — judge clause (a), test ownership (b), buil
   assert.ok(gate.includes("An sr-engineer return of a test to qa-engineer"), "(f) D19 return clause");
   assert.ok(gate.includes("may carry back only those listed errors and adds none"), "(f) D19 carries back only listed errors, adds none");
   assert.ok(gate.includes("Every other hand-off, sr-engineer → code-reviewer included, stays at zero"), "(f) every other hand-off stays at zero");
+  // (f) D21: the allowance covers sr's stop to pm as well; sr -> code-reviewer stays zero
+  assert.ok(
+    gate.includes("or its stop to pm (`sr_return` cap reached, or a scenario cannot be built), may carry back only those listed errors and adds none"),
+    "(f) D21 allowance covers sr-engineer's stop to pm (both cases)",
+  );
+  assert.ok(
+    gate.indexOf("Every other hand-off, sr-engineer → code-reviewer included, stays at zero") > gate.indexOf("stop to pm"),
+    "(f) D21 sr-engineer → code-reviewer is named as zero after the allowance, not inside it",
+  );
+
+  // (g) D21: State update — a role the server accepts no write from stops and reports; a writable role takes over
+  const upd = c05.split("\n").find((l) => l.startsWith("- **State update**"));
+  assert.ok(upd, "(g) State update bullet exists");
+  assert.ok(
+    upd.includes("When the server accepts no write from the acting role, that role stops and reports instead, and a role that can write takes over."),
+    "(g) State update carries the D21 sentence verbatim",
+  );
+  assert.ok(upd.includes("On crash/failure, still call it with the failure summary in `pending_notes`."), "(g) existing crash/failure sentence kept");
 });
 
 // ------------------------------------------------------------------ AC3
