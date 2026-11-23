@@ -1,0 +1,15 @@
+{"ts":"2026-11-23T08:28:35.991Z","feature":"e434-reviewer-visual","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T08:45:45.265Z","feature":"e434-reviewer-visual","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T08:52:42.245Z","feature":"e434-reviewer-visual","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T08:53:17.311Z","feature":"e434-reviewer-visual","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T09:09:43.276Z","feature":"e434-reviewer-visual","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T09:27:01.467Z","feature":"e434-reviewer-visual","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T09:36:10.300Z","feature":"e434-reviewer-visual","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T09:45:49.835Z","feature":"e434-reviewer-visual","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T09:56:13.216Z","feature":"e434-reviewer-visual","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T10:00:32.115Z","feature":"e434-reviewer-visual","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T10:07:56.284Z","feature":"e434-reviewer-visual","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T10:16:22.490Z","feature":"e434-reviewer-visual","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T10:17:09.033Z","feature":"e434-reviewer-visual","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T10:17:12.067Z","feature":"e434-reviewer-visual","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T10:24:46.117Z","feature":"e434-reviewer-visual","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

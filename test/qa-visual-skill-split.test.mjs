@@ -14,19 +14,21 @@ const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
 
 const QA_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-engineer.md");
-const QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
+// E434: the visual sub-skill is now code-reviewer's (skill-reviewer-visual.md), loaded by code-reviewer step 6a.
+const QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-reviewer-visual.md");
 
-test("AC-1: skill-qa-visual.md exists and carries the v3.14.0 contract (widget shape + pixel diff)", () => {
+test("AC-1: skill-reviewer-visual.md exists and carries the visual contract (widget shape + pixel diff), loaded by code-reviewer (E434 re-pin)", () => {
   // v3.14.0: contract upgraded — Step A widget shape checklist precedes
-  // Step B pixel diff; failure routes now include `visual_fail:` token for
-  // visual_round bumps; output filename is `qa_reports/visual_<task-id>.md`
-  // (server PASS gate). All v3.8.3 contract elements remain reachable.
-  assert.ok(fs.existsSync(QA_VISUAL_PATH), "skill-qa-visual.md must exist");
+  // Step B pixel diff; output filename is `qa_reports/visual_<task-id>.md`
+  // (server PASS gate). E434: the sub-skill is code-reviewer's, loaded only when the design declares
+  // `## Visual Baselines`, and its rejections are code-reviewer rejections (no `visual_fail:` token).
+  assert.ok(fs.existsSync(QA_VISUAL_PATH), "skill-reviewer-visual.md must exist");
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
   // Self-documenting header explaining the lazy-load relationship
-  assert.match(body, /Lazy-loaded by `skill-qa-engineer`/, "header must declare lazy-load relationship");
-  assert.match(body, /Visual Baselines/, "header must reference the trigger condition");
+  const header = body.slice(0, body.indexOf("\n## "));
+  assert.match(header, /code-reviewer/, "header must declare the code-reviewer relationship");
+  assert.match(header, /Visual Baselines/, "header must reference the trigger condition");
 
   // v3.14.0: Step A widget shape checklist
   assert.match(body, /Step A.*Widget Shape Checklist/is, "Step A widget shape checklist must exist");
@@ -38,15 +40,10 @@ test("AC-1: skill-qa-visual.md exists and carries the v3.14.0 contract (widget s
     assert.match(body, category, `sub-skill must enumerate diff category ${category}`);
   }
 
-  // Four failure routes (widget shape miss joined in v3.14.0); all
-  // implementation-side ones carry the `visual_fail:` token. `next_role` is a
-  // first-class field written as `next_role="<role>"`, not a
-  // `next_role: <role>` pending_notes token, so the regexes match the field
-  // form. (c9-protocol-fields, T-C9-15)
-  assert.match(body, /Widget shape miss.*next_role="sr-engineer".*visual_fail:/is, "widget shape miss must target sr-engineer with visual_fail token");
-  assert.match(body, /Pixel drift.*next_role="sr-engineer".*visual_fail:\s*pixel/is, "pixel drift route must carry visual_fail: pixel token");
-  assert.match(body, /Missing baseline.*next_role="design-auditor"/is, "missing baseline must route to design-auditor");
-  assert.match(body, /Missing impl.*next_role="sr-engineer".*visual_fail:\s*missing_impl/is, "missing impl must carry visual_fail: missing_impl token");
+  // E434: failure routes are code-reviewer CHANGES_REQUESTED rejections counted in `review_round` — no
+  // `visual_fail:` token, no visual counter.
+  assert.ok(!body.includes("visual_fail:"), "no visual_fail: token");
+  assert.match(body, /CHANGES_REQUESTED/, "rejections are code-reviewer CHANGES_REQUESTED");
 
   // PASS sub-verdict — now writes the visual_<task-id>.md PASS marker
   assert.match(body, /PASS sub-verdict/is, "PASS sub-verdict heading must exist");
@@ -105,10 +102,10 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // headroom is growth nobody decided to allow. Raise history:
   // specs/e260h-comment-rationale.md; raised to 18500 by specs/e288-integrator-stage0-and-test-hygiene.md (D1).
   assert.ok(qaSize <= 18500, `qa-engineer.md must be <= 18500 bytes (got ${qaSize})`);
-  // qa-visual.md cap: 20700 bytes, under the same headroom convention. It is
+  // reviewer-visual.md (qa-visual.md before E434) cap: 20700 bytes, under the same headroom convention. It is
   // lazy-loaded only when the visual gate arms, so non-visual tasks pay nothing.
   // Raise history: specs/e260h-comment-rationale.md (test/qa-visual-skill-split.test.mjs).
-  assert.ok(qaVisualSize <= 20700, `qa-visual.md must be <= 20700 bytes (got ${qaVisualSize})`);
+  assert.ok(qaVisualSize <= 20700, `reviewer-visual.md must be <= 20700 bytes (got ${qaVisualSize})`);
 });
 
 test("AC-6: the visual contract (per-row paths, 6 categories, routes, v3.14.0 additions) stays reachable in the sub-skill (E433 re-pin)", () => {
@@ -126,13 +123,12 @@ test("AC-6: the visual contract (per-row paths, 6 categories, routes, v3.14.0 ad
   for (const category of [/\(i\).*layout/i, /\(ii\).*spacing/i, /\(iii\).*element/i, /\(iv\).*color/i, /\(v\).*text/i, /\(vi\).*image/i]) {
     assert.match(combined, category, `combined surface must enumerate ${category}`);
   }
-  // Routes — v3.8.2 had 3; v3.14.0 has 4 (added widget shape miss).
-  // `next_role` is a first-class field written as `next_role="<role>"`, not a
-  // `next_role: <role>` token. (c9-protocol-fields, T-C9-15)
-  assert.match(combined, /next_role="sr-engineer"/, "sr-engineer route must exist");
-  assert.match(combined, /next_role="design-auditor"/, "design-auditor route must exist");
-  // v3.14.0 additions
-  assert.match(combined, /visual_fail:/, "v3.14.0: visual_fail token must be reachable for visual_round trigger");
+  // Routes — E434: code-reviewer rejections; implementation → sr-engineer, check defect → qa-engineer,
+  // design defect → Blocked pm (code-reviewer:FAIL has no design-auditor edge, D13). The visual_fail:
+  // token and the visual counter it ticked left the served rules.
+  assert.match(combined, /sr-engineer/, "sr-engineer route must exist");
+  assert.match(combined, /design defect/i, "design-defect route must exist");
+  assert.ok(!combined.includes("visual_fail:"), "E434: no visual_fail token");
   assert.match(combined, /Widget Shape Verification/, "v3.14.0: widget-shape checklist H2 must exist");
   // PASS sub-verdict (heading slightly different in v3.14.0 — uses ###)
   assert.match(combined, /PASS sub-verdict/is, "PASS sub-verdict must exist");

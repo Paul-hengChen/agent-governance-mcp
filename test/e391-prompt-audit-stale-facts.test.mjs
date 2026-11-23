@@ -77,15 +77,22 @@ test("AC-G2-11: lite says tw_update_state / tw_complete_task server-rejected, th
   assert.equal(count(t, "`tw_rollback_task`: server-rejected; `tw_switch_role`: SOP-forbidden."), 0);
 });
 
-test("AC-G2-12: QA skills reference each other as <agc install>/content/...", () => {
+test("AC-G2-12: the judge and its visual sub-skill reference each other as <agc install>/content/... (E434 re-pin)", () => {
   const qe = C("skill-qa-engineer.md");
-  const qv = C("skill-qa-visual.md");
-  // E433: qa-engineer is the test author and no longer lazy-loads the visual sub-skill (E434 owns that
-  // judge); the sub-skill itself still cites the qa SOP by the install-relative path.
+  const cr = C("skill-code-reviewer.md");
+  const rv = C("skill-reviewer-visual.md");
+  // E434: the visual sub-skill is code-reviewer's (skill-reviewer-visual.md); code-reviewer step 6a loads it by
+  // the install-relative path, and every <agc install>/content/ cross-reference it carries resolves to a
+  // shipped content file. qa-engineer (test author since E433) names neither the old nor the new file name
+  // as something to load.
   assert.equal(count(qe, "skill-qa-visual"), 0);
-  assert.equal(count(qv, "`<agc install>/content/skill-qa-engineer.md`"), 2);
-  for (const t of [qe, qv]) {
-    assert.doesNotMatch(t, /`content\/skill-qa-(visual|engineer)\.md`/);
+  assert.equal(count(cr, "`<agc install>/content/skill-reviewer-visual.md`"), 1);
+  assert.equal(count(rv, "`<agc install>/content/skill-qa-engineer.md`"), 0, "the old qa-SOP pointer moved to skill-code-reviewer");
+  for (const m of rv.matchAll(/`<agc install>\/content\/([^`]+)`/g)) {
+    assert.ok(fs.existsSync(path.join(ROOT, "content", m[1])), `rv cross-reference resolves: ${m[1]}`);
+  }
+  for (const t of [qe, cr, rv]) {
+    assert.doesNotMatch(t, /`content\/skill-(qa-visual|reviewer-visual|qa-engineer|code-reviewer)\.md`/);
   }
   assert.ok(Buffer.byteLength(qe) <= 18500, "skill-qa-engineer.md byte cap");
 });

@@ -314,7 +314,7 @@ export function parseAssertionFailures(section: string): string[] {
 
 // Region Diff rows `| surface | result |` where result ∈ {pass, accepted}.
 // Anything else (fail, material, unresolved, blank, drift) is a failure.
-// "accepted" is allowed because a difference qa-visual deliberately accepts is
+// "accepted" is allowed because a difference reviewer-visual deliberately accepts is
 // recorded in `## Allowed Differences`; here it signals "diff exists but cleared".
 export function parseRegionDiffFailures(section: string): string[] {
   const failures: string[] = [];

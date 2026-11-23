@@ -135,11 +135,17 @@ describe("constitution-deliverable-guard (v3.27.0)", () => {
   // A4 — Wording correction: "accepted and owned by the qa chain at PASS time"
   // replaces the old "authored under the qa chain".
   // -------------------------------------------------------------------------
-  test("A4 (t-a4-new-wording-present): corrected wording 'accepted and owned by the qa chain at PASS time' is present", () => {
-    assert.ok(
-      CONSTITUTION.includes("accepted and owned by the qa chain at PASS time"),
-      "New A4 wording 'accepted and owned by the qa chain at PASS time' not found — deliverable A4 not landed",
-    );
+  // E434 re-pin: on the test-first chain the judge is code-reviewer, so §3.2's enforcement sentence names the
+  // judge's PASS instead of "the qa chain" (keeping the qa wording would keep a false sentence).
+  test("A4 (t-a4-new-wording-present): §3.2 enforcement says the visual report is accepted at the judge's (code-reviewer) PASS, not by the qa chain", () => {
+    const s32 = CONSTITUTION.slice(CONSTITUTION.indexOf("### 3.2"));
+    const at = s32.indexOf("**Enforcement:**");
+    assert.ok(at > 0, "§3.2 keeps its **Enforcement:** clause");
+    const enforcement = s32.slice(at, s32.indexOf("\n- **", at) > 0 ? s32.indexOf("\n- **", at) : undefined);
+    assert.match(enforcement, /code-reviewer/, "the enforcement clause names the judge, code-reviewer");
+    assert.match(enforcement, /PASS/, "ownership is fixed at PASS time");
+    assert.ok(!CONSTITUTION.includes("owned by the qa chain at PASS time"), "the qa-chain ownership wording is gone");
+    assert.ok(!/qa-engineer|qa chain/.test(enforcement), "the enforcement clause gives the report to no qa role");
   });
 
   test("A4 (t-a4-old-wording-absent): stale wording 'authored under the qa chain' is absent", () => {
