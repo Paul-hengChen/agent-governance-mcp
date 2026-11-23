@@ -167,7 +167,7 @@ function parseDesignMode(content: string): string | null {
 
 // Per-task existence check for `qa_reports/visual_<task-id>.md`.
 // Mirror of hasEvidenceInFile / hasCodeReviewEvidenceInFile — existence is
-// sufficient; the qa-engineer + skill-qa-visual SOP enforce the contents
+// sufficient; the code-reviewer + skill-reviewer-visual SOP enforce the contents
 // (widget shape checklist, pixel diff sections). Server does NOT parse.
 export function hasVisualEvidenceInFile(
   workspacePath: string,
@@ -602,7 +602,7 @@ export function checkVisualProvenance(
 // ---------- v3.42.0 — Pixel-gate attestation (qa-visual-pixel-gate-attestation) ----------
 // SEVENTH/LAST visual sub-gate (AC-2/AC-5). The v3.38 provenance gate (now tightened by
 // DIFF_METRIC_PLACEHOLDERS, AC-1) confirms each diffed surface carries a REAL baseline +
-// non-placeholder diff-metric; this gate confirms qa-visual POSITIVELY attested the pixel
+// non-placeholder diff-metric; this gate confirms reviewer-visual POSITIVELY attested the pixel
 // gate ran to completion (`pixel_gate_complete: true`) per surface. Closes the F2
 // false-pass: a skipped diff can no longer ride structural assertions to PASS.
 
