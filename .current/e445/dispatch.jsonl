@@ -4,3 +4,5 @@
 {"ts":"2026-11-23T11:25:27.794Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-23T11:32:42.266Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-23T11:34:00.909Z","feature":"e445-spec-workshop-questioning","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:41:15.786Z","feature":"e445-spec-workshop-questioning","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:41:54.297Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

@@ -53,3 +53,10 @@ Satisfiability check: all 11 tests pass against a scratch copy of the SOP with t
 ## CI Runnability
 
 `node --test` headless, no human interaction; builds the composed prompt from `dist/` in an OS temp workspace, removed in `after`. Runs the same on Node 20 and 22 (no Node-22-only API).
+
+## AC21 Re-baseline (T-E445-03, planned R3 (b) return)
+
+- Scenario AC11 → `test/context-budget.test.mjs` | `AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1415 cap` (AC21 block only; title, re-baseline comment line, cap and assertion message changed; no other cap and no other test file touched).
+- Measurement: same computation as the test — frontmatter stripped, `stripRationale(stripOriginTags(expandPartials(body)))`, `Math.ceil(chars / 4)` — on sr-engineer's SOP (commit e99c7c9), after `npm run build`.
+- Delta: 1092 → **1415 ~tok (+323)**, zero headroom; matches pm's dry-run in the spec.
+- State: AC21 green; the expected-red manifest notes it (earlier lines kept).

@@ -39,3 +39,7 @@ test/e445-spec-workshop-questioning.test.mjs | AC10 (added lines): every added o
 # sr-engineer (T-E445-02): AC21 cap is still the E423 baseline (1092) while the SOP grew by the Copy / Strings;
 # the cap is re-measured and set by qa-engineer on the planned R3 (b) return (T-E445-03).
 test/context-budget.test.mjs | AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1092 cap
+
+# qa-engineer (T-E445-03): AC21 is now GREEN — cap re-measured on sr's SOP to the exact value 1415 ~tok
+# (was 1092, +323, zero headroom). The test title now reads "... meets ≤ 1415 cap"; the entry above keeps
+# its old title as the record of the planned red. No red remains in this manifest.
