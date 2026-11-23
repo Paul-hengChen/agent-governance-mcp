@@ -26,3 +26,27 @@ test/context-budget.test.mjs | AC-P2-6: non-visual §4 (DIAGRAM/S1/S2/S6) + §1 
 test/e16-judge-dispatch-charter.test.mjs | E16-06: coord-03 Amend-Resume relay escalation row points to the Constitution §3.1 charter (pointer-only, no duplicated mechanism)
 test/e5-intake-tiering.test.mjs | T-E5-03 content: coord-07 step 4a states the §2/§3 builder ≠ judge hard floor is never bypassed by any classification
 test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# T-E433-03 — qa SOP rewritten as the test author (AC3, D7, D15): judge phases (0.5 / 1 / 1.5 / 3.5 / 4), the PASS line, the ownership Hard rule, Phase 1.5 and every skill-qa-visual cite removed; 'Project build: ZERO errors' dropped for qa's own hand-off per R1 = (a). Re-pinned by qa (Probe table). Compose goldens + context-budget caps already listed under T-E433-01.
+test/ac-execution.test.mjs | AC3: skill-qa-engineer.md contains the exact new phase heading verbatim
+test/ac-execution.test.mjs | AC6: new Phase 3.5 references the existing Phase 4 FAIL escalation route and introduces NO new escalation-table row
+test/e20-e21-crash-resilience.test.mjs | QA-E21-3: skill-qa-engineer.md's crash-checkpoint bullet appears strictly before the 'Project build: ZERO errors' line in Phase 4
+test/e380-qa-suite-result-sop.test.mjs | AC9: skill-qa-engineer.md line 90 equals qa.pass-write byte for byte
+test/e380-qa-suite-result-sop.test.mjs | AC9: the PASS line lists every feature task and quotes PASS_TASKS_INCOMPLETE
+test/e380-qa-suite-result-sop.test.mjs | AC13: the PASS line tells qa to fill qa_suite_result from the full suite, on FAIL too
+test/e391-prompt-audit-stale-facts.test.mjs | AC-G2-12: QA skills reference each other as <agc install>/content/...
+test/e407-restatement-citations.test.mjs | AC6: qa ownership bullet is first in Hard rules and the cited bullet exists in every composition
+test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 35: skill-qa-engineer.md label "v3.14.0:" is origin-fenced in source and absent from the dispatch bundle
+test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 35: Phase 1.5 keeps '(lazy-load + PASS-gated when Visual Baselines present)' after the strip
+test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 36: skill-qa-engineer drops 'v3.14.0 ' before 'Visual Widgets shape checklist' (deletion, nothing fenced)
+test/e438-origin-fenced-labels.test.mjs | AC-E438-1/2 site 45: skill-qa-engineer drops '(pre-E3)' from 'Specs without proof annotations pay zero overhead'
+test/e440-current-rule-wording.test.mjs | AC-E440-1 site 1: skill-qa-engineer Phase 1.5 states the rule as 'No `pending_notes` deferral substitutes for it', not 'is REMOVED'
+test/pixel-perfect-visual-compare.test.mjs | AC-2: QA Phase 1.5 skips silently when Visual Baselines absent (v3.14.0 upgrade)
+test/pixel-perfect-visual-compare.test.mjs | AC-6: backwards-compat — v3.8.1 audits + non-UI workspaces still skip silently in v3.14.0
+test/pixel-perfect-visual-compare.test.mjs | regression: QA SOP step numbering is sequential 1..7 with no duplicates
+test/qa-visual-skill-split.test.mjs | AC-3: lazy-load hook has both Absent and Present branches with correct contracts (v3.14.0 PASS-gated)
+test/qa-visual-skill-split.test.mjs | AC-4: SOP step numbering 1..7 sequential with no duplicates
+test/qa-visual-skill-split.test.mjs | AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)
+test/repro-first-gate.test.mjs | S3: content/skill-qa-engineer.md carries the bugfix-mode Phase 0.5 branch making the Expected-Red Diff disposition load-bearing for PASS
+# Transient keep-green red (not a re-pin): MISSING_EVIDENCE, EXPECTED_RED_DIFF_MISSING, QA_REVIEW_TARGET_REQUIRED, AC_EXECUTION_LOG_MISSING, PASS_TASKS_INCOMPLETE were backtick-quoted only in the old qa judge phases; T-E433-04 quotes them in skill-code-reviewer.md, which turns this test green again (drop this entry then).
+test/error-code-contract.test.mjs | registry ⊆ doc: every documentedInProse:true entry is backtick-quoted in >=1 content/*.md
