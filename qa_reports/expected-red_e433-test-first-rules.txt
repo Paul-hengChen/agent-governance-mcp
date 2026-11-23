@@ -51,3 +51,11 @@ test/repro-first-gate.test.mjs | S3: content/skill-qa-engineer.md carries the bu
 
 # T-E433-04 — code-reviewer SOP absorbs the judge steps (tests-vs-scenarios review, full suite, Expected-Red Diff incl. bugfix branch, AC Execution per scenario, copy / visual-token audits + contract-defect test, PASS / rejection rows); 12691 bytes vs the 10725 cap (Probe table: qa re-pins the cap)
 test/e118-reviewer-ac-completeness.test.mjs | AC7 - token discipline: file grows by at most 1200 bytes over BASE (9525 bytes)
+
+# T-E433-06 — side-channel SOPs name the chain's judge (release-engineer PASS precondition / step 1 / refusal row now `(code-reviewer, PASS)`); PROMPT_TEMPLATE_3B scope line = tpl.scope_line (render golden re-captured by qa); PROMPT_REGISTRY qa-engineer / code-reviewer descriptions = desc.qa / desc.code_reviewer. All in the Probe table (owned / re-assigned).
+test/e177a-manifest.test.mjs | AC6 render e177a
+test/e178a-integrator-role.test.mjs | AC3: `integrator` MCP prompt registered as PROMPT_REGISTRY entry 12 (13th is spec-workshop, e423); prompts/integrator.ts matches the pm.ts pattern
+test/e235b-relative-worktree.test.mjs | R3 AC2 golden
+test/e289-render-addendum.test.mjs | AC-E289-4 the template has exactly one EnterWorktree line, right after the 先完整讀 line
+test/e394-release-sop.test.mjs | AC-P3 phases and dry-run named
+test/e394-release-sop.test.mjs | AC-P6 hard rules present

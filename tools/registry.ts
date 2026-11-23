@@ -1158,7 +1158,7 @@ export const PROMPT_REGISTRY: PromptRegistryEntry[] = [
   },
   {
     name: "qa-engineer",
-    description: "QA role. Verify code, write tests, rollback bugs.",
+    description: "QA role. Write each ticket scenario as a test before the build; no verdict.",
     arguments: [PROMPT_WORKSPACE_ARG],
     skillFile: "skill-qa-engineer.md",
   },
@@ -1188,7 +1188,7 @@ export const PROMPT_REGISTRY: PromptRegistryEntry[] = [
   },
   {
     name: "code-reviewer",
-    description: "Code review role — clean-context diff judge between sr-engineer and qa-engineer.",
+    description: "Code review role — the chain's judge: reviews tests and implementation, writes PASS.",
     arguments: [PROMPT_WORKSPACE_ARG],
     skillFile: "skill-code-reviewer.md",
   },

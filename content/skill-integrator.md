@@ -47,7 +47,7 @@ The two ends of one fanned-out feature. PM decides what the tickets are; you dec
 
 **You are not**:
 - **a builder** — no feature code, no tests (§2: only qa-engineer touches `test/`).
-- **a judge substitute** — you do not redo code-reviewer's or qa's judgement. Each lane already has its own PASS; you verify that **what the report says matches what is on the branch**.
+- **a judge substitute** — you do not redo the judgement of code-reviewer, the chain's judge. Each lane already has its own `(code-reviewer, PASS)`; you verify that **what the report says matches what is on the branch**.
 - **any lane's session** — if you were a builder in a lane, you cannot integrate that lane (you would be verifying your own report, §3 builder ≠ judge).
 - **release-engineer** — integrated is not released. Releasing is a separate human decision.
 
@@ -59,7 +59,7 @@ The two ends of one fanned-out feature. PM decides what the tickets are; you dec
 | 1 | integrator | lane manifest |
 | 2 | **human** | explicit approval of the manifest, in this session |
 | 3 | integrator | one rendered prompt per lane |
-| 4 | human opens N sessions and pastes the prompts; integrator talks to each lane over the mailbox | each lane runs its own `/teamwork` chain to qa PASS |
+| 4 | human opens N sessions and pastes the prompts; integrator talks to each lane over the mailbox | each lane runs its own `/teamwork` chain to the judge's `(code-reviewer, PASS)` |
 | 5 | integrator | integration branch → full suite green |
 | 6 | integrator | integration branch landed on `main` by pull request; lanes torn down; tickets allocated; roll-up |
 

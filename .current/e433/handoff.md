@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e433-test-first-rules"
 status: "In_Progress"
-last_updated: "2026-11-23T04:59:14.618Z"
+last_updated: "2026-11-23T05:08:34.758Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e433-test-first-rules.md"
 scope_decision: "single-feature"
@@ -16,7 +16,7 @@ dispatch_pins:
   qa-engineer: "sonnet"
 evidence_schema: 2
 next_role: "sr-engineer"
-dispatched_at: "2026-11-23T04:59:14.618Z"
+dispatched_at: "2026-11-23T05:08:34.758Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -33,8 +33,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- checkpoint: T-E433-04 completed content/skill-code-reviewer.md + templates/claude-code-agents/code-reviewer.md (uncommitted), awaiting full suite
-- sr-engineer: T-E433-03 done — 9e8abb7; 21 new reds recorded (manifest 46 entries = exactly the 46 suite reds; 4449/4497 pass, 2 skipped); next T-E433-04
+- checkpoint: T-E433-06 edits done (release-engineer / doc-writer / integrator SOPs, PROMPT_TEMPLATE_3B scope line, PROMPT_REGISTRY qa + code-reviewer descriptions), awaiting build + full suite
+- sr-engineer: T-E433-04 done — 46615be; 1 red added (e118 AC7 size cap, SOP 12691 B vs 10725) / 1 removed (error-code-contract 'registry ⊆ doc' green); manifest 46 entries = exactly the 46 suite reds (4449/4497 pass, 2 skipped); next T-E433-05
+- sr-engineer: T-07 mapping comment — skill-code-reviewer.md now backtick-quotes REVIEWER_COMPLETED_TASKS_REJECTED, MISSING_REVIEW_EVIDENCE, MISSING_EVIDENCE, EXPECTED_RED_DIFF_MISSING, AC_EXECUTION_LOG_MISSING, QA_REVIEW_TARGET_REQUIRED, PASS_TASKS_INCOMPLETE, QA_COMPLETION_EVIDENCE_MISSING, REVIEW_VERDICT_STATUS_MISMATCH, REVIEW_ROUND_EXCEEDED; SR_RETURN_CAP_EXCEEDED not quoted (pending ruling). Step labels for the hints exist verbatim: '**Expected-Red Diff**' (step 7), '**AC Execution**' (step 8).
+- sr-engineer: code-reviewer SOP rejection table rows: 'test defect (with or without an implementation defect)' → qa-engineer, 'implementation only (the tests are sound)' → sr-engineer, 'scenario defect (incl. a copy / visual-token coverage gap)' → pm, contract defect Blocked → pm; PASS row next_role human (omitted). The sr SOP (T-05) return-via-qa wording should match 'test defect'.
 - sr-engineer: test/e410-task-alias-content-tail.test.mjs AC2 pins const-12 at 22 split-lines (21 by wc -l) and it is not an owned test — const-12 was kept at 21 lines; any later edit to const-01/05/08/12, skill-pm.md, skill-integrator.md or skill-coordinator-lite.md must keep their line counts (37/23/11/22/120/249/53 split-lines) or flag it.
 - sr-engineer: coord-03 Escalation row 'visual work complete …' changed only `qa-engineer` → `code-reviewer` in `qa-visual`/… ; the qa-visual wording stays for E434.
 - sr-engineer: coord-03 Amend-Resume relay row avoids the colon form `resume_of: <role>` (skill-evolution-v3.11 AC-7 scans the composed coordinator for /resume_of:\s*[a-z-]/); keep that for later SOP edits too.
