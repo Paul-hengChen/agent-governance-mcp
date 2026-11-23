@@ -47,15 +47,17 @@ test("AC-A1: builder ≠ judge rule is in const-05 §3 and in all four compositi
   }
 });
 
-test("AC-A2: const-11 §3.2 keeps its header and exactly two visual bullets", () => {
+// E434 re-pin: the first bullet names the judge's sub-skill (const11.head) and §3.2 adds the measure-first
+// rule (const11.measure), so the bullet count is no longer pinned; the builder ≠ judge move still is.
+test("AC-A2: const-11 §3.2 keeps its header, opens with the reviewer-visual verdict bullet and keeps the no-global-frame bullet", () => {
   const c11 = C("const-11-design-chain-32.md");
   assert.ok(c11.includes("### 3.2 Visual Verdict Authority & Separation of Duties"), "§3.2 header kept");
   assert.equal(count(c11, "Builder ≠ judge"), 0, "the moved bullet is gone");
   assert.ok(!/builder/i.test(c11), "no 'builder' wording remains in const-11");
   const bullets = c11.split("\n").filter((l) => l.startsWith("- **"));
-  assert.equal(bullets.length, 2, "exactly two bullets remain");
-  assert.ok(bullets[0].startsWith("- **Visual verdict is qa-visual-owned."));
-  assert.ok(bullets[1].startsWith("- **No global-frame metric."));
+  assert.ok(bullets.length >= 2, "at least the two visual bullets remain");
+  assert.ok(bullets[0].startsWith("- **Visual verdict is reviewer-visual-owned.**"), "first bullet is const11.head");
+  assert.ok(bullets.some((b) => b.startsWith("- **No global-frame metric.")), "no-global-frame bullet kept");
 });
 
 test("AC-B: every builder ≠ judge citation resolves in each composition that loads it", () => {
@@ -67,7 +69,7 @@ test("AC-B: every builder ≠ judge citation resolves in each composition that l
     ["coord-07-core-sop.md", "§3 builder ≠ judge", (o) => o.chain],
     ["skill-integrator.md", "§3 builder ≠ judge", (o) => o.chain],
     ["skill-sr-engineer.md", "(§3 builder ≠ judge)", (o) => o.chain],
-    ["skill-qa-visual.md", "§3 builder ≠ judge provenance", (o) => o.chain && o.design],
+    ["skill-reviewer-visual.md", "§3 builder ≠ judge", (o) => o.chain && o.design],
   ];
   const stale = [/§3\.2 builder/, /builder≠judge/, /builder ≠ judge, §3\.2/, /builder \(§3\.2\)/];
   for (const [file, wording, loadedIn] of citing) {
@@ -105,12 +107,12 @@ test("AC-C: named sites restate no bare round number", () => {
   // E433 (D10): the qa FAIL loop is gone; const-06 names the review_round and sr_return caps instead.
   assert.ok(C("const-06-chain-31-head.md").includes("toward the `sr_return` cap, past which that return is rejected"), "C02 sr_return cap named");
   assert.ok(C("const-08-chain-31-mid.md").includes("cap of code-reviewer FAILs is exhausted"), "C03 review_round cap named");
+  // E434 (ruling 7): const-09 no longer runs a visual counter; a visual rejection counts in `review_round` and a
+  // shrinking pixel difference runs into the named `fix_try` cap (C04/C05 retired with the visual loop).
   const c09 = C("const-09-design-chain-vround.md");
-  assert.ok(c09.includes("any round past it locks"), "C04 visual_round cap named");
-  assert.ok(c09.includes("Split escalation (`visual_split`)"), "C05a");
-  assert.ok(c09.includes("once `visual_round` reaches the `visual_split` threshold"), "C05a");
-  assert.ok(c09.includes("grinding the remaining rounds"), "C05b");
-  assert.ok(c09.includes("from the `visual_split` threshold through the `visual_round` cap; mandatory route past the cap"), "C05c");
+  assert.ok(c09.includes("counts once in `review_round`"), "C04 visual rejections counted in review_round");
+  assert.ok(c09.includes("at the `fix_try` cap of tries that do not shrink it"), "C05 the fix_try cap named, no bare number");
+  assert.ok(!c09.includes("visual_split") && !c09.includes("visual_round"), "C05 split threshold and visual counter retired");
   const c12 = C("const-12-chain-r10-s4.md");
   assert.ok(c12.includes("past the `review_round` cap only pm may take the feature"), "C07 review_round cap named (E433 loop wording)");
   assert.ok(c12.includes("counts toward the `sr_return` cap, past which only pm may take the feature"), "C08 sr_return cap named");
@@ -119,13 +121,14 @@ test("AC-C: named sites restate no bare round number", () => {
   // E433: qa-engineer writes no FAIL, so its qa_round cap rows are gone (C09-C11); the cap it meets is sr_return.
   assert.ok(!qe.includes("`qa_round` cap"), "C09-C11 the qa SOP restates no qa_round cap");
   assert.ok(qe.includes("counts toward the `sr_return` cap, which the server checks on your claim"), "qa SOP names the sr_return cap");
-  const qv = C("skill-qa-visual.md");
-  assert.ok(qv.includes("Past the `visual_round` cap, only"), "C12 visual_round cap named");
-  assert.ok(qv.includes("| FAIL past the `visual_round` cap |"), "C13");
+  // E434: the visual sub-skill (skill-reviewer-visual) has no visual_round cap rows (C12/C13 retired); sr's
+  // split route (C14/C15) became the pixel-progress rule, which names the `fix_try` cap.
+  const rv = C("skill-reviewer-visual.md");
+  assert.ok(!rv.includes("visual_round"), "C12/C13 no visual_round cap in the visual sub-skill");
   const sr = C("skill-sr-engineer.md");
-  assert.ok(sr.includes("`visual_round` ≥ `visual_split` and you assess"), "C14");
-  assert.ok(sr.includes("(`visual_round` ≥ `visual_split`, cannot converge within budget)"), "C15");
-  for (const f of ["skill-sr-engineer.md", "skill-qa-visual.md", "skill-qa-engineer.md"]) {
+  assert.ok(!sr.includes("visual_split"), "C14/C15 split route retired");
+  assert.ok(sr.includes("only tries that do not shrink it count toward the `fix_try` cap"), "C14 the fix_try cap named");
+  for (const f of ["skill-sr-engineer.md", "skill-reviewer-visual.md", "skill-qa-engineer.md"]) {
     assert.doesNotMatch(C(f), /visual_round >= 3|Round 3|Round 4|Round 6|visual round 6/, `${f} has a bare cap number`);
   }
   // qa Escalation Routes table: the 2 test-author rows (scenario defect, interface collision) after E433.
@@ -134,13 +137,19 @@ test("AC-C: named sites restate no bare round number", () => {
   assert.equal(rows.length, 2, "Escalation Routes table keeps its 2 data rows");
 });
 
-test("AC-C01: Limits table has the visual_split row", () => {
+// E434 re-pin (ruling 7): the visual counter and split threshold left the Limits table; the `fix_try` cap
+// row that bounds pixel iteration stays and loads in every composition.
+test("AC-C01: Limits table has no visual_split / visual_round cap row; the fix_try cap row stays (E434)", () => {
   const head = C("const-01-core-head.md");
   assert.ok(head.startsWith("# Constitution\n"), "AC5: constitution header is the version-free '# Constitution'");
-  const row = head.split("\n").find((l) => l.startsWith("| `visual_split` threshold"));
-  assert.ok(row, "visual_split row exists in the Limits table");
-  const cells = row.split("|").map((c) => c.trim()).filter(Boolean);
-  assert.equal(cells[1], "3", "visual_split value is 3");
-  assert.ok(/`visual_round`/.test(cells[2]), "meaning names visual_round");
-  for (const o of COMBOS) assert.ok(composeConstitution(o).includes(row), `${label(o)} carries the Limits row`);
+  const lines = head.split("\n");
+  assert.ok(!lines.some((l) => l.startsWith("| `visual_split` threshold")), "no visual_split row");
+  assert.ok(!lines.some((l) => l.startsWith("| `visual_round` cap")), "no visual_round cap row");
+  const row = lines.find((l) => l.startsWith("| `fix_try` cap"));
+  assert.ok(row, "fix_try cap row exists in the Limits table");
+  for (const o of COMBOS) {
+    const c = composeConstitution(o);
+    assert.ok(c.includes(row), `${label(o)} carries the fix_try Limits row`);
+    assert.ok(!c.includes("`visual_split` threshold"), `${label(o)} carries no visual_split row`);
+  }
 });

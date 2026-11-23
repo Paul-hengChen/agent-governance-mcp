@@ -43,8 +43,10 @@ test("AC1 control: the rule is occurrence-level (flags tasks.md lines; skips the
 });
 
 // [file, 1-based line, old span, new span]
+// E434 re-pin: const-01 lost its `visual_round` cap and `visual_split` threshold Limits rows (two lines), so
+// the watermark row moved from line 33 to 31 and the file from 37 to 35 lines.
 const ROWS = [
-  ["const-01-core-head.md", 33, "Task-spawned with `model:` pinned by the parent (`Task(subagent_type=…)`)", "Subagent-dispatched with `model:` pinned by the parent"],
+  ["const-01-core-head.md", 31,"Task-spawned with `model:` pinned by the parent (`Task(subagent_type=…)`)", "Subagent-dispatched with `model:` pinned by the parent"],
   ["const-05-core-standards.md", 9, "Task-dispatched with a silent brief", "dispatched with a silent brief"],
   ["const-08-chain-31-mid.md", 2, "under Task-subagent dispatch — where", "under subagent dispatch — where"],
   ["const-08-chain-31-mid.md", 5, "under Task-subagent dispatch it is", "under subagent dispatch it is"],
@@ -71,7 +73,7 @@ test("AC2: each site carries its new span, the old span is gone, the line has no
 });
 
 test("AC2: each edited file keeps its line count", () => {
-  const counts = { "const-01-core-head.md": 37, "const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 11, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 249, "skill-pm.md": 120 };
+  const counts = { "const-01-core-head.md": 35,"const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 11, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 249, "skill-pm.md": 120 };
   for (const [f, c] of Object.entries(counts)) assert.equal(read(f).split("\n").length, c, f);
 });
 

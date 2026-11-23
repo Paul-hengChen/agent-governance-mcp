@@ -121,7 +121,7 @@ test("c9-protocol-fields (T-C9-12..16, AC-7): all 13 in-scope content files have
     "skill-sr-engineer.md",
     "skill-architect.md",
     "skill-code-reviewer.md",
-    "skill-qa-visual.md",
+    "skill-reviewer-visual.md", // E434: renamed from skill-qa-visual.md
     "skill-release-engineer.md",
     "skill-design-auditor.md",
     "skill-doc-writer.md",

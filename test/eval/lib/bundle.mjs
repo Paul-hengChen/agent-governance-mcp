@@ -23,7 +23,7 @@ export const FIXTURE_WORKSPACE = path.resolve(
 // in index.ts ("teamwork" -> skill-coordinator.md, "teamwork-lite" ->
 // skill-coordinator-lite.md, role prompts -> matching file names) plus the
 // tw_switch_role-only roles (code-reviewer, design-auditor, doc-writer,
-// release-engineer, qa-visual), whose SOP text ships from the same files.
+// release-engineer, reviewer-visual), whose SOP text ships from the same files.
 const ROLE_SKILL_FILES = Object.freeze({
   coordinator: "skill-coordinator.md",
   teamwork: "skill-coordinator.md",
@@ -37,7 +37,7 @@ const ROLE_SKILL_FILES = Object.freeze({
   "sr-engineer": "skill-sr-engineer.md",
   "code-reviewer": "skill-code-reviewer.md",
   "qa-engineer": "skill-qa-engineer.md",
-  "qa-visual": "skill-qa-visual.md",
+  "reviewer-visual": "skill-reviewer-visual.md",
   "doc-writer": "skill-doc-writer.md",
   "release-engineer": "skill-release-engineer.md",
 });

@@ -31,8 +31,9 @@ const SITES = [
   [1, "const-10-chain-31-tail.md", "read it and self-correct.", ["specs/qa-flow-enforcement-architecture.md", "Full matrix"]],
   [4, "coord-02-host-dispatch.md", "`ALLOWED_TRANSITIONS` matrix", ["tools/transitions.ts"]],
   [5, "skill-pm.md", "**Source-Credibility Gate**", ["specs/e4-design-source-credibility-gate.md"]],
-  [7, "skill-qa-visual.md", "(§3 builder ≠ judge provenance.)", ["research/figma-baselines.md"]],
-  [8, "skill-qa-visual.md", "**Multi-value guard:**", ["research/mode-feature-process-retrospective.md", "§四#7"]],
+  // E434 re-pin: the visual sub-skill was renamed skill-qa-visual.md -> skill-reviewer-visual.md (sites 7, 8).
+  [7, "skill-reviewer-visual.md", "(§3 builder ≠ judge provenance.)", ["research/figma-baselines.md"]],
+  [8, "skill-reviewer-visual.md", "**Multi-value guard:**", ["research/mode-feature-process-retrospective.md", "§四#7"]],
   [9, "skill-doc-writer.md", "doc-writer is NOT in `ALLOWED_TRANSITIONS`", ["tools/transitions.ts"]],
   [10, "skill-coordinator-lite.md", "Lite has no `agent_id` in the routing chain", ["tools/transitions.ts"]],
 ];
@@ -95,21 +96,22 @@ test("AC-E437-1: the three paths an agent must open carry the <agc install>/ pre
   assert.ok(read("templates", "claude-code-agents", "lite.md").includes("`<agc install>/content/skill-coordinator-lite.md`"));
 });
 
-test("AC-E437-3: skill-qa-visual Step C multi-value guard FAIL note is exactly the repo-path-free text", () => {
-  const src = read("content", "skill-qa-visual.md");
+// E434 re-pin: path only (skill-qa-visual.md -> skill-reviewer-visual.md); the guard's note text is kept.
+test("AC-E437-3: skill-reviewer-visual multi-value guard FAIL note is exactly the repo-path-free text", () => {
+  const src = read("content", "skill-reviewer-visual.md");
   assert.ok(src.includes('FAIL it with note: "context-dependent property requires per-context baseline". Per Constitution §3.2'), "note text exact, quote closes right after 'baseline'");
   for (const bundle of [src, dispatch(src)]) {
-    assert.ok(!bundle.includes("research/"), "no research/ citation anywhere in skill-qa-visual after E437+E438+E439 sites");
+    assert.ok(!bundle.includes("research/"), "no research/ citation anywhere in skill-reviewer-visual after E437+E438+E439 sites");
     assert.ok(!bundle.includes("§四#7"), "no retrospective section cite");
   }
 });
 
-test("AC-E437-1: a real buildPromptForRole bundle (qa-visual lazy skill and lite coordinator) carries none of the dropped citations", async () => {
+test("AC-E437-1: a real buildPromptForRole bundle (reviewer-visual lazy skill and lite coordinator) carries none of the dropped citations", async () => {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "e437-"));
   try {
     setActiveStorage(new FileHandoffStorage());
     await new FileHandoffStorage().writeState(ws, "e437-fixture", "In_Progress", [], []);
-    for (const skill of ["skill-coordinator-lite.md", "skill-doc-writer.md", "skill-pm.md", "skill-qa-visual.md"]) {
+    for (const skill of ["skill-coordinator-lite.md", "skill-doc-writer.md", "skill-pm.md", "skill-reviewer-visual.md"]) {
       const text = buildPromptForRole(skill, "e437", ws, false).messages[0].content.text;
       for (const b of [
         "specs/qa-flow-enforcement-architecture.md", "tools/transitions.ts",

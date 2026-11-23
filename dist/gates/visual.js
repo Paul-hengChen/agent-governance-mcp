@@ -146,7 +146,7 @@ function parseDesignMode(content) {
 }
 // Per-task existence check for `qa_reports/visual_<task-id>.md`.
 // Mirror of hasEvidenceInFile / hasCodeReviewEvidenceInFile — existence is
-// sufficient; the qa-engineer + skill-qa-visual SOP enforce the contents
+// sufficient; the code-reviewer + skill-reviewer-visual SOP enforce the contents
 // (widget shape checklist, pixel diff sections). Server does NOT parse.
 export function hasVisualEvidenceInFile(workspacePath, taskIds) {
     const present = [];

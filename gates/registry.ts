@@ -66,12 +66,11 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // Every entry is true. SR_RETURN_CAP_EXCEEDED, E431, DISPATCH_PIN_TIER_REJECTED,
-  // E300, and NON_REVIEWER_VERDICT_REJECTED, E139, each shipped false until a
-  // content/*.md sentence quoted it — E433 in the qa-engineer and sr-engineer
-  // SOPs, E295 in coord-02, E365 in const-08. The field
-  // exists so a code-internal gate can opt out without weakening the parity
-  // test.
+  // Every entry is true except VISUAL_ROUND_EXCEEDED, which only the old path still emits
+  // (no served rule quotes it since E434). SR_RETURN_CAP_EXCEEDED, E431, DISPATCH_PIN_TIER_REJECTED,
+  // E300, and NON_REVIEWER_VERDICT_REJECTED, E139, each shipped false until a content/*.md
+  // sentence quoted it — E433 in the qa-engineer and sr-engineer SOPs, E295 in coord-02, E365 in
+  // const-08. The field exists so a code-internal gate can opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
 
@@ -80,7 +79,7 @@ export interface GateDefinition {
 //   TRANSITION_REJECTED             coord-02-host-dispatch.md, skill-qa-engineer.md
 //   QA_ROUND_EXCEEDED               skill-qa-engineer.md
 //   REVIEW_ROUND_EXCEEDED           skill-code-reviewer.md
-//   VISUAL_ROUND_EXCEEDED           skill-qa-visual.md
+//   VISUAL_ROUND_EXCEEDED           (none)
 //   HOP_CAP_EXCEEDED                coord-01-core-head.md, coord-03-core-fallback.md
 //   SR_RETURN_CAP_EXCEEDED          skill-qa-engineer.md, skill-sr-engineer.md
 //   SCOPE_DECISION_REQUIRED         const-08-chain-31-mid.md, constitution-rationale.md, skill-pm.md
@@ -95,14 +94,14 @@ export interface GateDefinition {
 //   EXPECTED_RED_DIFF_MISSING       skill-code-reviewer.md
 //   REPRO_MANIFEST_MISSING          skill-qa-engineer.md, skill-sr-engineer.md
 //   VISUAL_BASELINES_REQUIRED       const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-design-auditor.md
-//   VISUAL_EVIDENCE_MISSING         const-07-design-chain-gates.md, skill-qa-visual.md
-//   VISUAL_WIDGETS_UNVERIFIED       skill-qa-visual.md
+//   VISUAL_EVIDENCE_MISSING         const-07-design-chain-gates.md, skill-reviewer-visual.md
+//   VISUAL_WIDGETS_UNVERIFIED       skill-reviewer-visual.md
 //   VISUAL_ASSERTIONS_REQUIRED      const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md
-//   VISUAL_REPORT_INCOMPLETE        const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-qa-visual.md
-//   VISUAL_PROVENANCE_MISSING       skill-qa-visual.md
-//   BASELINE_MANIFEST_MISSING       const-07-design-chain-gates.md, skill-design-auditor.md, skill-qa-visual.md
-//   BASELINE_PROVENANCE_INCOMPLETE  const-07-design-chain-gates.md, skill-design-auditor.md, skill-qa-visual.md
-//   PIXEL_GATE_ATTESTATION_MISSING  skill-qa-visual.md
+//   VISUAL_REPORT_INCOMPLETE        const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-reviewer-visual.md
+//   VISUAL_PROVENANCE_MISSING       skill-reviewer-visual.md
+//   BASELINE_MANIFEST_MISSING       const-07-design-chain-gates.md, skill-design-auditor.md, skill-reviewer-visual.md
+//   BASELINE_PROVENANCE_INCOMPLETE  const-07-design-chain-gates.md, skill-design-auditor.md, skill-reviewer-visual.md
+//   PIXEL_GATE_ATTESTATION_MISSING  skill-reviewer-visual.md
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
@@ -167,7 +166,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     armCondition: "opt-in (counter present)",
     clearingArtifact: "(pm, In_Progress) rebudget",
     hintStatic: " exceeds cap. Only (pm, In_Progress) allowed for pixel/widget rebudget.",
-    documentedInProse: true,
+    documentedInProse: false,
   },
   {
     errorCode: "HOP_CAP_EXCEEDED",
@@ -412,7 +411,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     triggerEdge: "PASS, baselines present, visual_<id>.md absent",
     armCondition: "visualGate.present",
     clearingArtifact: "write qa_reports/visual_<id>.md",
-    hintStatic: "Run Phase 1.5 (skill-qa-visual) and write the visual report before PASS.",
+    hintStatic: "Run the visual verdict (skill-reviewer-visual) and write the visual report before PASS.",
     documentedInProse: true,
   },
   {
@@ -436,7 +435,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     clearingArtifact: "add design section",
     hintStatic:
       "The design-auditor MUST emit it (skill-design-auditor " +
-      "§Artifact Schema) and PM copy it into the spec; qa-visual marks each row pass/fail. " +
+      "§Artifact Schema) and PM copy it into the spec; reviewer-visual marks each row pass/fail. " +
       "Add the section before retrying PASS.",
     documentedInProse: true,
   },
@@ -451,10 +450,10 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "qa_reports/visual_<id>.md must contain Canonical State Verification, " +
       "Structural Assertions, Region Diff (per-surface pass/accepted), Allowed " +
       "Differences, and a Verdict that normalizes to exactly PASS — every row " +
-      "cleared (skill-qa-visual §Report schema; headings may carry " +
+      "cleared (skill-reviewer-visual §Report schema; headings may carry " +
       "prefixes/suffixes but must contain the canonical names, evidence " +
       "schema v2). Resolve the failed/unverified " +
-      "rows — do NOT pre-accept them (visual verdict is qa-visual-owned, " +
+      "rows — do NOT pre-accept them (visual verdict is reviewer-visual-owned, " +
       "Constitution §3.2).",
     documentedInProse: true,
   },

@@ -19,7 +19,10 @@ const QA_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-engineer.md");
 // engineer file now only holds the lazy-load hook. Tests that assert
 // Phase 1.5 *content* must read the sub-skill; tests that assert the
 // *hook* still read QA_PATH.
-const QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
+// E434: the sub-skill is now code-reviewer's skill-reviewer-visual.md (the judge's visual verdict); the
+// per-row image read applies to over-threshold surfaces only and rejections are code-reviewer rejections.
+const QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-reviewer-visual.md");
+const OLD_QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
 
 test("AC-1: design-auditor Artifact Schema declares Visual Baselines H2 with 4-col schema (v3.16.0: MANDATORY when mode != no-design)", () => {
   // Without a declared home and columns for baselines, QA Phase 1.5 has nothing
@@ -58,7 +61,7 @@ test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff (
   // 6 categories and Read-tool contract are preserved.
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
-  // Read both files via Read tool
+  // Read both files via Read tool (E434: only for a surface over its threshold)
   assert.match(body, /Read both.*baseline path.*impl path.*via the Read tool/is, "both PNGs must be Read via the Read tool");
   // 6 enumerated categories (preserved from v3.8.2)
   for (const category of [
@@ -77,24 +80,18 @@ test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff (
   assert.match(body, /sub-section per\s*`?surface id`?/i, "one sub-section per surface id");
 });
 
-test("AC-4: v3.14.0 — four distinct failure routes (widget shape + pixel drift + missing baseline + missing impl)", () => {
-  // v3.14.0: routes expanded from 3 to 4. Widget shape miss is new; pixel
-  // drift retains the prior drift slot. Missing baseline → design-auditor;
-  // implementation routes carry visual_fail: token for visual_round bump.
-  // The routes name the next role as a state-write argument,
-  // `next_role="<role>"`, not as a `next_role: <role>` line in pending_notes,
-  // so the patterns below match the quoted form. (c9-protocol-fields, T-C9-15)
+// E434 re-pin: the visual rejections are code-reviewer `CHANGES_REQUESTED` writes counted in `review_round`
+// (no `visual_fail:` token, no visual counter); implementation defects route to sr-engineer, check defects to
+// qa-engineer, design defects (missing baseline included) go Blocked to pm, which routes to design-auditor
+// (code-reviewer:FAIL has no design-auditor edge, D13).
+test("AC-4: visual failure routes are code-reviewer rejections — implementation → sr-engineer, check defect → qa-engineer, design defect → Blocked pm (E434)", () => {
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
-
-  // Widget shape miss (new in v3.14.0) → sr-engineer with visual_fail token
-  assert.match(body, /Widget shape miss.*next_role="sr-engineer".*visual_fail:/is, "widget shape route must target sr-engineer with visual_fail token");
-  // Pixel drift (renamed from "visual drift") → sr-engineer with visual_fail: pixel
-  assert.match(body, /Pixel drift.*next_role="sr-engineer".*visual_fail:\s*pixel/is, "pixel drift must carry visual_fail: pixel token");
-  // Missing baseline → design-auditor (no visual_fail; auditor defect, not implementation)
-  assert.match(body, /Missing baseline.*next_role="design-auditor"/is, "missing baseline must route to design-auditor");
-  // Missing impl → sr-engineer with visual_fail: missing_impl
-  assert.match(body, /Missing impl.*next_role="sr-engineer".*visual_fail:\s*missing_impl/is, "missing impl must carry visual_fail: missing_impl token");
-  // PASS sub-verdict heading exists (v3.14.0 promotes it to its own H3 section)
+  assert.ok(!body.includes("visual_fail:"), "no visual_fail: token (the visual counter left the served rules)");
+  assert.match(body, /CHANGES_REQUESTED/, "rejections are CHANGES_REQUESTED");
+  assert.match(body, /`review_round`/, "counted in review_round");
+  assert.match(body, /widget shape[\s\S]*sr-engineer|sr-engineer[\s\S]*widget shape/i, "widget shape miss routes to sr-engineer");
+  assert.match(body, /check defect/i, "check defects named (route to qa-engineer)");
+  assert.match(body, /design defect/i, "design defects named (Blocked, pm)");
   assert.match(body, /PASS sub-verdict/is, "PASS sub-verdict must exist");
 });
 
@@ -111,11 +108,11 @@ test("AC-5: gating logic is source-agnostic (no Figma-only assumptions) — pres
   for (const source of ["Figma", "Sketch", "XD", "Penpot", "PDF", "mockup", "photo"]) {
     assert.ok(auditor.includes(source), `Visual Baselines must mention ${source}`);
   }
-  // v3.14.0 qa-visual sub-skill: source-agnostic claim now in Rationale's
+  // v3.14.0 visual sub-skill (skill-reviewer-visual since E434): source-agnostic claim now in Rationale's
   // pixel-diff bullet ("via multimodal vision against a user-supplied
   // baseline"). The literal phrase "Source-agnostic" was retired in favour
   // of the more specific multimodal-vision wording.
-  assert.match(qaVisual, /multimodal vision against a user-supplied baseline/i, "qa-visual must declare multimodal vision contract");
+  assert.match(qaVisual, /multimodal vision against a user-supplied baseline/i, "reviewer-visual must declare multimodal vision contract");
 });
 
 test("AC-6: backwards-compat — the qa SOP has no visual arm at all, so v3.8.1 audits + non-UI workspaces still skip silently (E433 re-pin)", () => {
@@ -124,7 +121,9 @@ test("AC-6: backwards-compat — the qa SOP has no visual arm at all, so v3.8.1 
   const qaBody = fs.readFileSync(QA_PATH, "utf-8");
   assert.doesNotMatch(qaBody, /lazy-load \+ PASS-gated/i, "no lazy-load arm in the qa SOP");
   assert.doesNotMatch(qaBody, /-\s*\*\*(Absent|Present)\*\*/, "no Absent/Present visual branches in the qa SOP");
-  assert.ok(fs.existsSync(QA_VISUAL_PATH), "the visual sub-skill file stays for E434");
+  // E434: the sub-skill was renamed; code-reviewer loads it (step 6a), the qa SOP never does.
+  assert.ok(fs.existsSync(QA_VISUAL_PATH), "the visual sub-skill ships as skill-reviewer-visual.md");
+  assert.ok(!fs.existsSync(OLD_QA_VISUAL_PATH), "skill-qa-visual.md is gone");
 });
 
 test("AC-7: v3.8.2 release entry is preserved in CHANGELOG (regression guard)", () => {

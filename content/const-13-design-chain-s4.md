@@ -1,10 +1,7 @@
 <!-- design-only:start -->
-A third counter
-`visual_round` (<!-- origin:start -->v3.14.0, <!-- origin:end -->§3.1) tracks pixel-fidelity iterations
-separately from test-logic failures; it only ticks when `pending_notes`
-contains `visual_fail:` and only fires when the workspace has a
+Visual checks arm only when the workspace has a
 `design/<active_feature>.md` whose `## Mode` is ≠ `no-design` (the<!-- origin:start --> v3.16.0<!-- origin:end -->
-self-arming signal). An armed workspace missing the `## Visual Baselines`
+self-arming signal), and a visual rejection counts in `review_round` (§3.1). An armed workspace missing the `## Visual Baselines`
 section is blocked at PASS with `VISUAL_BASELINES_REQUIRED` rather than
 silently passing through. Beyond `VISUAL_BASELINES_REQUIRED`, an armed
 workspace also rejects PASS with `VISUAL_ASSERTIONS_REQUIRED` (design omits

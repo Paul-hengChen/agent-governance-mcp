@@ -1046,7 +1046,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                 : gate("BASELINE_PROVENANCE_INCOMPLETE").hintStatic;
                             return { content: [{ type: "text", text }], isError: true };
                         }
-                        // Pixel-gate attestation: qa-visual must attest
+                        // Pixel-gate attestation: reviewer-visual must attest
                         // `pixel_gate_complete: true` per surface, so a skipped diff cannot
                         // ride structural assertions to PASS. Dormant for reports with no
                         // baseline: line; carry-forward surfaces are exempt; the B1

@@ -260,10 +260,12 @@ The same fallback applies to **every** role SOP. Drop any of these in `.current/
 .current/skill-sr-engineer.md
 .current/skill-code-reviewer.md
 .current/skill-qa-engineer.md
-.current/skill-qa-visual.md
+.current/skill-reviewer-visual.md
 .current/skill-doc-writer.md
 .current/skill-release-engineer.md
 ```
+
+**Renamed visual sub-skill**: `skill-qa-visual.md` is now `skill-reviewer-visual.md`, loaded by code-reviewer. After upgrading, a `.current/skill-qa-visual.md` override is no longer read (rename it to `.current/skill-reviewer-visual.md`), and a template copied by hand to `~/.claude/agents/qa-visual.md` stays behind (delete it and copy `templates/claude-code-agents/reviewer-visual.md`).
 
 The server's `loadContent()` (`prompts/build.ts`) checks `<workspace>/.current/<filename>` first, falls back to the bundled `content/<filename>`. Per-file granularity — overriding `skill-pm.md` leaves every other role on the shipped default.
 

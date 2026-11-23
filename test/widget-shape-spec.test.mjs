@@ -15,7 +15,8 @@ const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
 
 const SKILL_PM = path.join(PROJECT_ROOT, "content", "skill-pm.md");
 const SKILL_DESIGN_AUDITOR = path.join(PROJECT_ROOT, "content", "skill-design-auditor.md");
-const SKILL_QA_VISUAL = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
+// E434 re-pin: path only — the visual sub-skill is now code-reviewer's skill-reviewer-visual.md.
+const SKILL_QA_VISUAL = path.join(PROJECT_ROOT, "content", "skill-reviewer-visual.md");
 // compose-not-strip (ticket A9, DR-6): content/constitution.md is retired (AC8);
 // composeConstitution({chain:true,design:true}) reproduces it byte-for-byte
 // (Option R, architecture DR-1). CONSTITUTION is now the composed TEXT itself
@@ -114,9 +115,9 @@ test("AC-2: PM copies Visual Widgets verbatim from design-auditor output", () =>
   assert.match(pmBody, /design\/<feature>\.md.*Visual Widgets/i, "PM must reference design/<feature>.md Visual Widgets");
 });
 
-// ---------- skill-qa-visual carries widget shape verification, enforced at SOP level (R6) ----------
+// ---------- skill-reviewer-visual (was skill-qa-visual) carries widget shape verification, enforced at SOP level (R6) ----------
 
-test("R6: skill-qa-visual carries the Widget Shape Verification checklist", () => {
+test("R6: skill-reviewer-visual carries the Widget Shape Verification checklist", () => {
   const body = fs.readFileSync(SKILL_QA_VISUAL, "utf-8");
   assert.match(body, /Widget Shape Verification/, "Step A H2 must exist");
   assert.match(body, /Step A.*Widget Shape Checklist/is, "Step A heading must declare Widget Shape Checklist");
