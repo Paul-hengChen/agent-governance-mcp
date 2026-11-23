@@ -10,8 +10,8 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 
 | name | value | meaning |
 |---|---|---|
-| `qa_round` cap | 3 | Max qa-engineer FAIL rounds on one task before routing locks to pm. |
 | `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
+| `sr_return` cap | 2 | Max sr-engineer returns of one feature to qa-engineer before routing locks to pm. |
 | `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
 | `visual_split` threshold | 3 | `visual_round` from which sr-engineer MAY request a split. |
 | `hop` cap | 14 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |

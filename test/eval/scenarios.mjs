@@ -39,18 +39,25 @@ const RAW_SCENARIOS = [
     ],
   },
   {
-    id: "qa-engineer-pass-reply",
+    // E433 (D6): qa-engineer is the test author, not the judge, so the old "confirm PASS" reply is gone;
+    // the scripted duty is now the hand-off of red scenario tests to sr-engineer, with no verdict.
+    id: "qa-engineer-test-handoff",
     role: "qa-engineer",
-    tier: "sonnet",
+    tier: "opus",
     task:
-      "You just finished Phase 4 of your SOP for task T-EVAL-01: build is " +
-      "clean, all tests pass, the coverage gate is met, and Phase 1 review " +
-      "found no blocking findings. Reply to the human confirming PASS.\n\n" +
-      "You were dispatched via Task(subagent_type=\"qa-engineer\", model=\"sonnet\").",
+      "You just finished writing the tests for task T-EVAL-01: one test per " +
+      "ticket scenario, each red because the feature is not built yet, the " +
+      "expected-red manifest is written, and you listed the interface details " +
+      "you decided in your test report. Reply to the human with your hand-off.\n\n" +
+      "You were dispatched via Task(subagent_type=\"qa-engineer\", model=\"opus\").",
     assertions: [
-      (reply) => checkWatermark(reply, "qa-engineer", "sonnet"),
+      (reply) => checkWatermark(reply, "qa-engineer", "opus"),
       (reply) => checkTerseCap(reply),
       (reply) => checkBannedPhrases(reply),
+      (reply) => ({
+        pass: /sr-engineer/.test(reply) && !/status\s*=\s*PASS/i.test(reply),
+        reason: "hand-off must route to sr-engineer and carry no PASS verdict",
+      }),
     ],
   },
   {

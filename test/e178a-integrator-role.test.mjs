@@ -130,7 +130,7 @@ const FROZEN_FIRST_11_PROMPTS = [
   { name: "sr-engineer", description: "Load constitution, skill, state. Run first.", skillFile: "skill-sr-engineer.md" },
   { name: "researcher", description: "Deep research. Load constitution, skill, state.", skillFile: "skill-researcher.md" },
   { name: "pm", description: "PM role. Write specs, break down tasks, sync state.", skillFile: "skill-pm.md" },
-  { name: "qa-engineer", description: "QA role. Verify code, write tests, rollback bugs.", skillFile: "skill-qa-engineer.md" },
+  { name: "qa-engineer", description: "QA role. Write each ticket scenario as a test before the build; no verdict.", skillFile: "skill-qa-engineer.md" },
   { name: "teamwork", description: "Agent Governance Coordinator. Route tasks or execute them.", skillFile: "skill-coordinator.md" },
   {
     name: "teamwork-lite",
@@ -145,7 +145,7 @@ const FROZEN_FIRST_11_PROMPTS = [
   },
   {
     name: "code-reviewer",
-    description: "Code review role — clean-context diff judge between sr-engineer and qa-engineer.",
+    description: "Code review role — the chain's judge: reviews tests and implementation, writes PASS.",
     skillFile: "skill-code-reviewer.md",
   },
   {

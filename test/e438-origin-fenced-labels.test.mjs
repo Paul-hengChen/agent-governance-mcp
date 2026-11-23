@@ -60,7 +60,6 @@ const WRAP = [
   [31, "skill-integrator.md", "moves `.current/<lane>/` to history", " (E125)", ["E125"]],
   [33, "skill-pm.md", "- **Visual Widgets**", " (v3.14.0)", ["v3.14.0"]],
   [34, "skill-pm.md", "**Source-Credibility Gate**", " (E4)", ["(E4)"]],
-  [35, "skill-qa-engineer.md", "**Phase 1.5 — Visual Compare** (", "v3.14.0: ", ["v3.14.0"]],
   [37, "skill-qa-visual.md", "### Step A.0 — Baseline Source-of-Truth", " (v3.39.0)", ["v3.39.0"]],
   [38, "skill-qa-visual.md", "### Actual-Capture Output Convention", " (E30)", ["E30"]],
   [41, "skill-sr-engineer.md", "the step 7a format", " (C15)", ["C15"]],
@@ -89,22 +88,24 @@ test("AC-E438-1/2 site 14: R3/R-VIS and v3.26.0 leave the dispatch bundle and th
   assert.ok(l.includes("*(MANDATORY when mode ≠ no-design)*"), "stripped form is '*(MANDATORY when mode ≠ no-design)*'");
 });
 
-test("AC-E438-1/2 site 35: Phase 1.5 keeps '(lazy-load + PASS-gated when Visual Baselines present)' after the strip", () => {
-  const l = dispatch(src("skill-qa-engineer.md")).split("\n").find((x) => x.includes("**Phase 1.5 — Visual Compare**"));
-  assert.ok(l.includes("**Phase 1.5 — Visual Compare** (lazy-load + PASS-gated when Visual Baselines present):"), l.slice(0, 140));
+// E433: qa-engineer is the test author; its Phase 1.5 (site 35), the Visual Widgets checklist line (site 36)
+// and the Phase 3.5 line (site 45) left the SOP, so the labels those sites cleaned are re-pinned as absent.
+test("AC-E438-1/2 site 35: skill-qa-engineer carries no 'v3.14.0' label and no Phase 1.5 sentence", () => {
+  const s = src("skill-qa-engineer.md");
+  assert.ok(!s.includes("v3.14.0"), "no v3.14.0 label anywhere in the source");
+  assert.ok(!s.includes("Phase 1.5"), "the visual compare phase left the qa SOP (E434 owns the visual judge)");
 });
 
 // --- deletions and renames: sites 17, 36, 39, 40, 42, 45 ---
 
-test("AC-E438-1/2 site 36: skill-qa-engineer drops 'v3.14.0 ' before 'Visual Widgets shape checklist' (deletion, nothing fenced)", () => {
+test("AC-E438-1/2 site 36: skill-qa-engineer carries no 'Visual Widgets shape checklist' sentence and no version label before it", () => {
   const s = src("skill-qa-engineer.md");
-  assert.ok(s.includes("AND the Visual Widgets shape checklist"), "deletion applied");
+  assert.ok(!s.includes("Visual Widgets shape checklist"), "the checklist sentence left the qa SOP");
   assert.ok(!s.includes("the v3.14.0 Visual Widgets shape checklist"), "old wording gone");
 });
 
-test("AC-E438-1/2 site 45: skill-qa-engineer drops '(pre-E3)' from 'Specs without proof annotations pay zero overhead'", () => {
+test("AC-E438-1/2 site 45: skill-qa-engineer carries no '(pre-E3)' label", () => {
   const s = src("skill-qa-engineer.md");
-  assert.ok(s.includes("Specs without proof annotations pay zero overhead"), "deletion applied");
   assert.ok(!s.includes("pre-E3"), "no pre-E3 label anywhere in the source");
 });
 

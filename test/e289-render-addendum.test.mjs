@@ -85,7 +85,7 @@ test("AC-E289-4 the template has exactly one EnterWorktree line, right after the
   assert.ok(readAt >= 0);
   assert.equal(lines.filter((l) => l.includes("EnterWorktree")).length, 1);
   assert.equal(lines[readAt + 1], ENTER_LINE);
-  assert.ok(lines[readAt + 2].startsWith("你只負責這張票走到 qa PASS；"));
+  assert.ok(lines[readAt + 2].startsWith("你只負責這張票走到裁判（code-reviewer）PASS；"));
 });
 
 test("AC-E289-4 render substitutes <worktree> in both places of the new line", () => {

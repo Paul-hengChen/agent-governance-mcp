@@ -80,9 +80,10 @@ test("AC-G2-11: lite says tw_update_state / tw_complete_task server-rejected, th
 test("AC-G2-12: QA skills reference each other as <agc install>/content/...", () => {
   const qe = C("skill-qa-engineer.md");
   const qv = C("skill-qa-visual.md");
-  assert.equal(count(qe, "`<agc install>/content/skill-qa-visual.md`"), 4);
+  // E433: qa-engineer is the test author and no longer lazy-loads the visual sub-skill (E434 owns that
+  // judge); the sub-skill itself still cites the qa SOP by the install-relative path.
+  assert.equal(count(qe, "skill-qa-visual"), 0);
   assert.equal(count(qv, "`<agc install>/content/skill-qa-engineer.md`"), 2);
-  assert.ok(has(qe, "agc's install directory, not the workspace"));
   for (const t of [qe, qv]) {
     assert.doesNotMatch(t, /`content\/skill-qa-(visual|engineer)\.md`/);
   }

@@ -84,9 +84,9 @@ test("QA-E21-2: skill-qa-engineer.md's crash-checkpoint bullet fires before the 
   assert.ok(lineMatch[0].includes('agent_id="qa-engineer"'), "the checkpoint write must stamp agent_id=\"qa-engineer\"");
 });
 
-test("QA-E21-3: skill-qa-engineer.md's crash-checkpoint bullet appears strictly before the 'Project build: ZERO errors' line in Phase 4", () => {
+test("QA-E21-3: skill-qa-engineer.md's crash-checkpoint bullet appears strictly before the 'Build gate' line of the Run step", () => {
   const checkpointIdx = SKILL_QA.indexOf("**Crash checkpoint**");
-  const buildIdx = SKILL_QA.indexOf("Project build: ZERO errors");
+  const buildIdx = SKILL_QA.indexOf("Build gate (Constitution §2 *Build gate*)");
   assert.ok(checkpointIdx > 0 && buildIdx > 0, "both anchors must exist");
   assert.ok(checkpointIdx < buildIdx, "the crash checkpoint must precede the build/regression run, not follow it");
 });

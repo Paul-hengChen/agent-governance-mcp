@@ -12,7 +12,7 @@
 ## §2 檔案邊界
 
 - 共享生成物：`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`。
-- 測試目錄是 `test/`（含 `test/fixtures/**`），只有 qa-engineer 能碰。
+- 測試目錄是 `test/`（含 `test/fixtures/**`），歸 qa-engineer；例外照憲法 §2（bug 票上 qa-engineer 沒記下新測試時 sr-engineer 寫重現測試、可加較低層的測試，不改 qa-engineer 寫的測試）。
 
 ## §3 執行與驗證
 

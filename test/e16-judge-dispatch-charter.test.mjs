@@ -42,7 +42,7 @@ test("E16-01: const-08 §3.1 Single-role judge dispatch charter is appended to t
   // present verbatim — broadening must not have replaced it.
   assert.match(
     CONST08,
-    /the write that crosses the edge must set the first-class `resume_of` handoff field to `code-reviewer` or `qa-engineer`/,
+    /the write that crosses the edge setting the first-class `resume_of` handoff field to `code-reviewer`, naming that exact target role/,
     "the original resume_of mechanism sentence must survive unweakened",
   );
 });
@@ -55,8 +55,8 @@ test("E16-01: const-08 §3.1 Single-role judge dispatch charter is appended to t
 test("E16-02: const-08 §3.1 charter names a FRESH judge dispatch as sanctioned, not only a mid-chain resume", () => {
   assert.match(
     CONST08,
-    /a PM-sanctioned FRESH dispatch of exactly one judge role \(`code-reviewer` or `qa-engineer`\) on a test-only \/ evidence-only ticket/,
-    "charter must explicitly sanction a FRESH single-role judge dispatch on a test-only/evidence-only ticket",
+    /a PM-sanctioned FRESH dispatch of the judge alone \(`code-reviewer`\) on an evidence-only ticket/,
+    "charter must explicitly sanction a FRESH single-role judge dispatch on an evidence-only ticket (E433 D11: the judge is code-reviewer only; test-only work runs the main chain)",
   );
   assert.match(
     CONST08,
@@ -87,8 +87,8 @@ test("E16-03: const-08 §3.1 charter carries the same attestation-only trust mec
 test("E16-04: const-08 §3.1 charter states judge roles only — no edge opened to any build role", () => {
   assert.match(
     CONST08,
-    /judge roles only: the field opens no edge to any build role/,
-    "charter must explicitly restrict the broadened door to judge roles (code-reviewer/qa-engineer) only",
+    /judge only: the field opens no edge to any build role/,
+    "charter must explicitly restrict the broadened door to the judge (code-reviewer) only",
   );
 });
 
@@ -114,7 +114,7 @@ test("E16-06: coord-03 Amend-Resume relay escalation row points to the Constitut
   );
   assert.match(
     COORD03,
-    /The same edge also carries a PM-sanctioned fresh single-role judge dispatch on a test-only\/evidence-only ticket — charter: Constitution §3\.1/,
+    /The same edge also carries a PM-sanctioned fresh dispatch of the judge alone \(`code-reviewer`\) on an evidence-only ticket — charter: Constitution §3\.1/,
     "the relay row must carry the exact pointer sentence naming Constitution §3.1 as the charter's home",
   );
   // Pointer-only: the row must not re-derive the trust-mechanics prose that

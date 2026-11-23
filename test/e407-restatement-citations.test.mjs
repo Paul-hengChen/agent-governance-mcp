@@ -57,10 +57,13 @@ test("AC5: lite Hop cap-exempt bullet is the cited form and Limits / §5 resolve
   }
 });
 
+// E433 re-pin: qa-engineer is the test author and no longer owns tw_complete_task; its first Hard rule now
+// states that, and still cites the Constitution bullet (by name) instead of restating it.
 test("AC6: qa ownership bullet is first in Hard rules and the cited bullet exists in every composition", () => {
   const hard = section(read("skill-qa-engineer.md"), "## Hard rules");
   const first = hard.split("\n").find((l) => l.startsWith("- "));
-  assert.equal(first, "- **You own `tw_complete_task` and `tw_rollback_task`** (Constitution §3 *`tw_complete_task` ownership*).");
+  assert.ok(first.startsWith("- **Test author, never judge** (Constitution §3 *Builder ≠ judge*)"), first);
+  assert.ok(first.includes("(Constitution §3 *`tw_complete_task` ownership*)"), "the first bullet cites the ownership bullet by name");
   for (const o of ALL) assert.ok(composeConstitution(o).includes("**`tw_complete_task` ownership**"), label(o));
 });
 
