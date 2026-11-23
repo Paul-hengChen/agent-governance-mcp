@@ -32,3 +32,10 @@ test/e445-spec-workshop-questioning.test.mjs | AC9: step 5 keeps its three base 
 # Anchor-drift guard: the added-line scan finds no changed line for steps 2-5 because they are not edited yet
 # (the scan must not pass vacuously).
 test/e445-spec-workshop-questioning.test.mjs | AC10 (added lines): every added or changed line in steps 2-5 carries no new step, write tool, ticket id, repo path, Task alias or gate code
+
+# sr-engineer (T-E445-02): the nine e445 reds above are now green after T-E445-02 (SOP steps 2-5 carry the Copy / Strings);
+# qa's lines are kept as the record of the test-first reds.
+
+# sr-engineer (T-E445-02): AC21 cap is still the E423 baseline (1092) while the SOP grew by the Copy / Strings;
+# the cap is re-measured and set by qa-engineer on the planned R3 (b) return (T-E445-03).
+test/context-budget.test.mjs | AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1092 cap
