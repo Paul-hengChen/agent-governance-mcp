@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e433-test-first-rules"
 status: "In_Progress"
-last_updated: "2026-11-23T05:08:34.758Z"
+last_updated: "2026-11-23T05:16:21.635Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e433-test-first-rules.md"
 scope_decision: "single-feature"
@@ -16,7 +16,7 @@ dispatch_pins:
   qa-engineer: "sonnet"
 evidence_schema: 2
 next_role: "sr-engineer"
-dispatched_at: "2026-11-23T05:08:34.758Z"
+dispatched_at: "2026-11-23T05:16:21.635Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -33,11 +33,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- checkpoint: T-E433-06 edits done (release-engineer / doc-writer / integrator SOPs, PROMPT_TEMPLATE_3B scope line, PROMPT_REGISTRY qa + code-reviewer descriptions), awaiting build + full suite
-- sr-engineer: T-E433-04 done — 46615be; 1 red added (e118 AC7 size cap, SOP 12691 B vs 10725) / 1 removed (error-code-contract 'registry ⊆ doc' green); manifest 46 entries = exactly the 46 suite reds (4449/4497 pass, 2 skipped); next T-E433-05
+- sr-engineer: T-E433-06 done — 4f0d27c; 6 reds added / 0 removed (e177a AC6 render, e178a AC3 descriptions, e235b R3 AC2 golden, e289 AC-E289-4 scope line, e394 AC-P3 + AC-P6 release tuple; all Probe-table owned / re-assigned); manifest 52 entries = exactly the 52 suite reds (4443/4497 pass, 2 skipped); npm audit: no HIGH/CRITICAL; next T-E433-05 (after ruling), T-E433-11, T-E433-07
+- sr-engineer: T-06 wording — release-engineer 'the judge's tuple `(code-reviewer, PASS)`' (persona: 'already passed code-reviewer, the chain's judge'); doc-writer agent_id 'typically `code-reviewer`, the chain's judge, after PASS'; integrator stage 4 'to the judge's `(code-reviewer, PASS)`'. release-engineer escalation row 'test regression → qa-engineer' and integrator 5b step 7 (qa regenerates goldens) kept: qa still owns tests. docs/release-cd.md (T-07, doc.release_gate) names both tuples; the SOP names only the judge's per AC7.
+- sr-engineer: T-E433-04 done — 46615be; 1 red added (e118 AC7 size cap, SOP 12691 B vs 10725) / 1 removed (error-code-contract 'registry ⊆ doc' green); next T-E433-05
 - sr-engineer: T-07 mapping comment — skill-code-reviewer.md now backtick-quotes REVIEWER_COMPLETED_TASKS_REJECTED, MISSING_REVIEW_EVIDENCE, MISSING_EVIDENCE, EXPECTED_RED_DIFF_MISSING, AC_EXECUTION_LOG_MISSING, QA_REVIEW_TARGET_REQUIRED, PASS_TASKS_INCOMPLETE, QA_COMPLETION_EVIDENCE_MISSING, REVIEW_VERDICT_STATUS_MISMATCH, REVIEW_ROUND_EXCEEDED; SR_RETURN_CAP_EXCEEDED not quoted (pending ruling). Step labels for the hints exist verbatim: '**Expected-Red Diff**' (step 7), '**AC Execution**' (step 8).
 - sr-engineer: code-reviewer SOP rejection table rows: 'test defect (with or without an implementation defect)' → qa-engineer, 'implementation only (the tests are sound)' → sr-engineer, 'scenario defect (incl. a copy / visual-token coverage gap)' → pm, contract defect Blocked → pm; PASS row next_role human (omitted). The sr SOP (T-05) return-via-qa wording should match 'test defect'.
-- sr-engineer: test/e410-task-alias-content-tail.test.mjs AC2 pins const-12 at 22 split-lines (21 by wc -l) and it is not an owned test — const-12 was kept at 21 lines; any later edit to const-01/05/08/12, skill-pm.md, skill-integrator.md or skill-coordinator-lite.md must keep their line counts (37/23/11/22/120/249/53 split-lines) or flag it.
+- sr-engineer: test/e410-task-alias-content-tail.test.mjs AC2 pins const-12 at 22 split-lines (21 by wc -l) and it is not an owned test — const-12 was kept at 21 lines; any later edit to const-01/05/08/12, skill-pm.md, skill-integrator.md or skill-coordinator-lite.md must keep their line counts (37/23/11/22/120/249/53 split-lines) or flag it. (T-06 kept skill-integrator.md at 249 and lines 40/41/78/81/177/181/248 unchanged.)
 - sr-engineer: coord-03 Escalation row 'visual work complete …' changed only `qa-engineer` → `code-reviewer` in `qa-visual`/… ; the qa-visual wording stays for E434.
 - sr-engineer: coord-03 Amend-Resume relay row avoids the colon form `resume_of: <role>` (skill-evolution-v3.11 AC-7 scans the composed coordinator for /resume_of:\s*[a-z-]/); keep that for later SOP edits too.
 
