@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // `agc` — agent-governance-mcp workspace CLI (details: specs/e260c-bin-scripts.md).
-//   agc init [--artifacts=local|repo]  scaffold .current/.config.json, tasks.md, adapters.
+//   agc init [--artifacts=local|repo] [--adapter=shared|local]  scaffold
+//     .current/.config.json, tasks.md, adapters.
 //     Never writes .current/<lane>/handoff.md: any seeded prev tuple dead-ends the
 //     ALLOWED_TRANSITIONS lookup, so the first pm:In_Progress write creates it (E34).
 //   agc check  exit 1 on a stale adapter stamp; every other check is advisory.
@@ -33,7 +34,7 @@ const ADAPTERS = [
 
 const STR_USAGE =
   "Usage: agc <command>\n" +
-  "  init [--artifacts=local|repo]\n" +
+  "  init [--artifacts=local|repo] [--adapter=shared|local]\n" +
   "          Scaffold .current/.config.json, tasks.md, and per-agent entry\n" +
   "          adapters (CLAUDE.md, AGENTS.md, .antigravityrules) in the current\n" +
   "          directory. Existing files are left as-is, except CLAUDE.md's agc\n" +
@@ -42,6 +43,10 @@ const STR_USAGE =
   "          tasks.md, qa_reports/ and review_reports/ out of git via\n" +
   "          .git/info/exclude; --artifacts=repo tracks them. If any of them is\n" +
   "          already tracked, omitting the flag declares nothing — choose one.\n" +
+  "          --adapter=local puts CLAUDE.md's agc block in CLAUDE.local.md\n" +
+  "          instead, kept out of git via .git/info/exclude. With no flag,\n" +
+  "          local is picked only on a first install into a tracked CLAUDE.md\n" +
+  "          with local artifacts — see docs/install.md.\n" +
   "  check   Warn if any generated adapter files are stale vs the installed\n" +
   "          agent-governance-mcp version.\n";
 
@@ -77,13 +82,35 @@ function stampTemplate(tplName, version) {
   return readAdapterTemplate(tplName).split(AGC_VERSION_TOKEN).join(version);
 }
 
-// Upsert the marker-delimited block into CLAUDE.md.
-//   file absent           -> create CLAUDE.md containing just the block.
+// Where `agc init --adapter=<value>` puts the CLAUDE.md marker block: the
+// shared, usually tracked CLAUDE.md, or CLAUDE.local.md, which Claude Code
+// loads beside it and which agc keeps out of git via info/exclude.
+const ADAPTER_PLACEMENTS = { shared: "CLAUDE.md", local: "CLAUDE.local.md" };
+
+// Whether `text` holds a well-formed agc block: BEGIN marker, then END later.
+// The one definition of "holds a block" for init, check and eject.
+function holdsClaudeBlock(text) {
+  const beginIdx = text.indexOf(CLAUDE_BEGIN);
+  const endIdx = text.indexOf(CLAUDE_END);
+  return beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx;
+}
+
+// holdsClaudeBlock() for a file; false when it is absent or unreadable.
+function fileHoldsClaudeBlock(abs) {
+  try {
+    return holdsClaudeBlock(fs.readFileSync(abs, "utf-8"));
+  } catch {
+    return false;
+  }
+}
+
+// Upsert the marker-delimited block into `rel` (CLAUDE.md or CLAUDE.local.md).
+//   file absent           -> create the file containing just the block.
 //   file present, no block-> append a blank line + block.
 //   file present, block   -> replace text between markers (inclusive); prose untouched.
 // Returns "created" | "appended" | "updated".
-function writeClaudeBlock(cwd, stampedBlock) {
-  const target = path.join(cwd, "CLAUDE.md");
+function writeClaudeBlock(cwd, stampedBlock, rel = "CLAUDE.md") {
+  const target = path.join(cwd, rel);
   const block = stampedBlock.replace(/\n+$/, ""); // normalize trailing newlines
 
   if (!fs.existsSync(target)) {
@@ -331,18 +358,24 @@ function readDeclaredArtifacts(abs) {
 }
 
 // --- subcommand: init ------------------------------------------------------
-// Parse `agc init`'s arguments. Only --artifacts is recognised; any other
-// argument is ignored, as before the flag existed. An invalid value throws a
-// usage error BEFORE anything is written, so a typo never leaves a partial
-// scaffold behind. Returns { artifacts } — undefined when the flag is omitted.
+// Parse `agc init`'s arguments. Only --artifacts and --adapter are
+// recognised (`--name value` or `--name=value`); any other argument is
+// ignored, as before the flags existed. An invalid value throws a usage error
+// BEFORE anything is written, so a typo never leaves a partial scaffold
+// behind. Returns { artifacts, adapter } — each undefined when omitted.
 function parseInitArgs(argv) {
   let artifacts;
+  let adapter;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--artifacts") {
       artifacts = i + 1 < argv.length ? argv[++i] : "";
     } else if (a.startsWith("--artifacts=")) {
       artifacts = a.slice("--artifacts=".length);
+    } else if (a === "--adapter") {
+      adapter = i + 1 < argv.length ? argv[++i] : "";
+    } else if (a.startsWith("--adapter=")) {
+      adapter = a.slice("--adapter=".length);
     }
   }
   if (artifacts !== undefined && !isArtifactsMode(artifacts)) {
@@ -350,7 +383,10 @@ function parseInitArgs(argv) {
       `agc init: --artifacts must be "local" or "repo" (got ${JSON.stringify(artifacts)})`
     );
   }
-  return { artifacts };
+  if (adapter !== undefined && !Object.prototype.hasOwnProperty.call(ADAPTER_PLACEMENTS, adapter)) {
+    throw usageError(`agc init: --adapter must be "shared" or "local" (got ${JSON.stringify(adapter)})`);
+  }
+  return { artifacts, adapter };
 }
 
 function runInit(cwd, argv = []) {
@@ -363,7 +399,7 @@ function runInit(cwd, argv = []) {
 
   // Everything that can fail on bad input or an unusable git setup runs
   // before the first write, so a failure leaves the directory untouched.
-  const { artifacts: requested } = parseInitArgs(argv);
+  const { artifacts: requested, adapter: requestedAdapter } = parseInitArgs(argv);
   const repoRoot = resolveRepoRootOrNull(cwd); // null = not inside a git repo
   // Rules and pathspecs are anchored at the workspace, not at the repo root:
   // run from a subdirectory, the scaffold lands there and so must the rules.
@@ -400,6 +436,49 @@ function runInit(cwd, argv = []) {
         `contains a character unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character), ` +
         `so the exclude rule agc would write could match unintended files or be split across lines. ` +
         `Rename the directory, or re-run with --artifacts=repo.`
+    );
+  }
+
+  // Where CLAUDE.md's agc block goes. An explicit --adapter wins. Otherwise
+  // a re-run keeps the block where it already is: "local" when only
+  // CLAUDE.local.md holds it, in any artifacts mode and git state. Failing
+  // that, "local" only on a first install into a team file: inside git,
+  // CLAUDE.md tracked, artifacts mode "local", and no block in CLAUDE.md yet.
+  // Every other case is "shared", so a workspace whose CLAUDE.md holds the
+  // block (alone or beside CLAUDE.local.md) re-runs exactly as before.
+  const claudeTracked = isWorkspaceFileTracked({ repoRoot, workspace }, "CLAUDE.md");
+  const claudeHoldsBlock = fileHoldsClaudeBlock(path.join(cwd, "CLAUDE.md"));
+  const localHoldsBlock = fileHoldsClaudeBlock(path.join(cwd, ADAPTER_PLACEMENTS.local));
+  const keepsLocalBlock = requestedAdapter === undefined && localHoldsBlock && !claudeHoldsBlock;
+  const adapter =
+    requestedAdapter !== undefined
+      ? requestedAdapter
+      : keepsLocalBlock
+        ? "local"
+        : claudeTracked && mode === "local" && !claudeHoldsBlock
+          ? "local"
+          : "shared";
+
+  // Same refusal as local artifacts: the CLAUDE.local.md exclude rule is
+  // built from the workspace prefix, so an unsafe segment cannot be anchored.
+  // When no --adapter was given, the message names why "local" was picked
+  // instead of blaming a flag the user never passed.
+  if (adapter === "local" && workspace !== null && workspace.unsafeSegment !== null) {
+    if (keepsLocalBlock) {
+      throw usageError(
+        `agc init: refusing to update the agc block in CLAUDE.local.md — no --adapter was given, so local placement ` +
+          `was picked because CLAUDE.local.md already holds the agc block, but workspace path segment ` +
+          `"${escapeSegmentForDisplay(workspace.unsafeSegment)}" contains a character unsafe for a gitignore exclude rule ` +
+          `(a wildcard, a backslash, or a control character), so the CLAUDE.local.md exclude rule agc would write ` +
+          `could match unintended files or be split across lines. Rename the directory, or move the agc block ` +
+          `from CLAUDE.local.md into CLAUDE.md and re-run.`
+      );
+    }
+    throw usageError(
+      `agc init: refusing --adapter=local — workspace path segment "${escapeSegmentForDisplay(workspace.unsafeSegment)}" ` +
+        `contains a character unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character), ` +
+        `so the exclude rule agc would write could match unintended files or be split across lines. ` +
+        `Rename the directory, or re-run with --adapter=shared.`
     );
   }
 
@@ -517,6 +596,32 @@ function runInit(cwd, argv = []) {
     );
   }
 
+  // Git-side half of the adapter choice, independent of the artifacts mode.
+  // A CLAUDE.md that still holds the block is never edited here: it is a
+  // shared file, so removing the block is the user's own commit.
+  if (adapter === "local") {
+    if (repoRoot === null) {
+      errBlocks.push(
+        `agc init — note: not inside a git repository — skipped .git/info/exclude for CLAUDE.local.md`
+      );
+    } else {
+      const added = upsertSharedExclude(
+        repoRoot,
+        artifactExcludeRulesForPrefix(workspace.prefix, ADAPTER_LOCAL_EXCLUDE_RULES)
+      );
+      if (added.length > 0) {
+        notices.push(`agc init — added ${added.join(", ")} to the shared info/exclude`);
+      }
+    }
+    if (claudeHoldsBlock) {
+      errBlocks.push(
+        `agc init — note: CLAUDE.md still holds an agc adapter block; the block was also written to ` +
+          `CLAUDE.local.md. agc init does not edit CLAUDE.md: delete the lines from ` +
+          `"${CLAUDE_BEGIN}" to "${CLAUDE_END}" there by hand and commit that change.`
+      );
+    }
+  }
+
   // Remaining scaffolding (preserved verbatim; skip-if-exists).
   const files = [{ rel: "tasks.md", content: tasksTemplate }];
   for (const { rel, content } of files) {
@@ -534,11 +639,20 @@ function runInit(cwd, argv = []) {
   const ver = installedVersion();
   for (const { rel, tpl, mode } of ADAPTERS) {
     if (mode === "upsert") {
-      const result = writeClaudeBlock(cwd, stampTemplate(tpl, ver));
+      const target = ADAPTER_PLACEMENTS[adapter];
+      const result = writeClaudeBlock(cwd, stampTemplate(tpl, ver), target);
       if (result === "updated" || result === "appended") {
-        updated.push(rel); // both mean the file pre-existed
+        updated.push(target); // both mean the file pre-existed
       } else {
-        created.push(rel); // "created" — brand-new file
+        created.push(target); // "created" — brand-new file
+      }
+      // Only a fresh append prints this: an in-place update is an existing
+      // adopter's re-run, whose output stays as it was. No git command runs.
+      if (adapter === "shared" && result === "appended" && claudeTracked) {
+        errBlocks.push(
+          `agc init — note: CLAUDE.md is tracked by git, so the agc adapter block just added to it shows in ` +
+            `the team's diff — to keep the block out of git, use agc init --adapter=local (see docs/install.md)`
+        );
       }
       continue;
     }
@@ -936,6 +1050,73 @@ async function checkComments(cwd) {
   }
 }
 
+// --- adapter placement + git index-flag advisories (E444) --------------------
+// The files the CLAUDE.md block can live in; the index-flag advisory covers
+// exactly these (AGENTS.md and .antigravityrules are out of scope).
+const CLAUDE_BLOCK_FILES = [ADAPTER_PLACEMENTS.shared, ADAPTER_PLACEMENTS.local];
+
+// Which of CLAUDE.md / CLAUDE.local.md the stale check reads: the file(s)
+// holding a block, else CLAUDE.md alone (any stamp in it, as before
+// CLAUDE.local.md was a placement).
+function claudeCheckTargets(cwd) {
+  const holders = CLAUDE_BLOCK_FILES.filter((rel) => fileHoldsClaudeBlock(path.join(cwd, rel)));
+  return holders.length > 0 ? holders : [ADAPTER_PLACEMENTS.shared];
+}
+
+// Git index flags on CLAUDE.md / CLAUDE.local.md, from `git ls-files -v`:
+// tag S or s = skip-worktree, any lowercase tag = assume-unchanged ("s" is
+// both). Returns [{ rel, flag }] with rel relative to cwd; [] outside git or
+// on any git failure. Read-only: agc never runs git update-index.
+function adapterIndexFlags(cwd) {
+  let out;
+  try {
+    out = execFileSync("git", ["ls-files", "-v", "-z", "--", ...CLAUDE_BLOCK_FILES], {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return [];
+  }
+  const flags = [];
+  const seen = new Set();
+  const add = (rel, flag) => {
+    const key = `${flag}\0${rel}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    flags.push({ rel, flag });
+  };
+  for (const entry of out.split("\0")) {
+    if (entry.length < 3 || entry[1] !== " ") continue;
+    const tag = entry[0];
+    const rel = entry.slice(2);
+    if (tag === "S" || tag === "s") add(rel, "skip-worktree");
+    if (tag !== tag.toUpperCase()) add(rel, "assume-unchanged");
+  }
+  return flags;
+}
+
+// Advisory only (never touches the exit code): the block in both files, and
+// index flags that hide local changes from git status and later stop git pull.
+function checkAdapterPlacement(cwd) {
+  if (CLAUDE_BLOCK_FILES.every((rel) => fileHoldsClaudeBlock(path.join(cwd, rel)))) {
+    process.stderr.write(
+      "agc check — adapter block found in both CLAUDE.md and CLAUDE.local.md — Claude Code loads both files, so the block is read twice; remove it from one of them\n"
+    );
+  }
+  for (const { rel, flag } of adapterIndexFlags(cwd)) {
+    if (flag === "skip-worktree") {
+      process.stderr.write(
+        `agc check — ${rel} is flagged skip-worktree in the git index: git status and git diff hide its local changes, and git pull stops with "local changes would be overwritten" once upstream changes it — clear the flag with: git update-index --no-skip-worktree ${rel}\n`
+      );
+    } else {
+      process.stderr.write(
+        `agc check — ${rel} is flagged assume-unchanged in the git index: git status and git diff hide its local changes, and git pull can stop with "local changes would be overwritten" once upstream changes it — clear the flag with: git update-index --no-assume-unchanged ${rel}\n`
+      );
+    }
+  }
+}
+
 // --- subcommand: check -----------------------------------------------------
 async function runCheck(cwd) {
   checkResearchBinaries(cwd); // advisory; never affects exit code
@@ -945,12 +1126,16 @@ async function runCheck(cwd) {
   checkArtifactsDrift(cwd); // advisory; never affects exit code
   await checkHygiene(cwd); // advisory; never affects exit code
   await checkComments(cwd);
+  checkAdapterPlacement(cwd); // advisory; never affects exit code
 
   const ver = installedVersion();
   const stale = [];
   let present = 0;
 
-  for (const { rel } of ADAPTERS) {
+  const targets = ADAPTERS.flatMap(({ rel }) =>
+    rel === ADAPTER_PLACEMENTS.shared ? claudeCheckTargets(cwd) : [rel]
+  );
+  for (const rel of targets) {
     const target = path.join(cwd, rel);
     if (!fs.existsSync(target)) continue; // absent is not a stale condition
     present++;
@@ -996,7 +1181,8 @@ const STR_USAGE_FEATURE =
   "          .current/.config.json nodeModulesLinks), .env byte-copied.\n" +
   "          Primary's .current/.config.json is copied in when the checkout\n" +
   "          has none and git ignores it there (a snapshot: later edits in\n" +
-  "          primary do not reach the lane).\n" +
+  "          primary do not reach the lane). An ignored CLAUDE.local.md is\n" +
+  "          byte-copied the same way (agc init --adapter=local).\n" +
   "  feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>] [--pr <n>]\n" +
   "          Tear a lane down from the primary checkout. --shipped requires\n" +
   "          the branch merged into --base (default main), moves the lane's\n" +
@@ -1037,6 +1223,14 @@ const LANE_EXCLUDE_RULES = [".env", "/node_modules", "/.current/**/base-sha"];
 // artifacts choice. A subdirectory workspace must go through
 // artifactExcludeRulesForPrefix() / artifactPathsForPrefix() below.
 const ARTIFACT_EXCLUDE_RULES = ["/.current/", "/tasks.md", "/qa_reports/", "/review_reports/"];
+
+// The exclude rule `agc init --adapter=local` upserts, anchored to the
+// workspace through artifactExcludeRulesForPrefix(prefix, this list). Kept
+// apart from ARTIFACT_EXCLUDE_RULES: the adapter placement is independent of
+// the artifacts mode (check's drift test keys on that list), and eject
+// deletes every artifact path wholesale while CLAUDE.local.md may also hold
+// the user's own notes.
+const ADAPTER_LOCAL_EXCLUDE_RULES = ["/CLAUDE.local.md"];
 
 // Characters unsafe in a path segment agc writes verbatim into a gitignore
 // rule: the wildcards `* ? [ ]` (match too much), a backslash (git reads an
@@ -1568,6 +1762,46 @@ function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
             `until it is copied by hand`
         );
       }
+    }
+  }
+
+  // CLAUDE.local.md (`agc init --adapter=local`): the agc adapter block lives
+  // in this untracked file, so a fresh worktree lacks it and the lane would
+  // load no governance block. Byte copy from the repo root, like .env, only
+  // when the lane has no file there and git ignores it in the lane: an
+  // unignored copy would show as untracked and make `finish` refuse to remove
+  // the worktree. Not ignored: copy nothing and say how to add the rule.
+  const claudeLocalRel = "CLAUDE.local.md";
+  const primaryClaudeLocal = path.join(repoRoot, claudeLocalRel);
+  const laneClaudeLocal = path.join(lanePath, claudeLocalRel);
+  let primaryIsFile = false;
+  try {
+    primaryIsFile = fs.statSync(primaryClaudeLocal).isFile();
+  } catch {
+    // Absent (or unreadable): nothing to copy.
+  }
+  if (primaryIsFile && !lstatOrNull(laneClaudeLocal)) {
+    const ignored = gitTry(lanePath, ["check-ignore", "-q", "--", claudeLocalRel]).status;
+    if (ignored === 0) {
+      try {
+        fs.copyFileSync(primaryClaudeLocal, laneClaudeLocal, fs.constants.COPYFILE_EXCL);
+        out.push(
+          "agc feature start — copied CLAUDE.local.md from the primary checkout (bytes only; contents never read)"
+        );
+      } catch (err) {
+        if (!err || err.code !== "EEXIST") {
+          warn.push(
+            `agc feature start — warning: could not copy CLAUDE.local.md into the lane ` +
+              `(${err && err.message ? err.message : String(err)}) — copy it by hand to load the agc block there`
+          );
+        }
+      }
+    } else if (ignored === 1) {
+      warn.push(
+        "agc feature start — warning: CLAUDE.local.md in the primary checkout is not ignored by git, " +
+          "so it was not copied into the lane (it would show as untracked there) — run agc init " +
+          "--adapter=local in the primary checkout to add the exclude rule"
+      );
     }
   }
 
@@ -3755,7 +3989,9 @@ function installedAgentTemplates() {
     .filter((f) => lstatOrNull(f) !== null);
 }
 
-function ejectCannotDoBlock() {
+// `flags` is adapterIndexFlags() output; item 5 is appended only when it is
+// non-empty, so an unflagged workspace gets the four-item block unchanged.
+function ejectCannotDoBlock(flags) {
   const present = installedAgentTemplates();
   const tail =
     present.length === 0
@@ -3773,7 +4009,11 @@ function ejectCannotDoBlock() {
     "       claude mcp remove -s user agent-governance-mcp\n" +
     "     Other hosts: remove this server's entry from their MCP config file by hand.\n" +
     "  4. Remove the machine-wide subagent templates in ~/.claude/agents/: they may be in use by other projects on this machine, so eject never deletes them. Present:\n" +
-    tail
+    tail +
+    (flags.length === 0
+      ? ""
+      : "  5. Clear git index flags: the adapter file(s) below are flagged in the git index, and git pull can fail on them until the flag is cleared. agc never runs git update-index:\n" +
+        flags.map(({ rel, flag }) => `       git update-index --no-${flag} ${escapeSegmentForDisplay(rel)}\n`).join(""))
   );
 }
 
@@ -3785,20 +4025,22 @@ function ejectCannotDoBlock() {
 //   display         the path named in that list; raw, escaped only when printed
 //   advisory        true for a report-only line that prints even with nothing to eject
 
-// Host-trace entries (class iii), in plan order: the CLAUDE.md adapter block,
-// AGENTS.md / .antigravityrules, and this workspace's artifact exclude lines.
+// Host-trace entries (class iii), in plan order: the adapter block in
+// CLAUDE.md then CLAUDE.local.md, AGENTS.md / .antigravityrules, and this
+// workspace's artifact and adapter exclude lines.
 // ctx = { cwd, repoRoot, workspace } (repoRoot null outside git).
 function planHostTraceEntries(ctx) {
   const entries = [];
-  const claude = planClaudeBlockEntry(ctx);
-  if (claude !== null) entries.push(claude);
+  for (const rel of CLAUDE_BLOCK_FILES) {
+    const claude = planClaudeBlockEntry(ctx, rel);
+    if (claude !== null) entries.push(claude);
+  }
   for (const { rel, tpl, mode } of ADAPTERS) {
     if (mode !== "skip") continue;
     const e = planAdapterFileEntry(ctx, rel, tpl);
     if (e !== null) entries.push(e);
   }
-  const exclude = planExcludeEntry(ctx);
-  if (exclude !== null) entries.push(exclude);
+  entries.push(...planExcludeEntries(ctx));
   return entries;
 }
 
@@ -3814,26 +4056,45 @@ function isWorkspaceFileTracked(ctx, rel) {
   return trackedArtifactPaths(ctx.repoRoot, [{ display: target, target }]).length > 0;
 }
 
-// Reverse of writeClaudeBlock: drop the first BEGIN..END block, markers
-// inclusive, keeping every byte outside it. When what remains is only
-// whitespace the file held nothing but the block (a fresh `agc init` creates
-// exactly that), so the whole file is deleted rather than left empty. An
-// absent file is skipped silently; a file without a well-formed marker pair
-// is reported and left alone.
-function planClaudeBlockEntry(ctx) {
-  const abs = path.join(ctx.cwd, "CLAUDE.md");
+// What removing the agc block would leave of file `abs`: null when the file
+// is absent, { rest: null } when it holds no well-formed BEGIN..END pair (eject
+// leaves it untouched), else { rest } with every byte outside the first block.
+function claudeBlockRemoval(abs) {
   if (!fs.existsSync(abs)) return null;
-  const display = workspaceDisplay(ctx.workspace, "CLAUDE.md");
-  const label = `(iii) host traces — ${escapeSegmentForDisplay(display)}`;
   const existing = fs.readFileSync(abs, "utf-8");
   const beginIdx = existing.indexOf(CLAUDE_BEGIN);
   const endIdx = existing.indexOf(CLAUDE_END);
-  if (beginIdx === -1 || endIdx === -1 || endIdx < beginIdx) {
+  if (beginIdx === -1 || endIdx === -1 || endIdx < beginIdx) return { rest: null };
+  return { rest: existing.slice(0, beginIdx) + existing.slice(endIdx + CLAUDE_END.length) };
+}
+
+// Whether this workspace's CLAUDE.local.md is still on disk after eject: it
+// is kept when it holds no agc block (eject leaves it alone) or holds content
+// beside the block (only the block is removed).
+function localAdapterFileSurvivesEject(ctx) {
+  const removal = claudeBlockRemoval(path.join(ctx.cwd, ADAPTER_PLACEMENTS.local));
+  return removal !== null && (removal.rest === null || removal.rest.trim() !== "");
+}
+
+// Reverse of writeClaudeBlock for `rel` (CLAUDE.md or CLAUDE.local.md): drop
+// the first BEGIN..END block, markers inclusive, keeping every byte outside
+// it. When what remains is only whitespace the file held nothing but the
+// block (a fresh `agc init` creates exactly that), so the whole file is
+// deleted rather than left empty; any other content keeps the file. An absent
+// file is skipped silently; a file without a well-formed marker pair is
+// reported and left alone.
+function planClaudeBlockEntry(ctx, rel) {
+  const abs = path.join(ctx.cwd, rel);
+  const removal = claudeBlockRemoval(abs);
+  if (removal === null) return null;
+  const display = workspaceDisplay(ctx.workspace, rel);
+  const label = `(iii) host traces — ${escapeSegmentForDisplay(display)}`;
+  if (removal.rest === null) {
     const line = `${label}: no adapter block found — nothing to do`;
     return { line: () => line, apply: null, untrackedDelete: false };
   }
-  const rest = existing.slice(0, beginIdx) + existing.slice(endIdx + CLAUDE_END.length);
-  const tracked = isWorkspaceFileTracked(ctx, "CLAUDE.md");
+  const { rest } = removal;
+  const tracked = isWorkspaceFileTracked(ctx, rel);
   if (rest.trim() === "") {
     return {
       line: (applied) =>
@@ -3894,39 +4155,77 @@ function planAdapterFileEntry(ctx, rel, tpl) {
   };
 }
 
-// Remove exactly the artifact exclude lines `agc init --artifacts=local`
-// wrote for THIS workspace's prefix from the shared info/exclude. A line is
-// removed only when it equals one of those rules (a trailing CR aside); every
-// other line — lane rules, another workspace's rules, the adopter's own —
-// keeps its exact bytes and position. A workspace whose path holds a
-// character unsafe for an exclude rule never had rules written (init refuses local mode
-// there), so there is nothing to look for.
-function planExcludeEntry(ctx) {
+// Remove exactly the exclude lines `agc init --artifacts=local` and
+// `agc init --adapter=local` wrote for THIS workspace's prefix from the shared
+// info/exclude. A line is removed only when it equals one of those rules (a
+// trailing CR aside); every other line — lane rules, another workspace's
+// rules, the adopter's own — keeps its exact bytes and position. A workspace
+// whose path holds a character unsafe for an exclude rule never had rules
+// written (init refuses local mode there), so there is nothing to look for.
+// The CLAUDE.local.md rule is kept while that file stays on disk (it still
+// holds the user's own notes, with or without an agc block): dropping it would
+// leave the notes untracked, one `git add -A` away from the team's history.
+// A kept rule adds a report-only advisory line naming it.
+function planExcludeEntries(ctx) {
   const label = "(iii) host traces — .git/info/exclude";
   if (ctx.repoRoot === null) {
     const line = `${label}: skipped (not inside a git repository)`;
-    return { line: () => line, apply: null, untrackedDelete: false };
+    return [{ line: () => line, apply: null, untrackedDelete: false }];
   }
-  if (ctx.workspace.unsafeSegment !== null) return null;
+  if (ctx.workspace.unsafeSegment !== null) return [];
   const rules = new Set(artifactExcludeRulesForPrefix(ctx.workspace.prefix));
+  const [adapterRule] = artifactExcludeRulesForPrefix(ctx.workspace.prefix, ADAPTER_LOCAL_EXCLUDE_RULES);
+  const keepAdapterRule = localAdapterFileSurvivesEject(ctx);
   const { excludePath, existing, exists } = readSharedExclude(ctx.repoRoot);
   // Each line with its own terminator, so joining the survivors reproduces
   // their bytes exactly, including a missing final newline.
   const lines = exists ? existing.match(/[^\n]*\n|[^\n]+$/g) ?? [] : [];
-  const kept = lines.filter((l) => !rules.has(l.replace(/\r?\n$/, "")));
-  const n = lines.length - kept.length;
-  if (n === 0) {
+  let n = 0;
+  let adapterHit = false;
+  const kept = lines.filter((l) => {
+    const rule = l.replace(/\r?\n$/, "");
+    if (rules.has(rule)) {
+      n += 1;
+      return false;
+    }
+    if (rule === adapterRule) {
+      adapterHit = true;
+      return keepAdapterRule;
+    }
+    return true;
+  });
+  const removeAdapter = adapterHit && !keepAdapterRule;
+  const entries = [];
+  if (n === 0 && !removeAdapter) {
     const line = `${label}: nothing to remove`;
-    return { line: () => line, apply: null, untrackedDelete: false };
+    entries.push({ line: () => line, apply: null, untrackedDelete: false });
+  } else {
+    // Without the adapter rule removed the wording is the artifacts-only line as before.
+    const what = !removeAdapter
+      ? `${n} artifact exclude line(s)`
+      : n === 0
+        ? `the ${adapterRule} line`
+        : `${n} artifact exclude line(s) and the ${adapterRule} line`;
+    entries.push({
+      line: (applied) => (applied ? `${label}: removed ${what}` : `${label}: REMOVE ${what}`),
+      apply: () => atomicWriteFile(excludePath, kept.join("")),
+      untrackedDelete: false,
+    });
   }
-  return {
-    line: (applied) =>
-      applied
-        ? `${label}: removed ${n} artifact exclude line(s)`
-        : `${label}: REMOVE ${n} artifact exclude line(s)`,
-    apply: () => atomicWriteFile(excludePath, kept.join("")),
-    untrackedDelete: false,
-  };
+  if (adapterHit && keepAdapterRule) {
+    const file = escapeSegmentForDisplay(workspaceDisplay(ctx.workspace, ADAPTER_PLACEMENTS.local));
+    const why =
+      `${file} stays on disk because it still holds your own notes, and the line keeps it out of git; ` +
+      `remove the line by hand from the shared info/exclude once you no longer need it`;
+    entries.push({
+      line: (applied) =>
+        applied ? `${label}: kept the ${adapterRule} line — ${why}` : `${label}: the ${adapterRule} line will be kept — ${why}`,
+      apply: null,
+      untrackedDelete: false,
+      advisory: true,
+    });
+  }
+  return entries;
 }
 
 // The class (i)/(ii-b)/(ii-a) paths for this workspace, prefix-anchored.
@@ -4005,12 +4304,14 @@ function runEject(cwd, argv) {
   }
   entries.push(...planHostTraceEntries({ cwd, repoRoot, workspace }));
 
+  const indexFlags = repoRoot === null ? [] : adapterIndexFlags(cwd);
+
   if (tracked.length === 0 && !entries.some((e) => e.apply !== null)) {
     process.stdout.write("agc eject — nothing to eject.\n");
     for (const e of entries) {
       if (e.advisory) process.stdout.write(`${e.line(yes)}\n`);
     }
-    process.stdout.write(ejectCannotDoBlock());
+    process.stdout.write(ejectCannotDoBlock(indexFlags));
     return;
   }
 
@@ -4066,7 +4367,7 @@ function runEject(cwd, argv) {
         `Note: history still contains these files after that command.\n`
     );
   }
-  process.stdout.write(ejectCannotDoBlock());
+  process.stdout.write(ejectCannotDoBlock(indexFlags));
 }
 
 // --- dispatch --------------------------------------------------------------

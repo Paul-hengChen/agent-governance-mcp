@@ -16,6 +16,38 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.23.0] - 2026-11-23
+
+MINOR release. It ships one backlog ticket, E444, from a maintenance branch cut at the `v4.22.0`
+tag rather than from `main`: `main` already carries tickets of the v5.0.0 milestone, which are not
+released before v5.0.0 (human ruling 2026-11-19, ruling 18; branch procedure ruled 2026-11-23).
+Semver: MINOR, because `agc init` gains the `--adapter` flag and a new first-install default; no
+gate, error code, schema version, tool, prompt, transition table, shipped prompt text or
+dependency changes.
+
+### Added
+
+- **`agc init --adapter=shared|local` places the agc block in `CLAUDE.local.md` (E444).** In a repo
+  whose `CLAUDE.md` is a tracked team file, `local` writes the adapter block to `CLAUDE.local.md`,
+  which Claude Code loads beside `CLAUDE.md`, and adds a `/CLAUDE.local.md` rule, anchored to the
+  workspace prefix, to the shared `info/exclude`. Teammates never see the block in a diff, and the
+  `git update-index --skip-worktree CLAUDE.md` workaround, which makes `git pull` fail while
+  `git status` stays empty, is no longer needed. Setup is described in `docs/install.md`.
+
+### Changed
+
+- **Default placement with no `--adapter` (E444).** `local` is chosen only on a first install: a git
+  repo, a tracked `CLAUDE.md` without the block, and effective artifacts mode `local`. A re-run
+  keeps the block where it already is: a `CLAUDE.md` that holds the block is updated in place as
+  before, and a `CLAUDE.local.md` that holds it stays `local` in every artifacts mode. When `init`
+  newly adds the block to a tracked `CLAUDE.md`, it prints one line suggesting `--adapter=local`.
+- **`agc check`, `agc eject` and `agc feature start` know about `CLAUDE.local.md` (E444).** `check`
+  reads the adapter stamp from whichever of `CLAUDE.md` and `CLAUDE.local.md` holds the block, and
+  names a skip-worktree or assume-unchanged flag on either file together with the command that
+  clears it; `eject` removes the block from `CLAUDE.local.md`, mentions those flags, and keeps the
+  file and its exclude rule while the file still holds the user's own lines; `feature start` copies
+  the primary's `CLAUDE.local.md` into a new lane when git ignores it there.
+
 ## [4.22.0] - 2026-11-19
 
 MINOR release. It ships six backlog tickets from one prompt audit since v4.21.0, landed on `main`
