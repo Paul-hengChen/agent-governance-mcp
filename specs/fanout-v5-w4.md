@@ -2,7 +2,7 @@
 base: 6264f31    integration branch: integ/v5-w4
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類已核准 2026-11-23（Stage 2，單一 lane e433）；待派工。**
+**狀態：已結案 2026-11-23。** e433 已合併進 `integ/v5-w4`（merge `01cb04d`，零衝突、無實質解衝突）、finish、拆除；派工 base `96708e6`（清單 PR #165 merge）；merge 後 build 無 `dist/` 差異、audit 通過、`agc check` exit 0、`CLAUDE.md` 250 行；本波以一個 PR 合進 `main`，不發版（16.1 裁定 18）。lane 層 CI：run 45133074510 @ `6eaf0f9` 綠（Node 20、22）。Roll-up：e433 tickets 13、hop 10/14、review 退回 0、qa 退回 0（qa 兩次 Blocked 交 sr 做人類裁定後的修正 T-E433-12、T-E433-13，不計輪次）；證據 13/13。預算增量（~tok，對 E418 的節省）：design-arm constitution +425（E418 −1065）、teamwork bundle +541（−2490）、non-design constitution +426（−985）；skill-pm 上限 4791→4998、skill-sr 2805→3335、code-reviewer SOP 10646→12691 bytes（e118 上限 10725→12800）。波中人類裁定見 Decisions（R1 (a)、改劃兩次、D16–D21）。
 
 範圍由人類指定（integrator prompt「fan-out v5.0.0 里程碑的下一波（第 4 波）」，2026-11-23）：下一張是 E433，並依 `docs/backlog.md` 的相依找出剩下的票裡能與它同時跑的。順序依 `docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 17.1 裁定 4 修訂後的版本（E422 → E423 → E419 → E431 → E432 → E433 → E434 → E445 → E435 → 其餘照 16.1 裁定 17）。依 16.1 裁定 18，合進 `main` 但不發版，與 E435 一起發 v5.0.0。本波結束時不發版。
 
@@ -154,3 +154,21 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-23 | 人類 | e433 build gate 比照 R1：sr-engineer 因測試與情境矛盾或與既有程式衝突而退回 qa-engineer 時，只能帶著 qa 交來、已列在 `qa_reports/expected-red_<feature>.txt` 的編譯錯誤，不能新增；sr 交 code-reviewer 仍零錯誤。修訂 R1 (a) 的「sr 的交接在內」一句。只影響 e433 | 整合者 session（回覆「2. 比照 R1」） |
 | 2026-11-23 | 人類 | e433 code re-review 建議 (1) 在本 lane 修：憲法 §3 *State update* 補「伺服器不接受這個角色的任何寫入時，停下回報、由能寫入的角色接手」，與 qa SOP 撞 `SR_RETURN_CAP_EXCEEDED` 時停下不寫 state 一致。本票造成的矛盾。只影響 e433 | 整合者 session（回覆「(1) 修」）；e433 信箱 to-integrator#21，review `review_reports/review_T-E433-12.md` @ `b40bd44` |
 | 2026-11-23 | 人類 | e433 build gate 比照 D19 再放寬一步：sr-engineer 停下交 pm（`sr_return` 上限已到、情境做不出來）時，也只能帶著 `qa_reports/expected-red_<feature>.txt` 已列的編譯錯誤，不能新增；sr 交 code-reviewer 仍零錯誤。新 sr task T-E433-13（只改 `content/const-05-core-standards.md`），在 qa 這一棒 T-08／T-09 完成後以 qa Blocked → sr（不計 qa_round）→ code-reviewer → qa T-10。只影響 e433 | 整合者 session（回覆「(2) 比照 D19」） |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 96708e6
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/v5-w4 @ 782c80d）
+- lane-status：primary（main ← integ/v5-w4 @ 782c80d）release-cd-v4.22.0／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 1 條 lane、1 張票（E433）qa PASS、合併、finish、拆除；not yet released——依 16.1 裁定 18 與 E434、E435 一起隨 v5.0.0 發出。lane 紀錄在 `.current/history/2026-11/e433/`；裁定與驗證細節在本檔 Decisions 與狀態行。新發現 1 張：E446（doc-writer SOP 收尾的 state 寫入在 PASS 後被伺服器拒絕，改動前就有），已由 finish 配號並排進佇列第 257 號（里程碑之後）；無未配號的新發現。
+- 注意：`test/e433-test-first-rules.test.mjs` 的 AC9、AC12、AC13 以 `git archive`／`git diff` 讀固定 sha（`96708e6..ac5a692`）的內容做 base 比對，取不到 sha 時 skip；CI 用 `fetch-depth: 0`、本波以 `--no-ff` 合併，現在都會跑，但歷史若被壓縮就會靜默 skip。
+### 待人類決定
+- SQLite／HTTP 模式設不了 `chain_path`，合併後服務的規則叫 pm 設它，HTTP 模式的使用者會卡住（e433 qa 建議 (2)；v5.0.0 發版前沒有使用者遇到）。整合者建議不另開票：E435 移除 `chain_path` 標記後新鏈成為唯一路徑，這個缺口自然消失；請在 E435 的 cut 寫明 SQLite／HTTP 模式不靠標記也走新鏈，並列一條驗收。
+- 合併後重啟 primary 的 MCP server（`tools/registry.ts`、`tools/fanout-manifest.ts`、`gates/registry.ts` 是編譯過的程式）；使用者層級已安裝的 subagent 範本要不要重裝（qa-engineer 範本改 opus）。
+- 是否開下一波：v5.0.0 里程碑順序的下一張是 E434（相依 E433，本波已合併）。
+### 進行中的背景工作
+無
