@@ -112,9 +112,9 @@ accepted.
 **Completion-evidence gates (v3.86.0, v3.100.0).** Identity on a write is attestation-based
 by design, so the server verifies what it can: a completion claim must be backed by on-disk
 evidence regardless of who stamps it. The QA Completion-Evidence gate diffs an incoming
-`qa-engineer` write against the on-disk set, so ids a non-qa role persisted earlier would
-contribute no difference and slip past it — the Non-QA Completed-Tasks gate closes that
-prefill door upstream. Its predicate is strict (any non-empty list, not a set-difference)
+write by the chain's judge (code-reviewer) against the on-disk set, so ids another role
+persisted earlier would contribute no difference and slip past it — the Non-QA Completed-Tasks
+gate closes that prefill door upstream. Its predicate is strict (any non-empty list, not a set-difference)
 because a set-difference is exactly the shape of that bypass, and it has no exemptions
 because an exemption on this class of check is the hole that reopened once already (E32).
 

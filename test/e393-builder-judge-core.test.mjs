@@ -102,7 +102,8 @@ test("AC-C: named sites restate no bare round number", () => {
     assert.doesNotMatch(C(f), /Round \d|round \d|>= ?\d|up to \d|\d more rounds/, `${f} has a bare round number`);
   }
   // Named-cap phrasing per row.
-  assert.ok(C("const-06-chain-31-head.md").includes("cap of QA FAILs is exhausted"), "C02 qa_round cap named");
+  // E433 (D10): the qa FAIL loop is gone; const-06 names the review_round and sr_return caps instead.
+  assert.ok(C("const-06-chain-31-head.md").includes("toward the `sr_return` cap, past which that return is rejected"), "C02 sr_return cap named");
   assert.ok(C("const-08-chain-31-mid.md").includes("cap of code-reviewer FAILs is exhausted"), "C03 review_round cap named");
   const c09 = C("const-09-design-chain-vround.md");
   assert.ok(c09.includes("any round past it locks"), "C04 visual_round cap named");
@@ -111,13 +112,13 @@ test("AC-C: named sites restate no bare round number", () => {
   assert.ok(c09.includes("grinding the remaining rounds"), "C05b");
   assert.ok(c09.includes("from the `visual_split` threshold through the `visual_round` cap; mandatory route past the cap"), "C05c");
   const c12 = C("const-12-chain-r10-s4.md");
-  assert.ok(c12.includes("up to the\n`review_round` cap"), "C07 review_round cap named");
-  assert.ok(c12.includes("(up to the `qa_round` cap)"), "C08 qa_round cap named");
+  assert.ok(c12.includes("past the `review_round` cap only pm may take the feature"), "C07 review_round cap named (E433 loop wording)");
+  assert.ok(c12.includes("counts toward the `sr_return` cap, past which only pm may take the feature"), "C08 sr_return cap named");
   // skill-qa-engineer / skill-qa-visual / skill-sr-engineer.
   const qe = C("skill-qa-engineer.md");
-  assert.ok(qe.includes("*Escalation Routes: unresolved at the `qa_round` cap*"), "C09");
-  assert.ok(qe.includes("Once the `qa_round` cap of prior FAILs is exhausted"), "C10");
-  assert.ok(qe.includes("| unresolved at the `qa_round` cap | FAIL | `QA: <task-id> unresolved at the qa_round cap` | pm |"), "C11");
+  // E433: qa-engineer writes no FAIL, so its qa_round cap rows are gone (C09-C11); the cap it meets is sr_return.
+  assert.ok(!qe.includes("`qa_round` cap"), "C09-C11 the qa SOP restates no qa_round cap");
+  assert.ok(qe.includes("counts toward the `sr_return` cap, which the server checks on your claim"), "qa SOP names the sr_return cap");
   const qv = C("skill-qa-visual.md");
   assert.ok(qv.includes("Past the `visual_round` cap, only"), "C12 visual_round cap named");
   assert.ok(qv.includes("| FAIL past the `visual_round` cap |"), "C13");
@@ -127,10 +128,10 @@ test("AC-C: named sites restate no bare round number", () => {
   for (const f of ["skill-sr-engineer.md", "skill-qa-visual.md", "skill-qa-engineer.md"]) {
     assert.doesNotMatch(C(f), /visual_round >= 3|Round 3|Round 4|Round 6|visual round 6/, `${f} has a bare cap number`);
   }
-  // qa Escalation Routes table keeps its 7 data rows (rename only).
+  // qa Escalation Routes table: the 2 test-author rows (scenario defect, interface collision) after E433.
   const routes = qe.slice(qe.indexOf("## Escalation Routes"));
   const rows = routes.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| situation") && !l.startsWith("|---"));
-  assert.equal(rows.length, 7, "Escalation Routes table keeps 7 data rows");
+  assert.equal(rows.length, 2, "Escalation Routes table keeps its 2 data rows");
 });
 
 test("AC-C01: Limits table has the visual_split row", () => {

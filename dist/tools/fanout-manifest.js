@@ -70,7 +70,7 @@ export const PROMPT_TEMPLATE_3B = `開始做 <計劃或 feature>，你只負責 
 
 先完整讀 docs/lane-protocol.md（共同規則，包括信箱與回報格式），再讀 <計劃的必讀章節> + <票面 row>。
 \`feature start\` 建好 worktree 之後，呼叫 \`EnterWorktree\`（path = <worktree>）把這個 session 切進去；這個工具不能用時，每個 Bash 指令照舊自帶 \`cd <worktree> &&\`。
-你只負責這張票走到 qa PASS；波次層級的核取項屬於整合者。
+你只負責這張票走到裁判（code-reviewer）PASS；波次層級的核取項屬於整合者。
 
 【你的欄位】
 - primary: <primary 路徑>    base: <base>    ticket-slug: <ticket-slug>

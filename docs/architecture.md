@@ -124,11 +124,12 @@ USER → coordinator
          ├─ "plan / spec / create tasks"              → pm
          ├─ "design / architecture / contract"        → architect
          ├─ "implement / fix / refactor"              → sr-engineer
-         ├─ "test / verify / rollback"                → qa-engineer
+         ├─ "review / verify / rollback"              → code-reviewer
+         ├─ "test / write tests"                      → qa-engineer
          └─ "Q&A / 1-file edit / status check"        → direct reply
 
 specialist chain (full mode):
-  researcher? → design-auditor? → pm → architect? → sr-engineer ↔ code-reviewer → qa-engineer → PASS
+  researcher? → design-auditor? → pm → architect? → qa-engineer → sr-engineer → code-reviewer → PASS
 
 side-channel roles (post-PASS, manual):
   doc-writer       — updates README / CHANGELOG / docs
@@ -181,7 +182,7 @@ Two **independent** axes decide (a) who runs the coordinator and (b) whether eac
    role spawned as subagent           role switched in same ctx
    each tier-pinned model             no model switch
    pm(sonnet) architect(opus)         one model runs the chain
-   sr-engineer(opus) qa(sonnet)…
+   sr-engineer(opus) qa(opus)…
             │                                   │
    ← this is "model-routing"          ← this is "single model"
             │                                   │

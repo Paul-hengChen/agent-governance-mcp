@@ -491,12 +491,13 @@ test("S2: content/skill-sr-engineer.md carries the Repro-First (bugfix mode) SOP
   );
 });
 
-test("S3: content/skill-qa-engineer.md carries the bugfix-mode Phase 0.5 branch making the Expected-Red Diff disposition load-bearing for PASS", () => {
-  const skill = readContentFile("skill-qa-engineer.md");
-  assert.match(skill, /\*\*Bugfix-mode branch\*\*/, "must carry the named Bugfix-mode branch heading");
+// E433: the Expected-Red Diff step (formerly qa Phase 0.5) moved to the code-reviewer SOP, the chain's judge.
+test("S3: content/skill-code-reviewer.md carries the bugfix-mode Expected-Red Diff branch making the disposition load-bearing for PASS", () => {
+  const skill = readContentFile("skill-code-reviewer.md");
+  assert.match(skill, /\*\*Bugfix branch\*\*/, "must carry the named Bugfix branch heading");
   assert.ok(skill.includes("dispatch_mode"), "must reference the dispatch_mode signal");
   assert.ok(
-    /load-bearing for PASS/i.test(skill),
+    /load-bearing: PASS requires/i.test(skill),
     "must state the disposition is load-bearing for PASS in bugfix mode (AC3), not advisory",
   );
   assert.ok(

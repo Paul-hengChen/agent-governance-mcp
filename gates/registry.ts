@@ -66,10 +66,10 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // Every entry is true except SR_RETURN_CAP_EXCEEDED (E431; quoted in prose
-  // with E433). DISPATCH_PIN_TIER_REJECTED, E300, and
-  // NON_REVIEWER_VERDICT_REJECTED, E139, each shipped false until a content/*.md
-  // sentence quoted it — E295 in coord-02, E365 in const-08. The field
+  // Every entry is true. SR_RETURN_CAP_EXCEEDED, E431, DISPATCH_PIN_TIER_REJECTED,
+  // E300, and NON_REVIEWER_VERDICT_REJECTED, E139, each shipped false until a
+  // content/*.md sentence quoted it — E433 in the qa-engineer and sr-engineer
+  // SOPs, E295 in coord-02, E365 in const-08. The field
   // exists so a code-internal gate can opt out without weakening the parity
   // test.
   readonly documentedInProse: boolean;
@@ -77,25 +77,25 @@ export interface GateDefinition {
 
 // errorCode → doc-file mapping, read by test/error-code-contract.test.mjs (specs/c12-registry-field-consumers.md AC2); rows: grep -l '`<CODE>`' content/*.md
 //   AGENT_ID_REQUIRED               skill-qa-engineer.md
-//   TRANSITION_REJECTED             coord-02-host-dispatch.md
+//   TRANSITION_REJECTED             coord-02-host-dispatch.md, skill-qa-engineer.md
 //   QA_ROUND_EXCEEDED               skill-qa-engineer.md
 //   REVIEW_ROUND_EXCEEDED           skill-code-reviewer.md
 //   VISUAL_ROUND_EXCEEDED           skill-qa-visual.md
 //   HOP_CAP_EXCEEDED                coord-01-core-head.md, coord-03-core-fallback.md
-//   SR_RETURN_CAP_EXCEEDED          (none)
+//   SR_RETURN_CAP_EXCEEDED          skill-qa-engineer.md, skill-sr-engineer.md
 //   SCOPE_DECISION_REQUIRED         const-08-chain-31-mid.md, constitution-rationale.md, skill-pm.md
 //   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-coordinator-lite.md
 //   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, coord-03-core-fallback.md, skill-pm.md
 //   SOURCE_CREDIBILITY_UNVERIFIED   coord-03-core-fallback.md, skill-design-auditor.md, skill-pm.md
 //   FEATURE_LEASE_HELD              const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-release-engineer.md
 //   LEASE_OVERRIDE_AUDIT_MISSING    const-08-chain-31-mid.md
-//   MISSING_EVIDENCE                skill-qa-engineer.md
+//   MISSING_EVIDENCE                skill-code-reviewer.md
 //   QA_COMPLETION_EVIDENCE_MISSING  const-08-chain-31-mid.md, skill-code-reviewer.md
-//   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md, const-08-chain-31-mid.md
-//   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md
-//   REPRO_MANIFEST_MISSING          skill-sr-engineer.md
+//   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
+//   EXPECTED_RED_DIFF_MISSING       skill-code-reviewer.md
+//   REPRO_MANIFEST_MISSING          skill-qa-engineer.md, skill-sr-engineer.md
 //   VISUAL_BASELINES_REQUIRED       const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-design-auditor.md
-//   VISUAL_EVIDENCE_MISSING         const-07-design-chain-gates.md, skill-qa-engineer.md, skill-qa-visual.md
+//   VISUAL_EVIDENCE_MISSING         const-07-design-chain-gates.md, skill-qa-visual.md
 //   VISUAL_WIDGETS_UNVERIFIED       skill-qa-visual.md
 //   VISUAL_ASSERTIONS_REQUIRED      const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md
 //   VISUAL_REPORT_INCOMPLETE        const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-qa-visual.md
@@ -104,12 +104,12 @@ export interface GateDefinition {
 //   BASELINE_PROVENANCE_INCOMPLETE  const-07-design-chain-gates.md, skill-design-auditor.md, skill-qa-visual.md
 //   PIXEL_GATE_ATTESTATION_MISSING  skill-qa-visual.md
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
-//   REVIEWER_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md, skill-code-reviewer.md
+//   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
 //   NON_REVIEWER_VERDICT_REJECTED   const-08-chain-31-mid.md
-//   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
-//   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
-//   PASS_TASKS_INCOMPLETE           skill-qa-engineer.md
+//   QA_REVIEW_TARGET_REQUIRED       skill-code-reviewer.md
+//   AC_EXECUTION_LOG_MISSING        skill-code-reviewer.md
+//   PASS_TASKS_INCOMPLETE           skill-code-reviewer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
 
 // The 35-gate catalog, in documentation order, grouped by envelope; the one
@@ -200,8 +200,8 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     hintStatic:
       " — sr-engineer has returned this feature to qa-engineer the maximum 2 times. " +
       "Route to pm (pm:In_Progress) for a human ruling on the scenario.",
-    // Not yet quoted in any content/*.md; the prose citation lands with E433.
-    documentedInProse: false,
+    // Quoted in the qa-engineer and sr-engineer SOPs since E433.
+    documentedInProse: true,
   },
   // ---- orchestrator-json (codes 8-13, producer: orchestrator) ----
   {
@@ -363,7 +363,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     hintStatic:
       "qa_reports/expected-red_<feature>.txt is declared but no ## Expected-Red Diff " +
       "section was found in any qa_reports/review_<id>.md for the PASS'd ids " +
-      "(covers: files count). Run Phase 0.5 (skill-qa-engineer) — diff the actual " +
+      "(covers: files count). Run the Expected-Red Diff step (skill-code-reviewer) — diff the actual " +
       "suite reds against the manifest and record the disposition before PASS.",
     documentedInProse: true,
   },
@@ -610,14 +610,14 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     armCondition: "hasProofAnnotatedAC().armed (file-mode only)",
     clearingArtifact: "## AC Execution Log H2 in qa_reports/review_<id>.md (covers: files count)",
     hintStatic:
-      "Run Phase 3.5 (skill-qa-engineer) — execute each proof:-annotated AC in " +
+      "Run the AC Execution step (skill-code-reviewer) — execute each proof:-annotated AC in " +
       "specs/<feature>.md and record command, raw output/exit code, and a per-AC " +
       "pass/fail verdict under a ## AC Execution Log section in a " +
       "qa_reports/review_<id>.md for one of the PASS'd ids (covers: files count; " +
       "the heading may carry a prefix/suffix but must contain the canonical " +
       "name, evidence schema v2) " +
       "before PASS. The server checks the section's presence only — the proofs' " +
-      "truthfulness stays with qa-engineer / code-reviewer. " +
+      "truthfulness stays with the judge. " +
       "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",
     documentedInProse: true,
   },

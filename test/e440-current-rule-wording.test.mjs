@@ -20,12 +20,13 @@ const { applyTextTransforms } = await import(path.join(ROOT, "dist", "prompts", 
 const dispatch = (t) => applyTextTransforms(t, { fullDetail: false });
 const count = (h, n) => h.split(n).length - 1;
 
-test("AC-E440-1 site 1: skill-qa-engineer Phase 1.5 states the rule as 'No `pending_notes` deferral substitutes for it', not 'is REMOVED'", () => {
+// E433 re-pin: Phase 1.5 left the qa SOP (test author, E434 owns the visual judge), so neither the
+// rewritten sentence nor the old 'is REMOVED' escape-clause wording may appear in it any more.
+test("AC-E440-1 site 1: skill-qa-engineer carries neither the Phase 1.5 deferral sentence nor the old 'is REMOVED' wording", () => {
   const s = src("skill-qa-engineer.md");
-  const want = "No `pending_notes` deferral substitutes for it: no PASS without diff evidence when baselines exist.";
-  assert.equal(count(s, want), 1, "rewritten sentence present once");
+  assert.equal(count(s, "No `pending_notes` deferral substitutes for it"), 0, "the Phase 1.5 rule left the qa SOP");
   assert.ok(!s.includes('The escape clause "Phase 1.5 deferred" in `pending_notes` is REMOVED'), "old sentence gone");
-  assert.ok(dispatch(s).includes(want), "survives into the dispatch bundle");
+  assert.ok(!dispatch(s).includes("is REMOVED"), "no 'is REMOVED' phrasing in the dispatch bundle");
 });
 
 test("AC-E440-1 site 2: coord-03 Fallback paragraph ends at the fallback rule; the 'pre-v3.20.0 behavior' sentence is deleted", () => {

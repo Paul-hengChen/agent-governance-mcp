@@ -702,9 +702,11 @@ test("AC17: registry has 35 entries incl. SR_RETURN_CAP_EXCEEDED (shape pinned);
   assert.ok(e, "SR_RETURN_CAP_EXCEEDED registered");
   assert.equal(e.producer, "validateTransition");
   assert.equal(e.envelope, "transition-json");
-  assert.equal(e.documentedInProse, false);
+  // E433 (D16) re-pin: the code is now quoted in the qa-engineer and sr-engineer SOPs.
+  assert.equal(e.documentedInProse, true);
   const registrySrc = fs.readFileSync(path.join(ROOT, "gates", "registry.ts"), "utf-8");
-  assert.match(registrySrc, /SR_RETURN_CAP_EXCEEDED {10}\(none\)/, "mapping-comment row is (none)");
+  assert.match(registrySrc, /SR_RETURN_CAP_EXCEEDED {10}skill-qa-engineer\.md, skill-sr-engineer\.md/, "mapping-comment row names its quote sites");
+  assert.doesNotMatch(registrySrc, /SR_RETURN_CAP_EXCEEDED {10}\(none\)/, "no (none) row for it any more");
 
   assert.deepEqual(
     UPDATE_STATE_GATE_PIPELINE.map((s) => s.name),
