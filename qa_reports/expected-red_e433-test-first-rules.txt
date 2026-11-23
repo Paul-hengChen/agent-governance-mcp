@@ -1,0 +1,21 @@
+# T-E433-01 — constitution fragments (const-01/05/06/08, constitution-rationale): compose goldens + context-budget caps move with the text; e16 charter + e393 C02 pin the old qa judge / qa_round cap (D10, D11); doc-file mapping comment loses const-08 for MISSING_REVIEW_EVIDENCE and REVIEWER_COMPLETED_TASKS_REJECTED (old APPROVED-to-qa row removed; comment fixed by T-E433-07)
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 5761 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8840 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18614 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6937 ~tok)
+test/e16-judge-dispatch-charter.test.mjs | E16-01: const-08 §3.1 Single-role judge dispatch charter is appended to the Amend-Resume Edge bullet, resume_of is still required
+test/e16-judge-dispatch-charter.test.mjs | E16-02: const-08 §3.1 charter names a FRESH judge dispatch as sanctioned, not only a mid-chain resume
+test/e16-judge-dispatch-charter.test.mjs | E16-04: const-08 §3.1 charter states judge roles only — no edge opened to any build role
+test/e393-builder-judge-core.test.mjs | AC-C: named sites restate no bare round number
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
