@@ -1,0 +1,34 @@
+# e445-spec-workshop-questioning — intentional reds left by qa-engineer (T-E445-01, test-first chain).
+# All reds below are in the new test/e445-spec-workshop-questioning.test.mjs and fail for one reason:
+# the new SOP text (spec Copy / Strings) is not written into content/skill-spec-workshop.md yet (T-E445-02).
+# GREEN on the base and expected to stay green: AC1 and AC10 (unchanged sections).
+# Verified satisfiable: all 11 tests pass against a scratch copy of the SOP with the Copy / Strings applied
+# exactly as the spec orders them (single space between sentences).
+
+# sw.batch_cap / sw.batch_ready not in step 4 yet (base clause still reads "batch, each with ...").
+test/e445-spec-workshop-questioning.test.mjs | AC2: step 4 keeps the 4-question cap and admits only askable, mutually independent questions to a batch
+
+# sw.format / sw.by_number not in step 4 yet; the base clause sw.format replaces is still present.
+test/e445-spec-workshop-questioning.test.mjs | AC3: step 4 sets the `Q<n> — <title>: <question>` format, recommendation and example on own lines, answer by number
+
+# sw.yes not in step 4 yet.
+test/e445-spec-workshop-questioning.test.mjs | AC4: step 4 words each question so "yes" accepts the recommendation, and says so when it cannot
+
+# sw.reopen not yet directly after the preserved ruling sentence in step 4.
+test/e445-spec-workshop-questioning.test.mjs | AC5: step 4 keeps the dated/replacing ruling sentence and follows it with a separate reopen sentence
+
+# sw.prototype / sw.prototype_end not in step 4 yet.
+test/e445-spec-workshop-questioning.test.mjs | AC6: step 4 marks look-and-feel questions `needs prototype`, defers them, builds none, and ends `not ready to cut` if open
+
+# sw.lookup not appended to step 2 yet.
+test/e445-spec-workshop-questioning.test.mjs | AC7: step 2 keeps the survey before the first question, then keeps it short with parallel lookups
+
+# sw.facts not appended to step 3 yet.
+test/e445-spec-workshop-questioning.test.mjs | AC8: step 3 keeps delegated bulk reading, then never asks a lookup-able fact and treats a recommendation as no ruling
+
+# sw.pushback not appended to step 5 yet.
+test/e445-spec-workshop-questioning.test.mjs | AC9: step 5 keeps its three base sentences in order, then the one-time accept-all reminder
+
+# Anchor-drift guard: the added-line scan finds no changed line for steps 2-5 because they are not edited yet
+# (the scan must not pass vacuously).
+test/e445-spec-workshop-questioning.test.mjs | AC10 (added lines): every added or changed line in steps 2-5 carries no new step, write tool, ticket id, repo path, Task alias or gate code
