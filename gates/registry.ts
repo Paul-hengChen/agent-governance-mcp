@@ -66,13 +66,11 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // Every entry is true except VISUAL_ROUND_EXCEEDED, which only the old path
-  // still emits (no served rule quotes it since E434). SR_RETURN_CAP_EXCEEDED,
-  // E431, DISPATCH_PIN_TIER_REJECTED, E300, and NON_REVIEWER_VERDICT_REJECTED,
-  // E139, each shipped false until a content/*.md sentence quoted it — E433 in
-  // the qa-engineer and sr-engineer SOPs, E295 in coord-02, E365 in const-08.
-  // The field exists so a code-internal gate can opt out without weakening the
-  // parity test.
+  // Every entry is true except VISUAL_ROUND_EXCEEDED, which only the old path still emits
+  // (no served rule quotes it since E434). SR_RETURN_CAP_EXCEEDED, E431, DISPATCH_PIN_TIER_REJECTED,
+  // E300, and NON_REVIEWER_VERDICT_REJECTED, E139, each shipped false until a content/*.md
+  // sentence quoted it — E433 in the qa-engineer and sr-engineer SOPs, E295 in coord-02, E365 in
+  // const-08. The field exists so a code-internal gate can opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
 
