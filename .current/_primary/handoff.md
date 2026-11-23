@@ -1,5 +1,5 @@
 ---
-schema_version: 15
+schema_version: 16
 active_feature: "release-cd-v4.22.0"
 status: "In_Progress"
 last_updated: "2026-11-19T10:21:13.149Z"
@@ -14,8 +14,6 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "pm"
-dispatched_at: "2026-11-19T10:21:13.149Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
