@@ -25,3 +25,4 @@
 {"ts":"2026-11-23T06:34:11.293Z","feature":"e433-test-first-rules","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-23T06:41:36.727Z","feature":"e433-test-first-rules","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-23T07:03:30.408Z","feature":"e433-test-first-rules","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-11-23T07:04:14.343Z","feature":"e433-test-first-rules","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
