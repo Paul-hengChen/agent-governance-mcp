@@ -54,7 +54,7 @@ const SITES = [
   [10, "skill-sr-engineer.md",
     "(a prior rollout shipped grey `#333` primary buttons while accent `#3C5AAA` sat unused)",
     "A declared focus/selected/accent token that renders nowhere is a **build-gate failure** — fix before handoff."],
-  [11, "skill-qa-visual.md",
+  [11, "skill-reviewer-visual.md", // E434 re-pin: path only (renamed from skill-qa-visual.md)
     "(this once cost a full pixelmatch forensics round to clear a false alarm)",
     "Actuals written next to committed baselines dirty git status on every run, making a real visual regression indistinguishable from routine overwrite at a glance."],
 ];
@@ -91,12 +91,13 @@ test("AC-E439-1 site 1 (R1 = b): the const-11 §3.2 preamble is deleted — abse
     assert.ok(!source.includes(gone), `source no longer carries: ${gone.slice(0, 50)}`);
   }
   assert.ok(!source.includes(RS), "§3.x stays rationale-free: no fence added in const-11");
-  assert.match(source, /### 3\.2 Visual Verdict Authority & Separation of Duties<!-- origin:start --> \(v3\.26\.0\)<!-- origin:end -->\n\n- \*\*Visual verdict is qa-visual-owned\.\*\*/, "heading then first bullet");
+  // E434 re-pin: the first bullet is const11.head (the verdict is reviewer-visual-owned).
+  assert.match(source, /### 3\.2 Visual Verdict Authority & Separation of Duties<!-- origin:start --> \(v3\.26\.0\)<!-- origin:end -->\n\n- \*\*Visual verdict is reviewer-visual-owned\.\*\*/, "heading then first bullet");
   for (const opts of [{ chain: true, design: true }, { chain: false, design: true }]) {
     const c = composeConstitution(opts);
     assert.ok(!c.includes("false-PASS retrospective"), `constitution (${JSON.stringify(opts)}) carries no preamble`);
     // §3.2 is a chain-only segment; the lite composition does not load it at all
-    if (opts.chain) assert.ok(dispatch(c).includes("### 3.2 Visual Verdict Authority & Separation of Duties\n\n- **Visual verdict is qa-visual-owned.**"), "dispatch: heading directly followed by its rule bullets");
+    if (opts.chain) assert.ok(dispatch(c).includes("### 3.2 Visual Verdict Authority & Separation of Duties\n\n- **Visual verdict is reviewer-visual-owned.**"), "dispatch: heading directly followed by its rule bullets");
   }
   // the story still exists in the non-normative rationale file (one-way ref)
   assert.ok(fs.readFileSync(path.join(ROOT, "content", "constitution-rationale.md"), "utf-8").includes("false-PASS"), "story kept in constitution-rationale.md");

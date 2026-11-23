@@ -60,8 +60,9 @@ const WRAP = [
   [31, "skill-integrator.md", "moves `.current/<lane>/` to history", " (E125)", ["E125"]],
   [33, "skill-pm.md", "- **Visual Widgets**", " (v3.14.0)", ["v3.14.0"]],
   [34, "skill-pm.md", "**Source-Credibility Gate**", " (E4)", ["(E4)"]],
-  [37, "skill-qa-visual.md", "### Step A.0 — Baseline Source-of-Truth", " (v3.39.0)", ["v3.39.0"]],
-  [38, "skill-qa-visual.md", "### Actual-Capture Output Convention", " (E30)", ["E30"]],
+  // E434 re-pin: path only (the visual sub-skill is now skill-reviewer-visual.md).
+  [37, "skill-reviewer-visual.md", "### Step A.0 — Baseline Source-of-Truth", " (v3.39.0)", ["v3.39.0"]],
+  [38, "skill-reviewer-visual.md", "### Actual-Capture Output Convention", " (E30)", ["E30"]],
   [41, "skill-sr-engineer.md", "the step 7a format", " (C15)", ["C15"]],
   [43, "skill-architect.md", "the visual gate", " (R1)", ["R1"]],
   [44, "skill-pm.md", "blurs role ownership", " (A10)", ["A10"]],
@@ -132,9 +133,9 @@ test("AC-E438-3: each new reference name matches a heading that exists in the di
 });
 
 test("AC-E438-1: the dispatch bundles of the files whose every label was a site carry no bare ticket/version label", () => {
-  // integrator (sites 18-32), qa-visual (7/37/38 + E437 8), coord-03 (5-9): after the strip no E<n> / v<n>.<n>.<n> token remains.
+  // integrator (sites 18-32), reviewer-visual (was qa-visual, E434; 7/37/38 + E437 8), coord-03 (5-9): after the strip no E<n> / v<n>.<n>.<n> token remains.
   const LABEL = /\bE\d+[a-z]?\b|\bv\d+\.\d+\.\d+\b/;
-  for (const f of ["skill-integrator.md", "skill-qa-visual.md", "coord-03-core-fallback.md"]) {
+  for (const f of ["skill-integrator.md", "skill-reviewer-visual.md", "coord-03-core-fallback.md"]) {
     for (const line of dispatch(src(f)).split("\n")) {
       const m = line.match(LABEL);
       assert.ok(!m, `${f}: bare label "${m && m[0]}" in dispatch bundle line: ${line.slice(0, 140)}`);

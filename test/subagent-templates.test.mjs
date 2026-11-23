@@ -38,16 +38,16 @@ const EXPECTED_ROLES = [
   "sr-engineer",
   "code-reviewer",
   "qa-engineer",
-  "qa-visual",
+  "reviewer-visual",
   "doc-writer",
   "release-engineer",
   "lite",
   "teamwork",
 ];
 
-// Map subagent name -> corresponding content/skill-*.md. qa-visual's subagent
-// delegates to the qa-engineer top-level role (it's a lazy sub-skill, not in
-// the RoleName enum) — but its model tier comes from skill-qa-visual.md.
+// Map subagent name -> corresponding content/skill-*.md. reviewer-visual's subagent
+// delegates to the code-reviewer top-level role (it's a lazy sub-skill, not in
+// the RoleName enum) — but its model tier comes from skill-reviewer-visual.md (E434).
 // v3.21.0: `lite` maps to the unchanged skill-coordinator-lite.md;
 // `teamwork` maps to the logical key skill-coordinator.md (the composed full
 // coordinator; see readSkillFile above), not a file on disk.
@@ -59,7 +59,7 @@ const ROLE_TO_SKILL = {
   "sr-engineer": "skill-sr-engineer.md",
   "code-reviewer": "skill-code-reviewer.md",
   "qa-engineer": "skill-qa-engineer.md",
-  "qa-visual": "skill-qa-visual.md",
+  "reviewer-visual": "skill-reviewer-visual.md",
   "doc-writer": "skill-doc-writer.md",
   "release-engineer": "skill-release-engineer.md",
   "lite": "skill-coordinator-lite.md",

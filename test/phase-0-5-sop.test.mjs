@@ -55,18 +55,18 @@ test("AC-4: Phase 0.5 references the Constitution §1 Visual Widgets exception",
   assert.match(body, /scope violation/i, "must restate the scope-violation framing");
 });
 
-test("AC-4: Phase 0.5 wires the split-escalation guidance for visual_round >= 3", () => {
-  // The implementer-side mirror of the §3.1 split escalation. sr-engineer
-  // needs to know when to abandon and ask PM to split, instead of grinding
-  // to threshold renegotiation.
-  // `next_role` is a first-class state field (`next_role=pm` in prose, or a
-  // bare `pm` Escalation Routes table cell), not a `next_role: pm`
-  // pending_notes token, so the check looks for the `=` form.
-  // (c9-protocol-fields, T-C9-14)
+// E434 re-pin (ruling 7, R1 (a)): the visual split escalation is retired with the visual counter. The
+// implementer-side guidance is now the pixel-progress rule (Copy sr.progress): a shrinking difference is
+// progress, only non-shrinking tries count toward the `fix_try` cap, and at the cap sr-engineer hands the
+// surface to the judge instead of asking pm for a split.
+test("AC-4: Phase 0.5 wires the pixel-progress rule (shrinking difference = progress; fix_try cap hands the surface to the judge), no visual split", () => {
   const body = fs.readFileSync(SKILL_SR, "utf-8");
-  assert.match(body, /`visual_round`\s*≥\s*`visual_split`/, "must reference the `visual_round` ≥ `visual_split` threshold (E393: named cap, was visual_round >= 3)");
-  assert.match(body, /visual_split_requested:/, "must include the pending_notes token");
-  assert.match(body, /next_role\s*=\s*["']?pm/, "must route to pm via the first-class next_role field");
+  assert.ok(
+    body.includes("A pixel difference that shrinks on every try is progress, not the same failure; only tries that do not shrink it count toward the `fix_try` cap. At that cap, stop fixing that surface and hand off with it named in your hand-off note; `reviewer-visual` judges it (Constitution §3.1)."),
+    "sr.progress verbatim",
+  );
+  assert.doesNotMatch(body, /`visual_round`\s*≥\s*`visual_split`/, "no visual_split threshold");
+  assert.doesNotMatch(body, /visual_split_requested:/, "no split-request token");
 });
 
 test("AC-4: SOP step ordering — Task-Size Check (3) BEFORE Phase 0.5 (3a) BEFORE Implement (4)", () => {
