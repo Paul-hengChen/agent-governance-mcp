@@ -28,7 +28,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 同上 | `e423` AC8 | 步驟 1 的七個原句 | 不該紅 |
 | 同上 | `e423` AC9 | `## Outputs` 段的表頭與原句；regex「Write each ruling to the record the moment it is made, with its date; a ruling that replaces an earlier one names the one it replaces」 | 不該紅：步驟 4 的這句要原樣保留，第 (8) 點另寫一句 |
 | 同上 | `e423` AC10 | 完成條件原句（「every scenario has one verification, …」等）、`` `not doing` ``、`` `not ready to cut` ``、`list the open questions`、`file nothing` | 不該紅：第 (6) 點加的「以 `not ready to cut` 結束」不改這些句子 |
-| 同上（dispatch view：`stripRationale(stripOriginTags())`） | `e423` AC11 | 整份 SOP 不得命中 `specs/`、`research/`、`docs/discussion-`、`docs/backlog.md`、裸 `tools|gates/*.ts`、裸 `scripts/*.mjs`、`\bE\d{3}\b` 等 | 不該紅：新增文字不得引用討論檔、票號或 repo-only 路徑 |
+| 同上（dispatch view：`stripRationale(stripOriginTags())`） | `e423` AC11 | 整份 SOP 不得命中 `specs/`、`research/`、`docs/discussion-`、`docs/backlog.md`、裸 `tools/*.ts` 或 `gates/*.ts`、裸 `scripts/*.mjs`、`\bE\d{3}\b` 等 | 不該紅：新增文字不得引用討論檔、票號或 repo-only 路徑 |
 | `content/*.md` 全部 | `e410-task-alias-content-tail` | 不得用 `Task` 當子 agent 的代稱（允許的開頭字見第 17 行）；AC2 的行數／行號釘點只釘 const-01、const-05、const-08、const-12、skill-coordinator-lite、skill-integrator、skill-pm，不含本檔 | 不該紅：寫「subagent」不寫「Task」 |
 | `content/*.md` 全部 | `e434-reviewer-visual`（第 689–695 行） | `gates/registry.ts` 對照註解每列 = 實際以反引號引用該錯誤碼的 content 檔 | 不該紅：新增文字不得以反引號引用任何錯誤碼 |
 | `content/*.md` 全部 | `e440-current-rule-wording` AC-E440-1 | 不得含「pre-v3.20.0」「is REMOVED」「is retired」「no remaining routing convention」 | 不該紅 |
