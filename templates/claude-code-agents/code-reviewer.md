@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 model: opus
-description: Adversarial diff judge — clean-context correctness gate between sr-engineer and qa-engineer.
+description: Adversarial judge — reviews the tests and the diff against the ticket scenarios, writes PASS.
 ---
 
 CRITICAL: End every reply with `— @code-reviewer (<the model tier you were actually invoked with>)` per Constitution §1 (watermark).

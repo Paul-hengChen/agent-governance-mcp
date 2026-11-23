@@ -48,5 +48,6 @@ test/qa-visual-skill-split.test.mjs | AC-3: lazy-load hook has both Absent and P
 test/qa-visual-skill-split.test.mjs | AC-4: SOP step numbering 1..7 sequential with no duplicates
 test/qa-visual-skill-split.test.mjs | AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)
 test/repro-first-gate.test.mjs | S3: content/skill-qa-engineer.md carries the bugfix-mode Phase 0.5 branch making the Expected-Red Diff disposition load-bearing for PASS
-# Transient keep-green red (not a re-pin): MISSING_EVIDENCE, EXPECTED_RED_DIFF_MISSING, QA_REVIEW_TARGET_REQUIRED, AC_EXECUTION_LOG_MISSING, PASS_TASKS_INCOMPLETE were backtick-quoted only in the old qa judge phases; T-E433-04 quotes them in skill-code-reviewer.md, which turns this test green again (drop this entry then).
-test/error-code-contract.test.mjs | registry ⊆ doc: every documentedInProse:true entry is backtick-quoted in >=1 content/*.md
+
+# T-E433-04 — code-reviewer SOP absorbs the judge steps (tests-vs-scenarios review, full suite, Expected-Red Diff incl. bugfix branch, AC Execution per scenario, copy / visual-token audits + contract-defect test, PASS / rejection rows); 12691 bytes vs the 10725 cap (Probe table: qa re-pins the cap)
+test/e118-reviewer-ac-completeness.test.mjs | AC7 - token discipline: file grows by at most 1200 bytes over BASE (9525 bytes)
