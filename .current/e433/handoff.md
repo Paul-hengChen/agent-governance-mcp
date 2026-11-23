@@ -2,11 +2,11 @@
 schema_version: 16
 active_feature: "e433-test-first-rules"
 status: "In_Progress"
-last_updated: "2026-11-23T03:55:57.970Z"
+last_updated: "2026-11-23T04:04:09.614Z"
 last_agent: "pm"
 prd_path: "specs/e433-test-first-rules.md"
 scope_decision: "single-feature"
-scope_decision_why: "One backlog ticket (E433), single lane e433 per the human-approved specs/fanout-v5-w4.md; split into 7 sr + 3 qa tasks inside one feature, no design arm."
+scope_decision_why: "One backlog ticket (E433), single lane e433 per the human-approved specs/fanout-v5-w4.md; split into 8 sr + 3 qa tasks inside one feature, no design arm."
 dispatch_pins:
   pm: "opus"
   architect: "opus"
@@ -15,7 +15,7 @@ dispatch_pins:
   qa-engineer: "sonnet"
 evidence_schema: 2
 next_role: "sr-engineer"
-dispatched_at: "2026-11-23T03:55:57.970Z"
+dispatched_at: "2026-11-23T04:04:09.614Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -32,10 +32,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM: E433 cut drafted — specs/e433-test-first-rules.md; tasks T-E433-01..10 in .current/e433/tasks.md (7 sr, 3 qa). No architect hop (text-only; interface choices decided in spec D1–D15).
-- PM: baseline at 96708e6 green — 4497 tests, 4495 pass, 0 fail, 2 skipped. Run-based mutation probe (throwaway clone): 66 fails; red-file list in spec Probe table.
-- PM: integrator pre-review needed — 4 test files outside the lane row's owned set (test/fixtures/e177a/render-e177a.golden.txt, test/e407-restatement-citations.test.mjs, test/e20-e21-crash-resilience.test.mjs, test/e432-judge-report-checks.test.mjs) and line widenings in owned files (gates/registry.ts doc-file mapping comment, README.md:99, docs/architecture.md:127,184). fanout check --cut exit 1 naming exactly those 4.
-- PM: needs human ruling R1 (const-05 build gate on the qa → sr hand-off; recommended (a) narrow exception for manifest-listed test files). Cut NOT approved yet — cut_approved deliberately unset (Task-dispatched); coordinator attests after human approval.
+- PM: E433 cut v2 — specs/e433-test-first-rules.md; integrator pre-review applied (integrator session, specs/fanout-v5-w4.md Decisions 2026-11-23): 4 test files re-assigned to e433, line widenings approved (gates/registry.ts mapping comment, README.md:99, docs/architecture.md:127,184), docs/lane-protocol.md:37 + docs/lane-protocol-addendum.md:15 in scope (new AC13, new task T-E433-11), R1 = (a) ruled (D15 decided).
+- PM: ledger edit disclosed — T-E433-07 depends_on gains T-E433-11; T-E433-09 description/AC list gains AC13. sr order: T-01..T-06, T-11, T-07; then code-reviewer; qa T-08/T-09, T-10 last.
+- PM: baseline at 96708e6 green (4497 / 4495 pass / 0 fail / 2 skipped). fanout check --cut exit 1: 6 OUT, all covered by the integrator-session ruling (primary manifest edits not yet on this branch).
+- PM: no needs-human-ruling item left. cut_approved deliberately unset (Task-dispatched); coordinator attests after human approval.
 - PM: sr writes qa_reports/expected-red_e433-test-first-rules.txt (<test file> | <exact test name>) for every intentional red; sr never edits tests.
 
 ---
