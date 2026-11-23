@@ -1,0 +1,136 @@
+# Fan-out: v5.0.0 里程碑第 5 波（E434）
+base: 319ee75    integration branch: integ/v5-w5
+mailbox: ../agent-governance-mcp-lanes/_mailbox
+
+**狀態：已核准、派工中 2026-11-23。** 單一 lane e434。清單以 `docs/*` PR 合進 `main`，派工 base 取那次 merge。
+
+範圍由人類指定（integrator prompt「fan-out v5.0.0 里程碑的下一波（第 5 波）」，2026-11-23）：下一張是 E434，並依 `docs/backlog.md` 的相依找出剩下的票裡能與它同時跑的。順序依 `docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 17.1 裁定 4 修訂後的版本（E422 → E423 → E419 → E431 → E432 → E433 → E434 → E445 → E435 → 其餘照 16.1 裁定 17）。依 16.1 裁定 18，合進 `main` 但不發版，與 E435 一起發 v5.0.0。本波結束時不發版。
+
+## 派工前核對（整合者，2026-11-23，規劃時；派工時在派工 base 重做一次）
+- `git worktree list` 只有 primary；`main` = `origin/main` = `319ee75`（PR #166 merge，第 4 波）、工作樹乾淨；沒有 open 的 pull request；`feat/e434-*`、`integ/v5-w5` 都不存在；`../agent-governance-mcp-lanes/` 只剩空的 `_mailbox/`。primary handoff 停在 `release-cd-v4.22.0`（schema 16），drift 無（T-REL4-02、T-E421-01、T-E421-02 是舊 feature 的 evidence-backed 標記，照 drift 訊息不 sync）。`.current/.config.json`：`cutApprovalAutoTier` = `{}`（manifest tier 未開；E434 是 P2、超過 2 檔 → cut 在 lane session 呈人類）、`laneProtocolAddendum` = `docs/lane-protocol-addendum.md`（共用生成物：`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`）、`artifacts` = `repo`。
+- **第 4 波交接**：`node scripts/fanout.mjs handoff --check specs/fanout-v5-w4.md` exit 0，只有三個 `MOVED`（目標分支 `96708e6` → `319ee75`、worktree、primary `lane-status`，都是 PR #166 合併後的預期結果），零 `DIFF`。
+- **本 session 的 MCP server 跑第 4 波合併後的程式**：server 行程（本 session 的子行程）啟動於 2026-11-23 16:09，晚於 `dist/index.js` 的建置時間（同日 15:51）與 `319ee75` 的 commit 時間（同日 15:59）；`tw_get_state` 讀 schema 16 的 handoff 沒有報「newer server」錯誤；`schema/versions.ts` handoff = 16。因此服務出去的規則已是新鏈（qa-engineer 寫測試 → sr-engineer 實作 → code-reviewer 裁判並寫 PASS），e434 是第一條照新鏈跑的 lane。
+- **相依（`docs/backlog.md` depends_on 欄，2026-11-23 讀）**：剩下 11 張票（E434、E445、E435、E424、E425、E430、E426、E427、E428、E443、E420）中，相依全部已 DONE 的只有 E434（←E433，第 4 波已合併）與 E445（←E423 ✓）。其餘都等未完成的票：E435←E434；E424←E422、E435；E425←E422、E424、E435；E430←E425；E426←E422、E435；E427←E424；E428←E422、E423、E425；E443←E422、E425；E420←E419、E434。E446（第 4 波新開，相依無）排在里程碑之後，不在本次順序內；它改 `content/skill-doc-writer.md`，同樣撞共用生成物。
+- **E445 相依已滿足，但不能與 E434 同時跑**：（1）E445 改 `content/skill-spec-workshop.md`，票面寫明 `test/context-budget.test.mjs` AC21（stripped SOP 上限 1092 token、零餘裕）會紅、要把上限調到實測值；E434 改十幾個 `content/**` 檔、重新擷取 12 個 compose golden 與 `test/context-budget.test.mjs` 的多個上限。`content/**` 與 `test/context-budget.test.mjs` 都是共用生成物，一波只能歸一條 lane。（2）把 AC21 的上限調整留給 E434 lane 或整合後由 qa 重新擷取都不行：E445 lane 自己的 CI 會紅在 AC21，lane 層驗證過不了。（3）17.1 裁定 4 把 E445 排在 E434 之後。因此本波只有 E434 一條 lane；E445 在 E434 合併後單獨一波。
+- **E434 的程式面**（票面 + 16.1 審查修正 (1)–(5) + 第 4 波 e433 spec 的 Out of Scope）：
+  - **改名**：`content/skill-qa-visual.md` → `content/skill-reviewer-visual.md`；`templates/claude-code-agents/qa-visual.md` → `templates/claude-code-agents/reviewer-visual.md`（`model: sonnet` → `opus`，裁定 17；範本數仍是 12）。E433 已移除 qa SOP 的 Phase 1.5 視覺載入；從現在到 E434 合併之前，沒有任何角色載入視覺子 skill。
+  - **憲法**：`const-01-core-head.md`（Limits 表的 `visual_round` cap、`visual_split` threshold 兩列與第 9 行的舉例「the `visual_round` cap」）、`const-05-core-standards.md`（第 19 行 `visual_fail:`（§3.1 / skill-qa-visual））、`const-07-design-chain-gates.md`、`const-09-design-chain-vround.md`、`const-11-design-chain-32.md`（第 4 行「Visual verdict is qa-visual-owned」、第 18 行）、`const-13-design-chain-s4.md`（第 3–5 行 `visual_round` 計數）、`constitution-rationale.md`（第 63、135 行，§3.2 第 142–151 行，第 204–205 行 split 舉例）。
+  - **SOP**：`skill-code-reviewer.md`（設計宣告 baseline 時載入 `reviewer-visual`）、`skill-qa-engineer.md`（截圖與像素差改成 qa 寫的可執行檢查）、`skill-sr-engineer.md`（第 21、23、26、28 行提到 qa-visual／`visual_round`，第 52 行 split 升級列；新增「差異每次變小算進展」一句）、`skill-architect.md:24`、`skill-pm.md:32`、`skill-design-auditor.md:29,61`（人類列的第 56 行，目前在第 61 行）、`skill-coordinator-lite.md:35`、`coord-03-core-fallback.md`（第 9 行計數名稱、第 39 行升級列）、`coord-05-core-visual-drift.md`（第 5、9、12–13 行）。
+  - **伺服器**：`gates/registry.ts`——`VISUAL_EVIDENCE_MISSING` 的 `hintStatic`（第 415 行「Run Phase 1.5 (skill-qa-visual)」）與第 439、454、457 行提到 qa-visual 的 hint；errorCode → doc-file 對照註解（第 83、98–105 行，8 列寫著 `skill-qa-visual.md`，改名後全部要換）；第 69–73 行 `documentedInProse` 說明註解。`gates/visual.ts` 第 170 行註解；票面 (5)「PASS 時的視覺檢查讀新 sub-skill 寫的報告」——目前報告路徑是 `qa_reports/visual_<id>.md`（`gates/visual.ts:32`），E432 已讓兩條路徑的裁判報告都留在 `qa_reports/`，cut 決定路徑改不改。`tools/evidence-file.ts:317`、`tools/handoff-orchestrator.ts:1142` 是提到 qa-visual 的註解。
+  - **文件**：`README.md:107`（qa-visual 列：tier、說明）；`docs/config.md:263`（workspace override 清單的 `.current/skill-qa-visual.md`）與遷移說明（16.1 審查修正 (5)：改名後 workspace override 會被靜默忽略、手動複製到使用者 agents 目錄的 `qa-visual.md` 會留下）。
+- **視覺計數退役（16.1 裁定 7）的事實**：新鏈上 `visual_round` 已經不會增加——`tools/transitions.ts` 的計數只在 `(qa-engineer, FAIL)` 帶 `visual_fail:` 時加一（第 764–775 行），而 test-first 覆蓋層把 `qa-engineer:In_Progress → qa-engineer:FAIL` 關掉了（第 385–392 行 `TEST_FIRST_CLOSES`）；`reviewer-visual` 的退件是 `(code-reviewer, FAIL)`，本來就算 `review_round`。舊路徑（沒有 `chain_path` 的 feature）的計數與上限照舊，到 E435 拆舊路、E420 收錯誤碼為止。整合者建議：本票只退役規則文字，不改 `tools/transitions.ts`、`tools/handoff-orchestrator.ts` 的計數與上限、不移除 handoff／SQLite 的 `visual_round`、`visual_rounds_total` 欄位（移除欄位要升 schema，牽動 `tools/handoff-parse.ts`、`tools/handoff-write.ts`、`tools/handoff-types.ts`、`tools/storage-sqlite.ts`、`tools/metrics.ts`、`tools/gate-stats.ts`、`schema/**` 與一長串釘點，不在本票）。`CLAUDE.md:78` 的 `VISUAL_ROUND_CAP=6` 因此仍正確，不改。
+- **版本號與條數**：E434 不升 handoff／SQLite schema、不加也不收錯誤碼（票面：視覺錯誤碼合併是 E420）、`GATE_REGISTRY` 仍 35 條、pipeline 仍 17 步、不新增 `tools/*.ts` 或 `gates/*.ts`（不加 `CLAUDE.md` Layout 列）、`prompts/constitution-manifest.ts` 的 15 個片段不變（`const-09` 改寫內容、不刪檔；刪檔會牽動 manifest、`CLAUDE.md` 第 7 行「15 ordered fragments」與 Layout 列）。`Constitution\s+v[0-9]` 在 `content/`、`README.md`、`CLAUDE.md`、`test/` 都零筆。cut 若需要其中任何一項 → 先寄信給整合者，由整合者補列釘點測試，在整合者 session 由人類核准改劃。
+- **本 lane 自己跑的 prompt**：MCP server 從 primary 的 checkout 讀 `content/**`，lane worktree 裡改的規則合併前不會服務給任何 session；本 lane 照 `main` 上的新鏈跑（pm 設 `chain_path: "test-first"`）。本 repo 沒有 `design/`，lane 內不會載入 `reviewer-visual`。
+
+### 讀原始碼文字的測試（每個會改的檔都查了讀它原始碼的測試；本波只有一條 lane，下列測試全部歸 e434）
+literal 與 regex 寫法一起搜（`qa-visual|qa_visual|skill-qa-visual|visual_round|VISUAL_ROUND|visual_split|visual_fail`、各目標檔名），加上透過 `buildPromptForRole()` 讀組合後 prompt 的測試與 12 個 compose golden。測試檔名省略 `test/` 與 `.test.mjs`：
+
+| 被讀的檔 | 讀它的測試 |
+|---|---|
+| `content/skill-qa-visual.md`、`templates/claude-code-agents/qa-visual.md`（改名 → ENOENT） | `e360-qa-visual-review-task-ids`（第 12 行）、`e391-prompt-audit-stale-facts`（第 82、85 行）、`e393-builder-judge-core`（第 119–127 行）、`e412-qa-visual-template`（整檔，第 19–20 行 `name: qa-visual`、`model: sonnet`、第 34 行浮水印）、`e437-repo-only-paths`（第 34–35、98–112 行）、`e438-origin-fenced-labels`（第 63–64、135–137 行）、`e439-rationale-fenced-stories`（第 57 行）、`pixel-perfect-visual-compare`（第 18、22、51、105–118 行）、`qa-visual-skill-split`（整檔）、`skill-evolution-v3.11`（第 124 行）、`subagent-templates`（第 41、62 行範本名對 SOP、第 160–175 行 `model:` = `recommended_model`）、`widget-shape-spec`（第 18、117–119 行）、`e329-integrator-sop-followups`（第 145–146 行）、`pixel-gate-attestation`（第 678–779 行）、`eval/lib/bundle.mjs`（第 26、40 行） |
+| `content/const-01-core-head.md` | `e410-task-alias-content-tail`（AC2：第 33 行行號、檔案 37 行）、`e393-builder-judge-core`（AC-C01 第 137–145 行 `visual_split` 列）、`e433-test-first-rules`（AC2(d) Limits）、`e295-hop-cap-and-sop-halves`、`design-auditor-volume-guard`、`pixel-perfect-design-coverage`、`e391-prompt-audit-stale-facts`、`eval/lib/assertions.mjs` |
+| `content/const-05-core-standards.md` | `e433-test-first-rules`（AC2(b)(c)(e)(f)(g)）、`e410-task-alias-content-tail`（檔案 23 行、第 9 行）、`e393-builder-judge-core`、`e440-current-rule-wording`、`e43-test-file-ask-at-dispatch`、`e24-exemptions`、`e130-lane-default`、`e340-task-list-exception`、`skill-evolution-v3.11` |
+| `content/const-09-design-chain-vround.md` | `e393-builder-judge-core`（第 110–113 行 split 條文） |
+| `content/const-11-design-chain-32.md` | `e393-builder-judge-core`（第 57 行「Visual verdict is qa-visual-owned.」）、`compose-equivalence`、`e439-rationale-fenced-stories`（第 94–99 行） |
+| `content/const-13-design-chain-s4.md` | `e438-origin-fenced-labels` |
+| `content/constitution-rationale.md` | `compose-equivalence`、`e296-manifest-tier`、`e391-prompt-audit-stale-facts`、`e438-origin-fenced-labels`、`e439-rationale-fenced-stories` |
+| `content/coord-03-core-fallback.md` | `cut-approval-gate`、`e130-lane-default`、`e16-judge-dispatch-charter`、`e295-hop-cap-and-sop-halves`、`e296-manifest-tier`、`e297-main-protected-sop`、`e336-portable-pull`、`e350-fanout-call-form`、`e385-worktree-evidence`、`e391-prompt-audit-stale-facts`、`e393-builder-judge-core`、`e408-core-task-alias-tail`、`e416-filing-bar`、`e438-origin-fenced-labels`、`e440-current-rule-wording`、`e5-intake-tiering`、`e96-dispatch-preference`、`feature-lease`、`release-staging`、`skill-manifest`、`source-credibility-gate` |
+| `content/coord-05-core-visual-drift.md` | `e393-builder-judge-core`、`e407-restatement-citations`、`e408-core-task-alias-tail`、`e412-qa-visual-template`、`e438-origin-fenced-labels`、`skill-manifest` |
+| `content/skill-code-reviewer.md` | `e118-reviewer-ac-completeness`（SOP 位元組上限 12800）、`e433-test-first-rules`（AC5 必含字串）、`error-code-contract`、`ac-execution`、`e178a-integrator-role`、`e258a-comment-rule`、`e380-qa-suite-result-sop`、`e416-filing-bar`、`render-structure`、`repro-first-gate`、`skill-evolution-v3.11`、`subagent-templates`、`eval/lib/bundle.mjs` |
+| `content/skill-qa-engineer.md` | `e433-test-first-rules`（AC3，第 266 行「no skill-qa-visual」）、`qa-visual-skill-split`、`pixel-perfect-visual-compare`、`e122-state-render-injection`、`e178a-integrator-role`、`e20-e21-crash-resilience`、`e295-hop-cap-and-sop-halves`、`e308-single-source-tier-enum`、`e329-integrator-sop-followups`、`e376-render-omits-tier`、`e380-qa-suite-result-sop`、`e391-prompt-audit-stale-facts`、`e393-builder-judge-core`、`e407-restatement-citations`、`e43-test-file-ask-at-dispatch`、`e431-test-first-server-path`、`e438-origin-fenced-labels`、`e440-current-rule-wording`、`e5-intake-tiering`、`lane-ticket-allocation`、`render-structure`、`subagent-templates`、`telemetry`、`verify-release`、`eval/lib/bundle.mjs` |
+| `content/skill-sr-engineer.md` | `e393-builder-judge-core`（第 126–127 行 split 條文）、`e433-test-first-rules`（AC4）、`context-budget`、`compose-equivalence`、`e128-blocked-self-loop-repro`、`e178a-integrator-role`、`e20-e21-crash-resilience`、`e295-hop-cap-and-sop-halves`、`e308-single-source-tier-enum`、`e431-test-first-server-path`、`e438-origin-fenced-labels`、`e439-rationale-fenced-stories`、`phase-0-5-sop`、`prompt-state-footer`、`qa-flow`、`render-structure`、`repro-first-gate`、`skill-evolution-v3.11`、`skill-manifest`、`subagent-templates`、`widget-shape-spec`、`eval/lib/bundle.mjs` |
+| `content/skill-architect.md`、`content/skill-pm.md`、`content/skill-design-auditor.md`、`content/skill-coordinator-lite.md`（只改提到 qa-visual 的那一行） | `skill-pm.md`：`e410-task-alias-content-tail`（檔案 120 行）、`context-budget`、`e433-test-first-rules` 等 25 檔；`skill-coordinator-lite.md`：`e410-task-alias-content-tail`（第 43、49 行、檔案 53 行）、`teamwork-lite`、`e409-lite-write-tool-facts` 等 18 檔；`skill-design-auditor.md`：`design-auditor-volume-guard`、`e423-spec-workshop`、`source-credibility-gate` 等 16 檔；`skill-architect.md`：`phase-0-5-sop`、`e433-test-first-rules` 等 10 檔。同一行原地改、行數不變時這些測試照理不紅，PM probe 確認 |
+| `gates/registry.ts` | `error-code-contract`（對照註解每列對 `grep -l`、`documentedInProse` 對 content 引用）、`e295-hop-cap-and-sop-halves`（AC11 第 127 行 `(none)` 個數 0）、`e308-single-source-tier-enum`（E303-AC11a 第 72–76 行 `(none)` 個數 0）、`e431-test-first-server-path`（AC17 第 706–709 行）、`e433-test-first-rules`（AC9 即時部分：35 條、對照列對引用處；AC12：35 條、17 步）、`visual-evidence-gate`、`pixel-gate-attestation`、`e391-prompt-audit-stale-facts`、`qa-flow`、`release-staging` 等 32 檔 |
+| `gates/visual.ts`、`tools/evidence-file.ts`（只在 cut 改報告路徑時） | `visual-evidence-gate`、`visual-gate-e2e`、`visual-report-schema-validation`、`visual-widgets-unverified-gate`、`baseline-manifest-gate`、`pixel-gate-attestation`、`evidence-provenance`、`e136-evidence-path-injective`、`constitution-deliverable-guard`、`e423-spec-workshop`、`e432-judge-report-checks`、`covering-evidence`、`e154-multi-covers`、`qa-visual-skill-split` |
+| `tools/transitions.ts`、`tools/handoff-orchestrator.ts`（整合者建議不改；cut 改才相關） | `visual-round-transitions`、`visual-round-sqlite`、`visual-gate-e2e`、`hop-count-transitions`、`qa-flow`、`success-metrics`、`writestate-options-object`、`e433-test-first-rules`（AC12 固定 sha 區間，不受影響） |
+| `README.md`、`docs/config.md` | `subagent-templates`（README 的 subagent 安裝小節）；`docs/config.md` 的讀者（`e342-config-doc-wording`、`e289-config-key` 等）檢查別的段落，PM probe 確認 |
+
+**已知會被 E434 直接打紅的釘點**（literal grep，未試跑；PM probe 用完整套件確認）：
+
+| 測試（行） | 檢查什麼 | 為什麼會紅 |
+|---|---|---|
+| `test/context-budget.test.mjs:668,690-693,778,795-802` 與各角色上限 | 設計組合的哨兵字串（「Split escalation (`visual_split`)」「Visual verdict is qa-visual-owned」）；組合後 prompt 的 token 上限，多數零餘裕 | 條文改名與退役；文字增減 |
+| `test/fixtures/compose-golden/*.txt`（12 檔） | 組合後 bundle 逐位元 | 任何 `content/**` 改動（`const-01` 的 Limits 列在每個組合都有） |
+| `test/e393-builder-judge-core.test.mjs:57,110-127,137-145` | `const-11` 第一條「Visual verdict is qa-visual-owned.」；`const-09` split 條文；qa-visual SOP 的 `visual_round` 上限列；sr SOP 的 split 兩處；Limits 表有 `visual_split` 列且值 3 | 改名、計數與拆票門檻退役 |
+| `test/e410-task-alias-content-tail.test.mjs:64-76`（AC2） | `const-01` 第 33 行內容與檔案 37 行；`skill-coordinator-lite.md` 第 43、49 行與 53 行；`skill-pm.md` 120 行 | Limits 表刪兩列 → `const-01` 行數與行號都變（第 4 波漏掉的釘點類型 (a)） |
+| `test/e412-qa-visual-template.test.mjs`（整檔） | 範本 `name: qa-visual`、`model: sonnet`、浮水印、描述 | 改名、改 opus |
+| `test/subagent-templates.test.mjs:32-62,89,160-175` | 12 個範本的名稱清單與範本 → SOP 對照；`model:` = SOP `recommended_model` | 改名；`skill-reviewer-visual.md` 的 `recommended_model` 與範本一起改 opus |
+| `test/qa-visual-skill-split.test.mjs`、`test/pixel-perfect-visual-compare.test.mjs`、`test/e360-qa-visual-review-task-ids.test.mjs`、`test/widget-shape-spec.test.mjs`、`test/e437-repo-only-paths.test.mjs`、`test/e438-origin-fenced-labels.test.mjs`、`test/e439-rationale-fenced-stories.test.mjs`、`test/e391-prompt-audit-stale-facts.test.mjs`、`test/skill-evolution-v3.11.test.mjs`、`test/e329-integrator-sop-followups.test.mjs`、`test/pixel-gate-attestation.test.mjs`、`test/eval/lib/bundle.mjs` | 讀 `content/skill-qa-visual.md` 或 `templates/claude-code-agents/qa-visual.md` 的原文 | 檔案改名後 ENOENT；逐檔改讀新檔名或改寫斷言（測試檔名本身建議不改，見下） |
+| `test/error-code-contract.test.mjs`（對照註解與 `documentedInProse`） | 對照註解每列的檔案集合 = `grep -l` 的結果；`documentedInProse: true` 的碼至少在一個 content 檔被反引號引用 | 8 列的 `skill-qa-visual.md` 改名；`VISUAL_ROUND_EXCEEDED` 若不再被任何 content 引用 → 見下一列 |
+| `test/e295-hop-cap-and-sop-halves.test.mjs:127`（AC11）、`test/e308-single-source-tier-enum.test.mjs:72-76`（E303-AC11a）、`test/e431-test-first-server-path.test.mjs:706-709`（AC17） | `gates/registry.ts` 對照註解 `(none)` 個數 = 0 | 只在 cut 選 (B)（`VISUAL_ROUND_EXCEEDED` 不再引用 → `documentedInProse` 改 false、對照列寫 `(none)`）時紅（第 4 波漏掉的釘點類型 (b)(c)） |
+| `test/e118-reviewer-ac-completeness.test.mjs` | code-reviewer SOP 位元組上限 12800（第 4 波從 10725 調上來） | code-reviewer SOP 加 `reviewer-visual` 載入段 |
+| `test/e433-test-first-rules.test.mjs`（AC2(d)、AC3、AC5、AC9 即時部分、AC12 即時部分） | `const-01` Limits、qa SOP 不含 `skill-qa-visual`、code-reviewer SOP 必含字串、對照列對引用處、35 條／17 步／`CLAUDE.md` 250 行／`agc check` | 改到這些檔時要維持；固定 sha 區間（`96708e6..ac5a692`）的部分不受影響 |
+
+另外 `test/eval/`（`npm run eval`，不在 `npm test` 裡）讀範本與 SOP；cut 寫明跑不跑、結果如何。
+
+### 交給 lane 的 PM（寫進 cut，隨 cut 在 lane session 呈人類核准）
+- 本 lane 照新鏈：pm 寫入設 `chain_path: "test-first"`；qa-engineer 先寫每個情境的測試與 `qa_reports/expected-red_<feature>.txt`，sr-engineer 照測試實作、不改 qa 寫的測試，code-reviewer 裁判並寫 PASS、`tw_complete_task`。
+- PM probe 用完整測試套件試跑（`node scripts/test-lock.mjs -- npm test`），不只跑相關測試檔；cut 逐檔列出紅的測試，標明是上表已知的還是新發現的。紅的檔若不在 Lanes 表擁有欄逐檔列出的名單裡，cut 預審時一併列給整合者，由整合者補進清單並記一列 Decisions（改劃要人類在整合者 session 核准；lane session 不能自己決定）。
+- qa 寫的測試若要讀 base 樹的原始碼來比對，在擷取當下就把內容讀進記憶體；Node 20 上暫存目錄事後再讀會 ENOENT（第 3 波 e432 AC12）。不能用 `git show` 讀 base 樹（T-E77-02 的 meta-test 會擋）。用 `git archive` 讀固定 sha 時，取不到 sha（歷史被壓縮）會靜默 skip，cut 要寫明這一點。CI 跑 Node 20 與 22 兩版。
+- 測試檔改名：讀舊檔名的測試，建議保留測試檔名（例如 `test/e412-qa-visual-template.test.mjs`、`test/qa-visual-skill-split.test.mjs`），只改檔內讀的路徑與斷言；`fanout.mjs check` 只認擁有欄列出的檔名，改名後的新測試檔名不在清單裡會算越界。若 qa 要改名，先寄信給整合者補列。新測試用 `test/e434-*.test.mjs`。
+- cut 預審的信用 `type: proposal`，`re:` 一定要含 `cut`（例如 `re: cut e434`），`lane-status --mailbox-root` 才偵測得到。若走 architect，Open Questions 回來做第二次預審時也一樣（`re: cut e434 architecture`）。
+- 票面約 16 檔加 golden 與測試，超過單一 sr task 的檔數預算，cut 至少拆 3 個 sr task。建議切法（PM 定）：(a) 改名與 `skill-reviewer-visual.md`／範本、`skill-code-reviewer.md` 的載入、`skill-qa-engineer.md` 的可執行檢查、`skill-sr-engineer.md`；(b) 憲法片段（`const-01`、`const-05`、`const-07`、`const-09`、`const-11`、`const-13`）與 `constitution-rationale.md`；(c) `coord-03`、`coord-05`、提到 qa-visual 的四個 SOP 單行、`gates/registry.ts`（hint 與對照註解）、`gates/visual.ts` 等伺服器檔、`README.md`、`docs/config.md`。golden 與預算的重新擷取由 qa 在最後一次做。
+- 每個 AC 都要有實作 task，不只 qa task。
+- cut 要決定（整合者建議在括號內）：
+  1. 視覺計數退役的範圍（只退役規則文字；不改 `tools/transitions.ts`、`tools/handoff-orchestrator.ts`，理由見派工前核對；cut 若要改，先寄信）。
+  2. `VISUAL_ROUND_EXCEEDED` 的引用：(A) 在 `const-09` 留一句「舊路徑才有、test-first 不適用」的引用，`documentedInProse` 維持 true，`(none)` 釘點不動；(B) 不再引用，`documentedInProse` 改 false、對照列寫 `(none)`、第 69–73 行說明註解改成符合事實，`e295` AC11、`e308` E303-AC11a、`e431` AC17 的 `(none)` 斷言由 qa 重釘（已預先劃進本 lane，只限這三段）。（建議 (B)：與第 4 波「新鏈文字加入時同一個改動移除被取代的舊鏈文字」一致。這是 lane 內的選擇，寫進 cut 隨 cut 呈人類核准。）
+  3. 票面 (5) 視覺報告的路徑與寫入身分（保留 `qa_reports/visual_<id>.md`，只改由誰寫：`reviewer-visual` 以 code-reviewer 身分寫，與 E432 的裁判報告目錄一致；`gates/visual.ts` 可能只改註解）。
+  4. `const-09` 的處理（改寫內容、不刪檔：刪檔牽動 `prompts/constitution-manifest.ts`、`CLAUDE.md` 第 7 行與 Layout 列）。
+  5. 遷移說明放哪裡（`docs/config.md` 的 override 清單旁；v5.0.0 CHANGELOG 的遷移段屬 E435／release-engineer，不在本 lane）。
+  6. 是否走 architect（伺服器改動若只剩文字與註解，不必）。走 architect 時預審兩次：cut 先在信箱收斂、人類核准，architect 的 Open Questions 回來再預審一次。
+  7. `test/eval/` 跑不跑。
+- 舊路徑（沒有 `chain_path` 的 feature）的伺服器行為不變；本票不改 gate predicate、轉移表或 schema（除非 cut 經預審放寬第 3 項的路徑）。
+
+## Lanes
+| lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |
+|---|---|---|---|---|---|---|---|
+| e434 | E434 | feat/e434-reviewer-visual | ../agent-governance-mcp-lanes/e434 | `content/skill-qa-visual.md`、`content/skill-reviewer-visual.md`、`content/const-01-core-head.md`、`content/const-05-core-standards.md`、`content/const-07-design-chain-gates.md`、`content/const-09-design-chain-vround.md`、`content/const-11-design-chain-32.md`、`content/const-13-design-chain-s4.md`、`content/constitution-rationale.md`、`content/coord-03-core-fallback.md`、`content/coord-05-core-visual-drift.md`、`content/skill-code-reviewer.md`、`content/skill-qa-engineer.md`、`content/skill-sr-engineer.md`、`content/skill-architect.md`、`content/skill-pm.md`、`content/skill-design-auditor.md`、`content/skill-coordinator-lite.md`、`templates/claude-code-agents/qa-visual.md`、`templates/claude-code-agents/reviewer-visual.md`、`gates/registry.ts`、`gates/visual.ts`、`tools/evidence-file.ts`、`tools/transitions.ts`、`tools/handoff-orchestrator.ts`、`dist/gates/registry.*`、`dist/gates/visual.*`、`dist/tools/evidence-file.*`、`dist/tools/transitions.*`、`dist/tools/handoff-orchestrator.*`、`README.md`、`docs/config.md`、`CLAUDE.md`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`test/compose-equivalence.test.mjs`、`test/e393-builder-judge-core.test.mjs`、`test/e410-task-alias-content-tail.test.mjs`、`test/e412-qa-visual-template.test.mjs`、`test/subagent-templates.test.mjs`、`test/qa-visual-skill-split.test.mjs`、`test/pixel-perfect-visual-compare.test.mjs`、`test/e360-qa-visual-review-task-ids.test.mjs`、`test/widget-shape-spec.test.mjs`、`test/e437-repo-only-paths.test.mjs`、`test/e438-origin-fenced-labels.test.mjs`、`test/e439-rationale-fenced-stories.test.mjs`、`test/e391-prompt-audit-stale-facts.test.mjs`、`test/skill-evolution-v3.11.test.mjs`、`test/e329-integrator-sop-followups.test.mjs`、`test/pixel-gate-attestation.test.mjs`、`test/eval/lib/bundle.mjs`、`test/error-code-contract.test.mjs`、`test/e295-hop-cap-and-sop-halves.test.mjs`、`test/e308-single-source-tier-enum.test.mjs`、`test/e431-test-first-server-path.test.mjs`、`test/e118-reviewer-ac-completeness.test.mjs`、`test/e433-test-first-rules.test.mjs`、`test/visual-evidence-gate.test.mjs`、`test/visual-gate-e2e.test.mjs`、`test/e434-*.test.mjs`、`specs/e434-*.md`、`.current/e434/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；`content/skill-spec-workshop.md`、`content/skill-doc-writer.md`、`content/skill-integrator.md`、`content/skill-release-engineer.md`、`content/const-08-chain-31-mid.md`、`content/const-12-chain-r10-s4.md`、`templates/agent-adapters/**`、`AGENTS.md`、`.antigravityrules`、`prompts/**`、`schema/**`、`tools/handoff-parse.ts`、`tools/handoff-write.ts`、`tools/handoff-types.ts`、`tools/storage.ts`、`tools/storage-sqlite.ts`、`tools/metrics.ts`、`tools/gate-stats.ts`、`tools/tasks.ts`、`tools/registry.ts`、`tools/fanout-manifest.ts`、`gates/pipeline.ts`、`docs/architecture.md`、`docs/lane-protocol.md`、`docs/lane-protocol-addendum.md`、`CHANGELOG.md`、`docs/backlog.md`、`docs/v4.0.0-new-tickets.md`、`docs/discussion-2026-11-10-gate-retro-and-full-auto.md` | 做：票面 (1)–(5) 與 16.1 審查修正 (1)、(3)、(5)：`qa-visual` 改名 `reviewer-visual`（SOP 與範本），由 code-reviewer 在設計宣告 baseline 時載入、釘 opus、保留視覺裁定的條款改指它；截圖與像素差改成 qa 寫、sr 交接前必須通過的可執行檢查，`reviewer-visual` 只做超過門檻時讀圖、判定可接受差異與給裁定；接受的超門檻差異記在視覺報告的 `## Allowed Differences` 並寫明理由，不停下等人；視覺退件算 `review_round`；退役 `visual_round` 上限與 `visual_split` 門檻的規則文字（Limits 表、const-09、const-13、rationale、sr SOP 的 split 列），sr SOP 寫明差異每次變小算進展、不再變小才照 §5 連續修正上限停下；PASS 時的視覺檢查讀新 sub-skill 寫的報告；`gates/registry.ts` 的 hint 與對照註解改名；遷移說明（workspace override 改名、使用者 agents 目錄留下的舊範本）；golden 與預算重新擷取。不做：視覺錯誤碼合併或收碼（E420）；計數欄位移除或 schema 升級；prototype mode（已移到 E423）；「只有要實機或要人眼的情境才停票」（移到 E425）；`skill-spec-workshop.md`（E445）；拆舊路徑與 v5.0.0 CHANGELOG 遷移段（E435） | — |
+
+## 所有權重劃（相對於 lane-protocol 預設與補充規則）
+- **共用生成物整組歸 e434**：`content/**`（只限上表逐檔列出的檔）、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`。本波沒有別的 lane。E445 的相依已滿足，但同樣要改 `content/**` 與 `test/context-budget.test.mjs`，因此不進本波（見派工前核對）。
+- **`CLAUDE.md`**：擁有，只限第 78 行原地改（只在 cut 經預審決定改 `tools/transitions.ts` 的 `VISUAL_ROUND_CAP` 時；整合者建議不改）；總行數 250；第 7、9、11、13、44、64、195、220、221 行、e395 的 11 列 Layout 區塊、agc-adapter 區塊（第 236–250 行）與 `agc-version` stamp 不動。本票不新增 `tools/*.ts`，不加 Layout 列。
+- **`README.md`**：只限第 107 行（qa-visual 列）；第 20 行的計數描述講的是伺服器（舊路徑到 E435 前仍有），不動。
+- **`docs/config.md`**：只限第 263 行一帶的 override 清單與一段遷移說明。
+- **`gates/registry.ts`**：只限 hint 文字（第 415、439、454、457 行一帶）、errorCode → doc-file 對照註解、第 69–73 行 `documentedInProse` 說明註解，以及 cut 選 (B) 時 `VISUAL_ROUND_EXCEEDED` 的 `documentedInProse` 一個欄位；條數、`armCondition`、`triggerEdge`、其他碼的 `documentedInProse` 不動。
+- **`gates/visual.ts`、`tools/evidence-file.ts`、`tools/transitions.ts`、`tools/handoff-orchestrator.ts`**：擁有，但只限 cut 經預審寫明的改動（整合者建議只改提到 qa-visual 的註解；報告路徑與計數照舊）。
+- **預先劃進的測試段落**（Stage 2 一併核准）：`test/e295-hop-cap-and-sop-halves.test.mjs` 只限 AC11 的 `(none)` 斷言；`test/e308-single-source-tier-enum.test.mjs` 只限 E303-AC11a；`test/e431-test-first-server-path.test.mjs` 只限 AC17；`test/e410-task-alias-content-tail.test.mjs` 只限 AC2 的行數與行號兩段；`test/e433-test-first-rules.test.mjs` 只限即時讀 E434 改動檔的斷言（AC2(d)、AC3、AC5、AC9、AC12 的即時部分），固定 sha 區間的斷言不動；`test/error-code-contract.test.mjs` 只限對照註解與 `documentedInProse` 相關斷言；`test/e118-reviewer-ac-completeness.test.mjs` 只限 code-reviewer SOP 位元組上限。檔內其他測試不動。
+- **測試檔**：上面兩張表列出、會被打紅的測試檔逐一劃進 e434；其餘讀這些檔但 probe 綠的測試不必列。PM probe 找到不在清單的紅檔 → 預審時列給整合者，人類在整合者 session 核准後補進本欄並記 Decisions。
+
+## 完成定義 → 票
+| 完成定義條目 | 由哪張票讓它成立 | 同一波？ |
+|---|---|---|
+| `qa-visual` 的 SOP 與範本改名為 `reviewer-visual`，由 code-reviewer 在設計宣告 baseline 時載入；範本與 SOP `recommended_model` 都是 opus；沒有任何服務出去的文字把視覺裁定歸給 qa-engineer 或 qa-visual | e434（E434） | ✓ |
+| 截圖與像素差是 qa 寫的可執行檢查，sr 交接前必須通過；`reviewer-visual` 只在超過門檻時讀圖、判定、給裁定 | e434（E434） | ✓ |
+| 設計 feature、所有差異都在門檻內 → code-reviewer 寫 PASS 時沒有任何模型讀圖，寫入被接受 | e434（E434） | ✓ |
+| 一個 surface 超過門檻、`reviewer-visual` 接受 → PASS 被接受，視覺報告的 `## Allowed Differences` 列出 surface 與理由 | e434（E434） | ✓ |
+| 設計 feature 沒有視覺報告 → code-reviewer 寫 PASS 被既有的視覺證據碼拒絕 | e434（E434） | ✓ |
+| 視覺退件算 `review_round`；`visual_round` 上限與 `visual_split` 門檻的規則文字退役；sr SOP 寫明差異每次變小算進展 | e434（E434） | ✓ |
+| `gates/registry.ts` 的 hint 與對照註解指向新 sub-skill；`GATE_REGISTRY` 仍 35 條、不加不收錯誤碼；pipeline 17 步 | e434（E434） | ✓ |
+| 遷移說明：workspace override `.current/skill-qa-visual.md` 改名後被忽略、使用者 agents 目錄的舊 `qa-visual.md` 會留下 | e434（E434） | ✓ |
+| golden 與預算重新擷取 | e434（E434） | ✓ |
+| `CLAUDE.md` 仍 250 行、`agc check` exit 0；`dist/` 只含本 lane 改動的 `.ts` 產物；`npm audit --audit-level=high` exit 0 | e434（qa 核對） | ✓ |
+| E434 done-mark（not yet released：裁定 18，從 `main` 不發版，隨 v5.0.0 發出）；`npm run check:bookkeeping` exit 0 | 整合者（5c） | ✓ |
+| 本清單結案時寫 `## 接手步驟`，狀態行以「已結案」開頭 | 整合者（5c） | ✓ |
+
+## 整合後（整合者自己的 commit／接線）
+- merge 後 `node scripts/merge-invariants.mjs`；`npm run build` 後 `dist/` 無差異；golden capture 無差異；預算在上限內；`CLAUDE.md` 250 行。
+- 記帳：E434 done-mark（not yet released），`docs/backlog.md` 列與佇列 `docs/v4.0.0-new-tickets.md` 第 247 號列都要加；`npm run check:bookkeeping` 直接跑、不接 `| tail`，exit 0；表格儲存格裡的 `|` 跳脫成 `\|`。
+- 接線票：無。
+- 不發版（裁定 18）。合併後 primary 的 MCP server 需重啟（`gates/registry.ts` 等是編譯過的程式）；使用者層級已安裝的 subagent 範本不會自動更新，舊的 `qa-visual.md` 會留下，要人類決定是否重裝。
+- 下一波 E445 從合併後的 `main` 開，再來是 E435。
+
+## 合併順序
+1. `integ/v5-w5` 自當時的 `main` 開。
+2. ← `--no-ff` e434 → merge-invariants。`dist/` 衝突一律重建。
+3. `npm run build`、golden byte-identical、預算、`check:bookkeeping`、audit；記帳 commit。
+4. `finish e434 --shipped --base integ/v5-w5`；`fanout.mjs handoff --closing`；push、CI、`gh pr create`、`gh pr merge --auto --merge`；merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only`、`git branch -d integ/v5-w5`。不發版。
+
+## Dispatch pins
+- e434：`pm=opus`、`architect=opus`、`sr-engineer=opus`、`code-reviewer=opus`、`qa-engineer=opus`（人類 2026-11-23 裁定：新鏈下 qa-engineer 是測試作者，不沿用第 1–4 波的 sonnet；理由同裁定 17）。`reviewer-visual` 本 lane 不會載入（本 repo 沒有 `design/`），不設 pin。
+
+## Decisions
+| 日期 | 裁決者 | 內容 | 出處 |
+|---|---|---|---|
+| 2026-11-23 | 人類 | 開 v5.0.0 里程碑第 5 波：下一張是 E434，依 backlog 相依找出能並行的票；順序依 17.1 裁定 4 修訂版；合進 `main` 不發版（16.1 裁定 18）；dispatch pins 在 Stage 2 問 | integrator prompt「fan-out v5.0.0 里程碑的下一波（第 5 波）」；`docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 16.1、17.1 |
+| 2026-11-23 | 整合者 | Stage 1 核對：相依已滿足的是 E434 與 E445；E445 與 E434 共用 `content/**` 與 `test/context-budget.test.mjs`（共用生成物一波只歸一條 lane），且 17.1 裁定 4 排在 E434 之後，本波單一 lane；共用生成物整組歸 e434；讀原始碼文字的測試與已知紅點逐檔列出；`(none)` 個數、`documentedInProse`、`const-01` 行數釘點預先劃進；第 4 波交接 `handoff --check` exit 0（只有 `MOVED`） | 本檔 |
+| 2026-11-23 | 人類 | 核准本清單（單一 lane e434；E445 不進本波），含所有權重劃（共用生成物整組歸 e434；`CLAUDE.md`、`README.md`、`docs/config.md`、`gates/registry.ts`、`gates/visual.ts`、`tools/evidence-file.ts`、`tools/transitions.ts`、`tools/handoff-orchestrator.ts` 只限寫明的行與段落）、預先劃進的測試段落（e295 AC11、e308 E303-AC11a、e431 AC17、e410 AC2、e433 即時斷言、error-code-contract 對照斷言、e118 位元組上限）與交給 lane PM 的 cut 決定項；Dispatch pins：qa-engineer = opus（不沿用 sonnet）；本波結束不發版；寫進 lane 的 spec，lane 不再問 | 整合者 session（回覆「approve, qa-engineer 的 pin 用 opus」） |
