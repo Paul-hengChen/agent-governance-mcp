@@ -2,7 +2,7 @@
 base: 319ee75    integration branch: integ/v5-w5
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准、派工中 2026-11-23。** 單一 lane e434。清單以 `docs/*` PR 合進 `main`，派工 base 取那次 merge。
+**狀態：已結案 2026-11-23。** e434 已合併進 `integ/v5-w5`（merge `6a056f4`，零衝突、無實質解衝突）、finish、拆除；派工 base `e5ccda0`（清單 PR #167 merge），integ 自 `main` @ `0d2a1ce` 開出（多了 PR #168，E447 開票）；merge 後 build 無 `dist/` 差異、audit 通過、`agc check` exit 0、`CLAUDE.md` 250 行；本波以一個 PR 合進 `main`，不發版（16.1 裁定 18）。lane 層 CI：run 45156070806 @ `5cb6dac` 綠（Node 20、22）。Roll-up：e434 tickets 8、hop 6/14、review 退回 0、qa 退回 0、sr 退回 1/2（R3 (b) 計畫性退回，重擷快照）；證據 8/8。第一條照新鏈（test-first）跑完的 lane。預算（~tok）：lean 6029→5969、skill-pm 4998→4999、skill-sr 3335→3285、design-arm 9265→9219、teamwork 19155→19108、non-design 7363→7301、design-only 節省下限 1902→1918。波中人類裁定見 Decisions（改劃兩段測試、R1 (a)、R2 (a)、R3 (b)）。
 
 範圍由人類指定（integrator prompt「fan-out v5.0.0 里程碑的下一波（第 5 波）」，2026-11-23）：下一張是 E434，並依 `docs/backlog.md` 的相依找出剩下的票裡能與它同時跑的。順序依 `docs/discussion-2026-11-10-gate-retro-and-full-auto.md` 17.1 裁定 4 修訂後的版本（E422 → E423 → E419 → E431 → E432 → E433 → E434 → E445 → E435 → 其餘照 16.1 裁定 17）。依 16.1 裁定 18，合進 `main` 但不發版，與 E435 一起發 v5.0.0。本波結束時不發版。
 
@@ -140,3 +140,24 @@ literal 與 regex 寫法一起搜（`qa-visual|qa_visual|skill-qa-visual|visual_
 | 2026-11-23 | 人類 | e434 R1 = (a)（超門檻是量測不轉紅；差異每次變小就繼續，不再變小用滿 `fix_try` 後 sr 停修該 surface 交裁判；§5 例外寫在 const-09）、R2 = (a)（門檻內 surface 的元件形狀／結構斷言列由可執行檢查推得、不讀圖）、R3 = (b)（sr 做完 T-07 後計畫性退回 qa 一次，用 1 次 `sr_return`，qa 重擷 golden 與預算後經 sr 回 code-reviewer）。cut 本身仍由人類在 lane session 親手核准 | 整合者 session（回覆「approve, 都照建議」） |
 | 2026-11-23 | 整合者 | e434 lane 報告（to-integrator#8）驗證通過：HEAD `5cb6dac`（15 commits）、83 檔 0 out of bounds、證據 8/8（`review_reports/review_T-E434-01.md` APPROVED covers T-E434-01..08；`qa_reports/review_T-E434-01..08.md`）、工作樹乾淨、無新發現；lane 層 CI run 45156070806 @ `5cb6dac` 綠；回 close（to-lane#3）。reviewer 的 recommended／optional 列進波次報告，不開票 | 本檔；e434 信箱 to-integrator#8 |
 | 2026-11-23 | 整合者 | `integ/v5-w5` 自 `main` @ `0d2a1ce`（派工後多了 PR #168：E447 開票，只動 backlog 與佇列）開出；← `--no-ff` e434（merge `6a056f4`），零衝突、無實質解衝突；merge-invariants PASS；build 後 `dist/` 無差異、audit exit 0、`agc check` exit 0、`CLAUDE.md` 250 行；E434 done-mark（backlog 列與佇列第 247 號），`check:bookkeeping` exit 0 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 0d2a1ce
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/v5-w5 @ 42a397c）
+- lane-status：primary（main ← integ/v5-w5 @ 42a397c）release-cd-v4.22.0／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 本波 1 條 lane、1 張票（E434）code-reviewer PASS、合併、finish、拆除；not yet released——依 16.1 裁定 18 與 E445、E435 一起隨 v5.0.0 發出。lane 紀錄在 `.current/history/2026-11/e434/`；裁定與驗證細節在本檔 Decisions 與狀態行。新發現：無（lane 沒有 `pending-tickets.md`，finish 沒有配號）。
+- code-reviewer 的 recommended／optional（不開票，列在這裡）：`test/e360-qa-visual-review-task-ids.test.mjs` 沒斷言 FAIL 呼叫數（建議加至少一次）；`test/e393-builder-judge-core.test.mjs` AC-A2 由 `=== 2` 放寬為 `>= 2`，可釘成 3；pm 寫「prompt 除 X 外不變」這類條款時寫明只指 SOP 段落；AC9(a) 的 note 可加 `visual_fail:`、`test/e434-reviewer-visual.test.mjs` 開頭註解可精簡。
+- 注意：`test/e434-reviewer-visual.test.mjs` 以凍結在測試裡的 base 值與 `LANE_END_SHA=11073f3` 做比對；以 `git archive` 讀固定 sha 的部分取不到 sha 時 skip，CI 用 `fetch-depth: 0`、本波以 `--no-ff` 合併，現在都會跑，但歷史若被壓縮就會靜默 skip。
+### 待人類決定
+- 新鏈上「只有實作完才擷取得到的快照測試」（compose golden、預算上限）沒有規則處理：本波靠人類裁定 R3 (b) 讓 sr 計畫性退回 qa 一次；E445、E435 的 lane 會遇到同樣的情況。要每個 lane 照 R3 (b) 再裁一次，還是開票把它寫進 sr／qa SOP，由人類決定（整合者建議開票，寫進 SOP）。
+- SQLite／HTTP 模式設不了 `chain_path`（第 4 波留下，未變）：整合者建議在 E435 的 cut 寫明 SQLite／HTTP 模式不靠標記也走新鏈，並列一條驗收，不另開票。
+- 合併後重啟 primary 的 MCP server（`gates/registry.ts` 等是編譯過的程式）；使用者層級已安裝的 subagent 範本要不要重裝（舊 `qa-visual.md` 會留下，新範本 `reviewer-visual.md` 是 opus）。
+- E445 不在佇列檔 `docs/v4.0.0-new-tickets.md`，結案記帳時要補一列；遠端分支 `origin/docs/2026-11-20-file-e445` 已合併但沒刪。
+- 是否開下一波：v5.0.0 里程碑順序的下一張是 E445（相依 E423 ✓，本波已讓出共用生成物），再來是 E435。
+### 進行中的背景工作
+無
