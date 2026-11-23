@@ -1,0 +1,15 @@
+{"ts":"2026-11-23T11:16:58.543Z","feature":"e445-spec-workshop-questioning","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:21:27.437Z","feature":"e445-spec-workshop-questioning","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:22:03.168Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:25:27.794Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:32:42.266Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:34:00.909Z","feature":"e445-spec-workshop-questioning","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:41:15.786Z","feature":"e445-spec-workshop-questioning","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:41:54.297Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T11:42:58.362Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T13:24:55.087Z","feature":"e445-spec-workshop-questioning","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T13:25:45.308Z","feature":"e445-spec-workshop-questioning","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T13:36:55.312Z","feature":"e445-spec-workshop-questioning","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T13:37:33.420Z","feature":"e445-spec-workshop-questioning","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T13:38:53.542Z","feature":"e445-spec-workshop-questioning","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-23T13:51:32.529Z","feature":"e445-spec-workshop-questioning","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
