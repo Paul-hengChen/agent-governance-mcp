@@ -723,3 +723,31 @@ None.
 ### Red Reasons (T-19)
 
 0 red: no test in the four files depends on a field schema 17 drops or on a moved judge, so nothing is red at base. No test dropped. A `# T-E435-19` comment group (no rows) is appended to the manifest. Run: `node --test test/e31-config-nonfatal.test.mjs test/e92-e86-handoff-write-boundary.test.mjs test/lane-migrate.test.mjs test/prompt-state-footer.test.mjs` → 219 tests, 219 pass, 0 fail.
+
+## T-E435-20 — `rag-lifecycle`, `rag`, `success-metrics`, `stale-dispatch-detection` (AC4)
+
+Placement: existing files, edited in place (brief). Re-pinned tests carry `E435`. 218 changed test lines (111+ / 107-), under the 300-line cap. Contract: architecture *Handoff schema v17 (file mode)*, *Metrics sidecar* (new records carry no `qa_rounds`; `one_pass` = review and visual totals both 0), *Interface Contracts* `computeNewRound(review, visual, next, prev, notes, hop, featureChanged, reviewTot, visualTot)`, Rulings (a) drop. Conventions from T-E435-12/16/18 reused: hand-registered chains gain the real-shaped 16 -> 17 step; absence as `=== undefined` / `"k" in obj === false` / no `^qa_round(s_total)?:` line; removed `qaRoundsTotal` option / `emitFeatureMetrics` arg dropped from fixtures rather than passed and ignored; raw legacy fixtures at schema < 17 carrying `qa_round` stay.
+
+### Scenario → Test Map (T-20)
+
+| scenario | exact test name(s) |
+|---|---|
+| hand-registered chain v11 -> 17: review/visual totals seeded, `qa_round` / `qa_rounds_total` dropped | success-metrics `E8-M1 (E435): …` |
+| v0 / v9 / v11 legacy files heal to 17 with no qa lines; v18 refuses-loud against max 17; CURRENT 17 | success-metrics `E8-M2 (E435)`, `E8-M3 (E435)`, `E8-M4 (E435)`; stale-dispatch `T8 (E435)`, `T8b (E435)`, `T10 (E435)` |
+| `computeNewRound` new signature: no qa slots / qa total; review total ticks on code-reviewer FAIL, survives the judge's PASS and pm re-entry, resets on feature change; visual branch unchanged | success-metrics `E8-C1 … E8-C8 (E435)` |
+| writer / parser: review/visual totals round-trip and always serialize; no `qa_rounds_total` read or written | success-metrics `E8-H1 … E8-H4 (E435)` |
+| metrics record has no `qa_rounds`; `one_pass` keys on review + visual totals | success-metrics `E8-E1 (E435)`, `E8-E2 (E435)` |
+
+No change needed (left as is):
+- `test/rag-lifecycle.test.mjs` and `test/rag.test.mjs`: their `qa_round: 0` sits in storage-stub `parse()` returns (`parseState`, `FAKE_STATE`) that nothing reads (T-17 e137 precedent); no test in either file drives a PASS write, so the RAG-clear-on-PASS judge move (`JUDGE_ROLE`) has no pin here to re-pin (the `awaitAllInflightFor` / `deletePrdChunks` tests are storage-level and judge-agnostic).
+- success-metrics E3–E9, D1–D3, U1–U3: only the removed `qaRoundsTotal` option / arg dropped (green on both); seeded prevState `lastAgent: "qa-engineer", status: "PASS"` stays (legacy exit key `qa-engineer:PASS` -> `release-engineer:In_Progress` kept). S1/S2 summarizer records keep historical `qa_rounds` (older records' value ignored, T-18).
+- stale-dispatch T3 (writer-level `qa-engineer` PASS, no transition check) and the schema 9/10/13 raw fixtures carrying `qa_round`.
+
+### Open Interface Details (T-20)
+
+1. E8-C1 keeps a stale `(qa-engineer, FAIL)` input to pin that the result has no `qa_round` / `qa_rounds_total` key and ticks no review total; E8-C3 keeps the qa-engineer FAIL + `visual_fail:` token because the architecture leaves the visual branches unchanged (E420).
+2. E8-C4 moves "totals survive PASS" to the judge's `(code-reviewer, PASS)` (review_round resets, totals hold).
+
+### Red Reasons (T-20)
+
+21 red at base, all for the stated reason (no syntax / link error): 7 are `CURRENT_VERSIONS.handoff` 16 with no v16 -> v17 step (chain / heal stops at 16, refuse-loud names max 16) (T-E435-29); 8 `computeNewRound` re-pins on the old 11-slot signature (7 slot mis-assignment, 1 TypeError reading 'agent') (T-E435-30); 4 writer / parser still emit / read `qa_rounds_total` (T-E435-29); 2 metrics record still carries `qa_rounds` (T-E435-34). No test dropped. Rows under `# T-E435-20` in the manifest. Run: `node --test test/rag-lifecycle.test.mjs test/rag.test.mjs test/success-metrics.test.mjs test/stale-dispatch-detection.test.mjs` → 118 tests, 97 pass, 21 fail = the 21 rows, name for name.

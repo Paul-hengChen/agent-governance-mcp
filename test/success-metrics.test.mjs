@@ -99,7 +99,7 @@ async function dispatch(ws, args) {
 // totals preserved on same-feature heal (AC8).
 // ============================================================================
 
-test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/lossless", () => {
+test("E8-M1 (E435): registered v11->v12 seeds the totals, v16->v17 drops qa_round/qa_rounds_total; review/visual totals survive", () => {
   // Re-baselined for the lane-layout migration bump (e123a-lane-layout-migration): CURRENT is now 16 (E431), so the
   // manually-registered chain must extend two steps further (v13→v14,
   // cut_approved_source pin, stamp-only, seeds nothing; v14→v15,
@@ -129,22 +129,29 @@ test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/loss
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
   registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
+  // E435: real-shaped v16 -> v17 step (drops chain_path / qa_round / qa_rounds_total).
+  registerMigration({
+    kind: "handoff",
+    from: 16,
+    to: 17,
+    up: ({ chain_path: _c, qa_round: _q, qa_rounds_total: _t, ...i }) => ({ ...i, schema_version: 17 }),
+  });
 
   const result = runMigrations("handoff", { schema_version: 11, active_feature: "seed-feat", qa_round: 2, hop_count: 5 });
-  assert.deepEqual(result.applied, [12, 13, 14, 15, 16], "the v11->v12, v12->v13, v13->v14 AND v14->v15 steps run when on-disk is four behind CURRENT");
-  assert.equal(result.payload.schema_version, 16);
-  assert.equal(result.payload.qa_rounds_total, 0, "AC8 — stale rows migrate in with qa_rounds_total = 0");
+  assert.deepEqual(result.applied, [12, 13, 14, 15, 16, 17], "every step from v11 up to CURRENT 17 runs");
+  assert.equal(result.payload.schema_version, 17);
+  assert.equal("qa_rounds_total" in result.payload, false, "E435 — v16->v17 drops the seeded qa_rounds_total");
   assert.equal(result.payload.review_rounds_total, 0, "AC8 — stale rows migrate in with review_rounds_total = 0");
   assert.equal(result.payload.visual_rounds_total, 0, "AC8 — stale rows migrate in with visual_rounds_total = 0");
   assert.equal(result.payload.evidence_schema, undefined, "v12->v13 seeds no evidence_schema default (e23-evidence-schema-versioning D1 — migration invents no pin)");
   assert.equal(result.payload.cut_approved_source, undefined, "v13->v14 seeds no cut_approved_source default (e114-cut-approval-inheritance — migration invents no claim)");
   assert.equal(result.payload.dispatch_mechanism, undefined, "v14->v15 seeds no dispatch_mechanism default (e123a-lane-layout-migration — migration invents no attestation)");
   assert.equal(result.payload.active_feature, "seed-feat", "sibling field survives losslessly");
-  assert.equal(result.payload.qa_round, 2, "sibling cycle counter untouched (v11->v12 seeds only the 3 new fields)");
+  assert.equal("qa_round" in result.payload, false, "E435 — v16->v17 drops the qa_round cycle counter");
   assert.equal(result.payload.hop_count, 5, "hop_count untouched by this step (sibling, unrelated counter)");
 });
 
-test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT (v16) via readHandoffState/parseHandoff", async () => {
+test("E8-M2 (E435): a v0 legacy handoff migrates all the way to CURRENT (v17) via readHandoffState/parseHandoff", async () => {
   const ws = mkWs("e8-legacy-");
   resetSession(ws);
   fs.writeFileSync(
@@ -163,18 +170,19 @@ test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT
   await new Promise((resolve) => setTimeout(resolve, 30));
   const state = parseHandoff(ws);
   assert.equal(state.schema_version ?? CURRENT_VERSIONS.handoff, CURRENT_VERSIONS.handoff, "sanity: server CURRENT is what we migrate to");
-  assert.equal(CURRENT_VERSIONS.handoff, 16, "sanity: CURRENT is 16 (E431 chain_path/sr_return_count)");
-  assert.equal(state.qa_rounds_total, 0, "v0 legacy chain lands with qa_rounds_total seeded 0");
+  assert.equal(CURRENT_VERSIONS.handoff, 17, "sanity: CURRENT is 17 (E435 drops chain_path/qa_round/qa_rounds_total)");
+  assert.equal(state.qa_rounds_total, undefined, "E435 — v0 legacy chain lands with no qa_rounds_total");
   assert.equal(state.review_rounds_total, 0, "v0 legacy chain lands with review_rounds_total seeded 0");
   assert.equal(state.visual_rounds_total, 0, "v0 legacy chain lands with visual_rounds_total seeded 0");
   assert.equal(state.evidence_schema, undefined, "v0 legacy chain lands with evidence_schema NOT seeded (e23-evidence-schema-versioning D1 — absence-is-signal)");
   // readHandoffState above is what triggers the own-workspace migration (AC3) — the
   // flat fixture seeded above has already moved to the lane-scoped path.
   const raw = fs.readFileSync(currentHandoffPath(ws), "utf-8");
-  assert.match(raw, /schema_version:\s*16/, "on-disk heal lands at v16");
+  assert.match(raw, /schema_version:\s*17/, "on-disk heal lands at v17");
+  assert.doesNotMatch(raw, /^qa_round(s_total)?:/m, "E435 — healed file carries no qa_round / qa_rounds_total line");
 });
 
-test("E8-M3: a v17 handoff refuses-loud against this v16 server (no silent downgrade)", () => {
+test("E8-M3 (E435): a v18 handoff refuses-loud against this v17 server (no silent downgrade)", () => {
   // Re-baselined for the lane-layout migration bump (coupled bump, not a bare
   // constant swap): CURRENT is now 16 (E431), so "the future" this test probes must
   // move to 16 or the payload/assertion pair collapses to the incoherent
@@ -185,7 +193,7 @@ test("E8-M3: a v17 handoff refuses-loud against this v16 server (no silent downg
   fs.writeFileSync(
     path.join(ws, ".current", "handoff.md"),
     `---
-schema_version: 17
+schema_version: 18
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -200,12 +208,12 @@ qa_round: 0
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 17 > server max 16/,
-    "a v16 file must refuse-loud, never silently downgrade",
+    /on-disk version 18 > server max 17/,
+    "a v17 server must refuse-loud, never silently downgrade",
   );
 });
 
-test("E8-M4: totals are preserved (not reset) across a same-feature migration-heal write", async () => {
+test("E8-M4 (E435): review/visual totals are preserved across a same-feature migration-heal write; qa_rounds_total is dropped", async () => {
   // WHY: mirrors the architecture's DR on migration-heal write-back threading
   // (handoff.ts:511-542) — a hand-migrated v11 file that already carries
   // nonzero totals (e.g. hand-edited during a version skip) must not have
@@ -237,10 +245,10 @@ hop_count: 4
   await new Promise((resolve) => setTimeout(resolve, 30));
   // readHandoffState above is what triggers the own-workspace migration (AC3).
   const healed = fs.readFileSync(currentHandoffPath(ws), "utf-8");
-  assert.match(healed, /schema_version:\s*16/, "heal lands at CURRENT (v16)");
+  assert.match(healed, /schema_version:\s*17/, "heal lands at CURRENT (v17)");
   // v11 file had no totals at all (pre-e8 shape) -> migration seeds 0, and the
   // heal write must persist that seeded 0 (not silently drop the fields).
-  assert.match(healed, /qa_rounds_total:\s*0/, "heal write persists the seeded qa_rounds_total");
+  assert.doesNotMatch(healed, /^qa_round(s_total)?:/m, "E435 — heal write persists no qa_round / qa_rounds_total");
   assert.match(healed, /review_rounds_total:\s*0/, "heal write persists the seeded review_rounds_total");
   assert.match(healed, /visual_rounds_total:\s*0/, "heal write persists the seeded visual_rounds_total");
   assert.match(healed, /hop_count:\s*4/, "sibling hop_count survives the heal write untouched");
@@ -260,129 +268,126 @@ hop_count: 4
 // 0-defaults.
 // ============================================================================
 
-test("E8-C1: qa_rounds_total ticks +1 on (qa-engineer, FAIL); review/visual hold", () => {
+// E435: computeNewRound(review, visual, next, prev, notes, hop, featureChanged,
+// reviewTot, visualTot) — the qa slots and qa_rounds_total are gone (one judge,
+// qa-engineer never writes FAIL). Visual branches unchanged (E420).
+test("E8-C1 (E435): a stale (qa-engineer, FAIL) ticks no review total and returns no qa_rounds_total", () => {
   const r = computeNewRound(
-    3, 1, 0,
+    1, 0,
     { agent: "qa-engineer", status: "FAIL" },
     { agent: "sr-engineer", status: "In_Progress" },
     [],
     5, false,
-    2, 1, 0, // prev totals
+    1, 0, // prev totals
   );
-  assert.equal(r.qa_rounds_total, 3, "qa_rounds_total ticks 2 -> 3");
+  assert.equal("qa_rounds_total" in r, false, "no qa_rounds_total in the result");
+  assert.equal("qa_round" in r, false, "no qa_round in the result");
   assert.equal(r.review_rounds_total, 1, "review_rounds_total holds");
   assert.equal(r.visual_rounds_total, 0, "visual_rounds_total holds (no visual_fail token)");
 });
 
-test("E8-C2: review_rounds_total ticks +1 on (code-reviewer, FAIL); qa/visual hold", () => {
+test("E8-C2 (E435): review_rounds_total ticks +1 on (code-reviewer, FAIL); visual holds", () => {
   const r = computeNewRound(
-    0, 2, 0,
+    2, 0,
     { agent: "code-reviewer", status: "FAIL" },
     { agent: "sr-engineer", status: "In_Progress" },
     [],
     3, false,
-    4, 2, 1,
+    2, 1,
   );
-  assert.equal(r.qa_rounds_total, 4, "qa_rounds_total holds");
   assert.equal(r.review_rounds_total, 3, "review_rounds_total ticks 2 -> 3");
   assert.equal(r.visual_rounds_total, 1, "visual_rounds_total holds");
 });
 
-test("E8-C3: visual_rounds_total ticks +1 ONLY when the FAIL carries a visual_fail: token — and qa_rounds_total ticks too (same qa-engineer FAIL event)", () => {
+test("E8-C3 (E435): visual_rounds_total ticks +1 ONLY when the FAIL carries a visual_fail: token (visual branch unchanged)", () => {
   const withToken = computeNewRound(
-    0, 0, 5,
+    0, 5,
     { agent: "qa-engineer", status: "FAIL" },
     { agent: "sr-engineer", status: "In_Progress" },
     ["visual_fail: pixel diff at header"],
     2, false,
-    1, 0, 5,
+    0, 5,
   );
   assert.equal(withToken.visual_rounds_total, 6, "visual_rounds_total ticks 5 -> 6 with the token");
-  assert.equal(withToken.qa_rounds_total, 2, "qa_rounds_total ALSO ticks — it's still a (qa-engineer, FAIL) event");
+  assert.equal("qa_rounds_total" in withToken, false, "no qa_rounds_total in the result");
 
   const withoutToken = computeNewRound(
-    0, 0, 5,
+    0, 5,
     { agent: "qa-engineer", status: "FAIL" },
     { agent: "sr-engineer", status: "In_Progress" },
     ["plain FAIL, not a visual issue"],
     2, false,
-    1, 0, 5,
+    0, 5,
   );
   assert.equal(withoutToken.visual_rounds_total, 5, "visual_rounds_total holds without the token");
-  assert.equal(withoutToken.qa_rounds_total, 2, "qa_rounds_total still ticks (the qa-engineer FAIL predicate is unconditional on the token)");
 });
 
-test("E8-C4: totals SURVIVE a QA PASS — unlike the cycle counters, which reset", () => {
+test("E8-C4 (E435): totals SURVIVE the judge's (code-reviewer) PASS — unlike review_round, which resets", () => {
   const r = computeNewRound(
-    3, 0, 0,
-    { agent: "qa-engineer", status: "PASS" },
-    { agent: "qa-engineer", status: "In_Progress" },
+    2, 0,
+    { agent: "code-reviewer", status: "PASS" },
+    { agent: "code-reviewer", status: "In_Progress" },
     [],
     6, false,
-    3, 1, 0, // prior accumulated totals
+    1, 0, // prior accumulated totals
   );
-  assert.equal(r.qa_round, 0, "cycle qa_round resets on PASS (unchanged sibling behavior)");
-  assert.equal(r.qa_rounds_total, 3, "qa_rounds_total does NOT reset on PASS — it's a feature-lifetime total");
-  assert.equal(r.review_rounds_total, 1, "review_rounds_total likewise survives");
+  assert.equal(r.review_round, 0, "cycle review_round resets on the judge's PASS");
+  assert.equal(r.review_rounds_total, 1, "review_rounds_total does NOT reset on PASS — it's a feature-lifetime total");
   assert.equal(r.visual_rounds_total, 0, "visual_rounds_total likewise survives (here already 0)");
 });
 
-test("E8-C5: totals SURVIVE (pm, In_Progress) re-entry — unlike qa_round/review_round/visual_round/hop_count-adjacent cycle counters, which reset", () => {
+test("E8-C5 (E435): totals SURVIVE (pm, In_Progress) re-entry — unlike review_round/visual_round, which reset", () => {
   // WHY: this is the load-bearing asymmetry the architecture calls out
   // explicitly (AC3/AC8) — the whole point of the new counters is to survive
   // exactly the event that already zeros the pre-existing cycle counters.
   const r = computeNewRound(
-    4, 3, 2,
+    3, 2,
     { agent: "pm", status: "In_Progress" },
-    { agent: "qa-engineer", status: "FAIL" },
+    { agent: "code-reviewer", status: "FAIL" },
     [],
     10, false,
-    5, 4, 3, // prior accumulated totals
+    4, 3, // prior accumulated totals
   );
-  assert.equal(r.qa_round, 0, "cycle qa_round resets on pm re-entry");
   assert.equal(r.review_round, 0, "cycle review_round resets on pm re-entry");
   assert.equal(r.visual_round, 0, "cycle visual_round resets on pm re-entry");
-  assert.equal(r.qa_rounds_total, 5, "qa_rounds_total does NOT reset on pm re-entry");
   assert.equal(r.review_rounds_total, 4, "review_rounds_total does NOT reset on pm re-entry");
   assert.equal(r.visual_rounds_total, 3, "visual_rounds_total does NOT reset on pm re-entry");
 });
 
-test("E8-C6: feature_changed=true resets ALL three totals to 0 before applying this write's own increment", () => {
+test("E8-C6 (E435): feature_changed=true resets both totals to 0 before applying this write's own increment", () => {
   const r = computeNewRound(
-    0, 0, 0,
-    { agent: "qa-engineer", status: "FAIL" },
+    0, 0,
+    { agent: "code-reviewer", status: "FAIL" },
     { agent: "pm", status: "In_Progress" },
     [],
     0, true, // feature_changed
-    9, 8, 7, // stale totals from the OLD feature — must not survive
+    8, 7, // stale totals from the OLD feature — must not survive
   );
-  assert.equal(r.qa_rounds_total, 1, "base resets to 0 on feature change, then this write's own FAIL ticks it to 1");
-  assert.equal(r.review_rounds_total, 0, "base resets to 0 on feature change; no review FAIL this write");
+  assert.equal(r.review_rounds_total, 1, "base resets to 0 on feature change, then this write's own FAIL ticks it to 1");
   assert.equal(r.visual_rounds_total, 0, "base resets to 0 on feature change; no visual FAIL this write");
 });
 
-test("E8-C7: other writes (non-FAIL, non-feature-change) hold all three totals steady", () => {
+test("E8-C7 (E435): other writes (non-FAIL, non-feature-change) hold both totals steady", () => {
   const r = computeNewRound(
-    2, 1, 0,
+    1, 0,
     { agent: "sr-engineer", status: "In_Progress" },
-    { agent: "qa-engineer", status: "FAIL" },
+    { agent: "code-reviewer", status: "FAIL" },
     [],
     7, false,
-    3, 2, 1,
+    2, 1,
   );
   assert.deepEqual(
-    [r.qa_rounds_total, r.review_rounds_total, r.visual_rounds_total],
-    [3, 2, 1],
-    "no FAIL predicate matched -> all three totals hold at their prior value",
+    [r.review_rounds_total, r.visual_rounds_total],
+    [2, 1],
+    "no FAIL predicate matched -> both totals hold at their prior value",
   );
 });
 
-test("E8-C8: legacy computeNewRound callers omitting the 3 new prev-total args (and feature_changed/prev_hop_count) still compile and default totals to 0", () => {
+test("E8-C8 (E435): legacy computeNewRound callers omitting the prev-total args (and feature_changed/prev_hop_count) default totals to 0", () => {
   // Mirrors the earlier pre-v3.14/pre-v9 backwards-compat pins for
   // visual_round/hop_count (AC-10/AC-11) — the same widen-additively-defaulted contract.
-  const r = computeNewRound(1, 0, 0, { agent: "qa-engineer", status: "FAIL" });
-  assert.equal(r.qa_rounds_total, 1, "with all prev-totals defaulted to 0 and no feature_changed, a qa FAIL still ticks 0 -> 1");
-  assert.equal(r.review_rounds_total, 0);
+  const r = computeNewRound(0, 0, { agent: "code-reviewer", status: "FAIL" });
+  assert.equal(r.review_rounds_total, 1, "with prev-totals defaulted to 0, a code-reviewer FAIL ticks 0 -> 1");
   assert.equal(r.visual_rounds_total, 0);
 });
 
@@ -391,7 +396,7 @@ test("E8-C8: legacy computeNewRound callers omitting the 3 new prev-total args (
 // (mirror the hop_count test patterns in test/hop-count-transitions.test.mjs)
 // ============================================================================
 
-test("E8-H1: writeHandoffState(qaRoundsTotal=N, ...) -> parseHandoff(...).qa_rounds_total === N (round-trip)", async () => {
+test("E8-H1 (E435): writeHandoffState(reviewRoundsTotal/visualRoundsTotal=N) round-trips; no qa_rounds_total", async () => {
   const ws = mkWs("e8-rt-");
   resetSession(ws);
   markStateRead(ws);
@@ -402,17 +407,16 @@ test("E8-H1: writeHandoffState(qaRoundsTotal=N, ...) -> parseHandoff(...).qa_rou
     completedTasks: [],
     pendingNotes: [],
     lastAgent: "sr-engineer",
-    qaRoundsTotal: 5,
     reviewRoundsTotal: 3,
     visualRoundsTotal: 2,
   });
   const state = parseHandoff(ws);
-  assert.equal(state.qa_rounds_total, 5);
+  assert.equal(state.qa_rounds_total, undefined);
   assert.equal(state.review_rounds_total, 3);
   assert.equal(state.visual_rounds_total, 2);
 });
 
-test("E8-H2: writeHandoffState omitting the 3 totals normalises all three to 0", async () => {
+test("E8-H2 (E435): writeHandoffState omitting the totals normalises review/visual to 0; no qa_rounds_total", async () => {
   const ws = mkWs("e8-rt2-");
   resetSession(ws);
   markStateRead(ws);
@@ -425,12 +429,12 @@ test("E8-H2: writeHandoffState omitting the 3 totals normalises all three to 0",
     lastAgent: "pm",
   });
   const state = parseHandoff(ws);
-  assert.equal(state.qa_rounds_total, 0);
+  assert.equal(state.qa_rounds_total, undefined);
   assert.equal(state.review_rounds_total, 0);
   assert.equal(state.visual_rounds_total, 0);
 });
 
-test("E8-H3: parseHandoff sanitises negative/NaN hand-edited totals to 0", () => {
+test("E8-H3 (E435): parseHandoff sanitises negative/NaN hand-edited totals to 0; a v12 qa_rounds_total is dropped", () => {
   const ws = mkWs("e8-neg-");
   fs.writeFileSync(
     path.join(ws, ".current", "handoff.md"),
@@ -457,12 +461,12 @@ visual_rounds_total: not-a-number
 `,
   );
   const state = parseHandoff(ws);
-  assert.equal(state.qa_rounds_total, 0, "negative sanitises to 0");
+  assert.equal(state.qa_rounds_total, undefined, "E435 — the v16->v17 step drops the hand-edited qa_rounds_total");
   assert.equal(state.review_rounds_total, 0, "NaN sanitises to 0");
   assert.equal(state.visual_rounds_total, 0, "non-numeric sanitises to 0");
 });
 
-test("E8-H4: writeHandoffState ALWAYS serializes the 3 totals into YAML, even when 0 (discoverability, mirrors hop_count)", async () => {
+test("E8-H4 (E435): writeHandoffState ALWAYS serializes review/visual totals into YAML, even when 0; never qa_rounds_total", async () => {
   const ws = mkWs("e8-always-");
   resetSession(ws);
   markStateRead(ws);
@@ -473,12 +477,11 @@ test("E8-H4: writeHandoffState ALWAYS serializes the 3 totals into YAML, even wh
     completedTasks: [],
     pendingNotes: [],
     lastAgent: "pm",
-    qaRoundsTotal: 0,
     reviewRoundsTotal: 0,
     visualRoundsTotal: 0,
   });
   const raw = fs.readFileSync(currentHandoffPath(ws), "utf-8");
-  assert.match(raw, /qa_rounds_total:\s*0/, "qa_rounds_total: 0 is emitted, not omitted");
+  assert.doesNotMatch(raw, /^qa_round(s_total)?:/m, "E435 — no qa_round / qa_rounds_total line is emitted");
   assert.match(raw, /review_rounds_total:\s*0/, "review_rounds_total: 0 is emitted, not omitted");
   assert.match(raw, /visual_rounds_total:\s*0/, "visual_rounds_total: 0 is emitted, not omitted");
 });
@@ -497,7 +500,7 @@ function seedTasksAndPackage(ws, { code, checked = 2, unchecked = 1, version = "
   fs.writeFileSync(path.join(ws, "package.json"), JSON.stringify({ name: "x", version }));
 }
 
-test("E8-E1: full realistic chain — release-engineer terminal-marker write emits exactly one record with the correct shape", async () => {
+test("E8-E1 (E435): full realistic chain — release-engineer terminal-marker write emits exactly one record with the correct shape (no qa_rounds)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e8-e2e-");
   const feature = "e8metrics-full-feat";
@@ -516,7 +519,6 @@ test("E8-E1: full realistic chain — release-engineer terminal-marker write emi
     pendingNotes: [],
     lastAgent: "qa-engineer",
     hopCount: 9,
-    qaRoundsTotal: 2,
     reviewRoundsTotal: 1,
     visualRoundsTotal: 0,
   });
@@ -542,7 +544,7 @@ test("E8-E1: full realistic chain — release-engineer terminal-marker write emi
   const record = lines[0];
   assert.equal(record.feature, feature);
   assert.equal(record.tickets, 2, "tickets counts only the 2 checked T-E8METRICS-* lines");
-  assert.equal(record.qa_rounds, 2, "qa_rounds read from prevState.qa_rounds_total");
+  assert.equal("qa_rounds" in record, false, "E435 — new records carry no qa_rounds");
   assert.equal(record.review_rounds, 1, "review_rounds read from prevState.review_rounds_total");
   assert.equal(record.visual_rounds, 0, "visual_rounds read from prevState.visual_rounds_total");
   // hop_count 9 (seed) -> 10 after the OPENING write (qa-engineer ->
@@ -550,13 +552,13 @@ test("E8-E1: full realistic chain — release-engineer terminal-marker write emi
   // is a same-agent self-loop (no further bump), so prevState read at the
   // closing write carries hop_count=10.
   assert.equal(record.hops, 10, "hops read from prevState.hop_count (AC5 — no new field)");
-  assert.equal(record.one_pass, false, "one_pass is false — qa_rounds/review_rounds were nonzero at some point");
+  assert.equal(record.one_pass, false, "one_pass is false — review_rounds was nonzero at some point");
   assert.equal(record.released_version, "9.9.1", "released_version read from package.json at emit time");
   assert.ok(typeof record.ts === "string" && !Number.isNaN(Date.parse(record.ts)), "ts is a valid ISO-8601 timestamp");
-  assert.equal(Object.keys(record).sort().join(","), "feature,hops,one_pass,qa_rounds,released_version,review_rounds,tickets,ts,visual_rounds", "record carries exactly the AC1 shape, no stray keys");
+  assert.equal(Object.keys(record).sort().join(","), "feature,hops,one_pass,released_version,review_rounds,tickets,ts,visual_rounds", "record carries exactly the AC1 shape, no stray keys");
 });
 
-test("E8-E2: one_pass is true only when all three prevState totals are 0", async () => {
+test("E8-E2 (E435): one_pass is true when the review and visual prevState totals are both 0", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e8-onepass-");
   const feature = "e8onepass-feat";
@@ -566,13 +568,13 @@ test("E8-E2: one_pass is true only when all three prevState totals are 0", async
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 3, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 3, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
   const [record] = readMetricsLines(ws);
-  assert.equal(record.one_pass, true, "all three totals 0 at emit time -> one_pass true");
-  assert.equal(record.qa_rounds, 0);
+  assert.equal(record.one_pass, true, "review and visual totals 0 at emit time -> one_pass true");
+  assert.equal("qa_rounds" in record, false, "E435 — no qa_rounds field");
   assert.equal(record.review_rounds, 0);
   assert.equal(record.visual_rounds, 0);
 });
@@ -587,7 +589,7 @@ test("E8-E3: NO emit on any write where agent_id !== release-engineer, even with
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 1, qaRoundsTotal: 4, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 1, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
   const res = await dispatch(ws, {
     active_feature: feature, status: "In_Progress", agent_id: "pm",
@@ -607,7 +609,7 @@ test("E8-E4: NO emit on a release-engineer self-loop write whose next_role is an
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 2, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 2, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
   const res = await dispatch(ws, {
@@ -632,7 +634,7 @@ test("E8-E5 (SQLite): the terminal-marker write never emits, even though the wri
     await storage.writeState({
       workspacePath: dir, activeFeature: feature, status: "PASS",
       completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-      hopCount: 2, qaRoundsTotal: 3, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+      hopCount: 2, reviewRoundsTotal: 0, visualRoundsTotal: 0,
     });
     resetSession(dir);
     markStateRead(dir);
@@ -659,7 +661,7 @@ test("E8-E6 (AC2): a missing tasks.md degrades the WHOLE emit to a no-op (outer 
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 0, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
   const res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
@@ -678,7 +680,7 @@ test("E8-E7 (AC7/AC2): a missing package.json degrades ONLY released_version to 
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 0, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
   const res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
@@ -701,7 +703,7 @@ test("E8-E8 (AC2): an unwritable metrics.jsonl (path occupied by a directory) ne
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 0, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
   const res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
@@ -713,7 +715,7 @@ test("E8-E9: emitFeatureMetrics never throws directly, regardless of inputs (def
   assert.doesNotThrow(() => emitFeatureMetrics({
     workspacePath: "/nonexistent/path/that/cannot/possibly/exist",
     feature: "whatever",
-    qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0,
+    reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0,
   }));
 });
 
@@ -735,7 +737,7 @@ test("E12-D1 (AC7): dispatching the release-engineer closing-write signature TWI
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 1, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 1, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
 
   // First full open+close cycle — record #1.
@@ -763,7 +765,7 @@ test("E12-D2 (AC8): changing package.json's version between two closing-write di
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 1, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 1, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
 
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
@@ -794,7 +796,7 @@ test("E12-D3 (AC10): a pre-existing malformed line in .current/metrics.jsonl doe
   await storage.writeState({
     workspacePath: ws, activeFeature: feature, status: "PASS",
     completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
-    hopCount: 1, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+    hopCount: 1, reviewRoundsTotal: 0, visualRoundsTotal: 0,
   });
   await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
   const res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
@@ -813,12 +815,12 @@ test("E12-U1 (AC9): released_version resolving to null is a REAL dedupe key, not
   const feature = "e12-nullkey-feat";
   fs.writeFileSync(path.join(ws, "tasks.md"), "- [x] T-E12NULLKEY-01 done\n");
   // Deliberately no package.json -> released_version resolves to null both times.
-  emitFeatureMetrics({ workspacePath: ws, feature, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  emitFeatureMetrics({ workspacePath: ws, feature, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
   let lines = readMetricsLines(ws);
   assert.equal(lines.length, 1, "first null-version emit appends");
   assert.equal(lines[0].released_version, null);
 
-  emitFeatureMetrics({ workspacePath: ws, feature, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  emitFeatureMetrics({ workspacePath: ws, feature, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
   lines = readMetricsLines(ws);
   assert.equal(lines.length, 1, "AC9 — a second (feature, null) emit is deduped against the first, NOT treated as always-append");
 });
@@ -830,8 +832,8 @@ test("E12-U2: two DIFFERENT features emitted with the SAME released_version neve
     path.join(ws, "tasks.md"),
     "- [x] T-E12CROSSA-01 done\n- [x] T-E12CROSSB-01 done\n",
   );
-  emitFeatureMetrics({ workspacePath: ws, feature: "e12-crossa-feat", qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
-  emitFeatureMetrics({ workspacePath: ws, feature: "e12-crossb-feat", qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  emitFeatureMetrics({ workspacePath: ws, feature: "e12-crossa-feat", reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  emitFeatureMetrics({ workspacePath: ws, feature: "e12-crossb-feat", reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
   const lines = readMetricsLines(ws);
   assert.equal(lines.length, 2, "both features' records are present — same released_version does not cause cross-feature deduping");
   assert.deepEqual(lines.map((l) => l.feature).sort(), ["e12-crossa-feat", "e12-crossb-feat"]);
@@ -856,7 +858,7 @@ test("E12-U3 (AC10/AC11): metrics.jsonl unreadable mid-read (permissions error) 
   );
   fs.chmodSync(metricsPath(ws), 0o200);
   try {
-    emitFeatureMetrics({ workspacePath: ws, feature, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+    emitFeatureMetrics({ workspacePath: ws, feature, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
   } finally {
     fs.chmodSync(metricsPath(ws), 0o644); // restore so readMetricsLines below can read it back
   }

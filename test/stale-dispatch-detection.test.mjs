@@ -412,7 +412,7 @@ test("T7: active_feature change drops dispatched_at even though next_role was ju
 // refuse-loud for a hypothetical v11 file (AC-10 / DR-7)
 // ============================================================================
 
-test("T8: a v9 handoff (no dispatched_at) migrates to v10 on read — field stays undefined, hop_count/sibling fields preserved (DR-7)", async () => {
+test("T8 (E435): a v9 handoff (no dispatched_at) migrates to CURRENT 17 on read — field stays undefined, hop_count/sibling fields preserved, qa_round/qa_rounds_total dropped (DR-7)", async () => {
   const ws = mkWs();
   resetSession();
   writeRaw(
@@ -445,7 +445,8 @@ next_role: "sr-engineer"
   assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v9→v10→v11→v12");
   // Re-baselined for the success-telemetry schema bump: the file also climbs v11→v12, seeding
   // the three new cumulative totals to 0 (the hop_count counter precedent) (e8-success-telemetry).
-  assert.equal(state.qa_rounds_total, 0, "v11→v12 seeds qa_rounds_total: 0 (e8-success-telemetry)");
+  assert.equal(state.qa_rounds_total, undefined, "E435 — v16→v17 drops the qa_rounds_total v11→v12 seeded");
+  assert.equal(state.qa_round, undefined, "E435 — v16→v17 drops the legacy qa_round: 1");
   assert.equal(state.review_rounds_total, 0, "v11→v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.visual_rounds_total, 0, "v11→v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
   // Re-baselined for the evidence-schema bump: the file also climbs v12→v13,
@@ -461,21 +462,22 @@ next_role: "sr-engineer"
   // (absence-is-signal, migration invents no attestation) (e123a-lane-layout-migration).
   assert.equal(state.dispatch_mechanism, undefined, "v14→v15 must NOT seed dispatch_mechanism (absence-is-signal, e123a-lane-layout-migration)");
 
-  // On-disk heal: readHandoffState's fire-and-forget write-back lands at v16.
+  // On-disk heal: readHandoffState's fire-and-forget write-back lands at v17.
   resetSession();
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
   const healed = readRaw(ws);
-  assert.match(healed, /schema_version:\s*16/, "fire-and-forget heal lands the file at CURRENT (v16)");
+  assert.match(healed, /schema_version:\s*17/, "fire-and-forget heal lands the file at CURRENT (v17)");
+  assert.doesNotMatch(healed, /^qa_round(s_total)?:/m, "E435 — healed file carries no qa_round / qa_rounds_total line");
 
   // Re-running the migration on the now-current payload is a no-op — the file
   // stays at CURRENT and no further heal-write fires.
   resetSession();
   parseHandoff(ws);
-  assert.match(readRaw(ws), /schema_version:\s*16/, "second read stays at CURRENT, no further migration applied");
+  assert.match(readRaw(ws), /schema_version:\s*17/, "second read stays at CURRENT, no further migration applied");
 });
 
-test("T8b: a future v17 handoff refuses-loud against this v16 server (no silent downgrade)", () => {
+test("T8b (E435): a future v18 handoff refuses-loud against this v17 server (no silent downgrade)", () => {
   // Re-baselined for the lane-layout migration bump (coupled bump, not a bare
   // constant swap): CURRENT is now 16 (E431), so "the future" this test probes must
   // move to 16 or the payload/assertion pair collapses to the incoherent
@@ -486,7 +488,7 @@ test("T8b: a future v17 handoff refuses-loud against this v16 server (no silent 
   writeRaw(
     ws,
     `---
-schema_version: 17
+schema_version: 18
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -501,8 +503,8 @@ qa_round: 0
   );
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 17 > server max 16/,
-    "a v16 file must refuse-loud rather than silently downgrade",
+    /handoff on-disk version 18 > server max 17/,
+    "a v17 server must refuse-loud rather than silently downgrade",
   );
 });
 
@@ -740,6 +742,6 @@ sqliteDescribe("T9: SQLite storage never persists or surfaces dispatched_at/stal
 // unchanged semantics.
 // ============================================================================
 
-test("T10: sanity — CURRENT_VERSIONS.handoff is 16 (E431 chain_path/sr_return_count)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 16);
+test("T10 (E435): sanity — CURRENT_VERSIONS.handoff is 17 (E435 drops chain_path/qa_round/qa_rounds_total)", () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 17);
 });
