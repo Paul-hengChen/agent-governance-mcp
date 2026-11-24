@@ -700,3 +700,26 @@ No test dropped. Other e223 tests (AC4+) green on both: they print no state line
 ### Red Reasons (T-18)
 
 5 red at base, all assertion failures for the stated reason (no syntax / link error): e183 AC-E183-7, summarize-metrics still prints the `qa_rounds` column and `mean rounds: qa …` (T-E435-34); e22 S1, `CURRENT_VERSIONS.handoff` 16 (T-E435-29); e223 AC1/AC2/AC3, `WATCH_STATE_KEYS` still ends with `qa_round`, so state lines carry `qa_round=-` and AC3's re-arm fingerprint differs (T-E435-42). Rows under `# T-E435-18` in the manifest. Run: `node --test test/e183-summarize-metrics-lane.test.mjs test/e223-watch-rearm-gone.test.mjs test/e22-stale-notify.test.mjs test/e235a-relative-prd-path.test.mjs` → 53 tests, 48 pass, 5 fail = the 5 rows, name for name.
+
+## T-E435-19 — `e31-config-nonfatal`, `e92-e86-handoff-write-boundary`, `lane-migrate`, `prompt-state-footer` (AC4)
+
+Placement: existing files, edited in place (brief). 1 changed test line (0+ / 1-), under the 300-line cap. Contract: architecture *Handoff schema v17 (file mode)*, Rulings (a) drop. Conventions from T-E435-16/17 reused: raw legacy on-disk fixtures at schema < 17 carrying `qa_round` stay (historical shape, still climbs the chain); an in-memory current-state object drops the key rather than pass an ignored one (T-16 e116/e122 precedent).
+
+### Scenario → Test Map (T-19)
+
+| scenario | exact test name(s) |
+|---|---|
+| a current-shape (schema 17) state object carries no `qa_round`; `resolvePrdPath` still honours / degrades `prd_path` | prompt-state-footer `C6-03/AC-6: …` ×3 that use `fixtureState` (fixture drops `qa_round`; green on both) |
+
+No change needed (left as is):
+- `test/e31-config-nonfatal.test.mjs`: `writeMinimalHandoff` is an unversioned (v1) legacy file; it climbs to CURRENT on read and no assertion names `qa_round`, `schema_version` of the handoff, or the healed bytes.
+- `test/e92-e86-handoff-write-boundary.test.mjs`: AC4 fixture is a schema-13 legacy file (asserts only `scope_decision_why` length). The `content/*.md` + `docs/backlog.md` corpus sweep and the guarded-field / cap / whitespace tests build `qa_review` on `status: "In_Progress"` with no `agent_id` and validate through the zod schema only, so no qa-engineer PASS/FAIL writer exists to move to code-reviewer; the sweep stays green.
+- `test/lane-migrate.test.mjs`: `handoffBody` is a schema-15 legacy file moved byte-for-byte (RT1/CONFLICT/MERGE assert bytes, never fields; only the read-only `parseHandoff` runs), so v17 changes nothing.
+
+### Open Interface Details (T-19)
+
+None.
+
+### Red Reasons (T-19)
+
+0 red: no test in the four files depends on a field schema 17 drops or on a moved judge, so nothing is red at base. No test dropped. A `# T-E435-19` comment group (no rows) is appended to the manifest. Run: `node --test test/e31-config-nonfatal.test.mjs test/e92-e86-handoff-write-boundary.test.mjs test/lane-migrate.test.mjs test/prompt-state-footer.test.mjs` → 219 tests, 219 pass, 0 fail.

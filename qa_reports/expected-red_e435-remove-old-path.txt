@@ -400,3 +400,6 @@ test/e22-stale-notify.test.mjs | S1: sanity — CURRENT_VERSIONS.handoff/config 
 test/e223-watch-rearm-gone.test.mjs | AC1 gone key on start in the default set | WATCH_STATE_KEYS still ends with qa_round at base, so every state line carries qa_round=- (T-E435-42)
 test/e223-watch-rearm-gone.test.mjs | AC2 gone ordering | WATCH_STATE_KEYS still ends with qa_round at base, so every state line carries qa_round=- (T-E435-42)
 test/e223-watch-rearm-gone.test.mjs | AC3 gone keys are not carried | WATCH_STATE_KEYS still ends with qa_round at base, so the state line and its re-arm fingerprint differ (T-E435-42)
+
+# T-E435-19 — state fixture re-pins (4/5): e31-config-nonfatal, e92-e86-handoff-write-boundary, lane-migrate, prompt-state-footer
+# no red rows: every test in the four files is green at base and stays green under schema 17 (see tests report section T-E435-19)
