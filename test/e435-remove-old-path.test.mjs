@@ -16,6 +16,7 @@ import { markStateRead, resetSession } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { TOOL_REGISTRY, PROMPT_REGISTRY } from "../dist/tools/registry.js";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
+import { readHandoffState } from "../dist/tools/handoff-parse.js";
 import { CURRENT_VERSIONS } from "../dist/schema/versions.js";
 import { buildPromptForRole } from "../dist/prompts/build.js";
 // Namespace import: the new exports do not exist before the build, and a named import would fail the whole file.
@@ -59,8 +60,15 @@ function v16Handoff({ agent, status, marker = false, extra = "" }) {
 
 const text = (r) => r?.content?.[0]?.text ?? "";
 const rejected = (r) => Boolean(r?.isError) || text(r).startsWith("⛔") || text(r).startsWith("❌");
-// A zod failure throws; surface it as the rejection a client sees.
-const asRejection = (err) => ({ isError: true, content: [{ type: "text", text: `⛔ ${err.message}` }] });
+// A zod failure throws; surface it as the rejection a client sees. Under zod 4 `err.message` is the JSON-encoded
+// issue array (quotes escaped), so keep `issues` and render the first issue's message the way a client reads it.
+const asRejection = (err) => ({
+  isError: true,
+  issues: err.issues,
+  content: [{ type: "text", text: `⛔ ${err.issues?.[0]?.message ?? err.message}` }],
+});
+// The tool-boundary refine message, exact: the first zod issue (architecture Copy constants).
+const issueMsg = (r) => r?.issues?.[0]?.message;
 const hpath = (ws) => resolveCurrentLanePaths(ws).handoffPath;
 const state = (ws) => new FileHandoffStorage().parse(ws);
 
@@ -107,7 +115,7 @@ test("AC2: qa-engineer status=PASS is rejected and the message names code-review
   const before = fs.readFileSync(hpath(ws), "utf-8");
   const r = await upd(ws, "qa-engineer", "PASS", { qa_review: "x", review_task_ids: ["T-1"] });
   assert.ok(rejected(r), "qa-engineer PASS must be rejected");
-  assert.ok(text(r).includes(QA_PASS_MSG), `message names code-reviewer + migration note: ${text(r)}`);
+  assert.equal(issueMsg(r), QA_PASS_MSG, `message names code-reviewer + migration note: ${text(r)}`);
   assert.equal(fs.readFileSync(hpath(ws), "utf-8"), before, "no state written");
 });
 
@@ -171,14 +179,23 @@ test("AC3: a legal new-chain step is accepted and gets no migration hint; the hi
 
 // ---------------------------------------------------------------- AC4
 
-test("AC4: a schema 16 handoff carrying chain_path lazily migrates to 17 with chain_path, qa_round, qa_rounds_total dropped", () => {
+test("AC4: a schema 16 handoff carrying chain_path lazily migrates to 17 with chain_path, qa_round, qa_rounds_total dropped", async () => {
   assert.equal(CURRENT_VERSIONS.handoff, 17);
   const ws = mkWs({ agent: "pm", status: "In_Progress", marker: true });
   fresh(ws);
   const s = state(ws);
   for (const k of ["chain_path", "qa_round", "qa_rounds_total"]) assert.ok(!(k in s), `${k} dropped on read`);
   assert.equal(s.review_rounds_total, 0, "kept counters survive");
-  const disk = fs.readFileSync(hpath(ws), "utf-8");
+  // Lazy-migration contract (docs/schema-versions.md, pre-E435): parse() is a pure read; the disk heal is
+  // readHandoffState's (the tw_get_state read path) fire-and-forget write-back, so drive that and wait for it.
+  const read = JSON.parse(readHandoffState(ws));
+  assert.ok(!("chain_path" in read), "tw_get_state's read drops chain_path");
+  let disk = "";
+  for (let i = 0; i < 100; i++) {
+    disk = fs.readFileSync(hpath(ws), "utf-8");
+    if (/^schema_version: 17$/m.test(disk)) break;
+    await new Promise((res) => setTimeout(res, 10));
+  }
   assert.match(disk, /^schema_version: 17$/m, "heal write persisted v17");
   assert.doesNotMatch(disk, /chain_path|qa_round/);
 });
@@ -189,7 +206,8 @@ test("AC4: tw_update_state has no chain_path property, resume_of accepts only co
   assert.deepEqual(props.resume_of.enum, ["code-reviewer"]);
   const ws = mkWs({ agent: "pm", status: "In_Progress" });
   const bad = await upd(ws, "qa-engineer", "In_Progress", { resume_of: "qa-engineer" });
-  assert.ok(rejected(bad) && text(bad).includes(RESUME_OF_MSG), `resume_of qa-engineer rejected: ${text(bad)}`);
+  assert.ok(rejected(bad), `resume_of qa-engineer rejected: ${text(bad)}`);
+  assert.equal(issueMsg(bad), RESUME_OF_MSG);
   const ok = await upd(ws, "qa-engineer", "In_Progress", { chain_path: "test-first" });
   assert.ok(!rejected(ok), `an old client's chain_path is ignored, not rejected: ${text(ok)}`);
   assert.doesNotMatch(fs.readFileSync(hpath(ws), "utf-8"), /chain_path/);
@@ -286,7 +304,8 @@ test("AC9: SQLite mode rejects pm -> sr, qa PASS, qa completed_tasks and qa tw_c
     const s = await run(UPD, "pm", w("sr-engineer", "In_Progress"));
     assert.ok(rejected(s) && text(s).includes(PM_TO_SR("pm").trim()), `SQLite pm -> sr rejected with the hint: ${text(s)}`);
     const q = await run(UPD, "qa-engineer", w("qa-engineer", "PASS", { qa_review: "x", review_task_ids: ["T-1"] }));
-    assert.ok(rejected(q) && text(q).includes(QA_PASS_MSG), `SQLite qa PASS rejected naming code-reviewer: ${text(q)}`);
+    assert.ok(rejected(q), `SQLite qa PASS rejected naming code-reviewer: ${text(q)}`);
+    assert.equal(issueMsg(q), QA_PASS_MSG);
     const l = await run(UPD, "sr-engineer", w("qa-engineer", "In_Progress", { completed_tasks: ["T-1"] }));
     assert.match(text(l), /NON_JUDGE_COMPLETED_TASKS_REJECTED/);
     const c = await run(COMPLETE, "sr-engineer", { task_id: "T-1", agent_id: "qa-engineer" });

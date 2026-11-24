@@ -173,7 +173,8 @@ test("FM4 (E435): a qa-engineer write after code-reviewer:In_Progress is TRANSIT
   assert.ok(result.isError, "code-reviewer -> qa-engineer is not an edge");
   assert.match(result.content[0].text, /TRANSITION_REJECTED/);
   assert.ok(
-    result.content[0].text.includes('code-reviewer is the judge and closes the feature: approve with code-reviewer:PASS (review_verdict: "APPROVED"), or reject with code-reviewer:FAIL; qa-engineer does not follow code-reviewer.'),
+    // "⛔ <CODE>\n<JSON envelope>": read the envelope's top-level `hint` (architecture), not escaped text.
+    JSON.parse(result.content[0].text.slice(result.content[0].text.indexOf("\n") + 1)).hint.includes('code-reviewer is the judge and closes the feature: approve with code-reviewer:PASS (review_verdict: "APPROVED"), or reject with code-reviewer:FAIL; qa-engineer does not follow code-reviewer.'),
     `hint names code-reviewer as the closing judge; got: ${result.content[0].text}`,
   );
   assert.doesNotMatch(result.content[0].text, /NON_JUDGE_COMPLETED_TASKS_REJECTED|QA_COMPLETION_EVIDENCE_MISSING/);

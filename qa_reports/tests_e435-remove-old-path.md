@@ -1025,3 +1025,23 @@ Written by sr-engineer (T-E435-39). Full suite `node scripts/test-lock.mjs -- np
 ### Other T-E435-39 results
 
 `npm run build` green (postbuild `check:transitions-sync` OK, 22 keys); `npm audit --audit-level=high` exit 0 (1 low, 6 moderate); `node bin/agc-init.mjs check` exit 0 (comment advisories only); `node scripts/smoke-qa-flow.mjs` 12/12; `npm run eval` not run: `test/eval/run-eval.mjs` needs `ANTHROPIC_API_KEY`, unset here (human/coordinator to run). Deferred as planned: the `tools/role.ts` comment (e408 AC6 pins it; green).
+
+## T-E435-47 hand-back re-pins part 1 (qa-engineer, R3 (b))
+
+Placement: existing files only (brief). All eight (B) rows accepted as test-side; no SR-BUG.
+
+| file | test | re-pin |
+|---|---|---|
+| test/e139-non-reviewer-verdict.test.mjs | AC-E139-2 (E435), AC-E139-3 (E435) | new `envelope(r)` helper parses `"⛔ <CODE>\n<JSON>"`; asserts `error === "TRANSITION_REJECTED"` and `hint.includes(REVIEWER_TO_QA_HINT)` / `QA_JUDGE_HINT` (architecture: the in-flight hint lives in `hint`) |
+| test/e32-e33-gate-hardening.test.mjs | C2 (E435) | same envelope parse; `error` + `hint` asserted |
+| test/reviewer-completed-tasks-gate.test.mjs | FM4 (E435) | judge hint read from the envelope's top-level `hint` |
+| test/e435-remove-old-path.test.mjs | AC2, AC4 (input schema), AC9 | `asRejection` keeps zod 4 `err.issues`; asserts `issues[0].message === QA_PASS_MSG` / `RESUME_OF_MSG` exactly |
+| test/e435-remove-old-path.test.mjs | AC4 (schema 16 lazy migrate) | in-memory drop via `parse()` kept; disk heal driven through `readHandoffState` (the `tw_get_state` read path) and polled until `schema_version: 17` |
+
+### Open Interface Details
+
+- AC4 heal: the lazy-migration contract (docs/schema-versions.md, pre-E435; pinned by `handoff-versioning` AC-2, `dispatch-pins` M1b, `e114` AC1, and the `e235a` note "parseHandoff never heals") puts the disk write-back in `readHandoffState`, fire-and-forget. The architecture's "the heal write in handoff-parse persists the result" names that same function's file. `FileHandoffStorage.parse()` is a pure read, so the original expectation was a test defect, not an sr bug.
+
+### Results
+
+`node --test` on the four files: e139 8/8, e32-e33 + reviewer-completed-tasks 28/28, e435-remove-old-path 13/13 (SQLite present, AC9 ran). Eight rows cleared from `qa_reports/expected-red_e435-remove-old-path.txt`.

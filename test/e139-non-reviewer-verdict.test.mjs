@@ -54,6 +54,9 @@ async function seed(ws, feature, agent, status) {
 
 const handoffBytes = (ws) => fs.readFileSync(resolveCurrentLanePaths(ws).handoffPath);
 const text = (r) => r.content?.[0]?.text ?? "";
+// A TRANSITION_REJECTED reply is "⛔ <CODE>\n<JSON envelope>"; the hint lives in the envelope's top-level `hint`
+// field (architecture: "the in-flight hint lives in `hint`"), so parse it rather than text-search escaped JSON.
+const envelope = (r) => JSON.parse(text(r).slice(text(r).indexOf("\n") + 1));
 // A rejection may be thrown (tool-boundary / judge guard) rather than returned; fold both into one shape.
 async function upd(args) {
   try {
@@ -114,7 +117,8 @@ test("AC-E139-2 (E435): code-reviewer -> qa-engineer is no longer an edge, even 
   });
   assert.ok(r.isError, `the old APPROVED hand-off row must be rejected; got: ${text(r)}`);
   assert.match(text(r), /TRANSITION_REJECTED/);
-  assert.ok(text(r).includes(REVIEWER_TO_QA_HINT), `hint names code-reviewer as the closing judge; got: ${text(r)}`);
+  assert.equal(envelope(r).error, "TRANSITION_REJECTED");
+  assert.ok(envelope(r).hint.includes(REVIEWER_TO_QA_HINT), `hint names code-reviewer as the closing judge; got: ${text(r)}`);
   assert.doesNotMatch(text(r), new RegExp(CODE), "step 1 rejects before the verdict gate");
   // The judge closes instead: APPROVED with PASS is consistent and lands.
   const ws2 = mkWorkspace("e139-2b-");
@@ -154,7 +158,8 @@ test("AC-E139-3 (E435): no qa-engineer write can carry a verdict — self-loop, 
   });
   assert.ok(rb.isError, `qa-engineer after code-reviewer must be rejected; got: ${text(rb)}`);
   assert.match(text(rb), /TRANSITION_REJECTED/);
-  assert.ok(text(rb).includes(REVIEWER_TO_QA_HINT), text(rb));
+  assert.equal(envelope(rb).error, "TRANSITION_REJECTED");
+  assert.ok(envelope(rb).hint.includes(REVIEWER_TO_QA_HINT), text(rb));
 
   // (c) qa-engineer PASS and FAIL writes carrying any verdict: qa never judges
   for (const [status, verdict] of [["PASS", "APPROVED"], ["PASS", "CHANGES_REQUESTED"], ["FAIL", "APPROVED"], ["FAIL", "CHANGES_REQUESTED"]]) {
@@ -169,7 +174,7 @@ test("AC-E139-3 (E435): no qa-engineer write can carry a verdict — self-loop, 
       assert.match(text(r), JUDGE_ONLY, `qa PASS+${verdict} names code-reviewer as the judge`);
     } else {
       assert.match(text(r), /TRANSITION_REJECTED/, `qa FAIL+${verdict}`);
-      assert.ok(text(r).includes(QA_JUDGE_HINT), `qa FAIL+${verdict}: ${text(r)}`);
+      assert.ok(envelope(r).hint.includes(QA_JUDGE_HINT), `qa FAIL+${verdict}: ${text(r)}`);
     }
   }
 });

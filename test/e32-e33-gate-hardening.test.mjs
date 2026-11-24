@@ -189,7 +189,10 @@ test("C2 (E435): the old APPROVED hand-off shape (qa-engineer after code-reviewe
   });
   assert.ok(result.isError, `C2 must be REJECTED: ${result.content?.[0]?.text}`);
   assert.match(result.content[0].text, /TRANSITION_REJECTED/);
-  assert.ok(result.content[0].text.includes(REVIEWER_TO_QA_HINT), `S3 hint: ${result.content[0].text}`);
+  // "⛔ <CODE>\n<JSON envelope>": the S3 hint is the envelope's top-level `hint` (architecture), not escaped text.
+  const env = JSON.parse(result.content[0].text.slice(result.content[0].text.indexOf("\n") + 1));
+  assert.equal(env.error, "TRANSITION_REJECTED");
+  assert.ok(env.hint.includes(REVIEWER_TO_QA_HINT), `S3 hint: ${env.hint}`);
   assert.ok(!result.content[0].text.includes("MISSING_REVIEW_EVIDENCE"), "the dormant review-evidence gate is never reached");
   assert.ok(
     !result.content[0].text.includes("QA_COMPLETION_EVIDENCE_MISSING"),
