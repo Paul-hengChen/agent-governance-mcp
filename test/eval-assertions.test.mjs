@@ -161,7 +161,8 @@ test("t-escalation-fail-missing-key: call missing agent_id fails", () => {
 
 test("t-escalation-fail-bad-status: call with status=PASS (not Blocked|FAIL) fails", () => {
   const reply =
-    'tw_update_state(status=PASS, agent_id="qa-engineer", next_role="sr-engineer", pending_notes=["QA: T-01 PASS"])';
+    // E435: the judge's verdict (code-reviewer is the only PASS writer) is still not an escalation.
+    'tw_update_state(status=PASS, agent_id="code-reviewer", next_role="release-engineer", pending_notes=["code-reviewer: T-01 PASS"])';
   const result = checkEscalationShape(reply);
   assert.equal(result.pass, false, "non-Blocked/FAIL status must fail the escalation-shape check");
   assert.match(result.reason, /not Blocked or FAIL/);

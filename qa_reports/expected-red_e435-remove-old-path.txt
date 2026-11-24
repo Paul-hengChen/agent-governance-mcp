@@ -516,3 +516,5 @@ test/e405-release-runner.test.mjs | AC-R13 the stop line the workflow reads equa
 test/e405-release-runner.test.mjs | AC-R10 one exit code per runner class (the eleven new rows) | PASS_HANDOFF fixture is now (code-reviewer, PASS); release.mjs start still requires (qa-engineer, PASS) on an unmarked handoff at base -> PRECONDITION_NOT_PASS (T-E435-31)
 test/e405-release-docs.test.mjs | AC-D1 (E435) release-cd sections, inputs, secret and checklist; the checklist names one release judge | docs/release-cd.md line 63 still carries the two-judge marker wording at base (T-E435-42)
 test/e405-release-docs.test.mjs | AC-D2 (E435) the PRECONDITION_NOT_PASS row and the re-dispatch line name the judge's (code-reviewer, PASS) only | docs/release-cd.md lines 69 / 95 still carry the two-judge marker wording at base (T-E435-42)
+
+# T-E435-28 — verify-release / release-staging (no change, no rows), eval-assertions (escalation fixture re-pinned to a code-reviewer PASS, green), test/eval fixture handoff (one chain, no qa_round), scenarios.mjs / bundle.mjs (no change). No rows.

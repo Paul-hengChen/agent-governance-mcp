@@ -927,3 +927,59 @@ Pin / model asserts in `subagent-templates` unchanged (qa-engineer stays opus).
 ### Red Reasons (T-27)
 
 59 red at base, all assertion failures / release stops, none a syntax or link error: e394-release-script 37 (36 via the `(code-reviewer, PASS)` `state()` fixture hitting the base `qa-engineer` USAGE check, plus AC-S1 (E435) because base accepts a qa PASS); e405-release-runner 20 (the `PASS_HANDOFF` fixture stops `PRECONDITION_NOT_PASS` at base; AC-R8 (E435) the `commitMessage` default judge); e405-release-docs 2 (release-cd two-judge wording, T-E435-42). All clear with T-E435-31 / T-E435-42. Rows under `# T-E435-27` in the manifest. Run: `node --test` on the five files → 147 tests, 88 pass, 59 fail = the 59 rows, name for name.
+
+## T-E435-28 — `verify-release`, `release-staging`, `test/eval/scenarios.mjs`, `eval-assertions`, `test/eval/lib/bundle.mjs` (AC2, AC11)
+
+Placement: existing files only (brief). Contract: architecture *Copy* + *Rulings* (one chain pm → qa → sr → code-reviewer; `(code-reviewer, PASS)` the only verdict; `qa_round` gone).
+
+### Scenario → Test Map (T-28)
+
+| scenario | file | exact test name / change |
+|---|---|---|
+| a stray PASS is not an escalation, with the judge as the PASS writer | eval-assertions | t-escalation-fail-bad-status: call with status=PASS (not Blocked\|FAIL) fails (fixture call now `agent_id="code-reviewer"`, `next_role="release-engineer"`; was a qa-engineer PASS) |
+| eval bundles render the one chain, no `qa_round` | test/eval/fixtures/workspace/.current/handoff.md | frozen fixture: `last_agent` pm → qa-engineer (the pm → sr hop is not an edge any more), `qa_round` line dropped, note = qa-engineer tests ready → sr-engineer |
+| eval scenarios on the one chain | test/eval/scenarios.mjs | no change: E433 already re-pinned `qa-engineer-test-handoff` (hand-off to sr-engineer, no PASS); the "6 old-path names" count in the spec predates `81e7c0d5`. Current file names no `chain_path`, `qa_round`, qa PASS or old edge |
+| release self-check | verify-release | no change: `scripts/verify-release.mjs` has no judge logic (the judge gate is `release.mjs`, re-pinned in T-27); the `status: PASS` handoff bodies are bookkeeping-path fixtures. VR-20 untouched |
+| release SOP staging | release-staging | no change: release-engineer:Blocked → qa-engineer stays an edge (architecture table); `MINI_CHAIN_SCOPE_WHY` is a quoted historical `scope_decision_why`, only `mini-chain` / `PM/ARCH skipped` are read |
+| bundle role map | test/eval/lib/bundle.mjs | no change (no old-path text) |
+
+### Open Interface Details (T-28)
+
+1. Fixture `schema_version: 8` kept: the frozen file still exercises the lazy migration; dropping `qa_round` from a v8 file is valid input (absent = 0 at base, dropped at v17).
+
+### Red Reasons (T-28)
+
+No red tests (`# T-E435-28` comment block in the manifest, no rows). Run: `node --test test/verify-release.test.mjs test/release-staging.test.mjs test/eval-assertions.test.mjs` → 165 tests, 165 pass, 0 fail. Scenario import check: all 7 bundles build against the fixture.
+
+Eval expectation (`npm run eval`, T-E435-39 / T-E435-40): no scenario is expected to fail on the contract — the scripted replies (watermark, terse cap, escalation shape, qa hand-off to sr without PASS) do not depend on the content edits. Until T-E435-29/35/36 land, every bundle still contains `qa_round` (state render + SOP text); no assertion reads it.
+
+## qa re-pin phase summary (T-E435-01 … 28, 43, 44, 45)
+
+Manifest: 458 rows. Count per sr task = rows whose stated reason names that task as the LAST of the tasks it needs (a row naming several clears only when the highest-numbered one lands; e.g. the `ZodError status="PASS" requires agent_id="qa-engineer"` rows need T-31 and T-35):
+
+| sr task | rows that should turn green | rows naming the task at all |
+|---|---|---|
+| T-E435-29 (schema 17) | 78 | 93 |
+| T-E435-30 (transition table) | 118 | 142 |
+| T-E435-31 (orchestrator / evidence-file / release.mjs) | 109 | 140 |
+| T-E435-32 (qa cap + QA_ROUND_EXCEEDED out) | 14 | 37 |
+| T-E435-33 (NON_JUDGE code, step 9) | 59 | 64 |
+| T-E435-34 (qa_round consumers) | 7 | 7 |
+| T-E435-35 (registry / prompts) | 39 | 39 |
+| T-E435-36 (content: marker / resume_of / closing role) | 8 | 8 |
+| T-E435-37 (templates / CLAUDE.md) | 3 | 3 |
+| T-E435-38 (docs, migration-v5.md) | 1 | 1 |
+| T-E435-39 (qa-flow-enforcement-architecture.md) | 1 | 1 |
+| T-E435-40 (qa snapshot) | 0 | 0 (goldens / context-budget caps re-captured there, not manifest rows) |
+| T-E435-41 (const-11 / rationale / integrator) | 4 | 4 |
+| T-E435-42 (release-cd.md, lane-status, smoke-qa-flow) | 17 | 17 |
+
+Open notes for sr:
+- Schema-16 inputs in tests are frozen text (`v16Handoff()`, `V16_MARKED`, `writeV16Marked`), never the writer, so T-29 may drop the `chainPath` / `qaRound` writer options; the positional `qaRound` slot stays and is ignored (T-12).
+- `computeNewRound` re-pins call the new signature (no `prev_qa_round`); 11-slot callers fail with a TypeError until T-30.
+- `REPRO_MANIFEST_MISSING` message: "Test-first hand-off" → "Hand-off qa-engineer → sr-engineer needs the red-test manifest at <manifestPath>" (T-15 note 4).
+- `REPORT_SIGNERS` counts PASS sections signed code-reviewer and pre-v5 qa-engineer (T-17); `lane-status` `qa_round` reds moved to T-42.
+- e434 mapping comment and the 33-entry registry / step 9 name are asserted together (T-11): land T-32 and T-33 before reading those reds as regressions.
+- CLAUDE.md 250-line pin and `agc check` in e432 AC14 / e433 AC12 left to T-40; compose goldens and the six context-budget caps re-captured in T-40, not here.
+- Green-on-both guard tests (e438 fences, e177b REPORT_SIGNERS, visual-evidence-gate mirror, legacy exit keys qa-engineer:PASS/FAIL) must STAY green through T-32/33/36/41.
+- VR-20 in verify-release is a known load-sensitive flake; not a manifest row.
