@@ -91,9 +91,9 @@ test("E303-AC11c: index.ts carries no zod-telemetry emission; it lives in tools/
   assert.ok(REGISTRY.includes("emitZodGateTelemetry"));
 });
 
-test("E303-AC12: no new gate code beyond E431 (35 entries) and DISPATCH_PIN_TIER_REJECTED is the only tool-boundary producer", async () => {
+test("E303-AC12 (E435): no gate code beyond E435's 33 entries (35 - 3 removed + NON_JUDGE_COMPLETED_TASKS_REJECTED) and DISPATCH_PIN_TIER_REJECTED is the only tool-boundary producer", async () => {
   const { GATE_REGISTRY } = await import("../dist/gates/registry.js");
-  assert.equal(GATE_REGISTRY.length, 35);
+  assert.equal(GATE_REGISTRY.length, 33);
   const tb = GATE_REGISTRY.filter((g) => g.producer === "tool-boundary").map((g) => g.errorCode);
   assert.deepEqual(tb, ["DISPATCH_PIN_TIER_REJECTED"]);
 });

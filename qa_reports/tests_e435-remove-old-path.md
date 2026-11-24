@@ -462,3 +462,34 @@ Left as is (green on both): e150 AC13 ×6, AC15 `[]` ×4 + bypass-zod, AC15 writ
 ### Red Reasons (T-45)
 
 25 red at base, no syntax / link error: e247 AC1–AC4/AC7 and the e150 code-reviewer PASS case fail on the ZodError thrown inside `handleUpdateState` (the stated behaviour, not a harness fault); every other row fails on an assertion. Causes:code-reviewer PASS throws the pre-pre-flight ZodError (T-E435-31); code-reviewer ledger writes emit `REVIEWER_COMPLETED_TASKS_REJECTED` (T-E435-33); code-reviewer FAIL does not shrink (T-E435-31); code-reviewer:PASS → pm and code-reviewer → qa-engineer edges as at base (T-E435-30); AC20 description (T-E435-35). Rows under `# T-E435-45` in the manifest. Run: `node --test test/e150-completed-tasks-carry-forward.test.mjs test/e139-non-reviewer-verdict.test.mjs test/e247-pass-tasks-incomplete.test.mjs` → 45 tests, 20 pass, 25 fail = the 25 rows, name for name.
+
+## T-E435-11 — `error-code-contract`, `e26-gate-stats`, `e308-single-source-tier-enum`, `e35-pipeline-order`, `e434-reviewer-visual` (mapping-comment test only) (AC5)
+
+Placement: existing files, edited in place (brief). Re-titled tests carry `(E435)`. 227 changed lines (155+ / 72-), under the 300-line cap. Contract: architecture *Error codes (OQ (b), (f)) and `GATE_REGISTRY` = 33*, *`UPDATE_STATE_GATE_PIPELINE` — 17 steps*, *Metrics sidecar and `tw_gate_stats`*, Rulings (a), (b).
+
+### Scenario → Test Map (T-11)
+
+| scenario | exact test name(s) |
+|---|---|
+| registry 33, three codes removed, NON_JUDGE in REVIEWER's slot (orchestrator, plain-text, documentedInProse) | error-code-contract AC-1/AC-5 (E435) · E308/AC3 (… registry has 33 codes (E435)) · e308 E303-AC12 (E435) · e26 R1, R2, U1, D1, D2, T3b (33) |
+| ROUND_CAP / QA_ROUND_EXCEEDED gone | error-code-contract AC5 (E435) · AC2 (c12) cap literals (CAP_BY_CODE without QA_ROUND_EXCEEDED, green on both) |
+| union 16 members, TRANSITION_GATE_CODES 6 | error-code-contract DR-8 (E435) · e35 E435: TRANSITION_GATE_CODES is the 6 transition codes … |
+| pipeline 17 steps, step 9 `NON_JUDGE_COMPLETED_TASKS_REJECTED` with one code | e35 t-order-exact ×2 · E435: TRANSITION_GATE_CODES … step 9 … |
+| mapping comment = quote sites, 33 rows, NON_JUDGE → const-08 after REVIEW_VERDICT_STATUS_MISMATCH, removed rows gone | error-code-contract doc-file mapping (c12) · e434 AC10 |
+| registry comment texts (33-gate catalog, sections 1-6 / 7-12 / 13-32 / 33, 6 codes, 16-member, 10 handler-side; documentedInProse reason) | error-code-contract E435: gates/registry.ts count comments … · e434 AC10 |
+| every code obeys the contract (allowlist closure: NON_JUDGE rows replace REVIEWER / NON_QA rows; stale rows now fail) | error-code-contract AC3 (c12) |
+| tw_gate_stats drops mean_qa_rounds, historical qa_rounds ignored, removed codes surface as unregistered | e26 DE5 (E435) · U2 (E435) |
+
+Left as is (green on both): e308 E303-AC11a/b/c (VISUAL_ROUND_EXCEEDED `(none)` row unchanged); e35 step-count, TRANSITION_VALIDATION reference, parity, E300 tests; error-code-contract parity (AC-5, doc ⊆ registry, registry ⊆ doc), SR_RETURN_CAP allowlist reasons re-worded only.
+
+### Open Interface Details (T-11)
+
+1. e434 AC10 field comment: the architecture quotes only the reason fragment, so the claim (`Every entry is true except VISUAL_ROUND_EXCEEDED`) and the reason (`nothing emits it since E435: its counter ticks only on a qa-engineer FAIL; E420 owns the visual family`) are pinned as two substrings; `COPY.registryFieldComment` (old-path wording) is asserted absent via "only the old path still emits".
+2. The four section headers are pinned as substrings `---- transition-json (codes 1-6`, `---- orchestrator-json (codes 7-12`, `---- plain-text (codes 13-32`, `tool-boundary (code 33)` (no closing producer text pinned; the tool-boundary header may be bare or prefixed).
+3. NON_JUDGE allowlist reasons copy the removed REVIEWER rows' two reasons (free-English triggerEdge, snake_case armCondition); if sr writes a camelCase predicate into its armCondition, AC3 reports BOTH and the row goes.
+4. AC3 closure gains one check: an allowlist row naming an unregistered code fails (stale exemption).
+5. e26 `metricRecord` emits `qa_rounds` only when passed, modelling a historical record; DE5 asserts no `qa_rounds` key anywhere in `report.metrics` (per_feature included).
+
+### Red Reasons (T-11)
+
+20 red at base, all assertion failures (no syntax / link error): registry still 35 entries / mapping 35 rows (T-E435-32, T-E435-33); step 9 name and codes, TRANSITION_GATE_CODES 7, union 17, `ROUND_CAP_EXPORTED` exported (T-E435-32, T-E435-33); registry count comments 35 / 7 / 17 and documentedInProse old-path reason (T-E435-32, T-E435-33); `mean_qa_rounds` present (T-E435-34). Rows under `# T-E435-11` in the manifest. Run: `node --test test/error-code-contract.test.mjs test/e26-gate-stats.test.mjs test/e308-single-source-tier-enum.test.mjs test/e35-pipeline-order.test.mjs test/e434-reviewer-visual.test.mjs` → 92 tests, 72 pass, 20 fail = the 20 rows, name for name.

@@ -19,14 +19,14 @@ const { GATE_REGISTRY, ALL_GATE_CODES } = await import(
   path.join(PROJECT_ROOT, "dist", "gates", "registry.js")
 );
 
-// The three round-cap constants, imported so the
-// QA_ROUND_EXCEEDED/REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED triggerEdge
-// cap literals (">= 4", ">= 4", ">= 6") are checked against the live
-// transitions.ts values rather than trusted as hand-copied prose.
+// The two round-cap constants, imported so the
+// REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED triggerEdge cap literals
+// (">= 4", ">= 6") are checked against the live transitions.ts values rather
+// than trusted as hand-copied prose (the qa round cap left with E435).
 // HOP_CAP_EXPORTED is imported for the same reason: HOP_CAP_EXCEEDED's
 // triggerEdge carries the same ">= N" cap literal. (T-C12-02/03,
 // c12-registry-field-consumers, d2-server-brake-accounting)
-const { ROUND_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED, VISUAL_ROUND_CAP_EXPORTED, HOP_CAP_EXPORTED } = await import(
+const { REVIEW_ROUND_CAP_EXPORTED, VISUAL_ROUND_CAP_EXPORTED, HOP_CAP_EXPORTED } = await import(
   path.join(PROJECT_ROOT, "dist", "tools", "transitions.js")
 );
 
@@ -115,18 +115,26 @@ function fmt(codeMap, codes) {
     .join("; ");
 }
 
-// GATE_REGISTRY is the single source of truth. The entry count (35) is pinned so adding or
-// dropping a gate is a deliberate, visible change here. (AC-1, AC-5, E40)
+// GATE_REGISTRY is the single source of truth. The entry count (33) is pinned so adding or
+// dropping a gate is a deliberate, visible change here. (AC-1, AC-5, E40, E435)
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 35 entries (35 in, 35 out — e431 added SR_RETURN_CAP_EXCEEDED; before it e247 added PASS_TASKS_INCOMPLETE; before it e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
+test("AC-1/AC-5 (E435): GATE_REGISTRY has exactly 33 entries (35 - QA_ROUND_EXCEEDED - REVIEWER_COMPLETED_TASKS_REJECTED - NON_QA_COMPLETED_TASKS_REJECTED + NON_JUDGE_COMPLETED_TASKS_REJECTED, in REVIEWER_COMPLETED_TASKS_REJECTED's slot)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    35,
-    `expected exactly 35 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    33,
+    `expected exactly 33 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
+  for (const gone of ["QA_ROUND_EXCEEDED", "REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"]) {
+    assert.ok(!ALL_GATE_CODES.includes(gone), `${gone} is removed (E435)`);
+  }
+  const nj = GATE_REGISTRY.findIndex((g) => g.errorCode === "NON_JUDGE_COMPLETED_TASKS_REJECTED");
+  assert.equal(GATE_REGISTRY[nj - 1]?.errorCode, "REVIEW_VERDICT_STATUS_MISMATCH", "NON_JUDGE sits where REVIEWER_COMPLETED_TASKS_REJECTED was");
+  assert.equal(GATE_REGISTRY[nj].producer, "orchestrator");
+  assert.equal(GATE_REGISTRY[nj].envelope, "plain-text");
+  assert.equal(GATE_REGISTRY[nj].documentedInProse, true);
   assert.equal(
     ALL_GATE_CODES.length,
-    35,
+    33,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -238,11 +246,12 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
 
 // TransitionRejection["error"] (tools/transitions.ts) is a hand-written union, not generated from
 // the registry: it mixes validateTransition codes with handler-side codes kept for type narrowing.
-// Drift is caught by pinning it at 17 members and requiring it to be a subset of ALL_GATE_CODES.
+// Drift is caught by pinning it at 16 members (E435: 6 transition codes + 10 handler-side;
+// QA_ROUND_EXCEEDED left) and requiring it to be a subset of ALL_GATE_CODES.
 // Plain-text orchestrator codes (for example AC_EXECUTION_LOG_MISSING) stay out of both the union
 // and TRANSITION_GATE_CODES. (DR-8, DR-9)
 
-test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 17 members, all ⊆ ALL_GATE_CODES", () => {
+test("DR-8 (E435): TransitionRejection[\"error\"] union stays byte-identical at 16 members, all ⊆ ALL_GATE_CODES", () => {
   const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
   const unionMatch = transitionsSrc.match(
     /export interface TransitionRejection \{\s*error:\s*([\s\S]*?);\s*\n\s*attempted:/,
@@ -256,12 +265,13 @@ test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 17 memb
 
   assert.equal(
     members.length,
-    17,
-    `TransitionRejection["error"] must stay byte-identical at 17 members (DR-8, e4-design-source-credibility-gate re-baseline; E431 added SR_RETURN_CAP_EXCEEDED) — found ${members.length}: ${members.join(", ")}`,
+    16,
+    `TransitionRejection["error"] must stay byte-identical at 16 members (DR-8; E435 removed QA_ROUND_EXCEEDED) — found ${members.length}: ${members.join(", ")}`,
   );
+  assert.ok(!members.includes("QA_ROUND_EXCEEDED"), "QA_ROUND_EXCEEDED left the union (E435)");
   assert.equal(
     new Set(members).size,
-    17,
+    16,
     "TransitionRejection[\"error\"] union members must be unique",
   );
 
@@ -362,15 +372,14 @@ function extractEdgePairs(text) {
 }
 
 // ---------------------------------------------------------------------------
-// AC2 (cap literals): QA_ROUND_EXCEEDED/REVIEW_ROUND_EXCEEDED/
-// VISUAL_ROUND_EXCEEDED triggerEdge encodes the round cap as ">= N" — assert
-// N matches the LIVE ROUND_CAP/REVIEW_ROUND_CAP/VISUAL_ROUND_CAP constants in
-// tools/transitions.ts (4/4/6), not a hand-copied number that can drift
-// silently if the cap is ever re-tuned.
+// AC2 (cap literals): REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED triggerEdge
+// encodes the round cap as ">= N" — assert N matches the LIVE
+// REVIEW_ROUND_CAP/VISUAL_ROUND_CAP constants in tools/transitions.ts (4/6),
+// not a hand-copied number that can drift silently if the cap is ever
+// re-tuned. (QA_ROUND_EXCEEDED and ROUND_CAP left with E435.)
 // ---------------------------------------------------------------------------
 
 const CAP_BY_CODE = {
-  QA_ROUND_EXCEEDED: ROUND_CAP_EXPORTED,
   REVIEW_ROUND_EXCEEDED: REVIEW_ROUND_CAP_EXPORTED,
   VISUAL_ROUND_EXCEEDED: VISUAL_ROUND_CAP_EXPORTED,
   // HOP_CAP_EXCEEDED's triggerEdge carries the same ">= N" cap-literal shape
@@ -392,6 +401,12 @@ test("AC2 (c12): round-cap entries' triggerEdge numeric literal matches the live
       `${code} triggerEdge cap literal (${m[1]}) does not match the live transitions.ts cap (${cap})`,
     );
   }
+});
+
+test("AC5 (E435): the qa round cap is gone — transitions.js exports no ROUND_CAP_EXPORTED and no triggerEdge names prev_qa_round", async () => {
+  const mod = await import(path.join(PROJECT_ROOT, "dist", "tools", "transitions.js"));
+  assert.ok(!("ROUND_CAP_EXPORTED" in mod), "ROUND_CAP_EXPORTED removed with the qa round cap");
+  assert.deepEqual(GATE_REGISTRY.filter((g) => /\bprev_qa_round\b/.test(g.triggerEdge)).map((g) => g.errorCode), []);
 });
 
 // AC2: each orchestrator-producer armCondition predicate (camelCase identifier) must appear
@@ -502,8 +517,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    35,
-    `expected the mapping comment to list all 35 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    33,
+    `expected the mapping comment to list all 33 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -518,6 +533,25 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   }
 });
 
+// E435: the registry's count comments move with the catalog (architecture "Error codes",
+// comment texts), so a reader of gates/registry.ts is not told 35 / 7 / 17.
+test("E435: gates/registry.ts count comments state the 33-gate catalog, the four section ranges and the 6-code / 16-member / 10 handler-side split", () => {
+  const src = readSource(path.join("gates", "registry.ts"));
+  for (const s of [
+    "The 33-gate catalog",
+    "---- transition-json (codes 1-6",
+    "---- orchestrator-json (codes 7-12",
+    "---- plain-text (codes 13-32",
+    "tool-boundary (code 33)",
+    "The 6 codes",
+    "16-member TransitionRejection[\"error\"] union",
+    "10 additional handler-side",
+  ]) assert.ok(src.includes(s), `gates/registry.ts comment carries "${s}"`);
+  for (const s of ["The 35-gate catalog", "The 7 codes", "17-member TransitionRejection"]) {
+    assert.ok(!src.includes(s), `stale count comment "${s}" is gone`);
+  }
+});
+
 // AC3: every (errorCode, field) pair with free-form English and no checkable literal is
 // allowlisted here with a one-line reason. The closure test below requires each pair to be
 // either checked above or listed here, never neither and never both. clearingArtifact is out of
@@ -527,7 +561,6 @@ const FREE_TEXT_ALLOWLIST = [
   { code: "AGENT_ID_REQUIRED", field: "triggerEdge", reason: "free English description of the null/unknown agent condition; no named predicate or edge-pair literal to check" },
   { code: "AGENT_ID_REQUIRED", field: "armCondition", reason: "\"always (validateTransition step 1)\" — generic pointer to the enclosing function, reused verbatim (differing only by step N) across all 5 validateTransition-producer entries; not independently checkable per-entry" },
   { code: "TRANSITION_REJECTED", field: "armCondition", reason: "same generic validateTransition-step pointer as AGENT_ID_REQUIRED" },
-  { code: "QA_ROUND_EXCEEDED", field: "armCondition", reason: "same generic validateTransition-step pointer" },
   { code: "REVIEW_ROUND_EXCEEDED", field: "armCondition", reason: "same generic validateTransition-step pointer" },
   { code: "VISUAL_ROUND_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present)\" — free English; the visual_round counter is a handoff field, not a named predicate/function call" },
   { code: "HOP_CAP_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present)\" — free English, identical reasoning to VISUAL_ROUND_EXCEEDED; the hop_count counter is a handoff field, not a named predicate/function call. triggerEdge is NOT allowlisted — it is mechanically checked via CAP_BY_CODE (d2-server-brake-accounting re-baseline)." },
@@ -549,9 +582,12 @@ const FREE_TEXT_ALLOWLIST = [
   { code: "NON_REVIEWER_VERDICT_REJECTED", field: "triggerEdge", reason: "free English — the role:Status-shaped substring (code-reviewer:In_Progress -> qa-engineer:In_Progress) names the single exempt edge, not a rejecting edge; the code is documentedInProse:true and mapped to const-08-chain-31-mid.md, but the exempt-edge literal stays allowlisted" },
   { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "armCondition", reason: "\"agent_id=code-reviewer && review_verdict present\" — snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
-  { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal" },
-  { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
-  // Same two reasons and same shape as REVIEWER_COMPLETED_TASKS_REJECTED
+  // E435: NON_JUDGE_COMPLETED_TASKS_REJECTED replaces REVIEWER_COMPLETED_TASKS_REJECTED and
+  // NON_QA_COMPLETED_TASKS_REJECTED, whose rows had these same two reasons. Its predicate
+  // (agent_id !== JUDGE_ROLE && completed_tasks.length > 0) is field-name shorthand.
+  { code: "NON_JUDGE_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "NON_JUDGE_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
+  // Same two reasons and same shape as NON_JUDGE_COMPLETED_TASKS_REJECTED
   // immediately above. (d9-qa-review-scoped-append)
   { code: "QA_REVIEW_TARGET_REQUIRED", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "QA_REVIEW_TARGET_REQUIRED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
@@ -582,19 +618,14 @@ const FREE_TEXT_ALLOWLIST = [
   // triggerEdgeCheckable (same case as REPRO_MANIFEST_MISSING). armCondition is checked
   // mechanically via hasEvidenceInFile(...), so it is not allowlisted. (e18-write-provenance)
   { code: "QA_COMPLETION_EVIDENCE_MISSING", field: "triggerEdge", reason: "role:Status edge pair present (code-reviewer:In_Progress -> qa-engineer:In_Progress) but not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates); the \"(file-mode only)\" qualifier and set-difference precondition are free English" },
-  // Sibling of REVIEWER_COMPLETED_TASKS_REJECTED (one check, two codes), so the same two reasons:
-  // triggerEdge is free English, and armCondition is snake_case shorthand, so CAMEL_RE finds
-  // nothing to check. (E40)
-  { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
-  { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
   // DISPATCH_PIN_TIER_REJECTED (E300): a tool-boundary zod rejection raised in tools/registry.ts before
   // UPDATE_STATE_GATE_PIPELINE — there is no transition edge, and the arm condition is the zod enum itself.
   { code: "DISPATCH_PIN_TIER_REJECTED", field: "triggerEdge", reason: "tool-boundary zod rejection, no role:Status edge pair and no cap literal — it fires before any transition is evaluated" },
   { code: "DISPATCH_PIN_TIER_REJECTED", field: "armCondition", reason: "tool-boundary zod rejection: the arm condition is the z.enum on each dispatch_pins value, not a camelCase predicate/function-call literal in the orchestrator" },
   // SR_RETURN_CAP_EXCEEDED (E431): an opt-in counter cap on one edge. armCondition has the same shape as
   // HOP_CAP_EXCEEDED's (free English over a handoff counter); triggerEdge is prose around a counter comparison.
-  { code: "SR_RETURN_CAP_EXCEEDED", field: "triggerEdge", reason: "free English: a prev_sr_return_count comparison on one edge pair plus marker/bypass prose; no checkable cap or camelCase predicate literal" },
-  { code: "SR_RETURN_CAP_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present; marked feature only)\": free English; the sr_return_count counter is a handoff field, not a named predicate/function call, same reasoning as HOP_CAP_EXCEEDED" },
+  { code: "SR_RETURN_CAP_EXCEEDED", field: "triggerEdge", reason: "free English: a prev_sr_return_count comparison on one edge pair plus file-mode/bypass prose; no checkable cap or camelCase predicate literal" },
+  { code: "SR_RETURN_CAP_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present)\" (E435: no marker clause): free English; the sr_return_count counter is a handoff field, not a named predicate/function call, same reasoning as HOP_CAP_EXCEEDED" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {
@@ -628,6 +659,9 @@ test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is e
     allowlistKeys.length,
     "FREE_TEXT_ALLOWLIST must not contain duplicate (code, field) entries",
   );
+  // E435: a row naming a code no longer in the registry is a stale exemption, not a harmless one.
+  const stale = FREE_TEXT_ALLOWLIST.filter((e) => !ALL_GATE_CODES.includes(e.code)).map((e) => `${e.code}:${e.field}`);
+  assert.deepEqual(stale, [], `FREE_TEXT_ALLOWLIST rows naming unregistered codes: ${stale.join(", ")}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -655,7 +689,7 @@ test("E300: SUFFIX_RE classifies DISPATCH_PIN_TIER_REJECTED as a gate-shaped cod
   assert.ok(SUFFIX_RE.test("DISPATCH_PIN_TIER_REJECTED"));
 });
 
-test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 35 codes", async () => {
+test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry has 33 codes (E435)", async () => {
   // WHY: tools/registry.ts composes its hint from MODEL_TIERS while gates/registry.ts
   // keeps hintStatic as a literal (import-free leaf). This is the only check that the
   // two renderings cannot drift apart.
@@ -679,6 +713,6 @@ test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `D
   const g = GATE_REGISTRY.find((e) => e.errorCode === "DISPATCH_PIN_TIER_REJECTED");
   assert.equal(issues[0].message, `DISPATCH_PIN_TIER_REJECTED: "${echo}" ` + g.hintStatic);
   assert.equal(g.hintStatic, "is not a model tier; allowed: opus, sonnet, haiku, fable");
-  assert.equal(GATE_REGISTRY.length, 35);
-  assert.equal(ALL_GATE_CODES.length, 35);
+  assert.equal(GATE_REGISTRY.length, 33);
+  assert.equal(ALL_GATE_CODES.length, 33);
 });
