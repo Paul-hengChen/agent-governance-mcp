@@ -56,7 +56,6 @@ test("AC-6: writeHandoffState({...options}) writes equivalent state to positiona
     completedTasks: ["T01"],
     pendingNotes: ["next_role: sr-engineer"],
     lastAgent: "pm",
-    qaRound: 0,
     reviewRound: 0,
     visualRound: 0,
   });
@@ -76,12 +75,14 @@ test("AC-6: writeHandoffState({...options}) writes equivalent state to positiona
   assert.deepEqual(s1.completed_tasks, s2.completed_tasks);
   assert.deepEqual(s1.pending_notes, s2.pending_notes);
   assert.equal(s1.last_agent, s2.last_agent);
-  assert.equal(s1.qa_round, s2.qa_round);
+  // Schema 17 (E435) has no qa_round: the positional slot (0 above) is kept and ignored.
+  assert.equal(s1.qa_round, undefined);
+  assert.equal(s2.qa_round, undefined);
   assert.equal(s1.review_round, s2.review_round);
   assert.equal(s1.visual_round, s2.visual_round);
 });
 
-test("AC-6: options-object accepts all fields and persists them", async () => {
+test("AC-6: options-object accepts all fields and persists them (no qa_round since E435)", async () => {
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
@@ -92,8 +93,7 @@ test("AC-6: options-object accepts all fields and persists them", async () => {
     completedTasks: ["T01", "T02"],
     pendingNotes: ["visual_fail: pixel", "next_role: sr-engineer"],
     blockingReason: "QA found visual drift",
-    lastAgent: "qa-engineer",
-    qaRound: 1,
+    lastAgent: "code-reviewer",
     prdPath: undefined,
     reviewRound: 2,
     visualRound: 3,
@@ -102,8 +102,8 @@ test("AC-6: options-object accepts all fields and persists them", async () => {
   assert.equal(state.active_feature, "feat-full");
   assert.equal(state.status, "FAIL");
   assert.equal(state.blocking_reason, "QA found visual drift");
-  assert.equal(state.last_agent, "qa-engineer");
-  assert.equal(state.qa_round, 1);
+  assert.equal(state.last_agent, "code-reviewer");
+  assert.equal(state.qa_round, undefined);
   assert.equal(state.review_round, 2);
   assert.equal(state.visual_round, 3);
   assert.deepEqual(state.completed_tasks, ["T01", "T02"]);
@@ -156,25 +156,26 @@ test("AC-9: @deprecated tag also present on HandoffStorage interface positional 
 
 // ---------- older positional callers still get backwards-compatible defaults (AC-10) ----------
 
-test("AC-10: positional writeHandoffState with 8 args (pre-v3.9.0 baseline) defaults round counters to 0", async () => {
+test("AC-10: positional writeHandoffState with 8 args (pre-v3.9.0 baseline) defaults round counters to 0; the qaRound slot is ignored (E435)", async () => {
   // Why: a caller from the pre-v3.9.0 era passing only the first 8 args
   // (workspace, feat, status, completed, pending, blockingReason, lastAgent,
   // qaRound) must still produce a valid handoff with review_round=0,
-  // visual_round=0 stamped by defaults.
+  // visual_round=0 stamped by defaults. Since E435 the qaRound slot stays in
+  // the signature (no silent argument shift) but writes nothing.
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
   await writeHandoffState(
     ws, "feat-old", "In_Progress", [], [],
-    undefined, "pm", 0,
+    undefined, "pm", 1,
   );
   const state = parseHandoff(ws);
-  assert.equal(state.qa_round, 0);
+  assert.equal(state.qa_round, undefined, "qaRound slot is ignored");
   assert.equal(state.review_round, 0, "review_round MUST default to 0");
   assert.equal(state.visual_round, 0, "visual_round MUST default to 0");
 });
 
-test("AC-10: options-object with omitted optional fields defaults to historical defaults", async () => {
+test("AC-10: options-object with omitted optional fields defaults to historical defaults (no qa_round, E435)", async () => {
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
@@ -184,7 +185,7 @@ test("AC-10: options-object with omitted optional fields defaults to historical 
     status: "In_Progress",
   });
   const state = parseHandoff(ws);
-  assert.equal(state.qa_round, 0);
+  assert.equal(state.qa_round, undefined);
   assert.equal(state.review_round, 0);
   assert.equal(state.visual_round, 0);
   assert.deepEqual(state.completed_tasks, []);
@@ -198,7 +199,7 @@ test("AC-10: options-object with omitted optional fields defaults to historical 
 // options call; the round counters sit in adjacent, easily swapped slots, and
 // tests that compare parsed fields cannot catch an argument-position mix-up.
 
-test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
+test("E36: positional writeHandoffState (full 12-arg form; qaRound slot kept and ignored, E435) is byte-identical to the equivalent options-object call", async () => {
   const wsPositional = mkWorkspace();
   const wsOptions = mkWorkspace();
   // prd_path is now relativized against ITS OWN workspacePath on write
@@ -238,7 +239,6 @@ test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters 
     pendingNotes: ["note-one", "note-two"],
     blockingReason: "blocked for review",
     lastAgent: "sr-engineer",
-    qaRound: 2,
     prdPath: prdPathOptions,
     reviewRound: 3,
     visualRound: 4,
@@ -257,8 +257,10 @@ test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters 
   // wrong identically — the whole-file byte-compare above only proves the
   // two call shapes AGREE, not that either is correct against the historical
   // positional signature order).
+  // E435: the qaRound slot is kept so later slots do not shift, and ignored.
+  assert.doesNotMatch(readNormalized(wsPositional), /^qa_round:/m, "the ignored qaRound slot writes no qa_round");
   const state = parseHandoff(wsPositional);
-  assert.equal(state.qa_round, 2);
+  assert.equal(state.qa_round, undefined);
   assert.equal(state.review_round, 3);
   assert.equal(state.visual_round, 4);
   assert.equal(state.blocking_reason, "blocked for review");
@@ -270,7 +272,7 @@ test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters 
 // arg-order regression could hide. Its positional overload stops at visualRound
 // (11 args, no hopCount), matching the older HandoffStorage interface.
 
-test("E36: FileHandoffStorage.writeState positional (full 11-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
+test("E36: FileHandoffStorage.writeState positional (full 11-arg form; qaRound slot kept and ignored, E435) is byte-identical to the equivalent options-object call", async () => {
   const wsPositional = mkWorkspace();
   const wsOptions = mkWorkspace();
   const storage = new FileHandoffStorage();
@@ -307,7 +309,6 @@ test("E36: FileHandoffStorage.writeState positional (full 11-arg form, all 3 rou
     pendingNotes: ["note-three"],
     blockingReason: "storage-level blocking reason",
     lastAgent: "qa-engineer",
-    qaRound: 6,
     prdPath: prdPathOptions,
     reviewRound: 7,
     visualRound: 8,
@@ -319,8 +320,9 @@ test("E36: FileHandoffStorage.writeState positional (full 11-arg form, all 3 rou
     "FileHandoffStorage.writeState positional and options-object calls must produce byte-identical handoff.md (modulo last_updated)",
   );
 
+  assert.doesNotMatch(readNormalized(wsPositional), /^qa_round:/m, "the ignored qaRound slot writes no qa_round");
   const state = parseHandoff(wsPositional);
-  assert.equal(state.qa_round, 6);
+  assert.equal(state.qa_round, undefined);
   assert.equal(state.review_round, 7);
   assert.equal(state.visual_round, 8);
   assert.equal(state.blocking_reason, "storage-level blocking reason");

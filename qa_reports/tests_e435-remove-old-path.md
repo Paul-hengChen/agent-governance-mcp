@@ -493,3 +493,34 @@ Left as is (green on both): e308 E303-AC11a/b/c (VISUAL_ROUND_EXCEEDED `(none)` 
 ### Red Reasons (T-11)
 
 20 red at base, all assertion failures (no syntax / link error): registry still 35 entries / mapping 35 rows (T-E435-32, T-E435-33); step 9 name and codes, TRANSITION_GATE_CODES 7, union 17, `ROUND_CAP_EXPORTED` exported (T-E435-32, T-E435-33); registry count comments 35 / 7 / 17 and documentedInProse old-path reason (T-E435-32, T-E435-33); `mean_qa_rounds` present (T-E435-34). Rows under `# T-E435-11` in the manifest. Run: `node --test test/error-code-contract.test.mjs test/e26-gate-stats.test.mjs test/e308-single-source-tier-enum.test.mjs test/e35-pipeline-order.test.mjs test/e434-reviewer-visual.test.mjs` → 92 tests, 72 pass, 20 fail = the 20 rows, name for name.
+
+## T-E435-12 — `handoff-migration`, `schema-versions`, `handoff-versioning`, `handoff-write-arg-guard`, `writestate-options-object` (AC4)
+
+Placement: existing files, edited in place (brief). New / re-titled tests carry `E435`. 300 changed lines (213+ / 87-), at the cap. Contract: architecture *Handoff schema v17 (file mode)*, *`tools/registry.ts` (`UpdateStateArgs`)*, Decision Records (positional write overloads: keep the `qaRound` slot, ignored; `resume_of: "qa-engineer"` rejected), Rulings (a).
+
+### Scenario → Test Map (T-12)
+
+| scenario | exact test name(s) |
+|---|---|
+| v16 → v17 step drops `chain_path`, `qa_round`, `qa_rounds_total`, keeps every other field (sr_return_count, review/visual counters, dispatch_pins), applied `[17]` | handoff-migration `E435 AC4: the v16→v17 step drops chain_path, qa_round and qa_rounds_total and keeps every other field` |
+| a schema 16 file (marker present) heals to 17 on disk with the three lines gone | handoff-versioning `E435 AC4: readHandoffState heals a schema 16 handoff to 17 on disk, …` (frozen `V16_MARKED` text) |
+| stale `resume_of: "qa-engineer"` dropped at parse (no migration step) | handoff-migration `E435 AC4: a v17 handoff carrying a stale resume_of: "qa-engineer" parses with resume_of absent` |
+| `CURRENT_VERSIONS.handoff` 17; tasks / sqlite / config 2 | schema-versions `CURRENT_VERSIONS exposes the four kinds at their E435 levels …` |
+| writer stamps 17, writes none of the dropped fields; heals land at 17; refuse-loud says server max 17 | handoff-versioning AC-1 (stamp), AC-2 (×2), AC-4 (×2), AC-5; handoff-migration AC-7 round-trip (v17 stamp), AC-10(g) (v18 vs v17); schema-versions no-op (17), refuses-loud (17) |
+| full chain from v0..v6 ends without `qa_round` / `qa_rounds_total` (was "preserved") | handoff-migration AC-12(e) ×2, AC-7/AC-10(f), AC-7/B8, AC-1/C9 ×2 (applied `[7..17]`), AC-9/C9 |
+| positional `qaRound` slot kept (no argument shift) and ignored; options object has no `qaRound` | writestate-options-object AC-6 ×2, AC-10 ×2, E36 ×2 (byte-identical with options call that omits `qaRound`; no `qa_round:` line) |
+| PASS refine names code-reviewer (`PASS_IDENTITY_REFINE_MESSAGE`) at the stdio boundary | handoff-write-arg-guard `regression (t-reg-pass-requires-code-reviewer, E435): …` |
+| `resume_of` stays code-reviewer after the transient-field test | handoff-migration AC-3/c9 (resumeOf `code-reviewer`; green on both) |
+
+Left as is (green on both): schema-versions overwrite test (gains a 16→17 registration, harmless at base), all other schema-versions runner tests; handoff-write-arg-guard AC-1..AC-4 and prd_path (fixture `schema_version: 5` with `qa_round: 0` still climbs the chain); handoff-versioning fast path / boundary / regression tests.
+
+### Open Interface Details (T-12)
+
+1. `qa_round` absence is asserted as `state.qa_round === undefined` on the parsed state, and as no `^qa_round:` line in written files; `qa_rounds_total` absence on a migration payload as `"qa_rounds_total" in payload === false`.
+2. Schema 16 input is frozen text (`V16_MARKED` in handoff-versioning, a plain object in handoff-migration), never the writer, so it outlives T-E435-29.
+3. The PASS refine is pinned by the substring `agent_id: status="PASS" requires agent_id="code-reviewer"` (zod path + `PASS_IDENTITY_REFINE_MESSAGE`), not the full `❌ Invalid arguments …` prefix.
+4. Dropped for the 300-line cap: a stdio test of `resume_of: "qa-engineer"` → `RESUME_OF_ENUM_MESSAGE` (already covered by e435 AC4 input-schema test).
+
+### Red Reasons (T-12)
+
+28 red at base, all assertion failures (no syntax / link error): `CURRENT_VERSIONS.handoff` is 16 and no v16 → v17 step exists, so writes / heals stamp 16, the chain keeps `qa_round` / `qa_rounds_total`, and v17 files are refused (T-E435-29); the writer still emits `qa_round` from the positional slot (T-E435-29, T-E435-34 for `FileHandoffStorage`); the PASS refine still names qa-engineer (T-E435-35). Rows under `# T-E435-12` in the manifest. Run: `node --test test/handoff-migration.test.mjs test/schema-versions.test.mjs test/handoff-versioning.test.mjs test/handoff-write-arg-guard.test.mjs test/writestate-options-object.test.mjs` → 84 tests, 56 pass, 28 fail = the 28 rows, name for name.
