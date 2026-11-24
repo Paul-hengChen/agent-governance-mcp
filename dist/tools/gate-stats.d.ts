@@ -29,7 +29,6 @@ export interface FeatureOutcome {
     feature: string;
     released_version: string | null;
     tickets: number;
-    qa_rounds: number;
     review_rounds: number;
     visual_rounds: number;
     hops: number;
@@ -61,7 +60,6 @@ export interface GateStatsReport {
         features: number;
         one_pass_count: number;
         one_pass_rate: number | null;
-        mean_qa_rounds: number | null;
         mean_review_rounds: number | null;
         mean_visual_rounds: number | null;
         mean_hops: number | null;

@@ -18,7 +18,9 @@ import { handleIndexPrd, handleClearPrdChunks, DEFAULT_EMBEDDING_MODEL } from ".
 import { handleGateStats } from "./gate-stats.js";
 import { emitGateTelemetry } from "./telemetry.js";
 import { ALL_GATE_CODES } from "../gates/registry.js";
-import { PASS_IDENTITY_REFINE_MESSAGE } from "./transitions.js";
+import { PASS_IDENTITY_REFINE_MESSAGE, QA_PASS_REFINE_MESSAGE } from "./transitions.js";
+/** zod error for a resume_of value other than "code-reviewer". */
+export const RESUME_OF_ENUM_MESSAGE = 'resume_of accepts only "code-reviewer"; pm:In_Progress → qa-engineer:In_Progress is an ordinary edge, so omit resume_of there.';
 // ==========================================
 // Telemetry for rejections raised by zod (E303)
 // ==========================================
@@ -245,8 +247,7 @@ const UpdateStateArgs = z
     blocking_reason: z.string().max(2000).optional(),
     agent_id: z.string().max(200).optional(),
     // QA review notes attached when (status in {PASS, FAIL}) and
-    // (agent_id is the feature's judge: qa-engineer; code-reviewer on a
-    // test-first feature). Storage records the review to
+    // (agent_id is the judge, code-reviewer). Storage records the review to
     // qa_reports/review_<id>.md (file mode) or the reports table (SQLite).
     qa_review: z.string().max(10000).optional(),
     // qa_suite_result: the judge's structured suite figures. Shape-checked here (no
@@ -326,9 +327,9 @@ const UpdateStateArgs = z
     ])
         .optional(),
     // resume_of: Amend-Resume target; consumed by validateTransition via
-    // TransitionRequest.next_resume_of (AC-4). Restricted to the exact two
-    // roles the Amend-Resume Edge allows.
-    resume_of: z.enum(["code-reviewer", "qa-engineer"]).optional(),
+    // TransitionRequest.next_resume_of (AC-4). Only code-reviewer can be
+    // resumed; pm -> qa-engineer is an ordinary edge.
+    resume_of: z.enum(["code-reviewer"], { error: RESUME_OF_ENUM_MESSAGE }).optional(),
     // review_verdict: code-reviewer verdict; checked against status by the
     // REVIEW_VERDICT_STATUS_MISMATCH orchestrator gate (AC-5).
     review_verdict: z.enum(["APPROVED", "CHANGES_REQUESTED"]).optional(),
@@ -362,13 +363,6 @@ const UpdateStateArgs = z
     // check (REPRO_MANIFEST_MISSING) on the sr-engineer -> code-reviewer
     // edge. File-mode only. (E2, v11)
     dispatch_mode: z.enum(["feature", "bugfix"]).optional(),
-    // chain_path: test-first chain marker, a one-value enum checked here.
-    // Accepted only at its set points (a pm write, or the entry write
-    // pm/architect -> qa-engineer:In_Progress); anywhere else on an unmarked
-    // feature validateTransition rejects it. Permanent once set: carried
-    // across writes that omit it, never cleared, dropped on active_feature
-    // change, NOT re-armed on PM re-entry. File-mode only. (E431, v16)
-    chain_path: z.enum(["test-first"]).optional(),
     // cut_approved_source: client-set free text, NOT validated here. The
     // server cannot verify a claim about another workspace, so
     // tools/handoff-parse.ts silently drops a value not shaped
@@ -395,13 +389,18 @@ const UpdateStateArgs = z
     // QA_REVIEW_TARGET_REQUIRED (no "every open task" fallback).
     review_task_ids: z.array(z.string().max(500)).max(200).optional(),
 })
-    // PASS identity, first half: only qa-engineer or code-reviewer may write
-    // PASS. A code-reviewer PASS on a feature without chain_path: "test-first"
-    // is rejected with this same message by the orchestrator, which can read
-    // the persisted marker (a schema refine cannot).
-    .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer" || d.agent_id === "code-reviewer", {
-    message: PASS_IDENTITY_REFINE_MESSAGE,
-    path: ["agent_id"],
+    // PASS identity: only code-reviewer, the judge, may write PASS. A
+    // qa-engineer PASS gets the longer message naming the judge and the
+    // migration doc. The object is not .strict(): an unknown key an old
+    // client still sends is stripped, not rejected.
+    .superRefine((d, ctx) => {
+    if (d.status === "PASS" && d.agent_id !== "code-reviewer") {
+        ctx.addIssue({
+            code: "custom",
+            path: ["agent_id"],
+            message: d.agent_id === "qa-engineer" ? QA_PASS_REFINE_MESSAGE : PASS_IDENTITY_REFINE_MESSAGE,
+        });
+    }
 })
     // Mirror tw_index_prd's path-traversal guard: if prd_path is given it MUST
     // resolve inside workspace_path.
@@ -599,12 +598,12 @@ export const TOOL_REGISTRY = [
                 status: {
                     type: "string",
                     enum: ["In_Progress", "PASS", "FAIL", "Blocked"],
-                    description: 'Execution status. status="PASS" requires agent_id="qa-engineer" (agent_id="code-reviewer" on a test-first feature, chain_path: "test-first").',
+                    description: 'Execution status. status="PASS" requires agent_id="code-reviewer", the chain\'s judge; any other agent_id is rejected at the tool boundary.',
                 },
                 completed_tasks: {
                     type: "array",
                     items: { type: "string" },
-                    description: 'Task ids the judge has completed for this feature (only agent_id "qa-engineer" may change it; "code-reviewer" on a test-first feature). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; the judge\'s FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
+                    description: 'Task ids the judge has completed for this feature. Only agent_id "code-reviewer" may grow it; a non-empty list from any other agent_id is rejected (NON_JUDGE_COMPLETED_TASKS_REJECTED). File mode: a code-reviewer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; the code-reviewer\'s FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
                 },
                 pending_notes: {
                     type: "array",
@@ -617,11 +616,11 @@ export const TOOL_REGISTRY = [
                 },
                 agent_id: {
                     type: "string",
-                    description: 'Agent name. Validated against ALLOWED_TRANSITIONS. PASS reserved for "qa-engineer" ("code-reviewer" on a test-first feature).',
+                    description: 'Agent name. Validated against ALLOWED_TRANSITIONS. PASS reserved for "code-reviewer".',
                 },
                 qa_review: {
                     type: "string",
-                    description: "Review notes. Recorded as evidence when agent_id is the feature's judge (\"qa-engineer\"; \"code-reviewer\" on a test-first feature, chain_path: \"test-first\") and status in {PASS, FAIL}.",
+                    description: "Review notes. Recorded as evidence when agent_id is \"code-reviewer\" (the judge) and status in {PASS, FAIL}.",
                 },
                 qa_suite_result: {
                     type: "object",
@@ -637,7 +636,7 @@ export const TOOL_REGISTRY = [
                     },
                     required: ["passed", "total"],
                     additionalProperties: false,
-                    description: "Optional structured suite result for a PASS/FAIL write by the feature's judge (qa-engineer; code-reviewer on a test-first feature): {passed, total, command?}, integers with 0 ≤ passed ≤ total and total ≥ 1. Attested, not verified. When this write records qa_review evidence (agent_id the feature's judge, status PASS or FAIL, qa_review set), the server records it as one fixed line at the head of that evidence — `suite-result: <passed>/<total> passed (server-recorded from qa_suite_result)`, or `…; command: <command>)` when command is given — followed by a blank line and the qa_review text (file mode: the new section of qa_reports/review_<id>.md; SQLite: each reports row's notes). Ignored on any other write. Not persisted to the handoff. Transient: applies to THIS write only. Recording-only — gates nothing; passed < total is recorded as given.",
+                    description: "Optional structured suite result for a PASS/FAIL write by the judge (code-reviewer): {passed, total, command?}, integers with 0 ≤ passed ≤ total and total ≥ 1. Attested, not verified. When this write records qa_review evidence (agent_id code-reviewer, status PASS or FAIL, qa_review set), the server records it as one fixed line at the head of that evidence — `suite-result: <passed>/<total> passed (server-recorded from qa_suite_result)`, or `…; command: <command>)` when command is given — followed by a blank line and the qa_review text (file mode: the new section of qa_reports/review_<id>.md; SQLite: each reports row's notes). Ignored on any other write. Not persisted to the handoff. Transient: applies to THIS write only. Recording-only — gates nothing; passed < total is recorded as given.",
                 },
                 review_task_ids: {
                     type: "array",
@@ -692,13 +691,13 @@ export const TOOL_REGISTRY = [
                 },
                 resume_of: {
                     type: "string",
-                    enum: ["code-reviewer", "qa-engineer"],
-                    description: "Amend-Resume declaration: which stranded role a PM mid-chain amendment resumes. The pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress resume edge is accepted ONLY when this field names the exact target role. Transient: applies to THIS write only. Replaces the legacy 'resume_of: <role>' pending_notes line (handoff schema v7).",
+                    enum: ["code-reviewer"],
+                    description: "Amend-Resume declaration: a PM mid-chain amendment resumes a stranded code-reviewer. The pm:In_Progress → code-reviewer:In_Progress resume edge is accepted ONLY when this field is \"code-reviewer\"; pm:In_Progress → qa-engineer:In_Progress is an ordinary edge and needs no resume_of. Transient: applies to THIS write only. Replaces the legacy 'resume_of: <role>' pending_notes line (handoff schema v7).",
                 },
                 review_verdict: {
                     type: "string",
                     enum: ["APPROVED", "CHANGES_REQUESTED"],
-                    description: "Code-reviewer verdict. Server-checked for consistency against status (REVIEW_VERDICT_STATUS_MISMATCH): APPROVED requires status=In_Progress; CHANGES_REQUESTED requires status=FAIL. Optional even on code-reviewer writes — absence never fires the gate. Transient: applies to THIS write only. Replaces the legacy 'review: APPROVED|CHANGES_REQUESTED' pending_notes line (handoff schema v7).",
+                    description: "Code-reviewer verdict. Server-checked for consistency against status (REVIEW_VERDICT_STATUS_MISMATCH): APPROVED requires status=PASS or In_Progress; CHANGES_REQUESTED requires status=FAIL. Optional even on code-reviewer writes — absence never fires the gate. Transient: applies to THIS write only. Replaces the legacy 'review: APPROVED|CHANGES_REQUESTED' pending_notes line (handoff schema v7).",
                 },
                 dispatch_pins: {
                     type: "object",
@@ -719,11 +718,6 @@ export const TOOL_REGISTRY = [
                     type: "string",
                     enum: ["feature", "bugfix"],
                     description: "Ticket dispatch-mode classification (file-mode only). PM sets \"bugfix\" at cut time to mark a repro-first bug-fix ticket: the server then BLOCKS the sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase handoff with REPRO_MANIFEST_MISSING until qa_reports/expected-red_<feature>.txt records the failing reproduction test(s), and QA's Phase 0.5 expected-red disposition becomes load-bearing for PASS. Absence === \"feature\" (the default) — feature-mode chains are unaffected. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry; opt back into the full chain by explicitly setting \"feature\". Never gates a transition edge itself (handoff schema v11).",
-                },
-                chain_path: {
-                    type: "string",
-                    enum: ["test-first"],
-                    description: "Test-first chain marker (handoff schema v16, file-mode only). Set \"test-first\" on a pm write or on the entry write pm/architect → qa-engineer:In_Progress to put this feature on the test-first chain (qa-engineer writes the tests, sr-engineer builds, code-reviewer judges and writes PASS). On any other write of an unmarked feature it is rejected (TRANSITION_REJECTED). Feature-scoped and permanent: carried across writes that omit it, never cleared, dropped when active_feature changes, NOT re-armed on PM re-entry. Ignored in SQLite/HTTP mode.",
                 },
                 cut_approved_source: {
                     type: "string",
@@ -769,7 +763,7 @@ export const TOOL_REGISTRY = [
     }),
     defineTool({
         name: "tw_complete_task",
-        description: 'Mark task completed [x]. Reserved for qa-engineer — pass agent_id="qa-engineer" (code-reviewer on a test-first feature, chain_path: test-first).',
+        description: 'Mark task completed [x]. Reserved for code-reviewer, the chain\'s judge — pass agent_id="code-reviewer".',
         inputSchema: {
             type: "object",
             properties: {
@@ -787,7 +781,7 @@ export const TOOL_REGISTRY = [
                 },
                 agent_id: {
                     type: "string",
-                    description: 'Must be "qa-engineer" ("code-reviewer" on a test-first feature). Other values rejected.',
+                    description: 'Must be "code-reviewer". Other values rejected.',
                 },
             },
             required: ["workspace_path", "task_id"],
@@ -904,7 +898,7 @@ export const TOOL_REGISTRY = [
         description: "Reconcile tasks.md checkboxes to the authoritative handoff.completed_tasks " +
             "(handoff → tasks only). Use after background/parallel subagents or inline-coordinator " +
             "execution leaves drift (run tw_detect_drift first). NEVER promotes a tasks.md-only " +
-            "completion into handoff (that needs a qa-engineer PASS); vibe-drift is reported, not synced.",
+            "completion into handoff (that needs a code-reviewer PASS); vibe-drift is reported, not synced.",
         inputSchema: {
             type: "object",
             properties: {

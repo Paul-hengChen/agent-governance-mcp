@@ -8,7 +8,6 @@
 // errorCode → doc-file mapping, read by test/error-code-contract.test.mjs (specs/c12-registry-field-consumers.md AC2); rows: grep -l '`<CODE>`' content/*.md
 //   AGENT_ID_REQUIRED               skill-qa-engineer.md
 //   TRANSITION_REJECTED             coord-02-host-dispatch.md, skill-qa-engineer.md
-//   QA_ROUND_EXCEEDED               skill-qa-engineer.md
 //   REVIEW_ROUND_EXCEEDED           skill-code-reviewer.md
 //   VISUAL_ROUND_EXCEEDED           (none)
 //   HOP_CAP_EXCEEDED                coord-01-core-head.md, coord-03-core-fallback.md
@@ -34,20 +33,19 @@
 //   BASELINE_PROVENANCE_INCOMPLETE  const-07-design-chain-gates.md, skill-design-auditor.md, skill-reviewer-visual.md
 //   PIXEL_GATE_ATTESTATION_MISSING  skill-reviewer-visual.md
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
-//   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
-//   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
+//   NON_JUDGE_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
 //   NON_REVIEWER_VERDICT_REJECTED   const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-code-reviewer.md
 //   AC_EXECUTION_LOG_MISSING        skill-code-reviewer.md
 //   PASS_TASKS_INCOMPLETE           skill-code-reviewer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
-// The 35-gate catalog, in documentation order, grouped by envelope; the one
+// The 33-gate catalog, in documentation order, grouped by envelope; the one
 // tool-boundary entry (DISPATCH_PIN_TIER_REJECTED, raised by zod before the
 // pipeline) stays last. Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the
 // ordered UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
-    // ---- transition-json (codes 1-7, producer: validateTransition) ----
+    // ---- transition-json (codes 1-6, producer: validateTransition) ----
     {
         errorCode: "AGENT_ID_REQUIRED",
         producer: "validateTransition",
@@ -66,16 +64,6 @@ export const GATE_REGISTRY = [
         armCondition: "always (validateTransition step 4)",
         clearingArtifact: "a legal edge in ALLOWED_TRANSITIONS",
         hintStatic: " in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md.",
-        documentedInProse: true,
-    },
-    {
-        errorCode: "QA_ROUND_EXCEEDED",
-        producer: "validateTransition",
-        envelope: "transition-json",
-        triggerEdge: "prev_qa_round >= 4 and next != (pm,In_Progress)",
-        armCondition: "always (validateTransition step 2)",
-        clearingArtifact: "(pm, In_Progress) reset",
-        hintStatic: " exceeds cap. Only (pm, In_Progress) allowed to reset.",
         documentedInProse: true,
     },
     {
@@ -113,26 +101,26 @@ export const GATE_REGISTRY = [
         documentedInProse: true,
     },
     {
-        // E431 — test-first chain only: sr-engineer's third return of the
-        // feature to qa-engineer. Edge-specific (validateTransition step 2.6);
+        // E431 — sr-engineer's third return of the feature to qa-engineer
+        // (every file-mode feature since E435). Edge-specific (validateTransition step 2.6);
         // every other write on the feature is evaluated normally.
         errorCode: "SR_RETURN_CAP_EXCEEDED",
         producer: "validateTransition",
         envelope: "transition-json",
-        triggerEdge: "prev_sr_return_count >= 2 on sr-engineer:In_Progress -> qa-engineer:In_Progress, test-first features only (chain_path: test-first, file mode); feature_changed bypasses",
-        armCondition: "opt-in (counter present; marked feature only)",
+        triggerEdge: "prev_sr_return_count >= 2 on sr-engineer:In_Progress -> qa-engineer:In_Progress (file mode; SQLite never persists the counter); feature_changed bypasses",
+        armCondition: "opt-in (counter present)",
         clearingArtifact: "(pm, In_Progress) reset (sr_return_count -> 0) or active_feature change",
         hintStatic: " — sr-engineer has returned this feature to qa-engineer the maximum 2 times. " +
             "Route to pm (pm:In_Progress) for a human ruling on the scenario.",
         // Quoted in the qa-engineer and sr-engineer SOPs since E433.
         documentedInProse: true,
     },
-    // ---- orchestrator-json (codes 8-13, producer: orchestrator) ----
+    // ---- orchestrator-json (codes 7-12, producer: orchestrator) ----
     {
         errorCode: "SCOPE_DECISION_REQUIRED",
         producer: "orchestrator",
         envelope: "orchestrator-json",
-        triggerEdge: "pm:In_Progress -> {architect,sr-engineer}:In_Progress",
+        triggerEdge: "pm:In_Progress -> {architect,qa-engineer}:In_Progress",
         armCondition: "hasDesignModeRequiringVisual().required",
         clearingArtifact: ".current/feature-split.md OR scope_decision: single-feature",
         hintStatic: "Scope decision missing. Either: (a) create .current/feature-split.md documenting the " +
@@ -146,7 +134,7 @@ export const GATE_REGISTRY = [
         errorCode: "CUT_APPROVAL_REQUIRED",
         producer: "orchestrator",
         envelope: "orchestrator-json",
-        triggerEdge: "pm:In_Progress -> {architect,sr-engineer}:In_Progress (file-mode only)",
+        triggerEdge: "pm:In_Progress -> {architect,qa-engineer}:In_Progress (file-mode only)",
         armCondition: "unconditional; FileHandoffStorage only",
         clearingArtifact: "cut_approved: true on prev state",
         hintStatic: "Cut approval missing. PM must present the ticket cut inline in chat and " +
@@ -158,7 +146,7 @@ export const GATE_REGISTRY = [
         errorCode: "EXTERNAL_REFS_UNRESOLVED",
         producer: "orchestrator",
         envelope: "orchestrator-json",
-        triggerEdge: "pm:In_Progress -> {architect,sr-engineer}:In_Progress (file-mode only)",
+        triggerEdge: "pm:In_Progress -> {architect,qa-engineer}:In_Progress (file-mode only)",
         armCondition: "unconditional; FileHandoffStorage only; fires iff >=1 external_refs entry state==unresolved",
         clearingArtifact: "every external_refs entry fetched/indexed/user-confirmed-ignorable, or field absent/empty",
         hintStatic: " Each entry in external_refs must be fetched, indexed, or user-confirmed-ignorable " +
@@ -175,7 +163,7 @@ export const GATE_REGISTRY = [
         errorCode: "SOURCE_CREDIBILITY_UNVERIFIED",
         producer: "orchestrator",
         envelope: "orchestrator-json",
-        triggerEdge: "pm:In_Progress -> {architect,sr-engineer}:In_Progress",
+        triggerEdge: "pm:In_Progress -> {architect,qa-engineer}:In_Progress",
         armCondition: "checkSourceCredibility (fetch-based modes figma/sketch/xd/penpot only)",
         clearingArtifact: "every audited ## Source row carries credibility: full-page-composite, or design is non-fetch-mode / has no ## Source section / no design file",
         hintStatic: " Every audited row in a fetch-based design (figma/sketch/xd/penpot) must carry " +
@@ -213,7 +201,7 @@ export const GATE_REGISTRY = [
             "See specs/e10-lease-override.md AC2.",
         documentedInProse: true,
     },
-    // ---- plain-text (codes 14-34, producer: orchestrator) ----
+    // ---- plain-text (codes 13-32, producer: orchestrator) ----
     {
         errorCode: "MISSING_EVIDENCE",
         producer: "orchestrator",
@@ -236,17 +224,14 @@ export const GATE_REGISTRY = [
         errorCode: "QA_COMPLETION_EVIDENCE_MISSING",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "any write by the feature's judge (qa-engineer; code-reviewer on a test-first feature, chain_path: test-first) whose completed_tasks adds ids not in the on-disk completed set — no edge/status/verdict exemption (file-mode only)",
+        triggerEdge: "any write by code-reviewer (the judge) whose completed_tasks adds ids not in the on-disk completed set — no edge/status/verdict exemption (file-mode only)",
         armCondition: "agent_id === resolveJudgeReport().judge && newly-added completed ids non-empty && hasEvidenceInFile(newIds).missing non-empty; FileHandoffStorage only",
         clearingArtifact: "qa_reports/review_<id>.md (or a covers: file) on disk for every newly-added id — including via the qa_review auto-record on this same write",
-        hintStatic: "A qa-engineer write adding completed_tasks ids requires per-id QA evidence " +
-            "on disk (qa_reports/review_<id>.md or a covers: file) for each NEWLY added " +
-            "id — no exemption for any edge, status, or review_verdict. Run the QA " +
-            "review and record evidence first (attach qa_review with review_task_ids " +
-            "on a PASS/FAIL write, or write the report file), or drop the unevidenced " +
-            "ids from completed_tasks. If this is the code-reviewer APPROVED handoff, " +
-            "carry the review scope in review_task_ids INSTEAD of completed_tasks " +
-            "(c16 amendment, E32). See docs/backlog.md E18 incident (b) + E32.",
+        hintStatic: "code-reviewer is the judge: write its report for each newly added id " +
+            "first (qa_review with review_task_ids on a PASS/FAIL write, or " +
+            "qa_reports/review_<id>.md or a covers: file), or drop the unevidenced " +
+            "ids from completed_tasks. No exemption for any edge, status, or " +
+            "review_verdict. See docs/backlog.md E18 incident (b) + E32.",
         documentedInProse: true,
     },
     {
@@ -286,9 +271,9 @@ export const GATE_REGISTRY = [
         errorCode: "REPRO_MANIFEST_MISSING",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "sr-engineer:In_Progress -> code-reviewer:In_Progress (bugfix), or qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress on a test-first feature (chain_path: test-first) (file-mode only)",
-        armCondition: "prevState.dispatch_mode === bugfix on the sr -> code-reviewer edge, or resolveChainPath() === test-first on the qa -> sr edge without a no-new-test record (hasNoNewTestRecord); FileHandoffStorage only",
-        clearingArtifact: "qa_reports/expected-red_<feature>.txt present (hasExpectedRedManifest); on the test-first qa -> sr edge, qa_reports/no-new-test_<feature>.txt present also clears (hasNoNewTestRecord)",
+        triggerEdge: "sr-engineer:In_Progress -> code-reviewer:In_Progress (bugfix), or qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress (file-mode only)",
+        armCondition: "prevState.dispatch_mode === bugfix on the sr -> code-reviewer edge, or the qa -> sr edge without a no-new-test record (hasNoNewTestRecord); FileHandoffStorage only",
+        clearingArtifact: "qa_reports/expected-red_<feature>.txt present (hasExpectedRedManifest); on the qa -> sr edge, qa_reports/no-new-test_<feature>.txt present also clears (hasNoNewTestRecord)",
         hintStatic: "Bugfix-mode fix cannot hand off to code-reviewer until " +
             "qa_reports/expected-red_<feature>.txt records the failing reproduction " +
             "test(s) proven red before the fix (skill-sr-engineer). If repro is " +
@@ -413,37 +398,28 @@ export const GATE_REGISTRY = [
         envelope: "plain-text",
         triggerEdge: "code-reviewer write with review_verdict disagreeing with status",
         armCondition: "agent_id=code-reviewer && review_verdict present",
-        clearingArtifact: "APPROVED↔In_Progress or CHANGES_REQUESTED↔FAIL",
-        hintStatic: "A code-reviewer APPROVED verdict requires status=In_Progress; " +
+        clearingArtifact: "APPROVED↔{PASS, In_Progress} or CHANGES_REQUESTED↔FAIL",
+        hintStatic: "A code-reviewer APPROVED verdict requires status=PASS or In_Progress; " +
             "CHANGES_REQUESTED requires status=FAIL. Align review_verdict with status, " +
             "or omit review_verdict. See specs/c9-protocol-fields.md AC-5.",
         documentedInProse: true,
     },
     {
-        errorCode: "REVIEWER_COMPLETED_TASKS_REJECTED",
+        // Ledger authorship: only the chain's judge (code-reviewer) may grow
+        // completed_tasks; any other identity carrying a non-empty list is rejected
+        // at the write, every storage mode. Replaces REVIEWER_COMPLETED_TASKS_REJECTED
+        // and NON_QA_COMPLETED_TASKS_REJECTED (E435, ruling (b)).
+        errorCode: "NON_JUDGE_COMPLETED_TASKS_REJECTED",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "any code-reviewer-stamped write carrying non-empty completed_tasks",
-        armCondition: "agent_id=code-reviewer && completed_tasks.length > 0",
-        clearingArtifact: "omit completed_tasks (or pass []) on self-stamped code-reviewer writes; the APPROVED row stamps agent_id=qa-engineer with review scope in review_task_ids (c16 amendment, E32)",
-        hintStatic: "completed_tasks on a code-reviewer-stamped write is ledger pollution: " +
-            "the review-scope manifest travels in review_task_ids on the APPROVED " +
-            "handoff (agent_id=qa-engineer) — never in completed_tasks. Omit " +
-            "completed_tasks (or pass []) on this write. " +
-            "See specs/c16-c10-role-boundary.md AC-3 + the E32 amendment.",
-        documentedInProse: true,
-    },
-    {
-        errorCode: "NON_QA_COMPLETED_TASKS_REJECTED",
-        producer: "orchestrator",
-        envelope: "plain-text",
-        triggerEdge: "any write whose agent_id is present, is NOT qa-engineer, and is NOT code-reviewer, carrying non-empty completed_tasks",
-        armCondition: "agent_id present && agent_id !== \"qa-engineer\" && agent_id !== \"code-reviewer\" && completed_tasks.length > 0",
-        clearingArtifact: "omit completed_tasks (or pass []) on any non-qa-stamped write; only agent_id=qa-engineer may grow the ledger",
-        hintStatic: "completed_tasks on a non-qa-stamped write is ledger pollution: " +
-            "only agent_id=qa-engineer may grow completed_tasks, backed by the " +
-            "QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks " +
-            "(or pass []) on this write. See docs/backlog.md E40.",
+        triggerEdge: "any write whose agent_id is present and is NOT code-reviewer, carrying non-empty completed_tasks",
+        armCondition: "agent_id present && agent_id !== \"code-reviewer\" && completed_tasks.length > 0",
+        clearingArtifact: "omit completed_tasks (or pass []) on any write not stamped agent_id=code-reviewer; only the judge may grow the ledger",
+        hintStatic: "completed_tasks on a write not stamped agent_id=code-reviewer is ledger " +
+            "pollution: only code-reviewer, the chain's judge, may grow completed_tasks " +
+            "(or complete tasks through tw_complete_task), backed by the " +
+            "QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or " +
+            "pass []) on this write. See docs/backlog.md E40.",
         documentedInProse: true,
     },
     {
@@ -455,13 +431,11 @@ export const GATE_REGISTRY = [
         errorCode: "NON_REVIEWER_VERDICT_REJECTED",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "any file-mode write whose agent_id is present and is NOT code-reviewer, carrying review_verdict, except the APPROVED handoff (code-reviewer:In_Progress -> qa-engineer:In_Progress with review_verdict=APPROVED)",
-        armCondition: "FileHandoffStorage && review_verdict present && agent_id present && agent_id !== \"code-reviewer\" && !(prevTuple code-reviewer:In_Progress && nextTuple qa-engineer:In_Progress && review_verdict=APPROVED)",
-        clearingArtifact: "omit review_verdict on any write not stamped agent_id=code-reviewer; the one exception is the APPROVED handoff row (agent_id=qa-engineer on code-reviewer:In_Progress -> qa-engineer:In_Progress)",
+        triggerEdge: "any file-mode write whose agent_id is present and is NOT code-reviewer, carrying review_verdict",
+        armCondition: "FileHandoffStorage && review_verdict present && agent_id present && agent_id !== \"code-reviewer\"; no prevTuple/nextTuple edge exemption (E435)",
+        clearingArtifact: "omit review_verdict on any write not stamped agent_id=code-reviewer",
         hintStatic: "review_verdict is the code-reviewer's verdict field: only an " +
-            "agent_id=code-reviewer write, or the APPROVED handoff the code-reviewer " +
-            "stamps agent_id=qa-engineer on the code-reviewer:In_Progress -> " +
-            "qa-engineer:In_Progress edge, may carry it. Omit review_verdict on this " +
+            "agent_id=code-reviewer write may carry it. Omit review_verdict on this " +
             "write. See docs/backlog.md E139.",
         documentedInProse: true,
     },
@@ -469,8 +443,8 @@ export const GATE_REGISTRY = [
         errorCode: "QA_REVIEW_TARGET_REQUIRED",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "PASS/FAIL write by the feature's judge (qa-engineer; code-reviewer on a test-first feature) carrying qa_review with review_task_ids and completed_tasks both empty",
-        armCondition: "qa_review present && agent_id=judge (qa-engineer; code-reviewer on a test-first feature) && status in {PASS, FAIL}",
+        triggerEdge: "PASS/FAIL write by code-reviewer (the judge) carrying qa_review with review_task_ids and completed_tasks both empty",
+        armCondition: "qa_review present && agent_id=code-reviewer && status in {PASS, FAIL}",
         clearingArtifact: "review_task_ids=[<task-id>, ...] naming the reviewed task(s) on the write (or completed_tasks on PASS)",
         // Spec Copy/Strings row (d9-qa-review-scoped-append) — byte-exact.
         hintStatic: "A qa_review write must name the reviewed task(s) via review_task_ids " +
@@ -510,17 +484,17 @@ export const GATE_REGISTRY = [
         errorCode: "PASS_TASKS_INCOMPLETE",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "qa-engineer:In_Progress -> qa-engineer:PASS (every status=PASS write; file-mode only)",
+        triggerEdge: "code-reviewer:In_Progress -> code-reviewer:PASS (every status=PASS write; file-mode only)",
         armCondition: "status=PASS && featureLaneLedger().armed && listOpenFeatureTasks() non-empty; FileHandoffStorage only",
         clearingArtifact: "every listed id in completed_tasks (this write or on disk for the same feature), ticked, or voided via tw_void_task",
-        hintStatic: "A qa-engineer PASS must account for every open task in the feature's lane " +
+        hintStatic: "A code-reviewer PASS must account for every open task in the feature's lane " +
             "ledger: add each listed id to completed_tasks with its QA evidence (a covers: " +
             "line counts), or void a dropped task with tw_void_task, then retry the PASS. " +
             "Rows whose description starts with release-engineer or doc-writer (post-PASS " +
             "work) are exempt. See docs/backlog.md E247.",
         documentedInProse: true,
     },
-    // ---- tool-boundary (code 35, producer: zod at tools/registry.ts) ----
+    // ---- tool-boundary (code 33, producer: zod at tools/registry.ts) ----
     {
         // dispatch_pins tier enum (E300): each value must be one of the four tier
         // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no
@@ -555,16 +529,15 @@ export function gate(code) {
     }
     return def;
 }
-// The 7 codes validateTransition's rejection() may emit. For tests + optional
+// The 6 codes validateTransition's rejection() may emit. For tests + optional
 // Extract<> typing of validateTransition's own return — NOT for re-typing the
-// 17-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
+// 16-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
 // that union carries 10 additional handler-side envelope-consistency codes and
 // must stay byte-identical; non-drift is enforced by a test assertion
 // union ⊆ ALL_GATE_CODES, not by re-sourcing from here).
 export const TRANSITION_GATE_CODES = [
     "AGENT_ID_REQUIRED",
     "TRANSITION_REJECTED",
-    "QA_ROUND_EXCEEDED",
     "REVIEW_ROUND_EXCEEDED",
     "VISUAL_ROUND_EXCEEDED",
     "HOP_CAP_EXCEEDED",

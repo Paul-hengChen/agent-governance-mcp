@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e435-remove-old-path"
 status: "In_Progress"
-last_updated: "2026-11-24T13:06:30.719Z"
+last_updated: "2026-11-24T13:11:22.655Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e435-remove-old-path.md"
 scope_decision: "single-feature"
@@ -17,7 +17,7 @@ dispatch_pins:
 evidence_schema: 2
 chain_path: "test-first"
 next_role: "sr-engineer"
-dispatched_at: "2026-11-24T13:06:30.719Z"
+dispatched_at: "2026-11-24T13:11:22.655Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -34,11 +34,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E435-34 done (not yet judged): tools/metrics.ts — FeatureMetricRecord.qa_rounds and emitFeatureMetrics arg qaRoundsTotal out; one_pass = review and visual totals both 0; ROUND SEMANTICS comment says two families. tools/handoff-orchestrator.ts call site: the 'qaRoundsTotal: 0' placeholder arg (left by T-31) removed (2 lines).
-- sr-engineer: T-34 tools/gate-stats.ts — FeatureOutcome.qa_rounds, metrics.mean_qa_rounds and the qa_rounds read out; a pre-E435 record's qa_rounds is ignored. scripts/summarize-metrics.mjs — qa column and qa mean out ('mean rounds: review X / visual Y'); legend now 'review/visual_rounds count REWORK only (CHANGES_REQUESTED / visual FAIL)' (test AC-E183-7 forbids any \bqa\b in stdout, so the old 'qa/review/visual' legend had to change too).
-- sr-engineer: T-34 tools/storage.ts + tools/storage-sqlite.ts — positional writeState overloads keep the slot as _qaRound (ignored, same as handoff-write.ts T-29); options no longer pass qaRound. SQLite: HandoffRow.qa_round, parse read/emit, upsert column list + bind + txUpsert param out (15 -> 14 placeholders); CREATE TABLE and addColumnIfMissing DDL untouched (NOT NULL DEFAULT 0 fills the column on INSERT OR REPLACE); no SQLite version change (AC9 ruling).
-- sr-engineer: T-34 verify: npx tsc --noEmit = 0 errors (whole compile unit; nothing left for T-35 at type level). T-34 expected-red rows green: e26 DE5, e183 AC-E183-7, success-metrics E8-E1/E8-E2, visual-round-sqlite AC-8, writestate-options-object FileHandoffStorage positional. e366-sqlite, sqlite-versioning, rag: 41/41 green.
-- sr-engineer: note for qa: e435-remove-old-path AC9 (tagged T-30, T-34) still red, but past the T-34 part — SQLite pm -> sr is rejected with the hint; it now fails at the qa PASS assertion because the zod PASS refine in tools/registry.ts (T-35) has not landed, so requireJudge's BLOCKED text arrives instead of PASS_IDENTITY_REFINE_MESSAGE. Same cause for AC2 file mode. No test edits; no test collision. dist/** left unbuilt-in-commit (T-39 owns it). Diff ~76 source lines across 6 files. Next: T-E435-35.
+- sr-engineer: T-E435-35 done (not yet judged): tools/registry.ts descriptions per Copy (status, agent_id, completed_tasks, qa_review, qa_suite_result, resume_of, review_verdict, tw_complete_task + its agent_id; tw_sync 'qa-engineer PASS' -> 'code-reviewer PASS'); chain_path out of zod + JSON Schema (non-strict, stripped); resume_of z.enum(['code-reviewer'], {error: RESUME_OF_ENUM_MESSAGE}) (exported from tools/registry.ts); PASS refine -> superRefine (QA_PASS_REFINE_MESSAGE for qa-engineer, else PASS_IDENTITY_REFINE_MESSAGE). prompts/code-reviewer.ts + qa-engineer.ts descriptions per Copy; prompts/build.ts untouched. dist/ rebuilt and committed (whole unit). ~80 source lines.
+- sr-engineer: tools/role.ts comment NOT changed: test/e408-core-task-alias-tail AC6 pins the old 'qa-engineer:PASS -> release-engineer' comment verbatim and has no expected-red row (qa T-25 listed e408 as 'no change'). qa must re-pin e408 AC6 first, then the comment can move.
+- sr-engineer: verify: npm run build green (check:transitions-sync OK, 22 keys); npm audit --audit-level=high exit 0 (moderate fast-uri only). Full suite (committed clean tree, test-lock): 4579 tests, 4524 pass, 52 fail (before the role.ts revert; e408 AC6 now green -> 51).
+- sr-engineer: (a) 407 expected-red rows tagged <= T-35 now green. (b) rows tagged <= T-35 still red (15): e435 AC2 / AC4-schema / AC9 and e431 AC18, e432 AC12 — the test's asRejection uses ZodError.message, which zod 4 JSON-serializes, so the raw-quote QA_PASS_MSG / RESUME_OF_MSG can never match (implementation emits the exact Copy; likely test defect -> qa). e139 AC-E139-2/3/8, e32 C2, reviewer-completed-tasks FM4: TRANSITION_REJECTED hint arrives inside the JSON envelope with escaped quotes, so the S3 hint text (contains "APPROVED") does not match raw (T-30 hint/test). gates-expected-red I3, e396 I: qa PASS through the handler gets requireJudge BLOCKED text but the test's rejected() says not rejected (T-31). e435 AC4 migration heal 'schema_version: 17' (T-29), e435 AC7 (T-32), error-code-contract 33-gate comments (T-32/33).
+- sr-engineer: (c) failures with NO row (collisions for qa): compose-equivalence x6 (goldens), constitution-deliverable-guard (v3.27.0), context-budget AC8 x2, cut-approval-gate R-schema-1 (schema_version 15 pin), e128-ORC, e230 AC2 (pm -> sr incident sequence), e359 AC-E359-5 (qa FAIL write), e409 AC2 (known, T-E435-46), e419 AC2 + e434 AC13 (35 gates -> 33), e423 AC17 (qa PASS), error-code-contract AC-5 (ALL_GATE_CODES parity), skill-manifest t-golden-byte-identity, source-credibility-gate T11 (pm-pin block). Rows tagged > T-35 still red as expected (T-36..41). Next: qa disposition of (b)/(c), then T-36.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
