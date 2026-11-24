@@ -172,7 +172,7 @@ async function seedQaInProgress(ws, feature) {
     status: "In_Progress",
     completedTasks: [],
     pendingNotes: ["QA: claiming review"],
-    lastAgent: "qa-engineer",
+    lastAgent: "code-reviewer",
   });
   // Replace the seed's wall-clock last_updated with a fixed stamp that cannot
   // look hand-authored, so the write path's stamp check stays quiet. See
@@ -193,7 +193,7 @@ test("I1: PASS rejected with EXPECTED_RED_DIFF_MISSING when manifest armed + qa_
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
     pending_notes: ["QA: T01 PASS"],
     qa_review: "Looks good, no expected-red section written.",
@@ -216,7 +216,7 @@ test("I2: PASS succeeds once qa_review carries a ## Expected-Red Diff section (m
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
     pending_notes: ["QA: T01 PASS"],
     qa_review:
@@ -227,7 +227,7 @@ test("I2: PASS succeeds once qa_review carries a ## Expected-Red Diff section (m
   assert.ok(!text.includes("EXPECTED_RED_DIFF_MISSING"), "gate must not fire once satisfied");
 });
 
-test("I3: PASS succeeds with zero overhead when no manifest exists (backwards-compat, no expected reds declared)", async () => {
+test("I3: PASS succeeds with zero overhead when no manifest exists (backwards-compat, no expected reds declared); a qa-engineer PASS is rejected naming code-reviewer (E435)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "c15-int-no-manifest";
@@ -240,7 +240,7 @@ test("I3: PASS succeeds with zero overhead when no manifest exists (backwards-co
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
     pending_notes: ["QA: T01 PASS"],
     qa_review: "Looks good, no expected-red section, no manifest was ever declared.",
@@ -248,6 +248,16 @@ test("I3: PASS succeeds with zero overhead when no manifest exists (backwards-co
   const text = result.content[0].text;
   assert.ok(!result.isError, `PASS must succeed when no manifest was declared (non-red feature); got: ${text}`);
   assert.ok(!text.includes("EXPECTED_RED_DIFF_MISSING"), "gate must never fire when the manifest was never armed");
+
+  // E435: code-reviewer is the judge on every feature; the same PASS from qa-engineer is rejected naming code-reviewer, before any evidence gate runs.
+  const ws2 = mkWorkspace(); await seedQaInProgress(ws2, feature);
+  resetSession(ws2); markStateRead(ws2);
+  const qa = await handleUpdateState({
+    workspace_path: ws2, active_feature: feature, status: "PASS", agent_id: "qa-engineer",
+    completed_tasks: ["T01"], pending_notes: ["QA: T01 PASS"], qa_review: "qa is not the judge",
+  });
+  assert.ok(qa.isError, `qa-engineer PASS must be rejected; got: ${qa.content[0].text}`);
+  assert.match(qa.content[0].text, /reserved for code-reviewer, the chain's judge/);
 });
 
 test("I4: partial disposition — manifest armed, one of two PASS'd ids' file carries the H2 -> PASS succeeds (one-recorded-diff-covers-the-round contract)", async () => {
@@ -271,7 +281,7 @@ test("I4: partial disposition — manifest armed, one of two PASS'd ids' file ca
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01", "T02"],
     pending_notes: ["QA: T01/T02 PASS"],
     qa_review: "T01 evidence, no disposition section here.",

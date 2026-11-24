@@ -1,8 +1,8 @@
 // Coded by @qa-engineer
 // Scenario tests for specs/e431-test-first-server-path.md (AC1-AC18; AC19/AC20 have their own proofs).
 // Invariant: a feature runs the test-first chain (pm -> (architect) -> qa-engineer -> sr-engineer ->
-// code-reviewer, who judges and writes PASS) only when its persisted handoff carries chain_path: "test-first";
-// every unmarked feature keeps the old chain byte-for-byte. Tests drive the real tool entries
+// code-reviewer, who judges and writes PASS) on every feature since E435: a chain_path carried on input is
+// stripped, never stored; removed old-path steps get the docs/migration-v5.md hint. Tests drive the real tool entries
 // (TOOL_REGISTRY.run -> zod + orchestrator) against temp workspaces, so each outcome is the one a client sees.
 // Scope note: PASS-time evidence for the new judge is E432; AC3 asserts the transition/identity layer and a
 // handler write the current evidence gate accepts.
@@ -20,15 +20,13 @@ import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { TOOL_REGISTRY } from "../dist/tools/registry.js";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 import { CURRENT_VERSIONS } from "../dist/schema/versions.js";
-import {
-  validateTransition,
-  TEST_FIRST_OVERLAY,
-  HOP_CAP_EXPORTED,
-  SR_RETURN_CAP_EXPORTED,
-} from "../dist/tools/transitions.js";
+// Namespace import: E435 removes TEST_FIRST_OVERLAY; a named import of it would fail the whole file at link time.
+import * as T from "../dist/tools/transitions.js";
 import { GATE_REGISTRY } from "../dist/gates/registry.js";
 import { UPDATE_STATE_GATE_PIPELINE } from "../dist/tools/handoff-orchestrator.js";
 import { forceSeedStamp, forceSeedStampIfExists } from "./e148-seed-stamp.mjs";
+
+const { validateTransition, HOP_CAP_EXPORTED, SR_RETURN_CAP_EXPORTED, TEST_FIRST_OVERLAY } = T;
 
 let SqliteHandoffStorage;
 try {
@@ -42,6 +40,18 @@ const UPD = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
 const ADD = TOOL_REGISTRY.find((e) => e.name === "tw_add_task");
 const COMPLETE = TOOL_REGISTRY.find((e) => e.name === "tw_complete_task");
 
+// E435 Copy / Strings, frozen (zod-boundary messages by their quote-free tails: a ZodError's JSON escapes '"').
+const IN_FLIGHT_HINT =
+  " If this feature started on the pre-v5 chain, docs/migration-v5.md says how to finish or restart it.";
+const PM_TO_SR_HINT = (a) =>
+  ` The build entry is qa-engineer: hand off ${a}:In_Progress → qa-engineer:In_Progress; qa-engineer writes the scenario tests, or records that the ticket needs no new test, before sr-engineer builds.`;
+const QA_JUDGE_HINT =
+  " qa-engineer writes tests and never writes PASS or FAIL: code-reviewer is the judge and writes them from code-reviewer:In_Progress.";
+const REVIEWER_TO_QA_HINT =
+  ' code-reviewer is the judge and closes the feature: approve with code-reviewer:PASS (review_verdict: "APPROVED"), or reject with code-reviewer:FAIL; qa-engineer does not follow code-reviewer.';
+const QA_PASS_TAIL = "code-reviewer is the judge; qa-engineer writes tests and never writes PASS.";
+const RESUME_OF_TAIL = "pm:In_Progress → qa-engineer:In_Progress is an ordinary edge, so omit resume_of there.";
+
 // ---------------------------------------------------------------- helpers
 
 function mkWs(prefix = "e431-") {
@@ -51,7 +61,7 @@ function mkWs(prefix = "e431-") {
 }
 
 const text = (r) => r?.content?.[0]?.text ?? "";
-const rejected = (r) => Boolean(r?.isError) || text(r).startsWith("⛔");
+const rejected = (r) => Boolean(r?.isError) || text(r).startsWith("⛔") || text(r).startsWith("❌");
 
 // Seed a handoff through the real writer, then pin the stamp so the next write is not freshness-suspect.
 async function seed(ws, feature, agent, status, opts = {}) {
@@ -90,6 +100,8 @@ const state = (ws) => new FileHandoffStorage().parse(ws);
 // upd() re-pins last_updated before each write, so compare everything except that stamp.
 const handoffBytes = (ws) =>
   fs.readFileSync(resolveCurrentLanePaths(ws).handoffPath, "utf-8").replace(/^last_updated:.*$/m, "last_updated: <pinned>");
+const noMarkerOnDisk = (ws) =>
+  assert.doesNotMatch(fs.readFileSync(resolveCurrentLanePaths(ws).handoffPath, "utf-8"), /chain_path/, "chain_path never stored");
 
 // The JSON envelope of a transition-json rejection, when the text carries one.
 function envelope(r) {
@@ -101,7 +113,22 @@ function envelope(r) {
 
 const F = "e431-feat";
 
-// E432: a marked qa-engineer -> sr-engineer hand-off needs the red-test manifest or the no-new-test record
+// Frozen schema 16 handoff carrying the pre-E435 marker (copy of e435-remove-old-path v16Handoff, not imported).
+function writeV16Marked(ws, agent, status) {
+  const p = resolveCurrentLanePaths(ws).handoffPath;
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, [
+    "---", "schema_version: 16", `active_feature: "${F}"`, `status: "${status}"`,
+    'last_updated: "2026-01-01T00:00:00.123Z"', `last_agent: "${agent}"`, "cut_approved: true",
+    'scope_decision: "single-feature"', 'chain_path: "test-first"',
+    "qa_round: 2", "review_round: 0", "visual_round: 0", "hop_count: 0", "qa_rounds_total: 3",
+    "review_rounds_total: 0", "visual_rounds_total: 0", "---", "# Handoff State", "", "## Completed", "- (none)", "",
+    "## Pending & Handoff Notes", "- seed", "", "---",
+    "> System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.", "",
+  ].join("\n"));
+}
+
+// E432: a qa-engineer -> sr-engineer hand-off needs the red-test manifest or the no-new-test record
 // (qa_reports/no-new-test_<feature>.txt, existence only). These scenarios exercise routing, counters and
 // markers, not the manifest rule (test/e432-judge-report-checks.test.mjs owns that), so they record "no new test".
 function recordNoNewTest(ws) {
@@ -112,64 +139,67 @@ const w = (agent, status, extra = {}) => ({ active_feature: F, status, agent_id:
 
 // ---------------------------------------------------------------- AC1
 
-test("AC1: marked pm -> qa-engineer (no resume_of) then qa-engineer -> sr-engineer both accepted, marker persisted", async () => {
+test("AC1 (E435): pm -> qa-engineer (no resume_of, no marker) then qa-engineer -> sr-engineer both accepted; a chain_path carried on input is stripped, not stored", async () => {
   const ws = mkWs("e431-ac1-");
   recordNoNewTest(ws);
   await seed(ws, F, "pm", "In_Progress");
   const r1 = await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first" }));
-  assert.ok(!rejected(r1), `pm -> qa with the marker on the entry write must be accepted: ${text(r1)}`);
-  assert.equal(state(ws).chain_path, "test-first");
+  assert.ok(!rejected(r1), `pm -> qa is an ordinary edge; an old client's marker is ignored: ${text(r1)}`);
+  assert.equal(state(ws).chain_path, undefined, "the carried marker is stripped, not stored");
   const r2 = await upd(ws, w("sr-engineer", "In_Progress"));
-  assert.ok(!rejected(r2), `qa -> sr must be accepted on a marked feature: ${text(r2)}`);
-  assert.equal(state(ws).chain_path, "test-first", "the marker is carried across a write that omits it");
+  assert.ok(!rejected(r2), `qa -> sr accepted with no marker: ${text(r2)}`);
+  assert.equal(state(ws).chain_path, undefined);
+  noMarkerOnDisk(ws);
 });
 
 // ---------------------------------------------------------------- AC2
 
-test("AC2: marked architect -> qa accepted; pm/architect -> sr-engineer rejected TRANSITION_REJECTED", async () => {
+test("AC2 (E435): architect -> qa accepted with no marker; pm/architect -> sr-engineer rejected TRANSITION_REJECTED with the S1/S2 hint", async () => {
   const ws = mkWs("e431-ac2-");
-  await seed(ws, F, "architect", "In_Progress", { chainPath: "test-first" });
+  await seed(ws, F, "architect", "In_Progress");
   const ok = await upd(ws, w("qa-engineer", "In_Progress"));
   assert.ok(!rejected(ok), `architect -> qa accepted: ${text(ok)}`);
 
   for (const from of ["architect", "pm"]) {
     const ws2 = mkWs("e431-ac2b-");
-    await seed(ws2, F, from, "In_Progress", { chainPath: "test-first" });
+    await seed(ws2, F, from, "In_Progress");
     const before = handoffBytes(ws2);
     const r = await upd(ws2, w("sr-engineer", "In_Progress"));
-    assert.ok(rejected(r), `${from} -> sr must be closed on a marked feature`);
+    assert.ok(rejected(r), `${from} -> sr is not an edge`);
     assert.match(text(r), /TRANSITION_REJECTED/);
+    assert.ok(envelope(r).hint.endsWith(PM_TO_SR_HINT(from) + IN_FLIGHT_HINT), `hint names qa-engineer as the build entry: ${text(r)}`);
     assert.equal(handoffBytes(ws2), before, "a rejected write leaves state untouched");
   }
 });
 
 // ---------------------------------------------------------------- AC3
 
-test("AC3: marked code-reviewer PASS passes the tool boundary and transition check (unmarked does not)", () => {
-  // The tool boundary (zod, run via UPD.run in the next test) no longer refuses a code-reviewer PASS; the transition layer decides.
-  const marked = validateTransition({
+test("AC3 (E435): code-reviewer:In_Progress -> code-reviewer:PASS passes the transition check with no marker; qa-engineer:PASS gets the S4 hint", () => {
+  // The tool boundary (zod, run via UPD.run in the next test) accepts a code-reviewer PASS; the transition layer agrees.
+  const judge = validateTransition({
     prev: { agent: "code-reviewer", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "PASS" },
-    prev_qa_round: 0, prev_review_round: 0, prev_chain_path: "test-first",
+    prev_review_round: 0,
   });
-  assert.equal(marked, null, "no TRANSITION_REJECTED for the marked judge PASS");
-  const unmarked = validateTransition({
+  assert.equal(judge, null, "no TRANSITION_REJECTED for the judge's PASS, on every feature");
+  const qa = validateTransition({
     prev: { agent: "code-reviewer", status: "In_Progress" },
-    next: { agent: "code-reviewer", status: "PASS" },
-    prev_qa_round: 0, prev_review_round: 0,
+    next: { agent: "qa-engineer", status: "PASS" },
+    prev_review_round: 0,
   });
-  assert.equal(unmarked?.error, "TRANSITION_REJECTED");
+  assert.equal(qa?.error, "TRANSITION_REJECTED");
+  assert.ok(qa.hint.endsWith(QA_JUDGE_HINT + IN_FLIGHT_HINT), `S4 hint expected, got ${qa.hint}`);
 });
 
 test("AC3: ledger completed by code-reviewer via tw_complete_task, completed_tasks [] -> PASS accepted, last_agent code-reviewer", async () => {
   const ws = mkWs("e431-ac3-");
-  await seed(ws, F, "code-reviewer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws, F, "code-reviewer", "In_Progress");
   resetSession(ws); markStateRead(ws);
   await ADD.run({ workspace_path: ws, task_id: "T-1", description: "one" });
   const c = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "code-reviewer" });
   assert.match(text(c), /"success":true/);
   const r = await upd(ws, w("code-reviewer", "PASS", { qa_review: "judged", review_task_ids: ["T-1"] }));
-  assert.ok(!rejected(r), `marked code-reviewer PASS accepted: ${text(r)}`);
+  assert.ok(!rejected(r), `code-reviewer PASS accepted: ${text(r)}`);
   const s = state(ws);
   assert.equal(s.status, "PASS");
   assert.equal(s.last_agent, "code-reviewer");
@@ -177,13 +207,15 @@ test("AC3: ledger completed by code-reviewer via tw_complete_task, completed_tas
 
 // ---------------------------------------------------------------- AC4
 
-test("AC4: qa-engineer PASS on a marked feature is rejected, no state written (from qa and from code-reviewer)", async () => {
+test("AC4 (E435): qa-engineer PASS is rejected naming code-reviewer, no state written (from qa and from code-reviewer)", async () => {
   for (const from of ["qa-engineer", "code-reviewer"]) {
     const ws = mkWs("e431-ac4-");
-    await seed(ws, F, from, "In_Progress", { chainPath: "test-first" });
+    await seed(ws, F, from, "In_Progress");
     const before = handoffBytes(ws);
     const r = await upd(ws, w("qa-engineer", "PASS", { qa_review: "x", review_task_ids: ["T-1"], completed_tasks: ["T-1"] }));
-    assert.ok(rejected(r), `qa PASS from ${from}:In_Progress must be rejected on a marked feature`);
+    assert.ok(rejected(r), `qa PASS from ${from}:In_Progress must be rejected`);
+    assert.ok(text(r).includes(QA_PASS_TAIL), `rejection names code-reviewer as the judge: ${text(r)}`);
+    assert.ok(text(r).includes("docs/migration-v5.md"), `rejection carries the migration hint: ${text(r)}`);
     assert.equal(handoffBytes(ws), before, "no state written");
   }
 });
@@ -192,7 +224,7 @@ test("AC4: qa-engineer PASS on a marked feature is rejected, no state written (f
 
 test("AC5: after code-reviewer FAIL -> qa, qa straight back to code-reviewer is rejected; qa -> sr -> code-reviewer accepted", async () => {
   const ws = mkWs("e431-ac5-");
-  await seed(ws, F, "code-reviewer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws, F, "code-reviewer", "In_Progress");
   const f = await upd(ws, w("code-reviewer", "FAIL", { review_verdict: "CHANGES_REQUESTED", blocking_reason: "scenario gap" }));
   assert.ok(!rejected(f), `code-reviewer FAIL accepted: ${text(f)}`);
   assert.equal(state(ws).review_round, 1);
@@ -201,7 +233,7 @@ test("AC5: after code-reviewer FAIL -> qa, qa straight back to code-reviewer is 
 
   const ws2 = mkWs("e431-ac5b-");
   recordNoNewTest(ws2);
-  await seed(ws2, F, "qa-engineer", "In_Progress", { chainPath: "test-first", reviewRound: 1 });
+  await seed(ws2, F, "qa-engineer", "In_Progress", { reviewRound: 1 });
   const before = handoffBytes(ws2);
   const bad = await upd(ws2, w("code-reviewer", "In_Progress"));
   assert.ok(rejected(bad));
@@ -220,7 +252,7 @@ test("AC6: third sr -> qa return rejected SR_RETURN_CAP_EXCEEDED routing to pm; 
   assert.equal(SR_RETURN_CAP_EXPORTED, 2);
   const ws = mkWs("e431-ac6-");
   recordNoNewTest(ws);
-  await seed(ws, F, "sr-engineer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws, F, "sr-engineer", "In_Progress");
   for (const expected of [1, 2]) {
     const back = await upd(ws, w("qa-engineer", "In_Progress"));
     assert.ok(!rejected(back), `return ${expected} accepted: ${text(back)}`);
@@ -246,7 +278,7 @@ test("AC6: third sr -> qa return rejected SR_RETURN_CAP_EXCEEDED routing to pm; 
 
   // The cap is edge-specific: sr -> code-reviewer is not blocked at sr_return_count 2.
   const ws2 = mkWs("e431-ac6b-");
-  await seed(ws2, F, "sr-engineer", "In_Progress", { chainPath: "test-first", srReturnCount: 2 });
+  await seed(ws2, F, "sr-engineer", "In_Progress", { srReturnCount: 2 });
   const other = await upd(ws2, w("code-reviewer", "In_Progress"));
   assert.ok(!rejected(other), `sr -> code-reviewer not blocked by the cap: ${text(other)}`);
 });
@@ -256,7 +288,7 @@ test("AC6: third sr -> qa return rejected SR_RETURN_CAP_EXCEEDED routing to pm; 
 test("AC7: code-reviewer rejections to qa and to sr together reach review_round 4; next non-pm write REVIEW_ROUND_EXCEEDED", async () => {
   const ws = mkWs("e431-ac7-");
   recordNoNewTest(ws);
-  await seed(ws, F, "code-reviewer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws, F, "code-reviewer", "In_Progress");
   const fail = () => upd(ws, w("code-reviewer", "FAIL", { review_verdict: "CHANGES_REQUESTED", blocking_reason: "no" }));
   const hop = async (agent) => {
     const r = await upd(ws, w(agent, "In_Progress"));
@@ -281,24 +313,26 @@ test("AC7: code-reviewer rejections to qa and to sr together reach review_round 
 
 // ---------------------------------------------------------------- AC8
 
-test("AC8: marked pm -> qa without cut_approved rejected CUT_APPROVAL_REQUIRED; resume_of on a marked feature does not exempt (OQ1 = a)", async () => {
+test("AC8 (E435): pm -> qa without cut_approved rejected CUT_APPROVAL_REQUIRED; a carried chain_path neither exempts nor is stored", async () => {
   const ws = mkWs("e431-ac8a-");
   await seed(ws, F, "pm", "In_Progress", { cutApproved: false });
-  const r = await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first" }));
+  const r = await upd(ws, w("qa-engineer", "In_Progress"));
   assert.ok(rejected(r));
   assert.match(text(r), /CUT_APPROVAL_REQUIRED/);
 
   const ws2 = mkWs("e431-ac8b-");
-  await seed(ws2, F, "pm", "In_Progress", { cutApproved: false, chainPath: "test-first" });
-  const r2 = await upd(ws2, w("qa-engineer", "In_Progress", { resume_of: "qa-engineer" }));
-  assert.ok(rejected(r2), "OQ1 = a: resume_of does not exempt pm -> qa from the build-entry checks on a marked feature");
+  await seed(ws2, F, "pm", "In_Progress", { cutApproved: false });
+  const before = handoffBytes(ws2);
+  const r2 = await upd(ws2, w("qa-engineer", "In_Progress", { chain_path: "test-first" }));
+  assert.ok(rejected(r2), "an old client's marker opens no route around the build-entry checks");
   assert.match(text(r2), /CUT_APPROVAL_REQUIRED/);
+  assert.equal(handoffBytes(ws2), before);
 });
 
-test("AC8: marked pm -> qa rejected EXTERNAL_REFS_UNRESOLVED with an unresolved external ref", async () => {
+test("AC8 (E435): pm -> qa rejected EXTERNAL_REFS_UNRESOLVED with an unresolved external ref (no marker)", async () => {
   const ws = mkWs("e431-ac8c-");
   await seed(ws, F, "pm", "In_Progress", { externalRefs: [{ ref: "https://example.invalid/spec", state: "unresolved" }] });
-  const r = await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first" }));
+  const r = await upd(ws, w("qa-engineer", "In_Progress"));
   assert.ok(rejected(r));
   assert.match(text(r), /EXTERNAL_REFS_UNRESOLVED/);
 });
@@ -308,16 +342,16 @@ function writeDesign(ws, body) {
   fs.writeFileSync(path.join(ws, "design", `${F}.md`), body, "utf-8");
 }
 
-test("AC8: marked pm -> qa rejected SCOPE_DECISION_REQUIRED with an armed design and no scope decision", async () => {
+test("AC8 (E435): pm -> qa rejected SCOPE_DECISION_REQUIRED with an armed design and no scope decision (no marker)", async () => {
   const ws = mkWs("e431-ac8d-");
   writeDesign(ws, "# design\n\nmode: figma\n\n## Layout / Canvas\n\nx\n");
   await seed(ws, F, "pm", "In_Progress");
-  const r = await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first" }));
+  const r = await upd(ws, w("qa-engineer", "In_Progress"));
   assert.ok(rejected(r));
   assert.match(text(r), /SCOPE_DECISION_REQUIRED/);
 });
 
-test("AC8: marked pm -> qa rejected SOURCE_CREDIBILITY_UNVERIFIED with an un-attested fetch-based design", async () => {
+test("AC8 (E435): pm -> qa rejected SOURCE_CREDIBILITY_UNVERIFIED with an un-attested fetch-based design (no marker)", async () => {
   const ws = mkWs("e431-ac8e-");
   writeDesign(
     ws,
@@ -327,146 +361,157 @@ test("AC8: marked pm -> qa rejected SOURCE_CREDIBILITY_UNVERIFIED with an un-att
       "| figma | node 1:2 | yes | audited |  | — |\n",
   );
   await seed(ws, F, "pm", "In_Progress", { scopeDecision: "single-feature" });
-  const r = await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first", scope_decision: "single-feature" }));
+  const r = await upd(ws, w("qa-engineer", "In_Progress", { scope_decision: "single-feature" }));
   assert.ok(rejected(r));
   assert.match(text(r), /SOURCE_CREDIBILITY_UNVERIFIED/);
 });
 
-test("AC8: unmarked unapproved pm -> qa with resume_of qa-engineer stays accepted (the hand-back stays exempt)", async () => {
+test("AC8 (E435): unapproved pm -> qa carrying resume_of: qa-engineer is rejected at the tool boundary (the hand-back exemption is gone), no state written", async () => {
   const ws = mkWs("e431-ac8f-");
   await seed(ws, F, "pm", "In_Progress", { cutApproved: false });
+  const before = handoffBytes(ws);
   const r = await upd(ws, w("qa-engineer", "In_Progress", { resume_of: "qa-engineer" }));
-  assert.ok(!rejected(r), `unmarked resume stays exempt: ${text(r)}`);
-  assert.equal(state(ws).chain_path, undefined);
+  assert.ok(rejected(r), `resume_of: qa-engineer is no longer a value: ${text(r)}`);
+  assert.ok(text(r).includes(RESUME_OF_TAIL), `RESUME_OF_ENUM_MESSAGE expected: ${text(r)}`);
+  assert.equal(handoffBytes(ws), before);
 });
 
 // ---------------------------------------------------------------- AC9
 
-test("AC9: unmarked pm -> qa with neither marker nor resume_of rejected, hint names both forms; resume_of alone accepted", async () => {
+test("AC9 (E435): pm -> qa with neither marker nor resume_of is accepted; a pm-row miss hint names only the code-reviewer resume, no chain_path", async () => {
   const ws = mkWs("e431-ac9-");
   await seed(ws, F, "pm", "In_Progress");
-  const r = await upd(ws, w("qa-engineer", "In_Progress"));
+  const ok = await upd(ws, w("qa-engineer", "In_Progress"));
+  assert.ok(!rejected(ok), `pm -> qa is an ordinary edge: ${text(ok)}`);
+
+  const ws2 = mkWs("e431-ac9c-");
+  await seed(ws2, F, "pm", "In_Progress");
+  const r = await upd(ws2, w("code-reviewer", "In_Progress"));
   assert.ok(rejected(r));
   assert.match(text(r), /TRANSITION_REJECTED/);
   const hint = envelope(r).hint;
-  assert.ok(hint.includes('resume_of: "qa-engineer"'), "hint names the Amend-Resume form");
-  assert.ok(hint.includes('chain_path: "test-first"'), "hint names the test-first form");
-  assert.ok(
-    hint.includes(' Test-first entry: set chain_path: "test-first" on the entry write instead (needs an approved cut; no resume_of).'),
-    "Copy hint.pm_to_qa verbatim",
-  );
-  const ok = await upd(ws, w("qa-engineer", "In_Progress", { resume_of: "qa-engineer" }));
-  assert.ok(!rejected(ok), `resume_of alone accepted as today: ${text(ok)}`);
+  assert.ok(hint.includes('resume_of: "code-reviewer"'), "hint names the Amend-Resume form");
+  assert.ok(!hint.includes("chain_path"), `no marker form in the hint: ${hint}`);
+  assert.ok(!hint.includes("Test-first entry"), `the Test-first entry sentence is gone: ${hint}`);
+  assert.ok(!hint.includes('resume_of: "qa-engineer"'), `no qa-engineer resume form: ${hint}`);
 });
 
-test("AC9: on a marked feature a later pm -> qa write needs no resume_of", async () => {
+test("AC9 (E435): an in-flight schema 16 marked feature at pm:In_Progress moves to qa-engineer with no resume_of; the write stores schema 17 with no marker", async () => {
   const ws = mkWs("e431-ac9b-");
-  await seed(ws, F, "pm", "In_Progress", { chainPath: "test-first" });
+  writeV16Marked(ws, "pm", "In_Progress");
   const r = await upd(ws, w("qa-engineer", "In_Progress"));
-  assert.ok(!rejected(r), `marked pm -> qa without resume_of: ${text(r)}`);
+  assert.ok(!rejected(r), `pm -> qa without resume_of: ${text(r)}`);
+  const raw = fs.readFileSync(resolveCurrentLanePaths(ws).handoffPath, "utf-8");
+  assert.match(raw, /^schema_version: 17$/m);
+  assert.doesNotMatch(raw, /chain_path|qa_round/);
 });
 
 // ---------------------------------------------------------------- AC10
 
-test("AC10: marker survives omitting writes and is dropped on active_feature change", async () => {
+test("AC10 (E435): a chain_path carried on any write is stripped — never stored, never carried; a feature change stores none either", async () => {
   const ws = mkWs("e431-ac10-");
   recordNoNewTest(ws);
   await seed(ws, F, "pm", "In_Progress");
   assert.ok(!rejected(await upd(ws, w("qa-engineer", "In_Progress", { chain_path: "test-first" }))));
+  assert.equal(state(ws).chain_path, undefined, "stripped on the entry write");
   assert.ok(!rejected(await upd(ws, w("qa-engineer", "In_Progress", { pending_notes: ["still here"] }))));
-  assert.equal(state(ws).chain_path, "test-first", "omitting writes cannot clear the marker");
-  assert.ok(!rejected(await upd(ws, w("sr-engineer", "In_Progress"))));
-  assert.equal(state(ws).chain_path, "test-first");
+  assert.ok(!rejected(await upd(ws, w("sr-engineer", "In_Progress", { chain_path: "test-first" }))));
+  assert.equal(state(ws).chain_path, undefined, "stripped mid-chain");
+  noMarkerOnDisk(ws);
 
   const ws2 = mkWs("e431-ac10b-");
-  await seed(ws2, F, "pm", "In_Progress", { chainPath: "test-first" });
-  const next = await upd(ws2, { active_feature: "e431-next", status: "In_Progress", agent_id: "pm" });
+  await seed(ws2, F, "pm", "In_Progress");
+  const next = await upd(ws2, { active_feature: "e431-next", status: "In_Progress", agent_id: "pm", chain_path: "test-first" });
   assert.ok(!rejected(next), `new feature opened: ${text(next)}`);
   assert.equal(state(ws2).active_feature, "e431-next");
-  assert.equal(state(ws2).chain_path, undefined, "the new feature starts unmarked");
+  assert.equal(state(ws2).chain_path, undefined, "the new feature stores no marker");
 });
 
-test("AC10: marker carried mid-old-path is rejected TRANSITION_REJECTED, no state written", async () => {
-  for (const [agent, next] of [["sr-engineer", "code-reviewer"], ["code-reviewer", "qa-engineer"]]) {
-    const ws = mkWs("e431-ac10c-");
-    await seed(ws, F, agent, "In_Progress");
-    const before = handoffBytes(ws);
-    const r = await upd(ws, w(next, "In_Progress", { chain_path: "test-first" }));
-    assert.ok(rejected(r), `${agent} -> ${next} carrying the marker mid-old-path must be rejected`);
-    assert.match(text(r), /TRANSITION_REJECTED/);
-    assert.equal(handoffBytes(ws), before);
-  }
+test("AC10 (E435): chain_path carried mid-chain is ignored: sr -> code-reviewer accepted and stores none; code-reviewer -> qa-engineer rejected with the S3 hint, no state written", async () => {
+  const ws = mkWs("e431-ac10c-");
+  await seed(ws, F, "sr-engineer", "In_Progress");
+  const ok = await upd(ws, w("code-reviewer", "In_Progress", { chain_path: "test-first" }));
+  assert.ok(!rejected(ok), `sr -> code-reviewer is the chain's edge, marker or not: ${text(ok)}`);
+  assert.equal(state(ws).chain_path, undefined);
+
+  const ws2 = mkWs("e431-ac10d-");
+  await seed(ws2, F, "code-reviewer", "In_Progress");
+  const before = handoffBytes(ws2);
+  const r = await upd(ws2, w("qa-engineer", "In_Progress", { chain_path: "test-first" }));
+  assert.ok(rejected(r), "code-reviewer -> qa-engineer is a removed step, marker or not");
+  assert.match(text(r), /TRANSITION_REJECTED/);
+  assert.ok(envelope(r).hint.endsWith(REVIEWER_TO_QA_HINT + IN_FLIGHT_HINT), `S3 hint expected: ${text(r)}`);
+  assert.equal(handoffBytes(ws2), before);
 });
 
 // ---------------------------------------------------------------- AC11
 
-test("AC11: marked code-reviewer:PASS exits to pm, researcher, release-engineer and design-auditor", async () => {
+test("AC11 (E435): code-reviewer:PASS exits to pm, researcher, release-engineer and design-auditor (no marker)", async () => {
   for (const next of ["pm", "researcher", "release-engineer", "design-auditor"]) {
     const ws = mkWs("e431-ac11-");
-    await seed(ws, F, "code-reviewer", "PASS", { chainPath: "test-first" });
+    await seed(ws, F, "code-reviewer", "PASS");
     const r = await upd(ws, w(next, "In_Progress"));
     assert.ok(!rejected(r), `code-reviewer:PASS -> ${next} accepted: ${text(r)}`);
   }
 });
 
-test("AC11: unmarked code-reviewer PASS rejected as today", async () => {
+test("AC11 (E435): code-reviewer PASS with no marker is accepted (was rejected unmarked); the legacy qa-engineer:PASS / qa-engineer:FAIL keys still exit (DR-3)", async () => {
   const ws = mkWs("e431-ac11b-");
   await seed(ws, F, "code-reviewer", "In_Progress");
-  const before = handoffBytes(ws);
   const r = await upd(ws, w("code-reviewer", "PASS", { qa_review: "x", review_task_ids: ["T-1"] }));
-  assert.ok(rejected(r));
-  assert.match(text(r), /qa-engineer/);
-  assert.equal(handoffBytes(ws), before);
+  assert.ok(!rejected(r), `the judge's PASS on any feature: ${text(r)}`);
+  assert.equal(state(ws).last_agent, "code-reviewer");
+
+  // Legacy exit keys: a handoff left at qa-engineer:PASS / :FAIL by the pre-v5 chain can still leave it.
+  for (const [status, next] of [["PASS", "pm"], ["PASS", "release-engineer"], ["FAIL", "sr-engineer"], ["FAIL", "pm"]]) {
+    const v = validateTransition({
+      prev: { agent: "qa-engineer", status }, next: { agent: next, status: "In_Progress" },
+      prev_review_round: 0, feature_changed: status === "PASS",
+    });
+    assert.equal(v, null, `qa-engineer:${status} -> ${next} stays open as a legacy exit`);
+  }
 });
 
 // Feature change: the next step after a PASS almost always opens a different
-// active_feature (next ticket, release feature). The exit is judged against the
-// PREVIOUS feature's marker; the new feature itself starts unmarked.
+// active_feature (next ticket, release feature). The exit is judged on the
+// code-reviewer:PASS key itself; no marker is read or written (E435).
 const EXIT_ROLES = ["pm", "researcher", "release-engineer", "design-auditor"];
 
-test("AC11: validateTransition accepts all four exits from marked code-reviewer:PASS on a feature change", () => {
+test("AC11 (E435): validateTransition accepts all four exits from code-reviewer:PASS on a feature change, no marker", () => {
   for (const next of EXIT_ROLES) {
     const r = validateTransition({
       prev: { agent: "code-reviewer", status: "PASS" },
       next: { agent: next, status: "In_Progress" },
-      prev_qa_round: 0, prev_review_round: 0, prev_chain_path: "test-first", feature_changed: true,
+      prev_review_round: 0, feature_changed: true,
     });
     assert.equal(r, null, `code-reviewer:PASS -> ${next} on a feature change accepted`);
   }
 });
 
 for (const next of EXIT_ROLES) {
-  test(`AC11: feature change from marked code-reviewer:PASS accepted via handler for ${next}, new feature unmarked`, async () => {
+  test(`AC11 (E435): feature change from code-reviewer:PASS accepted via handler for ${next}, new feature stores no marker`, async () => {
     const ws = mkWs("e431-ac11fc-");
-    await seed(ws, F, "code-reviewer", "PASS", { chainPath: "test-first" });
+    await seed(ws, F, "code-reviewer", "PASS");
     const r = await upd(ws, { active_feature: "e431-next-feat", status: "In_Progress", agent_id: next });
-    assert.ok(!rejected(r), `${next} opening a new feature from marked code-reviewer:PASS accepted: ${text(r)}`);
+    assert.ok(!rejected(r), `${next} opening a new feature from code-reviewer:PASS accepted: ${text(r)}`);
     const s = state(ws);
     assert.equal(s.active_feature, "e431-next-feat");
-    assert.equal(s.chain_path, undefined, "new feature starts unmarked");
+    assert.equal(s.chain_path, undefined, "no marker on the new feature");
     assert.ok(!s.sr_return_count, "new feature carries no sr_return_count");
   });
 }
 
-test("AC11: feature-change write out of marked code-reviewer:PASS that carries chain_path ignores the old marker (pm marks the new feature; other roles rejected)", async () => {
-  // Why: the previous marker only opens the exits for a write that carries no chain_path;
-  // a carrying write is judged by the set-point rule alone, so the old marker cannot
-  // launder a non-pm role into marking a new feature.
-  const ws = mkWs("e431-ac11cp-");
-  await seed(ws, F, "code-reviewer", "PASS", { chainPath: "test-first" });
-  const ok = await upd(ws, { active_feature: "e431-next-cp", status: "In_Progress", agent_id: "pm", chain_path: "test-first" });
-  assert.ok(!rejected(ok), `pm opening a new feature with chain_path accepted: ${text(ok)}`);
-  assert.equal(state(ws).active_feature, "e431-next-cp");
-  assert.equal(state(ws).chain_path, "test-first", "the new feature is marked by its own pm write");
-
-  for (const role of ["researcher", "release-engineer", "design-auditor"]) {
-    const ws2 = mkWs("e431-ac11cp2-");
-    await seed(ws2, F, "code-reviewer", "PASS", { chainPath: "test-first" });
-    const before = handoffBytes(ws2);
-    const r = await upd(ws2, { active_feature: "e431-next-cp", status: "In_Progress", agent_id: role, chain_path: "test-first" });
-    assert.ok(rejected(r), `${role} carrying chain_path on a feature change must be rejected`);
-    assert.match(text(r), /TRANSITION_REJECTED/);
-    assert.equal(handoffBytes(ws2), before);
+test("AC11 (E435): feature-change write out of code-reviewer:PASS that carries chain_path is accepted for all four roles, the marker stripped", async () => {
+  // Why: the marker no longer means anything, so carrying it can neither open nor close an exit;
+  // each role's exit is decided by the code-reviewer:PASS row alone, and nothing is stored.
+  for (const role of EXIT_ROLES) {
+    const ws = mkWs("e431-ac11cp-");
+    await seed(ws, F, "code-reviewer", "PASS");
+    const r = await upd(ws, { active_feature: "e431-next-cp", status: "In_Progress", agent_id: role, chain_path: "test-first" });
+    assert.ok(!rejected(r), `${role} carrying chain_path on a feature change accepted: ${text(r)}`);
+    assert.equal(state(ws).active_feature, "e431-next-cp");
+    assert.equal(state(ws).chain_path, undefined, "the carried marker is stripped");
+    noMarkerOnDisk(ws);
   }
 });
 

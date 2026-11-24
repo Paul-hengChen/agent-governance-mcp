@@ -253,3 +253,46 @@ Left as is (green on both): AC-8 VISUAL_ROUND_CAP exported as 6. The prev tuples
 ### Red Reasons (T-43)
 
 9 red at base, all with the old-signature TypeError `Cannot read properties of undefined (reading 'agent')` (the new call puts `next` in the old prev_visual_round slot, so the old `next` slot is undefined). No syntax or link errors. Rows under `# T-E435-43` in the manifest. File run: 14 tests, 5 pass, 9 fail = the 9 T-43 rows, name for name.
+
+## T-E435-07 — `test/e431-test-first-server-path.test.mjs` half 1, `test/gates-expected-red.test.mjs`
+
+### Split (binding for T-E435-08)
+
+`e431-test-first-server-path.test.mjs` has no `describe` blocks; it splits at its `// ---- ACn` banners (line numbers at `5fdb7b45`, base for T-07):
+
+| half | task | blocks | base lines |
+|---|---|---|---|
+| 1 | T-E435-07 | header comment, imports, helpers (`mkWs`, `seed`, `upd`, `state`, `handoffBytes`, `envelope`, `recordNoNewTest`, `w`), AC1 – AC11 (incl. `EXIT_ROLES` and the AC11 per-role loop) | 1–472 |
+| 2 | T-E435-08 | AC12 (`NOTHING_NEW`, 4 tests), AC13, AC14 (`ledgerWs`), AC15, AC16, AC17 (×2), AC18 (SQLite), OVERLAY (`parseOverlayTable`) | 473–816 (now 518–861) |
+
+Changed lines: e431 half 1 = 277 (161+ / 116−), gates-expected-red = 22 (16+ / 6−); 299 total. Half 2 is untouched.
+
+Notes for T-08:
+- **Imports**: half 1 replaced the named `transitions.js` import with `import * as T` and `const { validateTransition, HOP_CAP_EXPORTED, SR_RETURN_CAP_EXPORTED, TEST_FIRST_OVERLAY } = T;` so half 2 still links. `TEST_FIRST_OVERLAY` is `undefined` after the build (OVERLAY test re-pin is T-08's); use `T.<name>` for E435 exports.
+- **Shared helpers half 1 added**: frozen `IN_FLIGHT_HINT`, `PM_TO_SR_HINT(a)`, `QA_JUDGE_HINT`, `REVIEWER_TO_QA_HINT`, `QA_PASS_TAIL`, `RESUME_OF_TAIL`; `noMarkerOnDisk(ws)`; `writeV16Marked(ws, agent, status)` (frozen schema 16 text with `chain_path: "test-first"`, `qa_round: 2`, `qa_rounds_total: 3`). `rejected()` also counts a `❌` prefix.
+- `seed(..., { chainPath })`: the writer option goes in T-E435-29; for an on-disk marker use `writeV16Marked`.
+- Half 2 at base still has `prev_qa_round` / `prev_chain_path` requests (AC12 closed-edge list, AC13, AC17), `qa_round` asserts (AC12), the old `tw_complete_task` texts (AC14), the two removed codes (AC15), `CURRENT_VERSIONS.handoff === 16` (AC16), registry 35 / step-9 name (AC17), the SQLite marker-ignored test (AC18).
+
+### Scenario → Test Map (T-07)
+
+| scenario | file | exact test name(s) |
+|---|---|---|
+| AC4 marker gone: stripped, never stored (was "set the marker") | e431 | AC1 (E435): pm -> qa-engineer (no resume_of, no marker) then qa-engineer -> sr-engineer both accepted; a chain_path carried on input is stripped, not stored · AC10 (E435): a chain_path carried on any write is stripped — never stored, never carried; a feature change stores none either · AC10 (E435): chain_path carried mid-chain is ignored: sr -> code-reviewer accepted and stores none; code-reviewer -> qa-engineer rejected with the S3 hint, no state written · AC11 (E435): feature-change write out of code-reviewer:PASS that carries chain_path is accepted for all four roles, the marker stripped |
+| AC4 in-flight v16 marked feature (lazy migration on the chain) | e431 | AC9 (E435): an in-flight schema 16 marked feature at pm:In_Progress moves to qa-engineer with no resume_of; the write stores schema 17 with no marker |
+| new chain unconditional (marked set-ups now seed no marker) | e431 | AC2 (E435): … S1/S2 hint · AC3: ledger completed by code-reviewer via tw_complete_task, … · AC5 · AC6 · AC7 (titles unchanged, marker dropped from the seeds) · AC8 (E435) EXTERNAL_REFS / SCOPE_DECISION / SOURCE_CREDIBILITY (no marker) · AC9 (E435): pm -> qa with neither marker nor resume_of is accepted; … · AC11 (E435) code-reviewer:PASS exits, validateTransition feature change, per-role handler loop (×4) |
+| AC2 judge (qa PASS rejected naming code-reviewer) | e431 | AC3 (E435): code-reviewer:In_Progress -> code-reviewer:PASS passes the transition check with no marker; qa-engineer:PASS gets the S4 hint · AC4 (E435): qa-engineer PASS is rejected naming code-reviewer, no state written (from qa and from code-reviewer) |
+| AC2 judge (old "unmarked keeps old behaviour" → rejection / legacy exits) | e431 | AC8 (E435): pm -> qa without cut_approved rejected CUT_APPROVAL_REQUIRED; a carried chain_path neither exempts nor is stored · AC8 (E435): unapproved pm -> qa carrying resume_of: qa-engineer is rejected at the tool boundary (the hand-back exemption is gone), no state written · AC11 (E435): code-reviewer PASS with no marker is accepted (was rejected unmarked); the legacy qa-engineer:PASS / qa-engineer:FAIL keys still exit (DR-3) |
+| AC2 judge on the evidence gate | gates-expected-red | I1, I2, I4 (names unchanged; PASS now by code-reviewer from code-reviewer:In_Progress) · I3: … ; a qa-engineer PASS is rejected naming code-reviewer (E435) |
+
+Left as is (green on both): gates-expected-red U1–U13, I5, I5b (predicates and source guards, no writer identity).
+
+### Open Interface Details (T-07)
+
+1. Tool-boundary messages (`QA_PASS_REFINE_MESSAGE`, `RESUME_OF_ENUM_MESSAGE`) asserted by their quote-free tails (`QA_PASS_TAIL`, `RESUME_OF_TAIL`) plus `docs/migration-v5.md`: the `upd()` helper surfaces a thrown ZodError's `err.message`, which is the JSON issue list, where `"` is escaped (seen at base: `status=\"PASS\" requires agent_id=\"qa-engineer\"`). Full-string equality is T-01's AC2.
+2. Old-step hints asserted with `envelope(r).hint.endsWith(<step hint> + IN_FLIGHT_HINT)` (same as qa-flow part 1).
+3. gates-expected-red I3's qa probe goes through `handleUpdateState` (no zod), so it hits the orchestrator's defence-in-depth `requireJudge(…, "tw_update_state(status=PASS)")`; asserted by the substring `reserved for code-reviewer, the chain's judge`.
+4. AC11 legacy exits are pinned on `validateTransition` (qa-engineer:PASS → pm / release-engineer on a feature change, qa-engineer:FAIL → sr-engineer / pm); green at base too, they ride in the red AC11 test whose first half is the inverted code-reviewer PASS.
+
+### Red Reasons (T-07)
+
+29 red at base, all assertion failures (no syntax / link error): e431 25 (unmarked table lacks the new edges / code-reviewer:PASS key; carried `chain_path` stored; `resume_of: qa-engineer` valid; qa-engineer PASS and `tw_complete_task` accepted; schema 16), gates-expected-red 4 (code-reviewer PASS rejected by the orchestrator's ZodError `requires agent_id="qa-engineer"` on an unmarked feature). Rows under `# T-E435-07` in the manifest. Run: `node --test test/e431-test-first-server-path.test.mjs test/gates-expected-red.test.mjs` → 58 tests, 29 pass, 29 fail = the 29 rows, name for name (half 2: 14 tests, all green, untouched; gates U1–U13, I5, I5b green).
