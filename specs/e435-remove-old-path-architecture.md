@@ -360,3 +360,14 @@ Answered with a recommendation each; the coordinator sends them for integrator p
 | (d) | SQLite mode | Answered by the human 2026-11-24: SQLite runs the new chain through the shared table; `sr_return` cap not enforced there; documented in `docs/migration-v5.md`; no field added. Restated only | No — already ruled | AC9 in `e435`; `visual-round-sqlite`, `e366` re-pinned to a code-reviewer judge |
 | (e) | Incoming `chain_path` after removal | Silently stripped by zod (object is non-strict); no source names it; the lane's unrestarted server keeps the marker in its own v16 handoff, migrated on first read after merge | No — decided by architecture | AC4: input schema has no `chain_path`; one test that a write carrying it is accepted and the field is absent from the written handoff |
 | (f) | Old-edge rejection code | `TRANSITION_REJECTED` with the in-flight hint; no new code | No — decided by architecture | No contract-test change for a new code; tests assert code + hint substrings |
+
+### Rulings (2026-11-24)
+
+| OQ | ruling | by |
+|---|---|---|
+| (a) | **Drop** `qa_round` / `qa_rounds_total` in the 16 → 17 bump, with metrics `qa_rounds`, `tw_gate_stats.mean_qa_rounds`, the lane-status `qa_round` column and watch key, and `attempted.qa_round`; SQLite column left in the DDL, unread, no SQLite version change. T-E435-41 gains `content/skill-integrator.md`. | human, lane session, after integrator pre-review close |
+| (b) | **Remove** `REVIEWER_COMPLETED_TASKS_REJECTED` and `NON_QA_COMPLETED_TASKS_REJECTED`, **add** `NON_JUDGE_COMPLETED_TASKS_REJECTED`; pipeline step 9 renamed; registry 33, pipeline 17 steps. | human, lane session, after integrator pre-review close |
+| (c), (e), (f) | as recommended above (decided by architecture; integrator pre-review agreed) | architect |
+| (d) | human ruling 2026-11-24 (manifest Decisions) | human |
+
+Task-list edits applied in place (ids unchanged): T-E435-30 gains `specs/qa-flow-enforcement-architecture.md` (Matrix section); `tools/lane-status.ts` and `scripts/smoke-qa-flow.mjs` move from T-E435-31 to T-E435-42 (AC column `AC2, AC4, AC7`); T-E435-41 gains `content/skill-integrator.md`; T-E435-33 names the ruled codes.
