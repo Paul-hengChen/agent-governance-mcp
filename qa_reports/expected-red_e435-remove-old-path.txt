@@ -432,3 +432,6 @@ test/visual-gate-e2e.test.mjs | AC-6 (E435): Round 6 sentinel — fires on cap-c
 test/visual-gate-e2e.test.mjs | AC-7 (E435): visual_round persists across writeState → readback; no qa_round field | the writer / parser still emit and read qa_round at base (schema 16): qa_round is 0, not undefined (T-E435-29)
 test/visual-gate-e2e.test.mjs | AC-10 (E435): handler composition — computeNewRound resets visual_round on PM re-entry post-cap | old 11-slot computeNewRound signature (qa slot first): next read from slot 4, TypeError reading 'agent' (T-E435-30)
 test/visual-round-sqlite.test.mjs | AC-8 (E435): writeState(visualRound=4) → parse(...).visual_round === 4; qa_round not read | SQLite parse still reads the qa_round column at base: qa_round is 0, not undefined (T-E435-34)
+
+# T-E435-22 — visual SOP/template pins: pixel-perfect-design-coverage, pixel-perfect-visual-compare, qa-visual-skill-split, e412-qa-visual-template, e360-qa-visual-review-task-ids
+# no rows: none of the five files pins old-path wording the E435 contract changes (all already on the E433/E434 code-reviewer visual judge); 29/29 green at base

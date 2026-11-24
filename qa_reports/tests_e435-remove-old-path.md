@@ -777,3 +777,28 @@ No change needed: `test/pixel-gate-attestation.test.mjs` and `test/baseline-mani
 ### Red Reasons (T-21)
 
 4 red at base, all for the stated reason (no syntax / link error): 2 `computeNewRound` re-pins on the old 11-slot signature (TypeError reading 'agent') (T-E435-30); 1 file-mode writer / parser still emit / read `qa_round` (T-E435-29); 1 SQLite parse still reads `qa_round` (T-E435-34). No test dropped. Rows under `# T-E435-21` in the manifest. Run: `node --test test/visual-gate-e2e.test.mjs test/visual-round-sqlite.test.mjs test/visual-evidence-gate.test.mjs test/pixel-gate-attestation.test.mjs test/baseline-manifest-gate.test.mjs` → 168 tests, 164 pass, 4 fail = the 4 rows, name for name.
+
+## T-E435-22 — `pixel-perfect-design-coverage`, `pixel-perfect-visual-compare`, `qa-visual-skill-split`, `e412-qa-visual-template`, `e360-qa-visual-review-task-ids` (AC7)
+
+Placement: existing files (brief). Result: **no file needs a change**; 0 changed test lines. Scope limit honoured (qa-closing / qa-PASS / old-chain wording only; no visual counting change, E420).
+
+### Scenario → Test Map (T-22)
+
+| file | what it pins | E435 contract touch | verdict |
+|---|---|---|---|
+| `pixel-perfect-design-coverage` | `skill-design-auditor.md` multi-pass / no-design rules; `skill-pm.md` Deferred-surface gate + Backwards-compat clause; CHANGELOG [3.8.1] | T-36 edits `skill-pm.md` step 8 / bugfix marker clauses only — not the pinned sentences | no change |
+| `pixel-perfect-visual-compare` | qa SOP has no Phase 1.5 / visual arm, steps 1..8; `skill-reviewer-visual.md` contract, code-reviewer `CHANGES_REQUESTED` routes | T-32 rewrites qa SOP line 13 tail / line 31 sentence; step count and the absent strings unaffected | no change |
+| `qa-visual-skill-split` | qa SOP without the v3.8.2 inline block / lazy-load hook, steps 1..8, size cap ≤ 18500 B; sub-skill contract + annotation tokens | T-32 Copy texts are shorter than the replaced ones, so the size cap only gains headroom | no change |
+| `e412-qa-visual-template` | `reviewer-visual.md` template: code-reviewer sub-dispatch, `tw_switch_role("code-reviewer")`, no qa-engineer delegation; coord-05 dispatch line | T-37 edits templates only where old-path text exists; this template has none (no `chain_path` / `test-first` / qa-PASS) | no change |
+| `e360-qa-visual-review-task-ids` | every visual FAIL call in `skill-reviewer-visual.md` is `agent_id="code-reviewer"` with `review_task_ids`; no `agent_id="qa-engineer"` | already the E435 judge (code-reviewer); file not in any sr task | no change |
+
+These five already pin the absence of qa-as-visual-judge wording (E433/E434 re-pins): `!tw_switch_role("qa-engineer")`, `!"qa-engineer's visual sub-dispatch"`, `!agent_id="qa-engineer"`, no Phase 1.5 in the qa SOP. That is the AC7 coverage this task owns; no new absence pin was added (brief: change only what the contract breaks).
+
+### Open Interface Details (T-22)
+
+1. Gaps: none. No pinned text in these files depends on wording sr has yet to write; the architecture Copy rows (T-32 qa SOP lines 13 / 31, T-36 skill-pm deletions, T-37 Execution Profile sentence) touch none of the asserted strings.
+2. `qa_reports/expected-red_e435-remove-old-path.txt` gets a `# T-E435-22` comment block with no rows (traceability, not a red).
+
+### Red Reasons (T-22)
+
+0 red. Run: `node --test test/pixel-perfect-design-coverage.test.mjs test/pixel-perfect-visual-compare.test.mjs test/qa-visual-skill-split.test.mjs test/e412-qa-visual-template.test.mjs test/e360-qa-visual-review-task-ids.test.mjs` → 29 tests, 29 pass, 0 fail = 0 rows. Expected to stay green after T-32 / T-36 / T-37 land (see table).
