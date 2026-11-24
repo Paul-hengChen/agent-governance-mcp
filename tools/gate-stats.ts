@@ -55,7 +55,6 @@ export interface FeatureOutcome {
   feature: string;
   released_version: string | null;
   tickets: number;
-  qa_rounds: number;
   review_rounds: number;
   visual_rounds: number;
   hops: number;
@@ -101,7 +100,6 @@ export interface GateStatsReport {
     features: number;
     one_pass_count: number;
     one_pass_rate: number | null; // null when zero features (no fake 0%)
-    mean_qa_rounds: number | null;
     mean_review_rounds: number | null;
     mean_visual_rounds: number | null;
     mean_hops: number | null;
@@ -366,7 +364,7 @@ export function computeGateStats(workspacePath: string): GateStatsReport {
       feature,
       released_version: releasedVersion,
       tickets: num(rec.tickets),
-      qa_rounds: num(rec.qa_rounds),
+      // A pre-E435 record's qa_rounds is ignored (the qa round is gone).
       review_rounds: num(rec.review_rounds),
       visual_rounds: num(rec.visual_rounds),
       hops: num(rec.hops),
@@ -376,7 +374,7 @@ export function computeGateStats(workspacePath: string): GateStatsReport {
 
   const featureCount = perFeature.length;
   const onePassCount = perFeature.filter((f) => f.one_pass).length;
-  const mean = (field: "qa_rounds" | "review_rounds" | "visual_rounds" | "hops"): number | null =>
+  const mean = (field: "review_rounds" | "visual_rounds" | "hops"): number | null =>
     featureCount === 0
       ? null
       : round2(perFeature.reduce((sum, f) => sum + f[field], 0) / featureCount);
@@ -426,7 +424,6 @@ export function computeGateStats(workspacePath: string): GateStatsReport {
       features: featureCount,
       one_pass_count: onePassCount,
       one_pass_rate: featureCount === 0 ? null : round2(onePassCount / featureCount),
-      mean_qa_rounds: mean("qa_rounds"),
       mean_review_rounds: mean("review_rounds"),
       mean_visual_rounds: mean("visual_rounds"),
       mean_hops: mean("hops"),

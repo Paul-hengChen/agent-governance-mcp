@@ -1509,8 +1509,6 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           emitFeatureMetrics({
             workspacePath: parsed.workspace_path,
             feature: parsed.active_feature,
-            // The qa round is gone (E435); T-34 drops the metrics arg.
-            qaRoundsTotal: 0,
             reviewRoundsTotal: prevState?.review_rounds_total ?? 0,
             visualRoundsTotal: prevState?.visual_rounds_total ?? 0,
             hops: prevState?.hop_count ?? 0,

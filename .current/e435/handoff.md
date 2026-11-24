@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e435-remove-old-path"
 status: "In_Progress"
-last_updated: "2026-11-24T13:04:23.658Z"
+last_updated: "2026-11-24T13:06:30.719Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e435-remove-old-path.md"
 scope_decision: "single-feature"
@@ -17,7 +17,7 @@ dispatch_pins:
 evidence_schema: 2
 chain_path: "test-first"
 next_role: "sr-engineer"
-dispatched_at: "2026-11-24T13:04:23.658Z"
+dispatched_at: "2026-11-24T13:06:30.719Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -34,12 +34,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E435-33 done (not yet judged): gates/registry.ts — REVIEWER_COMPLETED_TASKS_REJECTED + NON_QA_COMPLETED_TASKS_REJECTED out (union, entries, mapping rows); NON_JUDGE_COMPLETED_TASKS_REJECTED in REVIEWER's slot (orchestrator, plain-text, documentedInProse true; hintStatic/triggerEdge/armCondition/clearingArtifact per architecture Copy); mapping row 'NON_JUDGE_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md'; comments 'The 33-gate catalog', plain-text (codes 13-32), tool-boundary (code 33).
-- sr-engineer: T-33 orchestrator-family registry text per architecture Error-codes table + Copy: build-entry triggerEdges pm -> {architect,qa-engineer} (4 gates); REPRO_MANIFEST_MISSING triggerEdge/armCondition/clearingArtifact without marker; REVIEW_VERDICT_STATUS_MISMATCH (PASS or In_Progress), NON_REVIEWER_VERDICT_REJECTED (no APPROVED-handoff exception), QA_COMPLETION_EVIDENCE_MISSING, QA_REVIEW_TARGET_REQUIRED, PASS_TASKS_INCOMPLETE texts. Judgement call: NON_REVIEWER_VERDICT_REJECTED armCondition (not in Copy) keeps the prevTuple/nextTuple literals as 'no prevTuple/nextTuple edge exemption (E435)' so error-code-contract AC3 keeps it armCondition-checkable (it has no armCondition allowlist row).
-- sr-engineer: T-33 tools/handoff-orchestrator.ts — step 9 renamed NON_JUDGE_COMPLETED_TASKS_REJECTED, codes [NON_JUDGE_COMPLETED_TASKS_REJECTED], predicate agent_id && agent_id !== JUDGE_ROLE && completed_tasks.length > 0, emit '⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=[ids] on an agent_id=<id> write. ' + hintStatic; NON_REVIEWER_VERDICT_REJECTED isApprovedHandoff exception dropped.
-- sr-engineer: T-33 content: const-08 line 7 label 'Non-Judge Completed-Tasks Gate' + code NON_JUDGE_COMPLETED_TASKS_REJECTED; skill-code-reviewer.md line-16 'The marker' bullet deleted. Note for qa: content/constitution-rationale.md:116 still says 'the Non-QA Completed-Tasks' (prose, no code quote) — not in the T-33 row; T-41 owns rationale, rule there if wanted. Goldens / context-budget untouched (T-40).
-- sr-engineer: diff 62 added / 93 deleted across 4 files. No test edits; no test collision found. Expected-red rows tagged T-33 checkable only once the compile unit builds (T-35).
-- sr-engineer: tsc red (compile unit); my files clean. Remaining: tools/storage-sqlite.ts:480 qa_round, :553 qaRound, :583 qaRound; tools/storage.ts:164 qaRound (T-34). Next: T-E435-34.
+- sr-engineer: T-E435-34 done (not yet judged): tools/metrics.ts — FeatureMetricRecord.qa_rounds and emitFeatureMetrics arg qaRoundsTotal out; one_pass = review and visual totals both 0; ROUND SEMANTICS comment says two families. tools/handoff-orchestrator.ts call site: the 'qaRoundsTotal: 0' placeholder arg (left by T-31) removed (2 lines).
+- sr-engineer: T-34 tools/gate-stats.ts — FeatureOutcome.qa_rounds, metrics.mean_qa_rounds and the qa_rounds read out; a pre-E435 record's qa_rounds is ignored. scripts/summarize-metrics.mjs — qa column and qa mean out ('mean rounds: review X / visual Y'); legend now 'review/visual_rounds count REWORK only (CHANGES_REQUESTED / visual FAIL)' (test AC-E183-7 forbids any \bqa\b in stdout, so the old 'qa/review/visual' legend had to change too).
+- sr-engineer: T-34 tools/storage.ts + tools/storage-sqlite.ts — positional writeState overloads keep the slot as _qaRound (ignored, same as handoff-write.ts T-29); options no longer pass qaRound. SQLite: HandoffRow.qa_round, parse read/emit, upsert column list + bind + txUpsert param out (15 -> 14 placeholders); CREATE TABLE and addColumnIfMissing DDL untouched (NOT NULL DEFAULT 0 fills the column on INSERT OR REPLACE); no SQLite version change (AC9 ruling).
+- sr-engineer: T-34 verify: npx tsc --noEmit = 0 errors (whole compile unit; nothing left for T-35 at type level). T-34 expected-red rows green: e26 DE5, e183 AC-E183-7, success-metrics E8-E1/E8-E2, visual-round-sqlite AC-8, writestate-options-object FileHandoffStorage positional. e366-sqlite, sqlite-versioning, rag: 41/41 green.
+- sr-engineer: note for qa: e435-remove-old-path AC9 (tagged T-30, T-34) still red, but past the T-34 part — SQLite pm -> sr is rejected with the hint; it now fails at the qa PASS assertion because the zod PASS refine in tools/registry.ts (T-35) has not landed, so requireJudge's BLOCKED text arrives instead of PASS_IDENTITY_REFINE_MESSAGE. Same cause for AC2 file mode. No test edits; no test collision. dist/** left unbuilt-in-commit (T-39 owns it). Diff ~76 source lines across 6 files. Next: T-E435-35.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
