@@ -602,7 +602,8 @@ async function sqliteRun(m, label) {
     await go(w("qa-engineer", "PASS", { completed_tasks: ["T-2"], review_task_ids: ["T-2"], qa_review: "qa" }));
     await reseed("code-reviewer");
     await go(w("code-reviewer", "PASS", { review_verdict: "APPROVED", completed_tasks: ["T-2"], review_task_ids: ["T-2"], qa_review: "all good" }));
-    const final = storage.readState(dir);
+    // HandoffStorage.readState() returns the rendered JSON text (interface: string); parse() is the object read.
+    const final = storage.parse(dir);
     out.push({ status: final?.status, last_agent: final?.last_agent, chain_path: final?.chain_path ?? null });
   } finally {
     setActiveStorage(new FileHandoffStorage());

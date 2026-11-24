@@ -843,8 +843,9 @@ test("AC18 (E435): SQLite/HTTP mode runs the one chain: pm -> qa accepted withou
       ...w("qa-engineer", "In_Progress", { chain_path: "test-first" }),
     });
     assert.ok(!rejected(r), `pm -> qa is an ordinary edge in SQLite too: ${text(r)}`);
-    assert.equal(storage.readState(dir)?.last_agent, "qa-engineer");
-    assert.equal(storage.readState(dir)?.chain_path, undefined, "marker not persisted");
+    // HandoffStorage.readState() returns the rendered JSON text (interface: string); parse() is the object read.
+    assert.equal(storage.parse(dir)?.last_agent, "qa-engineer");
+    assert.equal(storage.parse(dir)?.chain_path, undefined, "marker not persisted");
 
     await reseed("code-reviewer");
     let p;

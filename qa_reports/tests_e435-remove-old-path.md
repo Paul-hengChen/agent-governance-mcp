@@ -1045,3 +1045,24 @@ Placement: existing files only (brief). All eight (B) rows accepted as test-side
 ### Results
 
 `node --test` on the four files: e139 8/8, e32-e33 + reviewer-completed-tasks 28/28, e435-remove-old-path 13/13 (SQLite present, AC9 ran). Eight rows cleared from `qa_reports/expected-red_e435-remove-old-path.txt`.
+
+## T-E435-48 hand-back re-pins part 2 (qa-engineer, R3 (b))
+
+Placement: existing files only (brief). All five (B) rows accepted as test-side; no SR-BUG.
+
+| file | test | re-pin |
+|---|---|---|
+| test/e431-test-first-server-path.test.mjs | AC18 (E435) | post-write reads use `storage.parse(dir)` (object), not `readState` |
+| test/e432-judge-report-checks.test.mjs | AC12 (E435) | `sqliteRun` final read uses `storage.parse(dir)` |
+| test/e423-spec-workshop.test.mjs | AC17 (renamed "judge PASS") | seed `code-reviewer:In_Progress`, PASS as `code-reviewer`; still VISUAL_BASELINES_REQUIRED naming mode=mockup |
+| test/e128-orchestrator-blocked-repair.test.mjs | E128-ORC | build entry pm -> qa-engineer -> sr-engineer (no-new-test record clears REPRO_MANIFEST_MISSING); hop_count pins 1 -> 2 |
+| test/e230-pm-amend-cut-approval.test.mjs | AC2 (renamed "qa-engineer build entry") | pm approve, pm pins amendment (`qa-engineer` pin), qa-engineer entry not rejected CUT_APPROVAL_REQUIRED |
+
+### Open Interface Details
+
+- SQLite `readState()`: `HandoffStorage.readState(workspacePath): string` (tools/storage.ts) and the SQLite implementation agree; `parse()` is the object read. Test defect, not an SR-BUG.
+- E128-ORC keeps its title ("19-step pipeline") — no manifest row, and the name is the historical incident label.
+
+### Results
+
+`node --test` on the five files: 98/98 pass, 0 skipped (SQLite present). Two rows cleared from `qa_reports/expected-red_e435-remove-old-path.txt` (e431 AC18, e432 AC12); e423/e128/e230 had no manifest rows.
