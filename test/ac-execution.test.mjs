@@ -213,11 +213,13 @@ test("U14: empty task id list -> present:false (no ids to satisfy the gate)", ()
 
 // ============================================================================
 // I1-I4 — Integration: handleUpdateState composition (AC_EXECUTION_LOG_MISSING)
-// Drives the real tw_update_state orchestrator; the qa_review text on the PASS write is
+// Drives the real tw_update_state orchestrator; the qa_review text on the judge's PASS write is
 // recorded verbatim into qa_reports/review_<id>.md, so it can carry the AC Execution Log H2.
+// E435: the judge is code-reviewer on every feature (no marker); each PASS is a
+// code-reviewer:In_Progress -> code-reviewer:PASS write.
 // ============================================================================
 
-async function seedQaInProgress(ws, feature) {
+async function seedJudgeInProgress(ws, feature) {
   resetSession(ws);
   markStateRead(ws);
   await writeHandoffState({
@@ -225,8 +227,8 @@ async function seedQaInProgress(ws, feature) {
     activeFeature: feature,
     status: "In_Progress",
     completedTasks: [],
-    pendingNotes: ["QA: claiming review"],
-    lastAgent: "qa-engineer",
+    pendingNotes: ["code-reviewer: claiming review"],
+    lastAgent: "code-reviewer",
   });
   // Force the seed's last_updated off the wall clock so the caller's
   // follow-up handleUpdateState call below never has a ~1/60000 chance of
@@ -234,12 +236,12 @@ async function seedQaInProgress(ws, feature) {
   forceSeedStamp(ws);
 }
 
-test("I1: PASS rejected with AC_EXECUTION_LOG_MISSING when spec armed + qa_review carries no AC Execution Log section", async () => {
+test("I1 (E435): code-reviewer PASS rejected with AC_EXECUTION_LOG_MISSING when spec armed + qa_review carries no AC Execution Log section", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "e3-int-blocked";
   writeSpec(ws, feature, ARMED_SPEC);
-  await seedQaInProgress(ws, feature);
+  await seedJudgeInProgress(ws, feature);
 
   resetSession(ws);
   markStateRead(ws);
@@ -247,9 +249,9 @@ test("I1: PASS rejected with AC_EXECUTION_LOG_MISSING when spec armed + qa_revie
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
-    pending_notes: ["QA: T01 PASS"],
+    pending_notes: ["code-reviewer: T01 PASS"],
     qa_review: "Looks good, no AC execution log written.",
   });
   const text = result.content[0].text;
@@ -257,12 +259,12 @@ test("I1: PASS rejected with AC_EXECUTION_LOG_MISSING when spec armed + qa_revie
   assert.ok(text.includes("AC_EXECUTION_LOG_MISSING"), `expected AC_EXECUTION_LOG_MISSING; got: ${text}`);
 });
 
-test("I2: PASS succeeds once qa_review carries a ## AC Execution Log section (spec armed)", async () => {
+test("I2 (E435): code-reviewer PASS succeeds once qa_review carries a ## AC Execution Log section (spec armed)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "e3-int-unblocked";
   writeSpec(ws, feature, ARMED_SPEC);
-  await seedQaInProgress(ws, feature);
+  await seedJudgeInProgress(ws, feature);
 
   resetSession(ws);
   markStateRead(ws);
@@ -270,9 +272,9 @@ test("I2: PASS succeeds once qa_review carries a ## AC Execution Log section (sp
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
-    pending_notes: ["QA: T01 PASS"],
+    pending_notes: ["code-reviewer: T01 PASS"],
     qa_review:
       "## AC Execution Log\nAC1: `mycli --version` -> printed 1.2.3, exit=0. PASS.\n",
   });
@@ -281,7 +283,7 @@ test("I2: PASS succeeds once qa_review carries a ## AC Execution Log section (sp
   assert.ok(!text.includes("AC_EXECUTION_LOG_MISSING"), "gate must not fire once satisfied");
 });
 
-test("I3: PASS succeeds with zero overhead when the spec has zero proof: lines (AC5, unarmed)", async () => {
+test("I3 (E435): code-reviewer PASS succeeds with zero overhead when the spec has zero proof: lines (AC5, unarmed)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "e3-int-unarmed";
@@ -290,7 +292,7 @@ test("I3: PASS succeeds with zero overhead when the spec has zero proof: lines (
     feature,
     "# feat\n\n## Acceptance Criteria\n- **AC1** — subjective judgment call, no proof: line.\n",
   );
-  await seedQaInProgress(ws, feature);
+  await seedJudgeInProgress(ws, feature);
 
   resetSession(ws);
   markStateRead(ws);
@@ -298,9 +300,9 @@ test("I3: PASS succeeds with zero overhead when the spec has zero proof: lines (
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
-    pending_notes: ["QA: T01 PASS"],
+    pending_notes: ["code-reviewer: T01 PASS"],
     qa_review: "Looks good, no AC execution log, spec has no proof: lines.",
   });
   const text = result.content[0].text;
@@ -308,12 +310,12 @@ test("I3: PASS succeeds with zero overhead when the spec has zero proof: lines (
   assert.ok(!text.includes("AC_EXECUTION_LOG_MISSING"), "gate must never fire when never armed");
 });
 
-test("I3b: PASS succeeds with zero overhead when no spec file exists at all (AC5, no-spec-file dormant)", async () => {
+test("I3b (E435): code-reviewer PASS succeeds with zero overhead when no spec file exists at all (AC5, no-spec-file dormant)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "e3-int-no-spec";
   // Intentionally NO specs/<feature>.md written.
-  await seedQaInProgress(ws, feature);
+  await seedJudgeInProgress(ws, feature);
 
   resetSession(ws);
   markStateRead(ws);
@@ -321,9 +323,9 @@ test("I3b: PASS succeeds with zero overhead when no spec file exists at all (AC5
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
-    pending_notes: ["QA: T01 PASS"],
+    pending_notes: ["code-reviewer: T01 PASS"],
     qa_review: "Looks good, no spec file ever existed for this feature.",
   });
   const text = result.content[0].text;

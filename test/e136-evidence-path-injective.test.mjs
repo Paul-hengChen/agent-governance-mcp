@@ -124,8 +124,8 @@ test("AC-E136-4: each of the six sites derives its stem from encodeEvidenceId, a
   assert.deepEqual(fs.readdirSync(path.join(ws, "review_reports")), [`review_${enc}.md`]);
   assert.deepEqual(hasCodeReviewEvidenceInFile(ws, [id]).present, [id]);
 
-  // qa-review record + hasEvidenceAnywhere
-  await recordReviewInFile(ws, [id], "PASS", "qa-engineer", "## Expected-Red Diff\nx\n## AC Execution Log\nx\n");
+  // judge-review record (code-reviewer, E435) + hasEvidenceAnywhere
+  await recordReviewInFile(ws, [id], "PASS", "code-reviewer", "## Expected-Red Diff\nx\n## AC Execution Log\nx\n");
   assert.deepEqual(fs.readdirSync(path.join(ws, "qa_reports")), [`review_${enc}.md`]);
   assert.ok(hasEvidenceAnywhere(ws, [id]).has(id));
 

@@ -584,3 +584,39 @@ Left as is (green on both): e161 AC-E161-9, source hygiene; e23 AC1-*, AC3-*, AC
 ### Red Reasons (T-14)
 
 27 red at base, all for the stated reason (no syntax / link error): 21 are a `ZodError` `status="PASS" requires agent_id="qa-engineer"` — a code-reviewer PASS on an unmarked feature never reaches the record or later gates (T-E435-31, T-E435-35); FM1/FM3/FM4/SQ1/SQ3 are assertion failures — the judge at base is qa-engineer, so a code-reviewer FAIL records nothing and QA_REVIEW_TARGET_REQUIRED does not arm (T-E435-31); e23 AC2-1 stops at v16 (T-E435-29). No test dropped. Rows under `# T-E435-14` in the manifest. Run: `node --test test/qa-review-scoped-append.test.mjs test/e23-evidence-schema.test.mjs test/e161-qa-suite-result.test.mjs test/e236-rejected-write-evidence.test.mjs test/e366-sqlite-rejected-write-evidence.test.mjs` → 45 tests, 18 pass, 27 fail = the 27 rows, name for name.
+
+## T-E435-15 — `e154-multi-covers`, `e136-evidence-path-injective`, `e32-e33-gate-hardening`, `ac-execution`, `repro-first-gate` (AC2)
+
+Placement: existing files, edited in place (brief). Re-titled / new tests carry `E435`. 292 changed lines (199+ / 93-), under the 300-line cap. Contract: architecture *`tools/handoff-orchestrator.ts`* (step 7 `REPRO_MANIFEST_MISSING` on every file-mode feature, "Hand-off"; steps 10–11 judge = `JUDGE_ROLE`), *Error codes* (`REPRO_MANIFEST_MISSING` triggerEdge), *Copy* (`QA_COMPLETION_EVIDENCE_MISSING` hintStatic, `hint.reviewer_to_qa`), Rulings (a), (b). Conventions from T-E435-10/13/14 reused: judge evidence at `qa_reports/review_<id>.md`, `MISSING_REVIEW_EVIDENCE` dormant, the removed code-reviewer → qa-engineer step asserted as `TRANSITION_REJECTED` + S3 hint.
+
+### Scenario → Test Map (T-15)
+
+| scenario | exact test name(s) |
+|---|---|
+| the E32 incident on the judge's own APPROVED write: review_reports covers-file alone does not back completed_tasks; ledger unpolluted | e32 R1 (PERMANENT REGRESSION PIN, E435) · R2 (E435) |
+| zero evidence → `QA_COMPLETION_EVIDENCE_MISSING`; Copy hint names the judge and "No exemption for any edge, status, or review_verdict." | e32 R4 (E435) |
+| the old APPROVED hand-off shape (qa-engineer after code-reviewer:In_Progress) → `TRANSITION_REJECTED` + S3 hint, no evidence gate reached | e32 C2 (E435) · P6b (E435) |
+| the judge's PASS with its own qa_review is accepted | e32 C3 (E435) |
+| evidence for a review_task_ids id never backs a different completed_tasks id; both evidenced → only the ledger id lands | e32 P6a (E435) · P6c (E435) |
+| envelope on the judge's write names each id, its path and the covers: fallback | e32 ENV-1 (E435) · ENV-2 (E435) |
+| `AC_EXECUTION_LOG_MISSING` on the judge's PASS (armed / satisfied / unarmed / no spec) | ac-execution I1 (E435) · I2 (E435) · I3 (E435) · I3b (E435) |
+| a second covers: line backs the judge's completion-evidence gate; review_reports lookup reads line 2 | e154 AC-E154-4 (E435) |
+| `REPRO_MANIFEST_MISSING` on qa-engineer:{In_Progress,Blocked} → sr-engineer:In_Progress with no marker; message "Hand-off qa-engineer → sr-engineer …" naming both paths, no "test-first" | repro G6 (E435) |
+| manifest or no-new-test record clears it | repro G7 (E435) |
+| registry triggerEdge = architecture text; no marker in triggerEdge / armCondition / clearingArtifact | repro R1 (E435) |
+| SQLite: qa → sr is an edge and the check never arms (file-mode only) | repro G8 (E435) |
+| v10 handoff climbs to 17: `qa_round` / `qa_rounds_total` dropped, CURRENT 17 | repro M1 (E435) |
+
+Left as is (green on both): e154 AC-E154-1/2/3/5; e136 all (AC-E136-4 signer moved to `code-reviewer`, data only); e32 none; ac-execution U1–U14, arm-regex ×3, I5, I5b, AC2/AC3/AC4/AC6, AC-X; repro D1–D6, Z1, G1–G5, S1–S3 (bugfix sr → code-reviewer edge unchanged).
+
+### Open Interface Details (T-15)
+
+1. e32 ledger writes are code-reviewer `In_Progress` self-loops (with or without `review_verdict: "APPROVED"`); step 9 passes the judge, step 11 fires. The old qa-engineer row is kept only where it pins the removed step (C2, P6b).
+2. P6a adds a `qa_reports/review_<A>.md` for the review_task_ids id, so the test still proves evidence for a different id never substitutes.
+3. e154 review side: `MISSING_REVIEW_EVIDENCE` is dormant (its only edge is gone, architecture *Findings outside scope* 1), so second-line coverage of `review_reports/` is pinned on `hasCodeReviewEvidenceInFile` (library); the gate-level coverage moved to the judge's PASS.
+4. repro G6 asserts the substring `Hand-off qa-engineer → sr-engineer needs the red-test manifest at <manifestPath>` (architecture: message unchanged except "Test-first hand-off" → "Hand-off") and the no-new-test record path; no state written.
+5. repro R1 asserts the triggerEdge with a literal `|` (the architecture table's `\|` is markdown escaping).
+
+### Red Reasons (T-15)
+
+20 red at base, all for the stated reason (no syntax / link error): 6 are a `ZodError` `status="PASS" requires agent_id="qa-engineer"` on a code-reviewer PASS (e32 C3, ac-execution I1–I3b, e154 AC-E154-4; T-E435-31/35); e32 R1/R2/R4/P6a/P6c/ENV-1/ENV-2 hit `REVIEWER_COMPLETED_TASKS_REJECTED` before the evidence gate (T-E435-33); e32 C2/P6b ride the still-open code-reviewer → qa-engineer edge (T-E435-30); repro G6/G7/G8 qa → sr is not an unmarked edge at base (T-E435-30/31); repro R1 registry text names the marker; repro M1 schema 16 (T-E435-29). No test dropped. Rows under `# T-E435-15` in the manifest. Run: `node --test test/e154-multi-covers.test.mjs test/e136-evidence-path-injective.test.mjs test/e32-e33-gate-hardening.test.mjs test/ac-execution.test.mjs test/repro-first-gate.test.mjs` → 69 tests, 49 pass, 20 fail = the 20 rows, name for name.
