@@ -1118,3 +1118,59 @@ Placement: existing files only (brief). The e409 and e178a rows are test-side; t
 ### Results
 
 `node --test` on the three files: 31 tests, 30 pass, 1 fail (exactly e408 AC6), 0 skipped. One row added to `qa_reports/expected-red_e435-remove-old-path.txt`, tagged T-E435-50.
+
+## T-E435-40 — golden and budget re-capture (qa-engineer, R3 (b) snapshot)
+
+Placement: existing files only (brief) — `test/fixtures/compose-golden/**` re-captured in place, `test/context-budget.test.mjs` edited in place. Mechanism: `npm run build` (dist/ unchanged, `git status --porcelain dist/` empty) then `node scripts/capture-constitution-golden.mjs`; no golden hand-edited. 12 captured, 7 changed, 5 byte-unchanged (`build-lite-{nondesign,design}{,-fd}.txt`, `hook-lite.txt`: the lite compose excludes const-06/08/11 and coord-*, so no E435 edit reaches them).
+
+### Per-golden hunks
+
+E435 content edits that reach a golden (from `git diff main..HEAD -- content/`):
+
+- H1 `content/const-06-chain-31-head.md` l.7 (T-E435-36): judge sentence drops `, on a feature whose PM write set chain_path: "test-first" (PM sets this marker on every feature it routes)`.
+- H2 `content/const-08-chain-31-mid.md` l.7 (T-E435-33): `**Non-QA Completed-Tasks Gate**` → `**Non-Judge …**`, `NON_QA_COMPLETED_TASKS_REJECTED` → `NON_JUDGE_COMPLETED_TASKS_REJECTED`.
+- H3 `content/const-11-design-chain-32.md` l.10 (T-E435-41): drops `on the test-first chain` (design-only fragment).
+- C1 `content/coord-03-core-fallback.md` l.9 (T-E435-32): `qa_round`/`review_round` → `review_round`.
+- C2 `content/coord-03-core-fallback.md` l.11 (T-E435-41): `summed review/qa rounds` → `summed review rounds`.
+- C3 `content/coord-07-core-sop.md` l.9 (T-E435-36): mini-chain pm write drops `carrying chain_path: "test-first"`.
+
+| golden | hunks (line) | attribution |
+|---|---|---|
+| build-full-design.txt | 72, 86, 106 | H1, H2, H3 |
+| build-full-design-fd.txt | 72, 86, 106 | H1, H2, H3 |
+| build-full-nondesign.txt | 64, 73 | H1, H2 (no const-11 on the non-design arm) |
+| build-full-nondesign-fd.txt | 64, 73 | H1, H2 |
+| constitution-monolith.txt | 72, 86, 106 | H1, H2 (origin tag kept, unstripped), H3 |
+| hook-full.txt | 72, 86, 106 | H1, H2, H3 (byte-identical to the monolith, as before) |
+| skill-coordinator-monolith.txt | 133, 135, 271 | C1, C2, C3 |
+| build-lite-*.txt (4), hook-lite.txt | none | — |
+
+Every hunk maps to an E435 edit; no unattributed hunk (no defect). skill-architect / skill-pm / skill-qa-engineer / skill-code-reviewer / skill-integrator / constitution-rationale edits reach no golden (the goldens compose only the sr-engineer skill, the coordinator and the constitution).
+
+### context-budget caps (measured, zero headroom; chars/4)
+
+| test | old → new | reason |
+|---|---|---|
+| skill-pm stripped | 4999 → 4942 | T-E435-36 drops the marker from the step-8 write, its marker sentence and the bugfix-mode marker clause, -57 |
+| design-arm constitution | 9219 → 9187 | H1 + H2 + H3, -32 |
+| teamwork coordinator bundle | 19108 → 19063 | design-arm -32 plus C1/C2/C3, -13; -45 |
+| non-design constitution | 7301 → 7275 | H1 + H2 on both arms (H3 is design-only), -26 |
+| design-only strip saving floor | 1918 → 1912 | see below |
+| lean always-on | 5969 (unchanged) | measured 5969: the lite compose excludes const-06/08/11; no edit |
+| skill-sr-engineer | 3285 (unchanged) | measured 3285: no E435 edit to skill-sr-engineer.md |
+| skill-spec-workshop | 1415 (unchanged) | measured 1415, per brief |
+| design − non-design sr bundle (≥ 1830) | unchanged | measured 2051, a guard with headroom by design; not a snapshot |
+
+Saving floor decision: it is a measured value, not a fixed guard. Its history is a chain of measured re-baselines (1999 → 1903 → 1902 → 1918), and the comment called it measured. It equals design-arm minus non-design, i.e. the size of the design-only fragments; H3 deletes 24 chars (6 ~tok) from design-only const-11, so the saving drops by exactly 6 (-32 design vs -26 non-design). That is a legitimate shrink of a design-only fragment, not a design fragment leaking into the non-design arm (what the floor guards); the ≥ 1830 bundle test still guards that. Re-baselined to 1912 with a note; the stale "at least 1902" comment now reads 1912.
+
+### Hygiene
+
+- `CLAUDE.md` 250 lines = the e433 / e432 AC14 pin (250).
+- `node bin/agc-init.mjs check` exit 0 (adapters current; comment/hygiene advisories only).
+- `npm audit --audit-level=high` exit 0 (7 low/moderate, no high/critical).
+- `npm run build` then `git status --porcelain dist/` empty.
+- `npm run eval` not run: no API key in this environment.
+
+### Manifest
+
+The 8 T-E435-39 snapshot rows in `qa_reports/expected-red_e435-remove-old-path.txt` are cleared (green); one `#` line records it. Remaining rows for open work: T-E435-50 (e359 ×5, e408 AC6).
