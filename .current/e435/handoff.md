@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e435-remove-old-path"
 status: "In_Progress"
-last_updated: "2026-11-24T08:24:21.529Z"
+last_updated: "2026-11-24T08:27:26.609Z"
 last_agent: "pm"
 prd_path: "specs/e435-remove-old-path.md"
 scope_decision: "single-feature"
@@ -16,7 +16,7 @@ dispatch_pins:
 evidence_schema: 2
 chain_path: "test-first"
 next_role: "architect"
-dispatched_at: "2026-11-24T08:24:21.529Z"
+dispatched_at: "2026-11-24T08:27:26.609Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -33,8 +33,8 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM cut written and committed (d34bc91c): specs/e435-remove-old-path.md, 40 tasks T-E435-01..40 in .current/e435/tasks.md. Awaiting human cut approval via coordinator (cut_approved NOT set; Task-dispatched).
-- Base probe at a1a36b2: 4536 tests, 4464 pass, 69 fail, 3 skipped. All 69 failures are SQLite tests failing on the missing better-sqlite3 native binding (shared node_modules link to primary has no build/). Code green, environment not. Needs `npm rebuild better-sqlite3` in the primary checkout before qa starts (coordinator/human decision).
+- PM cut amended per integrator pre-review (commit 204ecf95): (1) new sr task T-E435-41 for content/const-11-design-chain-32.md:10 and content/constitution-rationale.md:149 conditional test-first PASS wording (content/ re-grep found no other site); (2) new sr task T-E435-42 for docs/release-cd.md lines 63/69/95, readers e405-release-docs (T-27) and e433 AC10 (T-09) noted; (3) T-E435-02..28 now depend on T-E435-01, which creates the expected-red file; (4) review_round / sr_return caps cited by name from the Constitution Limits table (the old '4' was wrong). T-39 now depends on 41 and 42. Ledger edits made in place to .current/e435/tasks.md (depends_on on 23 unchecked qa tasks, notes on T-09 / T-27, T-39 depends_on); 42 tasks total. Awaiting human cut approval via coordinator (cut_approved NOT set).
+- Base probe at a1a36b2: 4536 tests, 4464 pass, 69 fail, 3 skipped; all 69 are SQLite tests failing on the missing better-sqlite3 native binding. The integrator owns `npm rebuild better-sqlite3` in the primary checkout (with human consent); T-E435-01 re-runs the probe and must see 0 fail.
 - Architect OQs: (a) drop qa_round/qa_rounds_total; (b) ledger codes remove vs re-define; (c) in-flight hint point and texts; (d) SQLite answered by human ruling 2026-11-24; (e) incoming chain_path argument after removal; (f) old-edge rejection code.
 - Server-restart stance: lane does not restart its MCP server; dist/ tests verify; code-reviewer PASS written on the old server.
 
