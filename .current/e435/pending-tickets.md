@@ -1,5 +1,7 @@
 # Pending tickets — lane e435
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E435-NEW-1
 title: MISSING_REVIEW_EVIDENCE never fires on the test-first chain, so batched code-review evidence is unchecked
@@ -13,5 +15,3 @@ body: |
   batched covers: reports. Fix: re-arm the check on the code-reviewer PASS write, or remove the gate, its registry
   entry and the content quote together (error-code contract).
 ```
-
-## Applied
