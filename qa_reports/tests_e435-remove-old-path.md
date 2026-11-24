@@ -331,3 +331,38 @@ Left as is (green on both): e396 U1, U2 (predicate only, no writer identity).
 ### Red Reasons (T-08)
 
 15 red at base, all assertion failures (no syntax / link error): e431 half 2 all 14 (unmarked new edges rejected; `qa_round` stored; `tw_complete_task` / ledger texts name qa-engineer and the old codes; schema 16; registry 35; overlay still exported, 21-key table), e396 I (code-reviewer PASS rejected by the orchestrator's ZodError). Rows under `# T-E435-08` in the manifest. Run: `node --test test/e431-test-first-server-path.test.mjs test/e396-covers-expected-red.test.mjs` → 42 tests, 2 pass, 40 fail = the 40 rows for these two files (25 T-07 + 15 T-08), name for name.
+
+## T-E435-09a — `test/e432-judge-report-checks.test.mjs` (half a; half b = `test/e433-test-first-rules.test.mjs`, not written)
+
+Placement: existing file, edited in place (brief). Split at the file boundary: e432 alone is 300 changed lines (136+ / 164−), so e433 is half b (see *Remaining* below). Re-titled tests carry `(E435)`.
+
+### Scenario → Test Map (T-09a)
+
+| scenario | exact test name(s) |
+|---|---|
+| AC2 judge on the evidence gates, no marker (seeds drop `chainPath`) | AC1 (E435): code-reviewer PASS with no marker accepted … · AC2 (E435): code-reviewer PASS (no marker) with no judge report … · AC3: expected-red and AC execution sections are read from the judge report (title unchanged, seed unmarked) |
+| AC2/AC4 resolver one-arg, judge code-reviewer | AC3 (E435): the resolver takes the workspace only and always names code-reviewer under qa_reports/; … |
+| AC2 ledger, Ruling (b) | AC4 (E435): a judge write that adds completed ids needs the judge report (no marker); a qa-engineer ledger write is NON_JUDGE_COMPLETED_TASKS_REJECTED |
+| qa → sr hand-off rule unconditional | AC5 (E435) · AC6 (E435) · AC7 (E435) |
+| drift reads the judge report, no marker; review_reports/ backs nothing (was "drifts exactly as base") | AC8 (E435) ×2 |
+| release judge `(code-reviewer, PASS)` only (precondition, `--state`, commit message) | AC10 (E435) ×3 |
+| one chain (base replays → direct per-write outcomes; `MISSING_REVIEW_EVIDENCE` scenario → `reviewerToQaClosed`, S3 hint, gate dormant) | AC11 (E435): `<scenario>` runs on the one chain with code-reviewer the judge, no marker ×11 |
+| AC9 SQLite, one judge, no SQLite schema change | AC12 (E435): SQLite runs the evidence gates with code-reviewer the judge; … |
+| registry 33, step 9 renamed, handoff 17 | AC14 (E435): registry 33, pipeline 17 (base names and order, step 9 renamed), … |
+
+Left as is (green on both): AC9 ×2 (lane-status; `REPORT_SIGNERS` keeps qa-engineer for pre-v5 reports, DR-6), AC13 (one resolver, consumers import it).
+
+### Open Interface Details (T-09a)
+
+1. Release texts keep today's format with the judge substituted: `is (<agent>, <status>), expected (code-reviewer, PASS) — commit the release gate's (code-reviewer, PASS) write to main first`, `--state must be a (code-reviewer, PASS) snapshot with an active_feature (got …)`, `Release gate: <feature> (code-reviewer PASS committed to main).` (architecture: `RELEASE_JUDGE` is the default of `notPass` / `commitMessage`). A stale `chain_path` in a schema 16 handoff or a `--state` snapshot changes nothing.
+2. AC11 drops the base-commit byte replay (the old chain is rejected by design); each scenario asserts its own per-write outcome table (`EXPECT`) plus no `chain_path` / `qa_round` / `qa_rounds_total` line in the stored handoff. `QA_COMPLETION_EVIDENCE_MISSING` hint asserted verbatim (Copy) in AC4.
+3. AC12: base replay → direct asserts; `tools/storage-sqlite.ts` byte-identity → its DDL (`CREATE TABLE … );` blocks and `addColumnIfMissing("…")` lines) equal to base (architecture: DDL untouched, upsert changes); `schema/migrations-sqlite.ts` stays byte-identical. Reports row `reviewer` = `code-reviewer`.
+4. AC14: step names = base names with index 8 replaced by `NON_JUDGE_COMPLETED_TASKS_REJECTED`; CLAUDE.md 250-line pin left to T-E435-40.
+
+### Red Reasons (T-09a)
+
+24 red at base, all assertion failures (no syntax / link error): unmarked code-reviewer PASS rejected by the orchestrator ZodError; unmarked qa → sr and pm → qa `TRANSITION_REJECTED`; `REVIEWER_COMPLETED_TASKS_REJECTED` emitted; resolver / release judge qa-engineer unmarked; `qa_round` stored; registry 35 / handoff 16. Rows under `# T-E435-09a` in the manifest. Run: `node --test test/e432-judge-report-checks.test.mjs` → 29 tests, 5 pass, 24 fail = the 24 rows, name for name.
+
+### Remaining — half b (`test/e433-test-first-rules.test.mjs`, AC10 follows T-E435-42)
+
+Planned re-pins (≈ 60 changed lines): AC1 forbidden list + `chain_path`; AC2 (a) const-06 line 7 → Copy text `` - `status=PASS` and `tw_complete_task` require the chain's judge, `agent_id="code-reviewer"`. ``; AC3 skill-qa-engineer line 13 tail / line 31 Copy texts, no `qa_round` / `QA_ROUND_EXCEEDED` / `chain_path`; AC5 no "**The marker**" bullet / `REVIEWER_COMPLETED_TASKS_REJECTED`; AC6 skill-pm step 8 without `, chain_path="test-first"` and without the "Set the marker" sentence, bugfix without "(with the `chain_path` marker)", skill-architect `` (`architect → sr-engineer` is not an edge) ``, coord-07 mini-chain without the marker clause; AC9 / AC12 live `GATE_REGISTRY.length` 33 (closed-range parts unchanged); AC10 the three `docs/release-cd.md` lines (63, 69, 95) pinned to the architecture's exact texts, `COPY.releaseGate` absent. Open question for half b: none so far — every text is given verbatim by the architecture Copy table (deletions derive the remaining text).

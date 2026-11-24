@@ -1,13 +1,11 @@
 // Coded by @qa-engineer
 // Scenario tests for specs/e432-judge-report-checks.md (AC1-AC14; AC15 is the suite + hygiene proof).
-// Invariant: on a test-first feature (chain_path: "test-first") the PASS-time evidence checks read the JUDGE's
-// report (code-reviewer) through ONE resolver (resolveJudgeReport), and the qa-engineer -> sr-engineer hand-off
-// needs the red-test manifest or the no-new-test record; on every unmarked feature every outcome stays
-// byte-identical to the base commit. Tests drive the real tool entries (TOOL_REGISTRY.run -> zod + orchestrator)
-// against temp workspaces under os.tmpdir(), so each outcome is the one a client sees.
-// AC11/AC12 replay the same scenarios against a base-commit build (git archive of BASE_SHA's dist/) and this
-// branch and compare normalised transcripts; the base commit is a closed historical SHA, guarded by
-// `git rev-parse --verify` and skipped loudly when unreachable (docs/lane-protocol.md section 3).
+// Invariant (E435: one chain, no marker): the PASS-time evidence checks read the JUDGE's report (code-reviewer,
+// unconditionally) through ONE resolver (resolveJudgeReport), and the qa-engineer -> sr-engineer hand-off
+// needs the red-test manifest or the no-new-test record. Tests drive the real tool entries (TOOL_REGISTRY.run ->
+// zod + orchestrator) against temp workspaces under os.tmpdir(), so each outcome is the one a client sees.
+// The base-commit build (git archive of BASE_SHA's dist/, a closed historical SHA guarded by
+// `git rev-parse --verify`, skipped loudly when unreachable) is kept only for checks that still hold across E435.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -152,10 +150,10 @@ const SECTION_AC = "## AC Execution Log\n\nAC1: `node --test` exit 0 pass\n";
 const SPEC_WITH_PROOF = "# spec\n\n## Acceptance Criteria\n\n- **AC1** thing\n  proof: `node --test x`\n";
 const judgeReport = (id, ...sections) => `# QA review — ${id}\n\n${sections.join("\n")}`;
 
-// A marked feature at code-reviewer:In_Progress with a ledger, manifest, a spec with a proof: line and optional judge report.
+// A feature (no marker, E435) at code-reviewer:In_Progress with a ledger, manifest, a spec with a proof: line and optional judge report.
 async function markedJudgeWs(prefix, { tasks = ["T-1"], completed = [], report, manifest = true, spec = true, feature = F } = {}) {
   const ws = mkWs(prefix);
-  await H.seed(ws, feature, "code-reviewer", "In_Progress", { chainPath: "test-first", completedTasks: completed });
+  await H.seed(ws, feature, "code-reviewer", "In_Progress", { completedTasks: completed });
   for (const t of tasks) await H.addTask(ws, t);
   if (manifest) put(ws, `qa_reports/expected-red_${feature}.txt`, "test/x.test.mjs | AC1: red\n");
   if (spec) put(ws, `specs/${feature}.md`, SPEC_WITH_PROOF);
@@ -165,7 +163,7 @@ async function markedJudgeWs(prefix, { tasks = ["T-1"], completed = [], report, 
 
 // ---------------------------------------------------------------- AC1
 
-test("AC1: marked code-reviewer PASS accepted when the judge report carries both required sections", async () => {
+test("AC1 (E435): code-reviewer PASS with no marker accepted when the judge report carries both required sections", async () => {
   const ws = await markedJudgeWs("e432-ac1-", { report: judgeReport("T-1", SECTION_ER, SECTION_AC) });
   const r = await H.upd(ws, w("code-reviewer", "PASS", { completed_tasks: ["T-1"] }));
   assert.ok(!rejected(r), `judge PASS must be accepted: ${text(r)}`);
@@ -176,7 +174,7 @@ test("AC1: marked code-reviewer PASS accepted when the judge report carries both
 
 // ---------------------------------------------------------------- AC2
 
-test("AC2: marked code-reviewer PASS with no judge report -> QA_COMPLETION_EVIDENCE_MISSING (names the path) or MISSING_EVIDENCE", async () => {
+test("AC2 (E435): code-reviewer PASS (no marker) with no judge report -> QA_COMPLETION_EVIDENCE_MISSING (names the path) or MISSING_EVIDENCE", async () => {
   const ws = await markedJudgeWs("e432-ac2a-");
   const before = handoffBytes(ws);
   const r = await H.upd(ws, w("code-reviewer", "PASS", { completed_tasks: ["T-1"] }));
@@ -210,15 +208,10 @@ test("AC3: expected-red and AC execution sections are read from the judge report
   assert.ok(text(r2).includes(path.join(noAc, "qa_reports", "review_T-1.md")), `Inspected: names the judge report path: ${text(r2)}`);
 });
 
-test("AC3: the resolver returns one location for both chain paths; a report only under review_reports/ clears nothing", async () => {
+test("AC3 (E435): the resolver takes the workspace only and always names code-reviewer under qa_reports/; a report only under review_reports/ clears nothing", async () => {
   const { resolveJudgeReport } = await import(pathToFileURL(path.join(ROOT, "dist/tools/evidence-file.js")).href);
   const dir = path.join(os.tmpdir(), "e432-resolver");
-  const marked = resolveJudgeReport(dir, "test-first");
-  const unmarked = resolveJudgeReport(dir);
-  assert.equal(marked.judge, "code-reviewer");
-  assert.equal(unmarked.judge, "qa-engineer");
-  assert.equal(marked.dir, unmarked.dir, "D1: the judge report stays in one directory on both paths");
-  assert.equal(unmarked.dir, path.join(dir, "qa_reports"));
+  assert.deepEqual(resolveJudgeReport(dir), { judge: "code-reviewer", dir: path.join(dir, "qa_reports") }, "one judge, one directory, no marker argument");
 
   const ws = await markedJudgeWs("e432-ac3c-");
   put(ws, "review_reports/review_T-1.md", judgeReport("T-1", SECTION_ER, SECTION_AC));
@@ -229,44 +222,47 @@ test("AC3: the resolver returns one location for both chain paths; a report only
 
 // ---------------------------------------------------------------- AC4
 
-test("AC4: marked judge write that adds completed ids needs the judge report; unmarked keeps REVIEWER_COMPLETED_TASKS_REJECTED", async () => {
+// E435 Copy: QA_COMPLETION_EVIDENCE_MISSING hintStatic, verbatim.
+const QA_COMPLETION_HINT =
+  "code-reviewer is the judge: write its report for each newly added id first (qa_review with review_task_ids on a PASS/FAIL write, or qa_reports/review_<id>.md or a covers: file), or drop the unevidenced ids from completed_tasks. No exemption for any edge, status, or review_verdict. See docs/backlog.md E18 incident (b) + E32.";
+
+test("AC4 (E435): a judge write that adds completed ids needs the judge report (no marker); a qa-engineer ledger write is NON_JUDGE_COMPLETED_TASKS_REJECTED", async () => {
   for (const [status, from, extra] of [
     ["In_Progress", "sr-engineer", {}],
     ["FAIL", "code-reviewer", { review_verdict: "CHANGES_REQUESTED", blocking_reason: "x" }],
   ]) {
     const ws = mkWs("e432-ac4a-");
-    await H.seed(ws, F, from, "In_Progress", { chainPath: "test-first" });
+    await H.seed(ws, F, from, "In_Progress");
     const before = handoffBytes(ws);
     const r = await H.upd(ws, w("code-reviewer", status, { completed_tasks: ["T-2"], ...extra }));
     assert.ok(rejected(r), `${status}: ${text(r)}`);
     assert.match(text(r), /QA_COMPLETION_EVIDENCE_MISSING/, `${status} without a report`);
+    assert.ok(text(r).includes(QA_COMPLETION_HINT), `${status}: the hint names code-reviewer as the judge: ${text(r)}`);
     assert.equal(handoffBytes(ws), before);
   }
   const ok = mkWs("e432-ac4b-");
-  await H.seed(ok, F, "sr-engineer", "In_Progress", { chainPath: "test-first" });
+  await H.seed(ok, F, "sr-engineer", "In_Progress");
   put(ok, "qa_reports/review_T-2.md", judgeReport("T-2", SECTION_ER));
   const r = await H.upd(ok, w("code-reviewer", "In_Progress", { completed_tasks: ["T-2"] }));
   assert.ok(!rejected(r), `with the judge report: ${text(r)}`);
 
-  const un = mkWs("e432-ac4c-");
-  await H.seed(un, F, "sr-engineer", "In_Progress");
-  const u = await H.upd(un, w("code-reviewer", "In_Progress", { completed_tasks: ["T-2"] }));
+  const qa = mkWs("e432-ac4c-");
+  await H.seed(qa, F, "qa-engineer", "In_Progress");
+  put(qa, "qa_reports/review_T-2.md", judgeReport("T-2", SECTION_ER));
+  const before = handoffBytes(qa);
+  const u = await H.upd(qa, w("qa-engineer", "In_Progress", { completed_tasks: ["T-2"] }));
   assert.ok(rejected(u));
-  assert.match(text(u), /REVIEWER_COMPLETED_TASKS_REJECTED/);
-  if (HB) {
-    const un2 = mkWs("e432-ac4d-");
-    await HB.seed(un2, F, "sr-engineer", "In_Progress");
-    const b = await HB.upd(un2, w("code-reviewer", "In_Progress", { completed_tasks: ["T-2"] }));
-    assert.equal(norm(text(u), un), norm(text(b), un2), "today's text, byte for byte against base");
-  }
+  assert.ok(text(u).includes("⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks="), text(u));
+  assert.doesNotMatch(text(u), /REVIEWER_COMPLETED_TASKS_REJECTED|NON_QA_COMPLETED_TASKS_REJECTED/, "the removed ledger codes are never emitted");
+  assert.equal(handoffBytes(qa), before, "no state written");
 });
 
 // ---------------------------------------------------------------- AC5 / AC6 / AC7
 
-test("AC5: marked qa -> sr without manifest or no-new-test record -> REPRO_MANIFEST_MISSING naming both paths", async () => {
+test("AC5 (E435): qa -> sr (no marker) without manifest or no-new-test record -> REPRO_MANIFEST_MISSING naming both paths", async () => {
   for (const status of ["In_Progress", "Blocked"]) {
     const ws = mkWs("e432-ac5-");
-    await H.seed(ws, F, "qa-engineer", status, { chainPath: "test-first" });
+    await H.seed(ws, F, "qa-engineer", status);
     const before = handoffBytes(ws);
     const r = await H.upd(ws, w("sr-engineer", "In_Progress"));
     assert.ok(rejected(r), `qa:${status} -> sr must be rejected: ${text(r)}`);
@@ -277,11 +273,11 @@ test("AC5: marked qa -> sr without manifest or no-new-test record -> REPRO_MANIF
   }
 });
 
-test("AC6: the no-new-test record or the manifest alone clears qa -> sr; content is never read (empty file clears)", async () => {
+test("AC6 (E435): with no marker, the no-new-test record or the manifest alone clears qa -> sr; content is never read (empty file clears)", async () => {
   for (const file of [`no-new-test_${F}.txt`, `expected-red_${F}.txt`]) {
     for (const content of ["docs-only change\n", ""]) {
       const ws = mkWs("e432-ac6-");
-      await H.seed(ws, F, "qa-engineer", "In_Progress", { chainPath: "test-first" });
+      await H.seed(ws, F, "qa-engineer", "In_Progress");
       put(ws, `qa_reports/${file}`, content);
       const r = await H.upd(ws, w("sr-engineer", "In_Progress"));
       assert.ok(!rejected(r), `${file} (${content.length} bytes) must clear: ${text(r)}`);
@@ -289,9 +285,9 @@ test("AC6: the no-new-test record or the manifest alone clears qa -> sr; content
   }
 });
 
-test("AC7: marked bug ticket shares the manifest: qa-written manifest clears both hops; a no-new-test record leaves sr -> code-reviewer armed", async () => {
+test("AC7 (E435): a bug ticket (no marker) shares the manifest: qa-written manifest clears both hops; a no-new-test record leaves sr -> code-reviewer armed", async () => {
   const a = mkWs("e432-ac7a-");
-  await H.seed(a, F, "qa-engineer", "In_Progress", { chainPath: "test-first", dispatchMode: "bugfix" });
+  await H.seed(a, F, "qa-engineer", "In_Progress", { dispatchMode: "bugfix" });
   put(a, `qa_reports/expected-red_${F}.txt`, "test/x.test.mjs | repro\n");
   const a1 = await H.upd(a, w("sr-engineer", "In_Progress"));
   assert.ok(!rejected(a1), `qa -> sr: ${text(a1)}`);
@@ -299,7 +295,7 @@ test("AC7: marked bug ticket shares the manifest: qa-written manifest clears bot
   assert.ok(!rejected(a2), `sr -> code-reviewer with no file written by sr: ${text(a2)}`);
 
   const b = mkWs("e432-ac7b-");
-  await H.seed(b, F, "qa-engineer", "In_Progress", { chainPath: "test-first", dispatchMode: "bugfix" });
+  await H.seed(b, F, "qa-engineer", "In_Progress", { dispatchMode: "bugfix" });
   put(b, `qa_reports/no-new-test_${F}.txt`, "cannot reproduce from the public interface\n");
   const b1 = await H.upd(b, w("sr-engineer", "In_Progress"));
   assert.ok(!rejected(b1), `qa -> sr with the record: ${text(b1)}`);
@@ -315,9 +311,9 @@ test("AC7: marked bug ticket shares the manifest: qa-written manifest clears bot
 
 const PASS_HDR = (by, verdict = "PASS") => `## 2026-11-20T00:00:00.000Z — ${verdict} — by ${by}\n\nnotes\n\n`;
 
-async function driftWs(h, { marked, reportPath, report }) {
+async function driftWs(h, { reportPath, report }) {
   const ws = mkWs("e432-ac8-");
-  await h.seed(ws, F, "code-reviewer", "In_Progress", marked ? { chainPath: "test-first" } : {});
+  await h.seed(ws, F, "code-reviewer", "In_Progress");
   put(ws, "tasks.md", "<!-- schema_version: 1 -->\n# Tasks\n\n## Active\n- [x] T-3 judged task\n- [ ] T-9 open\n");
   if (reportPath) put(ws, reportPath, report);
   return ws;
@@ -325,27 +321,26 @@ async function driftWs(h, { marked, reportPath, report }) {
 const driftOf = (h, ws) => JSON.parse(h.m.drift.detectDrift(ws));
 const vibeFor = (rep, id) => rep.details.filter((d) => d.includes(id) && /vibe-coding drift/.test(d));
 
-test("AC8: marked feature, PASS-last judge report (root and archive) backs the id; FAIL-last is drift", async () => {
+test("AC8 (E435): with no marker, a PASS-last judge report (root and archive) backs the id; FAIL-last is drift", async () => {
   const passBody = `# QA review — T-3\n\n${PASS_HDR("code-reviewer")}`;
   for (const rel of ["qa_reports/review_T-3.md", `qa_reports/archive/${F}/review_T-3.md`]) {
-    const ws = await driftWs(H, { marked: true, reportPath: rel, report: passBody });
+    const ws = await driftWs(H, { reportPath: rel, report: passBody });
     const rep = driftOf(H, ws);
     assert.ok(rep.evidenceBackedIds.includes("T-3"), `${rel}: evidence-backed ${JSON.stringify(rep)}`);
     assert.deepEqual(vibeFor(rep, "T-3"), [], `${rel}: no vibe-coding line for T-3`);
   }
   const failLast = `# QA review — T-3\n\n${PASS_HDR("code-reviewer")}${PASS_HDR("code-reviewer", "FAIL")}`;
-  const ws = await driftWs(H, { marked: true, reportPath: "qa_reports/review_T-3.md", report: failLast });
+  const ws = await driftWs(H, { reportPath: "qa_reports/review_T-3.md", report: failLast });
   const rep = driftOf(H, ws);
   assert.ok(!rep.evidenceBackedIds.includes("T-3"));
   assert.ok(vibeFor(rep, "T-3").length > 0, `FAIL-last is reported as drift: ${JSON.stringify(rep.details)}`);
 });
 
-test("AC8: unmarked workspace with only APPROVED / CHANGES_REQUESTED code-review files drifts exactly as base", async (t) => {
-  if (!BASE) return t.skip(baseSkipReason);
+test("AC8 (E435): a workspace with only APPROVED / CHANGES_REQUESTED code-review files under review_reports/ backs nothing: the id is drift", async () => {
   for (const body of ["# Review\n\nVerdict: APPROVED\n", "# Review\n\nVerdict: CHANGES_REQUESTED\n"]) {
-    const a = await driftWs(H, { marked: false, reportPath: "review_reports/review_T-3.md", report: body });
-    const b = await driftWs(HB, { marked: false, reportPath: "review_reports/review_T-3.md", report: body });
-    assert.equal(norm(JSON.stringify(driftOf(H, a)), a), norm(JSON.stringify(driftOf(HB, b)), b));
+    const rep = driftOf(H, await driftWs(H, { reportPath: "review_reports/review_T-3.md", report: body }));
+    assert.ok(!rep.evidenceBackedIds.includes("T-3"), JSON.stringify(rep));
+    assert.ok(vibeFor(rep, "T-3").length > 0, `a review_reports/ note is not the judge report: ${JSON.stringify(rep.details)}`);
   }
 });
 
@@ -423,45 +418,41 @@ async function runRelease(root, argv) {
 const startDry = (fx) => ["start", "--bump", "patch", "--tickets", "E7", "--work-dir", fx.work, "--dry-run"];
 const notPassCode = REL.EXIT_CLASSES.find((c) => c.id === "PRECONDITION_NOT_PASS").code;
 
-test("AC10: release s1 accepts (code-reviewer, PASS) only with the marker; unmarked stops with today's text", async () => {
-  const marked = releaseFixture(handoffText("code-reviewer", "PASS", true));
-  const rm = await runRelease(marked.root, startDry(marked));
-  assert.notEqual(rm.code, notPassCode, `marked judge PASS passes s1: ${rm.err}`);
-  assert.ok(fs.existsSync(path.join(marked.work, "state.md")), "s1 copied the handoff to the work dir");
-
-  const unmarked = releaseFixture(handoffText("code-reviewer", "PASS", false));
-  const ru = await runRelease(unmarked.root, startDry(unmarked));
-  assert.equal(ru.code, notPassCode);
-  assert.match(ru.err, /RELEASE_STOP PRECONDITION_NOT_PASS: .*is \(code-reviewer, PASS\), expected \(qa-engineer, PASS\) — commit the release gate's \(qa-engineer, PASS\) write to main first/);
-  assert.ok(!fs.existsSync(path.join(unmarked.work, "state.md")), "nothing written before the tuple holds");
-
+test("AC10 (E435): release s1 accepts (code-reviewer, PASS) with or without a stale schema 16 marker; (qa-engineer, PASS) stops naming the judge", async () => {
+  for (const marked of [true, false]) {
+    const fx = releaseFixture(handoffText("code-reviewer", "PASS", marked));
+    const r = await runRelease(fx.root, startDry(fx));
+    assert.notEqual(r.code, notPassCode, `judge PASS (marker ${marked}) passes s1: ${r.err}`);
+    assert.ok(fs.existsSync(path.join(fx.work, "state.md")), "s1 copied the handoff to the work dir");
+  }
   const qa = releaseFixture(handoffText("qa-engineer", "PASS", false));
   const rq = await runRelease(qa.root, startDry(qa));
-  assert.notEqual(rq.code, notPassCode, `unmarked qa PASS passes s1 as today: ${rq.err}`);
+  assert.equal(rq.code, notPassCode);
+  assert.match(rq.err, /RELEASE_STOP PRECONDITION_NOT_PASS: .*is \(qa-engineer, PASS\), expected \(code-reviewer, PASS\) — commit the release gate's \(code-reviewer, PASS\) write to main first/);
+  assert.ok(!fs.existsSync(path.join(qa.work, "state.md")), "nothing written before the tuple holds");
 });
 
-test("AC10: the --state pre-input check follows the same judge rule", async () => {
+test("AC10 (E435): the --state pre-input check follows the same judge rule", async () => {
   const run = async (state) => {
     const fx = releaseFixture(handoffText("qa-engineer", "PASS", false));
     put(fx.base, "state.json", JSON.stringify(state));
     return runRelease(fx.root, ["prepare", "--version", "1.2.4", "--state", path.join(fx.base, "state.json"),
       "--tickets", "E7", "--message-file", path.join(fx.base, "nope.txt"), "--dry-run"]);
   };
-  const markedJudge = await run({ last_agent: "code-reviewer", status: "PASS", active_feature: "feat", chain_path: "test-first" });
-  assert.doesNotMatch(markedJudge.err, /--state must be a/, `marked judge PASS accepted: ${markedJudge.err}`);
-  assert.match(markedJudge.err, /RELEASE_STOP USAGE: .*--message-file/, "the check moved on to the next pre-input");
-  const unmarkedJudge = await run({ last_agent: "code-reviewer", status: "PASS", active_feature: "feat" });
-  assert.match(unmarkedJudge.err, /--state must be a \(qa-engineer, PASS\) snapshot with an active_feature \(got code-reviewer, PASS\)/);
-  const qaUnmarked = await run({ last_agent: "qa-engineer", status: "PASS", active_feature: "feat" });
-  assert.doesNotMatch(qaUnmarked.err, /--state must be a/, `unmarked qa PASS accepted as today: ${qaUnmarked.err}`);
+  for (const extra of [{ chain_path: "test-first" }, {}]) {
+    const judge = await run({ last_agent: "code-reviewer", status: "PASS", active_feature: "feat", ...extra });
+    assert.doesNotMatch(judge.err, /--state must be a/, `judge PASS accepted with or without a stale marker: ${judge.err}`);
+    assert.match(judge.err, /RELEASE_STOP USAGE: .*--message-file/, "the check moved on to the next pre-input");
+  }
+  const qa = await run({ last_agent: "qa-engineer", status: "PASS", active_feature: "feat" });
+  assert.match(qa.err, /--state must be a \(code-reviewer, PASS\) snapshot with an active_feature \(got qa-engineer, PASS\)/);
 });
 
-test("AC10: the release-gate line names the judge; unmarked text is byte-identical", () => {
+test("AC10 (E435): the release-gate line names code-reviewer by default", () => {
   const args = { version: "1.2.4", oldVersion: "1.2.3", bump: "patch", activeFeature: "feat", tickets: ["E7"] };
-  const unmarked = REL.commitMessage(args);
-  assert.match(unmarked, /Release gate: feat \(qa-engineer PASS committed to main\)\./);
-  assert.equal(REL.commitMessage({ ...args, judge: "qa-engineer" }), unmarked);
-  assert.match(REL.commitMessage({ ...args, judge: "code-reviewer" }), /Release gate: feat \(code-reviewer PASS committed to main\)\./);
+  const msg = REL.commitMessage(args);
+  assert.match(msg, /Release gate: feat \(code-reviewer PASS committed to main\)\./);
+  assert.equal(REL.commitMessage({ ...args, judge: "code-reviewer" }), msg);
 });
 
 // ---------------------------------------------------------------- AC11 (old path byte-identical vs base)
@@ -472,30 +463,24 @@ function norm(s, ws) {
   for (const p of new Set([ws, fs.realpathSync(ws)])) out = out.split(p).join("<WS>");
   return out.replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z/g, "<TS>");
 }
-function evidenceDump(ws) {
-  const dir = path.join(ws, "qa_reports");
-  if (!fs.existsSync(dir)) return {};
-  const out = {};
-  for (const f of fs.readdirSync(dir).sort()) out[f] = norm(fs.readFileSync(path.join(dir, f), "utf-8"), ws);
-  return out;
-}
-
-// Each scenario drives writes through harness h and returns a transcript of every outcome plus the persisted bytes.
+// E435: one chain, code-reviewer the judge. Each scenario drives writes through harness h and returns one outcome per write.
 const SCENARIOS = {
   async chain(h, ws) {
     const t = [];
     const rec = async (args) => { const r = await h.upd(ws, args); t.push({ args, rejected: rejected(r), text: text(r) }); };
-    await h.seed(ws, F, "pm", "In_Progress");
-    for (const a of ["sr-engineer", "code-reviewer", "qa-engineer"]) await rec(w(a, "In_Progress"));
-    await rec(w("qa-engineer", "PASS", { completed_tasks: ["T-1"], review_task_ids: ["T-1"], qa_review: "ok" }));
+    await h.seed(ws, F, "pm", "In_Progress", { scopeDecision: "single-feature" });
+    put(ws, `qa_reports/no-new-test_${F}.txt`, "routing scenario\n");
+    for (const a of ["qa-engineer", "sr-engineer", "code-reviewer"]) await rec(w(a, "In_Progress"));
+    await rec(w("code-reviewer", "PASS", { review_verdict: "APPROVED", completed_tasks: ["T-1"], review_task_ids: ["T-1"], qa_review: "ok" }));
     return t;
   },
   async architectFailLoop(h, ws) {
     const t = [];
     const rec = async (args) => { const r = await h.upd(ws, args); t.push({ args, rejected: rejected(r), text: text(r) }); };
-    await h.seed(ws, F, "pm", "In_Progress");
-    for (const a of ["architect", "sr-engineer", "code-reviewer", "qa-engineer"]) await rec(w(a, "In_Progress"));
-    await rec(w("qa-engineer", "FAIL", { blocking_reason: "bug", review_task_ids: ["T-1"], qa_review: "found a bug" }));
+    await h.seed(ws, F, "pm", "In_Progress", { scopeDecision: "single-feature" });
+    put(ws, `qa_reports/no-new-test_${F}.txt`, "routing scenario\n");
+    for (const a of ["architect", "qa-engineer", "sr-engineer", "code-reviewer"]) await rec(w(a, "In_Progress"));
+    await rec(w("code-reviewer", "FAIL", { review_verdict: "CHANGES_REQUESTED", blocking_reason: "bug", review_task_ids: ["T-1"], qa_review: "found a bug" }));
     await rec(w("sr-engineer", "In_Progress"));
     return t;
   },
@@ -516,27 +501,27 @@ const SCENARIOS = {
     return t;
   },
   async completionEvidenceMissing(h, ws) {
-    await h.seed(ws, F, "qa-engineer", "In_Progress");
-    const r = await h.upd(ws, w("qa-engineer", "In_Progress", { completed_tasks: ["T-9"] }));
+    await h.seed(ws, F, "code-reviewer", "In_Progress");
+    const r = await h.upd(ws, w("code-reviewer", "In_Progress", { completed_tasks: ["T-9"] }));
     return [{ rejected: rejected(r), text: text(r) }];
   },
   async missingEvidence(h, ws) {
-    await h.seed(ws, F, "qa-engineer", "In_Progress", { completedTasks: ["T-9"] });
-    const r = await h.upd(ws, w("qa-engineer", "PASS", { completed_tasks: ["T-9"] }));
+    await h.seed(ws, F, "code-reviewer", "In_Progress", { completedTasks: ["T-9"] });
+    const r = await h.upd(ws, w("code-reviewer", "PASS", { completed_tasks: ["T-9"] }));
     return [{ rejected: rejected(r), text: text(r) }];
   },
   async expectedRedMissing(h, ws) {
-    await h.seed(ws, F, "qa-engineer", "In_Progress");
+    await h.seed(ws, F, "code-reviewer", "In_Progress");
     put(ws, `qa_reports/expected-red_${F}.txt`, "test/x.test.mjs | red\n");
     put(ws, "qa_reports/review_T-1.md", "# QA review - T-1\n\nno sections\n");
-    const r = await h.upd(ws, w("qa-engineer", "PASS", { completed_tasks: ["T-1"] }));
+    const r = await h.upd(ws, w("code-reviewer", "PASS", { completed_tasks: ["T-1"] }));
     return [{ rejected: rejected(r), text: text(r) }];
   },
   async acLogMissing(h, ws) {
-    await h.seed(ws, F, "qa-engineer", "In_Progress");
+    await h.seed(ws, F, "code-reviewer", "In_Progress");
     put(ws, `specs/${F}.md`, SPEC_WITH_PROOF);
     put(ws, "qa_reports/review_T-1.md", judgeReport("T-1", SECTION_ER));
-    const r = await h.upd(ws, w("qa-engineer", "PASS", { completed_tasks: ["T-1"] }));
+    const r = await h.upd(ws, w("code-reviewer", "PASS", { completed_tasks: ["T-1"] }));
     return [{ rejected: rejected(r), text: text(r) }];
   },
   async reproManifestMissing(h, ws) {
@@ -544,67 +529,46 @@ const SCENARIOS = {
     const r = await h.upd(ws, w("code-reviewer", "In_Progress"));
     return [{ rejected: rejected(r), text: text(r) }];
   },
-  async missingReviewEvidence(h, ws) {
+  async reviewerToQaClosed(h, ws) {
     await h.seed(ws, F, "code-reviewer", "In_Progress");
     const r = await h.upd(ws, w("qa-engineer", "In_Progress", { review_task_ids: ["T-1"] }));
     return [{ rejected: rejected(r), text: text(r) }];
   },
   async qaReviewTargetRequired(h, ws) {
-    await h.seed(ws, F, "qa-engineer", "In_Progress");
-    const r = await h.upd(ws, w("qa-engineer", "PASS", { qa_review: "ok" }));
+    await h.seed(ws, F, "code-reviewer", "In_Progress");
+    const r = await h.upd(ws, w("code-reviewer", "PASS", { qa_review: "ok" }));
     return [{ rejected: rejected(r), text: text(r) }];
   },
 };
 
-const REWRITTEN_HINT_CODES = ["EXPECTED_RED_DIFF_MISSING", "AC_EXECUTION_LOG_MISSING"];
+// One entry per write: null = accepted, a RegExp = rejected with matching text.
+const S3 = /TRANSITION_REJECTED[\s\S]*code-reviewer is the judge and closes the feature[\s\S]*docs\/migration-v5\.md/;
+const EXPECT = {
+  chain: [null, null, null, null],
+  architectFailLoop: [null, null, null, null, null, null],
+  bugfix: [/REPRO_MANIFEST_MISSING: e432-feat\. Expected repro manifest at /, null],
+  amendResume: [null],
+  completionEvidenceMissing: [/QA_COMPLETION_EVIDENCE_MISSING/],
+  missingEvidence: [/MISSING_EVIDENCE/],
+  expectedRedMissing: [/EXPECTED_RED_DIFF_MISSING/],
+  acLogMissing: [/AC_EXECUTION_LOG_MISSING/],
+  reproManifestMissing: [/REPRO_MANIFEST_MISSING/],
+  reviewerToQaClosed: [S3],
+  qaReviewTargetRequired: [/QA_REVIEW_TARGET_REQUIRED/],
+};
 
 for (const [name, fn] of Object.entries(SCENARIOS)) {
-  test(`AC11: unmarked ${name} outcome is identical on the base commit and this branch`, async (t) => {
-    if (!BASE) return t.skip(baseSkipReason);
-    const wsA = mkWs("e432-ac11a-");
-    const wsB = mkWs("e432-ac11b-");
-    const a = await fn(H, wsA);
-    const b = await fn(HB, wsB);
-    // E433 (D1): normalise exactly the two deliberately rewritten hintStatic texts (hint.expected_red,
-    // hint.ac_log), each side through its own module set, so only an unintended difference still fails.
-    const normHints = (s, h) => {
-      let out = s;
-      for (const code of REWRITTEN_HINT_CODES) {
-        const g = h.m.gates.GATE_REGISTRY.find((e) => e.errorCode === code);
-        if (g) out = out.split(g.hintStatic).join(`<HINT:${code}>`);
-      }
-      return out;
-    };
-    const snap = (tr, ws, h) => JSON.stringify({
-      tr: tr.map((x) => ({ ...x, text: normHints(norm(x.text, ws), h) })),
-      handoff: norm(handoffBytes(ws), ws),
-      evidence: evidenceDump(ws),
+  test(`AC11 (E435): ${name} runs on the one chain with code-reviewer the judge, no marker`, async () => {
+    const ws = mkWs("e432-ac11-");
+    const tr = await fn(H, ws);
+    assert.equal(tr.length, EXPECT[name].length, `${name}: one outcome per write`);
+    EXPECT[name].forEach((want, i) => {
+      if (want === null) assert.ok(!tr[i].rejected, `${name} #${i} accepted: ${tr[i].text}`);
+      else { assert.ok(tr[i].rejected, `${name} #${i} rejected`); assert.match(tr[i].text, want, `${name} #${i}`); }
     });
-    assert.equal(snap(a, wsA, H), snap(b, wsB, HB), `${name}: transcript, persisted handoff and evidence bytes identical`);
-    assert.ok(a.length > 0);
+    assert.doesNotMatch(handoffBytes(ws), /^(chain_path|qa_round|qa_rounds_total):/m, `${name}: no dropped field stored`);
   });
 }
-
-test("AC11: the rejection scenarios still reject on this branch (guards against a vacuous replay)", async () => {
-  const expect = {
-    completionEvidenceMissing: /QA_COMPLETION_EVIDENCE_MISSING/,
-    missingEvidence: /MISSING_EVIDENCE/,
-    expectedRedMissing: /EXPECTED_RED_DIFF_MISSING/,
-    acLogMissing: /AC_EXECUTION_LOG_MISSING/,
-    reproManifestMissing: /REPRO_MANIFEST_MISSING/,
-    missingReviewEvidence: /MISSING_REVIEW_EVIDENCE/,
-    qaReviewTargetRequired: /QA_REVIEW_TARGET_REQUIRED/,
-  };
-  for (const [name, re] of Object.entries(expect)) {
-    const ws = mkWs("e432-ac11c-");
-    const [r] = await SCENARIOS[name](H, ws);
-    assert.ok(r.rejected, `${name} rejected`);
-    assert.match(r.text, re, name);
-  }
-  const ws = mkWs("e432-ac11d-");
-  const t = await SCENARIOS.chain(H, ws);
-  assert.ok(t.every((x) => !x.rejected), "the unmarked chain still passes end to end");
-});
 
 // ---------------------------------------------------------------- AC12 (SQLite)
 
@@ -630,12 +594,14 @@ async function sqliteRun(m, label) {
       try { r = await UPD.run({ workspace_path: dir, completed_tasks: [], pending_notes: [], ...args }); } catch (err) { r = { isError: true, content: [{ type: "text", text: `⛔ ${err.message}` }] }; }
       out.push({ rejected: rejected(r), text: norm(text(r), dir) });
     };
-    await reseed("qa-engineer", ["T-1"]);
-    await go(w("qa-engineer", "PASS", { completed_tasks: ["T-1"] }));
+    await reseed("code-reviewer", ["T-1"]);
+    await go(w("code-reviewer", "PASS", { completed_tasks: ["T-1"] }));
+    await reseed("code-reviewer");
+    await go(w("code-reviewer", "PASS", { qa_review: "ok" }));
     await reseed("qa-engineer");
-    await go(w("qa-engineer", "PASS", { qa_review: "ok" }));
-    await reseed("qa-engineer");
-    await go(w("qa-engineer", "PASS", { completed_tasks: ["T-2"], review_task_ids: ["T-2"], qa_review: "all good" }));
+    await go(w("qa-engineer", "PASS", { completed_tasks: ["T-2"], review_task_ids: ["T-2"], qa_review: "qa" }));
+    await reseed("code-reviewer");
+    await go(w("code-reviewer", "PASS", { review_verdict: "APPROVED", completed_tasks: ["T-2"], review_task_ids: ["T-2"], qa_review: "all good" }));
     const final = storage.readState(dir);
     out.push({ status: final?.status, last_agent: final?.last_agent, chain_path: final?.chain_path ?? null });
   } finally {
@@ -649,21 +615,24 @@ async function sqliteRun(m, label) {
   return { out, rows };
 }
 
-test("AC12: SQLite rejections and a qa PASS with qa_review replay identically on base and branch; storage files byte-identical", async (t) => {
+// The SQLite DDL (CREATE TABLE blocks + addColumnIfMissing lines) of a storage-sqlite.ts source text.
+const sqliteDdl = (src) => [...src.matchAll(/CREATE TABLE IF NOT EXISTS[\s\S]*?\);|addColumnIfMissing\("[^"]*"\)/g)].map((x) => x[0]);
+
+test("AC12 (E435): SQLite runs the evidence gates with code-reviewer the judge; a qa PASS is rejected naming code-reviewer; no SQLite schema change", async (t) => {
   if (!CUR.sqlite) return t.skip("better-sqlite3 not installed");
-  if (!BASE) return t.skip(baseSkipReason);
   const cur = await sqliteRun(CUR, "cur");
-  const base = await sqliteRun(BASE, "base");
-  assert.deepEqual(cur.out, base.out);
-  assert.deepEqual(cur.rows, base.rows, "reports rows identical");
   assert.match(cur.out[0].text, /MISSING_EVIDENCE/);
   assert.match(cur.out[1].text, /QA_REVIEW_TARGET_REQUIRED/);
-  assert.ok(!cur.out[2].rejected, `qa PASS with qa_review accepted: ${cur.out[2].text}`);
-  assert.equal(cur.rows.length, 1);
+  assert.ok(cur.out[2].rejected && cur.out[2].text.includes("code-reviewer is the judge; qa-engineer writes tests and never writes PASS."), `qa PASS rejected: ${cur.out[2].text}`);
+  assert.ok(!cur.out[3].rejected, `code-reviewer PASS with qa_review accepted: ${cur.out[3].text}`);
+  assert.deepEqual(cur.out[4], { status: "PASS", last_agent: "code-reviewer", chain_path: null });
+  assert.deepEqual(cur.rows.map((r) => [r.task_id, r.status, r.reviewer]), [["T-2", "PASS", "code-reviewer"]]);
   assert.equal(CUR.versions.CURRENT_VERSIONS.sqlite, 2);
-  for (const f of ["tools/storage-sqlite.ts", "schema/migrations-sqlite.ts"]) {
-    assert.equal(fs.readFileSync(path.join(ROOT, f), "utf-8"), BASE.srcText[f], `${f} byte-identical to base`);
-  }
+  if (!BASE) return t.skip(baseSkipReason);
+  assert.equal(fs.readFileSync(path.join(ROOT, "schema/migrations-sqlite.ts"), "utf-8"), BASE.srcText["schema/migrations-sqlite.ts"], "SQLite migrations byte-identical to base");
+  const ddl = sqliteDdl(fs.readFileSync(path.join(ROOT, "tools/storage-sqlite.ts"), "utf-8"));
+  assert.ok(ddl.length > 5, "DDL located (vacuity guard)");
+  assert.deepEqual(ddl, sqliteDdl(BASE.srcText["tools/storage-sqlite.ts"]), "no SQLite column added or dropped (qa_round stays in the DDL)");
 });
 
 // ---------------------------------------------------------------- AC13 (one shared resolver)
@@ -691,18 +660,21 @@ test("AC13: the resolver is exported from exactly one module and every consumer 
 
 // ---------------------------------------------------------------- AC14 (counts unchanged)
 
-test("AC14: registry 35, pipeline 17 (names and order as base), evidence schema 2, handoff 16, sqlite 2, CLAUDE.md 250 lines", async () => {
-  assert.equal(CUR.gates.GATE_REGISTRY.length, 35);
+test("AC14 (E435): registry 33, pipeline 17 (base names and order, step 9 renamed), evidence schema 2, handoff 17, sqlite 2, CLAUDE.md 250 lines", async () => {
+  assert.equal(CUR.gates.GATE_REGISTRY.length, 33);
   const pipe = CUR.orchestrator.UPDATE_STATE_GATE_PIPELINE;
   assert.equal(pipe.length, 17);
   if (BASE) {
-    assert.deepEqual(pipe.map((s) => s.name), BASE.orchestrator.UPDATE_STATE_GATE_PIPELINE.map((s) => s.name), "same step names, same order");
+    const want = BASE.orchestrator.UPDATE_STATE_GATE_PIPELINE.map((s) => s.name);
+    assert.equal(want[8], "REVIEWER_COMPLETED_TASKS_REJECTED", "base step 9");
+    want[8] = "NON_JUDGE_COMPLETED_TASKS_REJECTED";
+    assert.deepEqual(pipe.map((s) => s.name), want, "base step names and order, step 9 renamed (Ruling (b))");
   } else {
     console.warn(`[WARN] e432 AC14: step-name comparison against base skipped: ${baseSkipReason}`);
   }
   const ev = await import(pathToFileURL(path.join(ROOT, "dist/gates/evidence-schema.js")).href);
   assert.equal(ev.EVIDENCE_SCHEMA_CURRENT, 2);
-  assert.equal(CUR.versions.CURRENT_VERSIONS.handoff, 16);
+  assert.equal(CUR.versions.CURRENT_VERSIONS.handoff, 17);
   assert.equal(CUR.versions.CURRENT_VERSIONS.sqlite, 2);
   const lines = fs.readFileSync(path.join(ROOT, "CLAUDE.md"), "utf-8").split("\n");
   const count = lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
