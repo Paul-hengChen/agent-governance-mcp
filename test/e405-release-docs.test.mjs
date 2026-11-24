@@ -17,6 +17,11 @@ const DOC = fs.readFileSync(path.join(REPO, "docs", "release-cd.md"), "utf-8");
 const CONTRIB = fs.readFileSync(path.join(REPO, "CONTRIBUTING.md"), "utf-8");
 const rel = await import(pathToFileURL(path.join(REPO, "scripts", "release.mjs")).href);
 
+// E435 architecture Copy rows "release-cd.md line 63 / 69 / 95" (T-42), verbatim; e433 AC10 pins the same texts.
+const RELEASE_CD_63 = "- [ ] One `docs/*` pull request, merged to `main`, carries both the release gate feature's PASS state write from its judge (`.current/_primary/handoff.md`), `(code-reviewer, PASS)`, and the release's CHANGELOG entry under `## [Unreleased]`.";
+const RELEASE_CD_69 = "After a successful release, `main`'s handoff is no longer the judge's `(code-reviewer, PASS)` and `## [Unreleased]` is empty, so dispatching again by mistake stops at once (`PRECONDITION_NOT_PASS` or `CHANGELOG_ENTRY_MISSING`) instead of releasing twice.";
+const RELEASE_CD_95 = "`.current/_primary/handoff.md` on `main` is not the judge's `(code-reviewer, PASS)`, has no usable `active_feature`, or cannot be parsed; the detail names the tuple";
+
 const section = (name) => {
   const start = DOC.indexOf(`\n## ${name}\n`);
   assert.ok(start >= 0, `## ${name} exists`);
@@ -25,7 +30,7 @@ const section = (name) => {
 };
 const tableRows = (text) => text.split("\n").filter((l) => /^\|.*\|$/.test(l) && !/^\|[-| ]+\|$/.test(l)).map((l) => l.slice(1, -1).split("|").map((c) => c.trim()));
 
-test("AC-D1 release-cd sections, inputs, secret and checklist", () => {
+test("AC-D1 (E435) release-cd sections, inputs, secret and checklist; the checklist names one release judge", () => {
   assert.ok(DOC.startsWith("# Release CD\n"));
   assert.deepEqual(DOC.split("\n").filter((l) => l.startsWith("## ")),
     ["## Trigger", "## Inputs", "## Secret", "## Before you trigger", "## When a run fails", "## Manual fallback"], "six sections, in order");
@@ -56,7 +61,9 @@ test("AC-D1 release-cd sections, inputs, secret and checklist", () => {
   const before = section("Before you trigger");
   const items = before.split("\n").filter((l) => l.startsWith("- [ ] "));
   assert.equal(items.length, 5, "five checklist items");
-  assert.match(items[0], /`\(qa-engineer, PASS\)`/);
+  // E435: one judge — the checklist line is the architecture's Copy text (same as e433 AC10's COPY.releaseCd63).
+  assert.equal(items[0], RELEASE_CD_63, "checklist item 1 is the release-cd line 63 Copy text");
+  assert.ok(!DOC.includes("(qa-engineer, PASS)") && !DOC.includes("chain_path"), "no qa-engineer release gate, no marker");
   assert.match(items[0], /`## \[Unreleased\]`/);
   assert.match(items[0], /`docs\/\*` pull request/);
   assert.match(items[1], /`docs\/dependency-advisories\.md`/);
@@ -83,6 +90,15 @@ test("AC-D2 runner-only classes map one to one onto the docs table", () => {
   assert.deepEqual(rows.map((r) => [Number(r[0]), r[1], r[2]]), want.map((c) => [c.code, c.id, c.phases.join(", ")]), "code, class and phase columns equal EXIT_CLASSES");
   assert.ok(rows.every((r) => r.length === 5 && r.every((c) => c !== "")), "five non-empty cells per row");
   assert.deepEqual(all.find((r) => r[0] === "code"), ["code", "class", "phase", "meaning", "what to do"]);
+});
+
+test("AC-D2 (E435) the PRECONDITION_NOT_PASS row and the re-dispatch line name the judge's (code-reviewer, PASS) only", () => {
+  // WHY: release.mjs gates on (code-reviewer, PASS) alone (architecture "Release gate"); the guide must not tell an
+  // operator that a qa-engineer PASS or a marked feature releases.
+  const row = tableRows(section("When a run fails")).find((r) => r[1] === "PRECONDITION_NOT_PASS");
+  assert.ok(row, "the row exists");
+  assert.equal(row[3], RELEASE_CD_95, "meaning cell is the line 95 Copy text");
+  assert.ok(DOC.split("\n").includes(RELEASE_CD_69), "line 69 Copy text");
 });
 
 test("AC-D4 CONTRIBUTING names the release workflow once", () => {

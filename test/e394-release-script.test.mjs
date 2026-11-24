@@ -174,7 +174,8 @@ function workTree(fx, o = {}) {
 }
 const state = (fx, over = {}) => {
   const p = path.join(fx.inputs, "state.json");
-  fs.writeFileSync(p, JSON.stringify({ last_agent: "qa-engineer", status: "PASS", active_feature: "feat", completed_tasks: ["T-E7-01"], scope_decision_why: "", pending_notes: [], ...over }));
+  // E435: the release gate is the judge's (code-reviewer, PASS); a qa-engineer PASS no longer releases.
+  fs.writeFileSync(p, JSON.stringify({ last_agent: "code-reviewer", status: "PASS", active_feature: "feat", completed_tasks: ["T-E7-01"], scope_decision_why: "", pending_notes: [], ...over }));
   return p;
 };
 const msgFile = (fx, text) => {
@@ -1259,4 +1260,22 @@ test("E406 AC-E406-7 pre-6 still stops on an untracked root stray file (exit 13)
   fx.put("stray-root.txt", "x\n");
   const r = await runMain(fx, prepareArgs(fx));
   assert.equal(r.code, 13, r.err);
+});
+
+test("AC-S1 (E435) prepare takes only a (code-reviewer, PASS) --state: a qa-engineer PASS is a USAGE stop, with or without the old marker", async () => {
+  // WHY: E435 leaves one judge; the release gate has no marker branch and no historical qa-engineer fallback
+  // (architecture Decision Records, "Release gate"), so a primary handoff left at (qa-engineer, PASS) cannot ship.
+  for (const over of [{ last_agent: "qa-engineer" }, { last_agent: "qa-engineer", chain_path: "test-first" }]) {
+    const fx = mkFixture();
+    workTree(fx);
+    const before = snapshot(fx);
+    const r = await runMain(fx, prepareArgs(fx, ["--dry-run"], { state: state(fx, over) }));
+    assert.equal(r.code, 2, `${JSON.stringify(over)}: ${r.err}`);
+    assert.match(stopLine(r), /^RELEASE_STOP USAGE: --state must be a \(code-reviewer, PASS\) snapshot with an active_feature \(got qa-engineer, PASS\)$/);
+    assert.deepEqual(snapshot(fx), before, "nothing changed");
+  }
+  const fx = mkFixture();
+  workTree(fx);
+  const ok = await runMain(fx, prepareArgs(fx, ["--dry-run"], { state: state(fx, { chain_path: "test-first" }) }));
+  assert.equal(ok.code, 0, `a code-reviewer PASS releases; a stray chain_path changes nothing: ${ok.err}`);
 });

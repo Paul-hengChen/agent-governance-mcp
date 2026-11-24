@@ -899,3 +899,31 @@ Left as is: agc-adapters E101 (its `code-reviewer … qa-engineer … MUST … T
 ### Red Reasons (T-26)
 
 3 red at base, all assertion failures: E101 (E435) and AC-E395-7 (E435) (old "judging in-context" clause, T-37); AC-E395-8 (E435) (line 78 `ROUND_CAP=4`, T-37). Rows under `# T-E435-26` in the manifest. Run: `node --test` on the five files → 89 tests, 86 pass, 3 fail = the 3 rows, name for name.
+
+## T-E435-27 — `subagent-templates`, `e394-release-script`, `e394-release-sop`, `e405-release-runner`, `e405-release-docs` (AC2, AC7)
+
+Placement: existing files, edited in place (brief). Re-titled / new tests carry `(E435)`. Contract: architecture *Decision Records* "Release gate" (`(code-reviewer, PASS)` only, no marker branch, no historical qa-engineer fallback) and *Copy* rows release-cd.md line 63 / 69 / 95.
+
+### Scenario → Test Map (T-27)
+
+| scenario | exact test name(s) |
+|---|---|
+| prepare `--state` accepts only `(code-reviewer, PASS)`; qa PASS (with or without `chain_path`) is a USAGE stop; a stray `chain_path` on a judge PASS changes nothing | AC-S1 (E435) prepare takes only a (code-reviewer, PASS) --state: … (e394-release-script); every prepare-driven test re-pinned through the `state()` fixture default |
+| start precondition `(code-reviewer, PASS)`; qa PASS and marked qa PASS stop `PRECONDITION_NOT_PASS`; detail names `(code-reviewer, Blocked)` vs expected `(code-reviewer, PASS)` | AC-R1 (E435) the main handoff must be (code-reviewer, PASS) … (e405-release-runner); every start-driven test re-pinned through `PASS_HANDOFF` |
+| commit message names `code-reviewer PASS` (default and runner path) | AC-R8 (E435) commitMessage: … · AC-R8 commit message file outside the root, … |
+| release-cd checklist / line 69 / PRECONDITION_NOT_PASS meaning = Copy (same texts as e433 AC10, T-44) | AC-D1 (E435) … · AC-D2 (E435) the PRECONDITION_NOT_PASS row and the re-dispatch line … |
+| release SOP names one judge | AC-P6 (E435) the SOP names one release judge: … (green at base, E433 already rewrote the SOP) |
+| no subagent template makes qa-engineer the closing role | E435: no subagent template makes qa-engineer the closing role; code-reviewer's template writes PASS (green at base) |
+
+Pin / model asserts in `subagent-templates` unchanged (qa-engineer stays opus).
+
+### Open Interface Details (T-27)
+
+1. USAGE detail pinned verbatim as the current shape with the judge substituted: `--state must be a (code-reviewer, PASS) snapshot with an active_feature (got qa-engineer, PASS)`.
+2. PRECONDITION_NOT_PASS detail pinned on `is (code-reviewer, Blocked), expected (code-reviewer, PASS)` (current `notPass` shape, judge = `RELEASE_JUDGE`).
+3. release-cd Copy texts held in `e405-release-docs` as constants equal to e433's `COPY.releaseCd63/69/95`; line 95 pinned as the row's meaning cell.
+4. `e394-release-script` lane fixture `.current/lane1/handoff.md` (`last_agent: qa-engineer`) left as is: it is swept content, never the gate input.
+
+### Red Reasons (T-27)
+
+59 red at base, all assertion failures / release stops, none a syntax or link error: e394-release-script 37 (36 via the `(code-reviewer, PASS)` `state()` fixture hitting the base `qa-engineer` USAGE check, plus AC-S1 (E435) because base accepts a qa PASS); e405-release-runner 20 (the `PASS_HANDOFF` fixture stops `PRECONDITION_NOT_PASS` at base; AC-R8 (E435) the `commitMessage` default judge); e405-release-docs 2 (release-cd two-judge wording, T-E435-42). All clear with T-E435-31 / T-E435-42. Rows under `# T-E435-27` in the manifest. Run: `node --test` on the five files → 147 tests, 88 pass, 59 fail = the 59 rows, name for name.
