@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e435-remove-old-path"
 status: "In_Progress"
-last_updated: "2026-11-24T13:44:44.514Z"
+last_updated: "2026-11-24T13:45:57.761Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e435-remove-old-path.md"
 scope_decision: "single-feature"
@@ -17,7 +17,7 @@ dispatch_pins:
 evidence_schema: 2
 chain_path: "test-first"
 next_role: "code-reviewer"
-dispatched_at: "2026-11-24T13:44:44.514Z"
+dispatched_at: "2026-11-24T13:45:57.761Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -35,10 +35,10 @@ sr_return_count: 1
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E435-50 ready for code review — tools/tasks-file.ts voidRefusalMessage ledger + both branches (and docstring) name code-reviewer, row branch unchanged; tools/role.ts line 40 = the qa-specified code-reviewer:PASS line, lines 36-39 unchanged and still read correctly. Commits 6cf540d9 (fix + dist), 2761e33d (lane checkpoint), 4feb977b (manifest).
-- Full suite (clean tree, scripts/test-lock.mjs -- npm test): 4579 tests, 4576 pass, 0 fail, 3 skipped. All 6 T-E435-50 rows (e359 x5, e408 AC6) green and cleared from qa_reports/expected-red_e435-remove-old-path.txt.
-- Expected-red: no row is red (0 failures in the suite). Note for code-reviewer: the manifest still lists ~448 non-comment rows from T-E435-01..42 that are now green but were never removed; I left them (brief scoped me to T-E435-50 rows only) — clearing them is a judge/coordinator call.
-- Checks: npm run build OK (check:transitions-sync OK); npm audit --audit-level=high exit 0; agc check exit 0 (OK 4.23.0; comment advisories only, pre-existing); tsc clean via build.
+- sr-engineer: T-E435-50 ready for code review — tools/tasks-file.ts voidRefusalMessage ledger + both branches (and docstring) name code-reviewer, row branch unchanged; tools/role.ts line 40 = the qa-specified code-reviewer:PASS line, lines 36-39 unchanged. Commits 6cf540d9 (fix + dist), 2761e33d / 8c1c4329 (lane state), 4feb977b (6 T-50 rows cleared), 340a4095 (448 earlier rows cleared).
+- Full suite (clean tree after 6cf540d9, scripts/test-lock.mjs -- npm test): 4579 tests, 4576 pass, 0 fail, 3 skipped.
+- Expected-red (coordinator follow-up, AC10): cleared 454 rows in total (6 T-E435-50 + 448 from T-E435-01..46). Each <file> | <test name> was mapped to an ok result in that suite log (TAP-unescaped); none was among the 3 skipped, none unmatched. Section comment markers kept; qa_reports/expected-red_e435-remove-old-path.txt has 0 open rows.
+- Checks: npm run build OK (check:transitions-sync OK); npm audit --audit-level=high exit 0; agc check exit 0 (OK 4.23.0; comment advisories only, pre-existing).
 - npm run eval not run (no API key) — human to run.
 
 ---
