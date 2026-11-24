@@ -851,3 +851,28 @@ Left as is: e391 all (pins stale facts the contract does not touch: registry sta
 ### Red Reasons (T-24)
 
 3 red at base, all assertion failures: T-E5-03 (E435) (coord-07 marker clause, T-36); AC6 (E435) (qa SOP `qa_round` / `QA_ROUND_EXCEEDED`, T-32); A4 (E435) (const-11 conditional wording, T-41). Rows under `# T-E435-24` in the manifest. Run: `node --test` on the five files → 82 tests, 79 pass, 3 fail = the 3 rows, name for name (plus the `constitution-deliverable-guard (v3.27.0)` describe wrapper, red only through its A4 (E435) subtest).
+
+## T-E435-25 — `token-efficiency`, `e440-current-rule-wording`, `e410-task-alias-content-tail`, `e408-core-task-alias-tail`, `e438-origin-fenced-labels` (AC7; text pins 3/3)
+
+Placement: existing files, edited in place (brief). New / re-pinned tests carry `(E435)`. 39 changed test lines (38+ / 1−) over 3 files; `e410` and `e408` need no change.
+
+### Scenario → Test Map (T-25)
+
+| contract text (task) | file | exact test name |
+|---|---|---|
+| `resume_of` accepts only `code-reviewer` (Copy `RESUME_OF_ENUM_MESSAGE`, desc.resume_of): const-08 Amend-Resume Edge and skill-pm declaration name `code-reviewer`; no content/*.md names qa-engineer as a `resume_of` target | e440 | AC-E440-2 (E435): the resume_of rule sentences name code-reviewer as the only resume target |
+| lines E435 rewrites in place (const-08 line 7 judge label T-33, skill-pm step 8 / bugfix T-36, coord-03 hop counter T-32, const-06 / coord-07 / skill-architect T-36, const-11 T-41) keep their origin fences and add no bare label to the dispatch bundle | e438 | AC-E438-1/2 (E435): lines E435 rewrites keep their origin fences and carry no bare label in the dispatch bundle |
+| FAIL passthrough fixture is the judge's FAIL (qa-engineer never writes FAIL; positional qa-round slot no longer passed) | token-efficiency | drift: passthrough details are preserved alongside compressed groups (fixture only, title unchanged) |
+
+Left as is: e410 all — its line-number pins (const-05:9, const-08:2/5, skill-pm:111) and per-file line counts do not move, because every E435 edit to const-05 / const-08 / skill-pm is an in-line span change (Copy: const-08 line 7 label/code; skill-pm step 8 and bugfix clause deletions inside lines 91 and 93; no const-05 line is rewritten); no line is inserted or deleted, so no new number to derive. e408 all — it has no content line-number pins (sites are located by replacement text); its only numbered pin is `templates/claude-code-agents/lite.md` line 9, which E435 does not touch. e440 AC-E440-1 sites and the "is REMOVED / is retired" scan already guard the architecture's "new wording avoids the retired shapes" rule. e438 site rows unchanged (no E438 anchor is on a line E435 rewrites except the ones the new test covers).
+
+### Open Interface Details (T-25)
+
+1. e440 pin quotes the current const-08 / skill-pm resume_of sentences verbatim (already code-reviewer-only since E433; the Copy rewrites neither); the qa-engineer-target scan is a regex over `resume_of … to|=|:|names qa-engineer`, so the ordinary-edge wording (`pm:In_Progress → qa-engineer:In_Progress`) does not trip it.
+2. e438 anchors chosen to survive the Copy edits (e.g. "Completed-Tasks Gate" matches both the Non-QA and Non-Judge labels; skill-pm step 8 anchored before the deleted `, chain_path="test-first"` span).
+3. T-24 gap "skill-pm marker clauses pinned nowhere": covered elsewhere — `test/e433-test-first-rules.test.mjs` (T-44) asserts skill-pm has no "Set the `chain_path" sentence, no "(with the `chain_path` marker)" bugfix clause and no `chain_path` at all; `test/e435-remove-old-path.test.mjs` AC4 (no content/ source names `chain_path`) and AC7 (no composed prompt names `chain_path`) cover the composed side. No extra absence pin added.
+4. Finding (outside touch scope, not in the contract): `tools/role.ts` comment pinned by e408 AC6 still says "opens on the qa-engineer:PASS -> release-engineer:In_Progress edge"; the legacy exit key stays per T-20 notes, so left pinned as is.
+
+### Red Reasons (T-25)
+
+No red tests: both new tests and the re-pinned fixture are green at base and must stay green after T-E435-32/33/36/41 (guards against a rewrite that strips a fence, adds a bare label, or reintroduces a qa-engineer resume target). `# T-E435-25` comment block in the manifest, no rows. Run: `node --test` on the five files → 82 tests, 82 pass, 0 fail.

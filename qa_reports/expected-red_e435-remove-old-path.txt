@@ -447,3 +447,6 @@ test/skill-evolution-v3.11.test.mjs | AC-10 (E435): schema/versions.ts handoff s
 test/e5-intake-tiering.test.mjs | T-E5-03 content (E435): coord-07 mini-chain opens with a pm-stamped write carrying no chain_path marker | coord-07 line 9 still carries `chain_path: "test-first"` on the mini-chain opening write at base (T-E435-36)
 test/e407-restatement-citations.test.mjs | AC6 (E435): qa ownership bullet is first in Hard rules, counts no qa round, and the cited bullet exists in every composition | skill-qa-engineer.md line 13 tail still names `qa_round` and `QA_ROUND_EXCEEDED` at base (T-E435-32)
 test/constitution-deliverable-guard.test.mjs | A4 (E435): §3.2 enforcement restricts status=PASS to code-reviewer with no test-first chain condition | const-11 line 10 still says "on the test-first chain `status=PASS` is server-restricted to" at base (T-E435-41)
+
+# T-E435-25 — content text pins (3/3): token-efficiency, e440-current-rule-wording, e410-task-alias-content-tail (no change), e408-core-task-alias-tail (no change), e438-origin-fenced-labels
+# no rows: the new / re-pinned tests are green at base (resume_of content already names only code-reviewer since E433; E435-edited lines carry no bare label yet) and must stay green after T-E435-32/33/36/41; 82/82 green at base

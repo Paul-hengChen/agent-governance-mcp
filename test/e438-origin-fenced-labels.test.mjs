@@ -132,6 +132,31 @@ test("AC-E438-3: each new reference name matches a heading that exists in the di
   assert.match(dispatch(src("skill-sr-engineer.md")), /\*\*Scoped Render Self-Check\*\*/, "skill-sr-engineer Scoped Render Self-Check heading survives (its label is fenced)");
 });
 
+// E435 rewrites these lines in place (marker clause, judge label, PASS restriction); the rewrite must keep each
+// origin fence where one was, and add no bare label to the dispatch bundle. Anchors survive the rewrite.
+test("AC-E438-1/2 (E435): lines E435 rewrites keep their origin fences and carry no bare label in the dispatch bundle", () => {
+  const LABEL = /\bE\d+[a-z]?\b|\bv\d+\.\d+\.\d+\b/;
+  const SITES = [
+    ["const-08-chain-31-mid.md", "Completed-Tasks Gate", " (v3.100.0, E40)"],
+    ["skill-pm.md", "**Bugfix mode**", " (v3.73.0, E2)"],
+    ["coord-03-core-fallback.md", "**Hop counter scope**", " (v3.67.0, D2)"],
+    ["skill-pm.md", "8. `tw_update_state(active_feature=<name>", null],
+    ["const-06-chain-31-head.md", "`tw_complete_task` require the chain's judge", null],
+    ["const-11-design-chain-32.md", "server-restricted to", null],
+    ["coord-07-core-sop.md", "**(ii) mini-chain**", null],
+    ["skill-architect.md", "7. Otherwise: `tw_update_state(", null],
+  ];
+  for (const [f, anchor, span] of SITES) {
+    const s = src(f);
+    const line = s.split("\n").find((l) => l.includes(anchor));
+    assert.ok(line, `${f}: anchor line present: ${anchor}`);
+    if (span) assert.ok(line.includes(fenced(span)), `${f}: anchor line keeps ${fenced(span)}`);
+    const out = dispatch(s).split("\n").find((l) => l.includes(anchor));
+    const m = out && out.match(LABEL);
+    assert.ok(out && !m, `${f}: dispatch line "${anchor}" carries bare label "${m && m[0]}"`);
+  }
+});
+
 test("AC-E438-1: the dispatch bundles of the files whose every label was a site carry no bare ticket/version label", () => {
   // integrator (sites 18-32), reviewer-visual (was qa-visual, E434; 7/37/38 + E437 8), coord-03 (5-9): after the strip no E<n> / v<n>.<n>.<n> token remains.
   const LABEL = /\bE\d+[a-z]?\b|\bv\d+\.\d+\.\d+\b/;
