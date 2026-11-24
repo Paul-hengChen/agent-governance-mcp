@@ -646,3 +646,31 @@ Left as is (green on both): raw legacy fixtures carrying `qa_round: 0` at schema
 ### Red Reasons (T-16)
 
 14 red at base, all for the stated reason (assertion failures, no syntax / link error): 10 are `CURRENT_VERSIONS.handoff` 16 with no v16 → v17 step (chains / heals stop at 16; refuse-loud names max 16) (T-E435-29); e116 AC1/AC2 and e122 leaf shapes see the writer still emitting `qa_round` (T-E435-29); XG-both-edges hits `TRANSITION_REJECTED` on pm → qa-engineer for an unmarked feature (T-E435-30/31). No test dropped. Rows under `# T-E435-16` in the manifest. Run: `node --test test/cut-approval-gate.test.mjs test/dispatch-pins.test.mjs test/e114-cut-approval-inheritance.test.mjs test/e116-archive-on-feature-change.test.mjs test/e122-state-render-injection.test.mjs` → 110 tests, 96 pass, 14 fail = the 14 rows, name for name.
+
+## T-E435-17 — `e123b9-lane-flip`, `e137-rag-render`, `e177b-lane-status`, `e178b-lane-watch`, `e178b-cut-prereview` (AC4)
+
+Placement: existing files, edited in place (brief). Re-titled / new tests carry `E435`. 58 changed test lines (41+ / 17-), under the 300-line cap. Contract: architecture *Handoff schema v17 (file mode)*, T-42 row (`tools/lane-status.ts`: `REPORT_SIGNERS` in the PASS-section regex; `qa_round` column, total, cap check and watch key out), Decision Records (lane-status report signers), Rulings (a) drop. Conventions from T-E435-12/16 reused (absence as `"k" in obj === false`, no `qa_round` text in rendered output).
+
+### Scenario → Test Map (T-17)
+
+| scenario | exact test name(s) |
+|---|---|
+| same-feature roll-up: no `qaRounds` total, no `qaRound` on rows, cap checks only `hop` / `review_round`, rendered text has no `qa_round` / `ROUND_CAP_EXPORTED` | e177b `AC4 (E435): --rollup sums hop/review_round …` |
+| cross-lane roll-up: no `qaRounds` in `combined`, no per-lane `qa_round` check, rendered text has no `qa_round` | e177b `AC6 (E435): --lanes/--all sums …` |
+| `REPORT_SIGNERS`: PASS sections signed `code-reviewer` and pre-v5 `qa-engineer` count, `sr-engineer` does not | e177b `AC5b (E435): checkLaneEvidence counts PASS sections signed by code-reviewer or qa-engineer (pre-v5), never by another role` (green on both: base `JUDGE_IDENTITIES` already holds both) |
+| watch keys are `feature … review_round` (no `qa_round`); every state line ends at `review_round` | e178b-lane-watch AC1 (E435), AC2 transition, AC3 ×2, AC4, AC5, AC6, AC15 |
+| a changing stale `qa_round` field in a handoff prints nothing | e178b-lane-watch `AC2 non-watched field silent (E435: …)` |
+| lane-flip fixtures sit at CURRENT with no `qa_round` line, so no schema heal rewrites them; Round 2 tolerance lands at CURRENT | e123b9 AC8 Round 2, AC21 family (green on both: `CURRENT_VERSIONS.handoff`, not a literal) |
+
+No change needed (left as is): `test/e137-rag-render.test.mjs` (a storage stub's `parse()` returns `qa_round: 0`; nothing reads it, no assertion depends on it) and `test/e178b-cut-prereview.test.mjs` (handoff-reader stub carries `qa_round: 0`; no assertion names `qa_round` or a state line). Also left: e178b-lane-watch AC7 reader stub (`qa_round: 0`, never asserted); e123b9 AC14 lane-side fixture at schema 16 (conflict thrown before any read or heal); e123b9 `metrics.jsonl` sidecar line with historical `qa_rounds` (byte-copied data, never parsed); e177b `writeReview` default signer `qa-engineer` (pre-v5 evidence, accepted by `REPORT_SIGNERS`).
+
+### Open Interface Details (T-17)
+
+1. e123b9 fixtures use `${CURRENT_VERSIONS.handoff}` instead of a literal: the fixture's stated purpose is "already at the current schema" (no heal), so it stays true on both sides; a literal 17 would make every lane-flip test red at base for no contract reason.
+2. Watch key list pinned as a literal `["feature", "status", "last_agent", "next_role", "hop", "review_round"]` (architecture: watch key out, order otherwise unchanged).
+3. The `REPORT_SIGNERS` test drives `checkLaneEvidence` (public export) only; it does not import `REPORT_SIGNERS` from `dist/tools/evidence-file.js` (a missing named export would fail the whole file at base).
+4. Rendered column header not pinned exactly; only the absence of `qa_round` text.
+
+### Red Reasons (T-17)
+
+11 red at base, all assertion failures for the stated reason (no syntax / link error): e177b AC4/AC6, lane-status still sums / cap-checks / renders `qa_round` (T-E435-42); e178b-lane-watch ×9, `WATCH_STATE_KEYS` still ends with `qa_round`, so every state line carries `qa_round=-` (and AC4's re-arm fingerprint differs) (T-E435-42). No test dropped. Rows under `# T-E435-17` in the manifest. Run: `node --test test/e123b9-lane-flip.test.mjs test/e137-rag-render.test.mjs test/e177b-lane-status.test.mjs test/e178b-lane-watch.test.mjs test/e178b-cut-prereview.test.mjs` → 69 tests, 58 pass, 11 fail = the 11 rows, name for name.

@@ -97,10 +97,10 @@ function isoNow(offsetMs = 0) {
 }
 
 /** Write (or append a round to) a `review_<id>.md` evidence file. */
-function writeReview(dir, id, { status = "PASS", covers, append = false } = {}) {
+function writeReview(dir, id, { status = "PASS", covers, append = false, by = "qa-engineer" } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const header = append ? "" : `# QA review — ${id}\n\n${covers ? `covers: ${covers.join(", ")}\n\n` : ""}`;
-  const section = `## ${isoNow()} — ${status} — by qa-engineer\n\n${status === "PASS" ? "looks good" : "not yet"}\n\n`;
+  const section = `## ${isoNow()} — ${status} — by ${by}\n\n${status === "PASS" ? "looks good" : "not yet"}\n\n`;
   const filePath = path.join(dir, `review_${id}.md`);
   if (append) fs.appendFileSync(filePath, section);
   else fs.writeFileSync(filePath, header + section);
@@ -222,7 +222,9 @@ test("AC3: a handoff that parses but carries no active_feature at all is still c
 // AC4 — same-feature roll-up vs the REAL exported cap constants
 // ---------------------------------------------------------------------------
 
-test("AC4: --rollup sums hop/review_round/qa_round across matching lanes and names the REAL exported cap constant's value when over cap", { timeout: 30000 }, async (t) => {
+// E435 (ruling (a) drop): schema 17 has no qa_round, so the roll-up has no qa_round total, cap
+// check or column; hop and review_round keep their caps.
+test("AC4 (E435): --rollup sums hop/review_round across matching lanes, names the REAL exported cap constant's value when over cap, and carries no qa_round total, cap check or column", { timeout: 30000 }, async (t) => {
   const primary = mkPrimary(t, "e177b-ac4-primary-");
   // A third, non-matching lane keeps computeFeatureRollup's own degrade posture
   // clean (readable, real active_feature) so the OVER CAP assertions below
@@ -230,15 +232,17 @@ test("AC4: --rollup sums hop/review_round/qa_round across matching lanes and nam
   await writeLane(primary, { activeFeature: "e177b-unrelated-primary-lane", hopCount: 0 });
   const wtA = addWorktree(t, primary, "feat/e906a-capcheck", "e177b-ac4-a-");
   const wtB = addWorktree(t, primary, "feat/e906b-capcheck", "e177b-ac4-b-");
-  await writeLane(wtA, { activeFeature: "e906-capcheck", hopCount: HOP_CAP_EXPORTED + 1, reviewRound: 3, qaRound: 2 });
-  await writeLane(wtB, { activeFeature: "e906-capcheck", hopCount: HOP_CAP_EXPORTED + 1, reviewRound: 3, qaRound: 3 });
+  await writeLane(wtA, { activeFeature: "e906-capcheck", hopCount: HOP_CAP_EXPORTED + 1, reviewRound: 3 });
+  await writeLane(wtB, { activeFeature: "e906-capcheck", hopCount: HOP_CAP_EXPORTED + 1, reviewRound: 3 });
 
   const report = computeLaneStatus({ repoRoot: primary });
   const rollup = rollupSameFeature(report, "e906-capcheck");
   assert.equal(rollup.matchingLanes.length, 2);
   assert.equal(rollup.totals.hop, 2 * (HOP_CAP_EXPORTED + 1), `must sum only the ${rollup.featureId} lanes, never every lane in the repo`);
   assert.equal(rollup.totals.reviewRounds, 6);
-  assert.equal(rollup.totals.qaRounds, 5);
+  assert.equal("qaRounds" in rollup.totals, false, "schema 17: no qa_round total");
+  assert.ok(rollup.matchingLanes.every((l) => !("qaRound" in l)), "schema 17: no qaRound on a lane row");
+  assert.deepEqual(rollup.capChecks.map((c) => c.metric).sort(), ["hop", "review_round"], "no qa_round cap check (ROUND_CAP removed)");
 
   const hopCheck = rollup.capChecks.find((c) => c.metric === "hop");
   assert.equal(hopCheck.capName, "HOP_CAP_EXPORTED", "must name the REAL exported constant, never a bare number");
@@ -257,6 +261,7 @@ test("AC4: --rollup sums hop/review_round/qa_round across matching lanes and nam
     rendered,
     new RegExp(`OVER CAP: feature total review_round 6 exceeds REVIEW_ROUND_CAP_EXPORTED = ${REVIEW_ROUND_CAP_EXPORTED}`),
   );
+  assert.doesNotMatch(rendered, /qa_round|\bROUND_CAP_EXPORTED/, "no qa_round column, total or cap in the rendered roll-up");
 });
 
 // ---------------------------------------------------------------------------
@@ -372,7 +377,7 @@ test("AC5c: a feature id with no derivable ticket token prints the exact fallbac
 // AC6 — cross-feature (wave-level) roll-up: per-lane caps, informational sum
 // ---------------------------------------------------------------------------
 
-test("AC6: --lanes/--all sums across DIFFERING active_feature values, evaluates caps PER LANE only, and marks the combined total informational", { timeout: 30000 }, async (t) => {
+test("AC6 (E435): --lanes/--all sums across DIFFERING active_feature values, evaluates caps PER LANE only, marks the combined total informational, and has no qa_round column or total", { timeout: 30000 }, async (t) => {
   const primary = mkPrimary(t, "e177b-ac6-primary-");
   await writeLane(primary, { activeFeature: "e177b-ac6-primary-noise", hopCount: 0 });
   const wtA = addWorktree(t, primary, "feat/e910-one", "e177b-ac6-a-");
@@ -402,6 +407,9 @@ test("AC6: --lanes/--all sums across DIFFERING active_feature values, evaluates 
   assert.match(rendered, /Caps are evaluated PER LANE/);
   assert.match(rendered, /Combined total \(informational only, not capped\)/);
   assert.match(rendered, new RegExp(`OVER CAP: lane ${path.basename(wtC)} .* hop ${HOP_CAP_EXPORTED + 1} exceeds HOP_CAP_EXPORTED`));
+  assert.equal("qaRounds" in subset.combined, false, "schema 17: no qa_round in the combined total");
+  assert.ok(subset.perLaneCaps.every((p) => p.checks.every((c) => c.metric !== "qa_round")), "no per-lane qa_round cap check");
+  assert.doesNotMatch(rendered, /qa_round/, "no qa_round column or total in the rendered cross-lane roll-up");
 
   // --all must include the noisy primary lane too, and every named lane is
   // listed under its OWN active_feature (never a shared/blended one).
@@ -441,6 +449,18 @@ test("laneMatchesName: matches by worktree basename, branch-derived laneId, or t
   assert.equal(laneMatchesName(row, "  E913  "), true, "case/whitespace-insensitive");
   assert.equal(laneMatchesName(row, ""), false);
   assert.equal(laneMatchesName(row, "nope"), false);
+});
+
+// E435 REPORT_SIGNERS: a read-only report counts the judge's (code-reviewer's) PASS sections and
+// pre-v5 qa-engineer ones; any other signer is not evidence.
+test("AC5b (E435): checkLaneEvidence counts PASS sections signed by code-reviewer or qa-engineer (pre-v5), never by another role", { timeout: 30000 }, () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "e177b-signers-"));
+  const qaDir = path.join(ws, "qa_reports");
+  writeReview(qaDir, "T-E915-01", { by: "code-reviewer" });
+  writeReview(qaDir, "T-E915-02", { by: "qa-engineer" });
+  writeReview(qaDir, "T-E915-03", { by: "sr-engineer" });
+  const result = checkLaneEvidence(ws, "e915-signers", [], "e915");
+  assert.deepEqual([...result.evidenceIds].sort(), ["T-E915-01", "T-E915-02"]);
 });
 
 test("Security/boundary: checkLaneEvidence never lets a hostile active_feature escape qa_reports/ as an archive path segment", { timeout: 30000 }, () => {
