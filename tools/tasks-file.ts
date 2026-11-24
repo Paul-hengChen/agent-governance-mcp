@@ -459,7 +459,7 @@ export async function rollbackTaskInFile(
  * same bytes. The caller still decides WHETHER to refuse (row or ledger marks
  * the task done); this only picks the recovery advice for the state found. A
  * ledger-only hit cannot be fixed by rollback (the row is already open), so it
- * names the qa-engineer FAIL write that clears the ledger. (E359)
+ * names the code-reviewer FAIL write that clears the ledger. (E359)
  */
 export function voidRefusalMessage(
   taskId: string,
@@ -471,14 +471,14 @@ export function voidRefusalMessage(
     return (
       prefix +
       `the task list shows it open, but the handoff completed_tasks ledger still records it. ` +
-      `Have qa-engineer remove it first with a FAIL write (tw_update_state) carrying ` +
+      `Have code-reviewer remove it first with a FAIL write (tw_update_state) carrying ` +
       `review_task_ids=[${taskId}]; then void it.`
     );
   }
   if (ledgerCompleted) {
     return (
       prefix +
-      `to undo it, roll it back (tw_rollback_task) and have qa-engineer remove it from the ` +
+      `to undo it, roll it back (tw_rollback_task) and have code-reviewer remove it from the ` +
       `handoff completed_tasks ledger with a FAIL write (tw_update_state) carrying ` +
       `review_task_ids=[${taskId}]; then void it.`
     );
