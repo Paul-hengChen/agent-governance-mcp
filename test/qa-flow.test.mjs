@@ -1898,21 +1898,22 @@ test("T-C9-10/AC-5: sr-engineer write carrying review_verdict=APPROVED is REJECT
 // release-engineer has a legal write path in and out (T-MATRIX-C13, v3.49.0)
 // ============================================================================
 // Without a legal path an agent may hand-edit handoff.md instead of stopping.
-// Pins qa-engineer:PASS → release-engineer:In_Progress, release-engineer:In_Progress
-// → pm:In_Progress, a non-empty allowed set, the unchanged earlier PASS successors
+// Pins code-reviewer:PASS → release-engineer:In_Progress (E435: the judge's
+// PASS; qa-engineer:PASS survives only as a legacy exit key), release-engineer:In_Progress
+// → pm:In_Progress, a non-empty allowed set, the PASS successors
 // and steady round counters (specs/c13-release-engineer-write-path.md).
 
-// ---------- opening edge — qa-engineer:PASS → release-engineer:In_Progress (T-MATRIX-C13(a)) ----------
+// ---------- opening edge — code-reviewer:PASS → release-engineer:In_Progress (T-MATRIX-C13(a)) ----------
 
-test("T-MATRIX-C13: qa-engineer:PASS → release-engineer:In_Progress accepted", () => {
+test("T-MATRIX-C13 (E435): code-reviewer:PASS → release-engineer:In_Progress accepted", () => {
   // WHY: this is the legal opening write the incident lacked — release-engineer
   // stamping its own agent_id straight out of PASS, no more mis-stamping as
   // "pm" and no more hand-editing handoff.md to route around a rejection.
+  // Since E435 the PASS it opens from is the judge's, code-reviewer:PASS.
   assert.equal(
     validateTransition({
-      prev: { agent: "qa-engineer", status: "PASS" },
+      prev: { agent: "code-reviewer", status: "PASS" },
       next: { agent: "release-engineer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -1930,7 +1931,6 @@ test("T-MATRIX-C13: release-engineer:In_Progress → pm:In_Progress accepted", (
     validateTransition({
       prev: { agent: "release-engineer", status: "In_Progress" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -1947,7 +1947,6 @@ test("T-MATRIX-C13: release-engineer:In_Progress → sr-engineer:In_Progress REJ
   const r = validateTransition({
     prev: { agent: "release-engineer", status: "In_Progress" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
   });
   assert.ok(r, "transition must be rejected");
@@ -1974,7 +1973,6 @@ test("T-MATRIX-C13: release-engineer:In_Progress → qa-engineer:In_Progress REJ
   const r = validateTransition({
     prev: { agent: "release-engineer", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
   });
   assert.ok(r, "transition must be rejected");
@@ -2007,89 +2005,75 @@ test("T-MATRIX-C13: release-engineer:In_Progress row is present in ALLOWED_TRANS
   );
 });
 
-// ---------- qa-engineer:PASS keeps its pm/researcher successors (T-MATRIX-C13(d)) ----------
+// ---------- the judge's PASS keeps the pm/researcher successors (T-MATRIX-C13(d)) ----------
 
-test("T-MATRIX-C13: qa-engineer:PASS → pm:In_Progress still accepted (no regression from AC1 edit)", () => {
-  // WHY: AC1 is additive — adding release-engineer as a third successor of
-  // qa-engineer:PASS must not disturb the two pre-existing edges.
+test("T-MATRIX-C13 (E435): code-reviewer:PASS → pm:In_Progress accepted (the next feature opens from the judge's PASS)", () => {
+  // WHY: AC1 is additive — release-engineer as a successor of the PASS row
+  // must not disturb the pre-existing edges; E435 moves them to code-reviewer:PASS.
   assert.equal(
     validateTransition({
-      prev: { agent: "qa-engineer", status: "PASS" },
+      prev: { agent: "code-reviewer", status: "PASS" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
   );
 });
 
-test("T-MATRIX-C13: qa-engineer:PASS → researcher:In_Progress still accepted (no regression from AC1 edit)", () => {
+test("T-MATRIX-C13 (E435): code-reviewer:PASS → researcher:In_Progress accepted", () => {
   assert.equal(
     validateTransition({
-      prev: { agent: "qa-engineer", status: "PASS" },
+      prev: { agent: "code-reviewer", status: "PASS" },
       next: { agent: "researcher", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
   );
 });
 
-test("T-MATRIX-C13/E37: qa-engineer:PASS allowed-next contains all four successors {pm, researcher, release-engineer, design-auditor}", () => {
-  // WHY: a direct spot-check of the static row itself, complementing the
-  // behavioural accept tests above. The row holds pm, researcher,
-  // release-engineer, and design-auditor (whose post-PASS opening edge matches
-  // the fresh-workspace null:null opener's design-auditor:In_Progress entry).
-  // The test pins identity (row.some per entry) AND count (row.length), so a
-  // future edit that swaps one successor for another without changing the
-  // count is still caught. (E37, v3.94.0)
-  const row = ALLOWED_TRANSITIONS.get("qa-engineer:PASS");
-  assert.ok(row, "qa-engineer:PASS row must exist");
-  assert.ok(row.some((c) => c.agent === "pm" && c.status === "In_Progress"), "row must retain (pm, In_Progress)");
-  assert.ok(
-    row.some((c) => c.agent === "researcher" && c.status === "In_Progress"),
-    "row must retain (researcher, In_Progress)",
-  );
-  assert.ok(
-    row.some((c) => c.agent === "release-engineer" && c.status === "In_Progress"),
-    "row must retain (release-engineer, In_Progress)",
-  );
-  assert.ok(
-    row.some((c) => c.agent === "design-auditor" && c.status === "In_Progress"),
-    "row must gain (design-auditor, In_Progress) — E37",
-  );
-  assert.equal(row.length, 4, "row must have exactly 4 successors — additive, not a fifth accidental entry");
+test("T-MATRIX-C13/E37 (E435): code-reviewer:PASS and the legacy qa-engineer:PASS exit key both list exactly {pm, researcher, release-engineer, design-auditor}", () => {
+  // WHY: a direct spot-check of the static rows, complementing the behavioural
+  // accept tests above. deepEqual pins identity, count and order, so swapping
+  // one successor for another is still caught (E37). E435: code-reviewer:PASS
+  // is the new key; qa-engineer:PASS stays, unreachable as a target, so a
+  // workspace upgraded at a closed qa PASS can still open its next feature (DR-3).
+  const expected = [
+    { agent: "pm", status: "In_Progress" },
+    { agent: "researcher", status: "In_Progress" },
+    { agent: "release-engineer", status: "In_Progress" },
+    { agent: "design-auditor", status: "In_Progress" },
+  ];
+  assert.deepEqual(ALLOWED_TRANSITIONS.get("code-reviewer:PASS"), expected, "code-reviewer:PASS row (new key)");
+  assert.deepEqual(ALLOWED_TRANSITIONS.get("qa-engineer:PASS"), expected, "qa-engineer:PASS legacy exit row, unchanged");
 });
 
 // ---------- round counters hold across the release hop (T-MATRIX-C13(e)) ----------
 
-test("T-MATRIX-C13: computeNewRound holds qa_round/review_round/visual_round steady across qa-engineer:PASS → release-engineer:In_Progress", () => {
-  // WHY: next=(release-engineer, In_Progress) matches none of
-  // computeNewRound's reset-or-increment branches (all keyed on qa-engineer or
-  // pm as next.agent), so all three counters must hold from a nonzero prior
-  // value — correct, since PASS already zeroed them and nothing should change
-  // on the hop into release-engineer. Both calls here are a role change
-  // (qa-engineer -> release-engineer) with no feature_changed, so hop_count = 1
-  // in both cases (see the hop_count note above). (spec AC4)
+test("T-MATRIX-C13 (E435): computeNewRound holds review_round/visual_round steady across code-reviewer:PASS → release-engineer:In_Progress", () => {
+  // WHY: next=(release-engineer, In_Progress) matches none of computeNewRound's
+  // reset-or-increment branches, so both counters hold from a nonzero prior
+  // value — PASS already zeroed them and nothing changes on the release hop.
+  // Role change with no feature_changed, so hop_count = 1. E435 signature:
+  // (review, visual, next, prev, …); no qa_round / qa_rounds_total. (spec AC4)
+  const cr_pass = { agent: "code-reviewer", status: "PASS" };
   assert.deepEqual(
-    computeNewRound(2, 3, 4, { agent: "release-engineer", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
-    { qa_round: 2, review_round: 3, visual_round: 4, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    computeNewRound(3, 4, { agent: "release-engineer", status: "In_Progress" }, cr_pass),
+    { review_round: 3, visual_round: 4, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
   // Also pin the zero-prior case (the realistic post-PASS state).
   assert.deepEqual(
-    computeNewRound(0, 0, 0, { agent: "release-engineer", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
-    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    computeNewRound(0, 0, { agent: "release-engineer", status: "In_Progress" }, cr_pass),
+    { review_round: 0, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });
 
-test("T-MATRIX-C13: computeNewRound re-zeros all three counters on release-engineer:In_Progress → pm:In_Progress", () => {
-  // WHY: the closing write hits the existing (pm, In_Progress) reset branch —
-  // already covered generically elsewhere, but this pins it specifically after
-  // a (release-engineer, In_Progress) prev. Role change (release-engineer ->
-  // pm), no feature_changed, so hop_count = 1. (spec AC4)
+test("T-MATRIX-C13 (E435): computeNewRound re-zeros both counters on release-engineer:In_Progress → pm:In_Progress", () => {
+  // WHY: the closing write hits the (pm, In_Progress) reset branch, pinned
+  // here after a (release-engineer, In_Progress) prev. Role change, no
+  // feature_changed, so hop_count = 1. (spec AC4)
   assert.deepEqual(
-    computeNewRound(2, 3, 4, { agent: "pm", status: "In_Progress" }, { agent: "release-engineer", status: "In_Progress" }),
-    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    computeNewRound(3, 4, { agent: "pm", status: "In_Progress" }, { agent: "release-engineer", status: "In_Progress" }),
+    { review_round: 0, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });
 
@@ -2097,72 +2081,82 @@ test("T-MATRIX-C13: computeNewRound re-zeros all three counters on release-engin
 // design-auditor may open the next feature after a PASS (T-E37-01, v3.94.0)
 // ============================================================================
 // The design-armed chain opens each feature with design-auditor before pm, so
-// qa-engineer:PASS must admit design-auditor:In_Progress, or every feature after
-// the first is rejected. qa-engineer:FAIL is deliberately not widened (a failure
-// starts a fix loop, not a re-audit); a reject test pins that.
+// the PASS row (code-reviewer:PASS since E435) must admit design-auditor:In_Progress,
+// or every feature after the first is rejected. The FAIL rows are deliberately not
+// widened (a failure starts a fix loop, not a re-audit); a reject test pins that.
 
-// ---------- opening edge — qa-engineer:PASS → design-auditor:In_Progress (T-E37-01(a)) ----------
+// ---------- opening edge — code-reviewer:PASS → design-auditor:In_Progress (T-E37-01(a)) ----------
 
-test("T-E37-01: qa-engineer:PASS → design-auditor:In_Progress accepted", () => {
+test("T-E37-01 (E435): code-reviewer:PASS → design-auditor:In_Progress accepted", () => {
   // WHY: the legal post-PASS opening write — design-auditor stamps its own
   // agent_id straight out of a prior feature's PASS to open the next one,
   // exactly as it can from null:null. Mirrors the release-engineer opening
   // edge test above (T-MATRIX-C13(a)).
   assert.equal(
     validateTransition({
-      prev: { agent: "qa-engineer", status: "PASS" },
+      prev: { agent: "code-reviewer", status: "PASS" },
       next: { agent: "design-auditor", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
   );
 });
 
-// ---------- limit — qa-engineer:FAIL → design-auditor:In_Progress rejected (T-E37-01(b)) ----------
+// ---------- limit — the FAIL rows → design-auditor:In_Progress rejected (T-E37-01(b)) ----------
 
-test("T-E37-01: qa-engineer:FAIL → design-auditor:In_Progress still REJECTED (E38 deferral pin)", () => {
-  // WHY: a QA failure starts a fix loop (sr-engineer/pm), not a re-audit, so
-  // qa-engineer:FAIL is deliberately NOT widened alongside qa-engineer:PASS.
-  // This pin makes any future widening of the FAIL row a deliberate, reviewed
-  // edit rather than an accidental copy of the PASS row's entry. (E37, E38)
+test("T-E37-01 (E435): code-reviewer:FAIL → design-auditor:In_Progress REJECTED; the legacy qa-engineer:FAIL exit key stays unwidened (E38 deferral pin)", () => {
+  // WHY: a failure starts a fix loop (sr-engineer, the test author qa-engineer,
+  // or pm), not a re-audit, so the judge's FAIL row is deliberately NOT widened
+  // alongside the PASS row. Any future widening must be a deliberate, reviewed
+  // edit. E435: the judge's FAIL is code-reviewer:FAIL; its row gains
+  // qa-engineer:In_Progress (a test defect goes back to the test author).
   const r = validateTransition({
-    prev: { agent: "qa-engineer", status: "FAIL" },
+    prev: { agent: "code-reviewer", status: "FAIL" },
     next: { agent: "design-auditor", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
   });
   assert.ok(r, "transition must be rejected");
   assert.equal(r.error, "TRANSITION_REJECTED");
-  assert.ok(
-    !r.allowed.some((a) => a.new_agent === "design-auditor"),
-    `allowed list must NOT contain design-auditor; got ${JSON.stringify(r.allowed)}`,
-  );
   assert.deepEqual(
     r.allowed,
     [
       { new_agent: "sr-engineer", new_status: "In_Progress" },
       { new_agent: "pm", new_status: "In_Progress" },
+      { new_agent: "qa-engineer", new_status: "In_Progress" },
     ],
-    "qa-engineer:FAIL allowed set must be unchanged — exactly {sr-engineer, pm}",
+    "code-reviewer:FAIL allowed set must be exactly {sr-engineer, pm, qa-engineer}",
+  );
+  const legacy = validateTransition({
+    prev: { agent: "qa-engineer", status: "FAIL" },
+    next: { agent: "design-auditor", status: "In_Progress" },
+  });
+  assert.equal(legacy?.error, "TRANSITION_REJECTED");
+  assert.deepEqual(
+    legacy.allowed,
+    [
+      { new_agent: "sr-engineer", new_status: "In_Progress" },
+      { new_agent: "pm", new_status: "In_Progress" },
+    ],
+    "qa-engineer:FAIL legacy exit key must be unchanged — exactly {sr-engineer, pm}",
   );
 });
 
 // ---------- round counters hold across the design-auditor hop (T-E37-01(c)) ----------
 
-test("T-E37-01: computeNewRound holds qa_round/review_round/visual_round steady across qa-engineer:PASS → design-auditor:In_Progress", () => {
+test("T-E37-01 (E435): computeNewRound holds review_round/visual_round steady across code-reviewer:PASS → design-auditor:In_Progress", () => {
   // Same expectation as the release-engineer hop test: design-auditor matches
-  // no reset or increment branch, so all three counters hold from nonzero. A
+  // no reset or increment branch, so both counters hold from nonzero. A
   // reachable PASS state already has them at zero, but a future edit adding
   // design-auditor to a reset branch would otherwise go unnoticed.
+  const cr_pass = { agent: "code-reviewer", status: "PASS" };
   assert.deepEqual(
-    computeNewRound(2, 3, 4, { agent: "design-auditor", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
-    { qa_round: 2, review_round: 3, visual_round: 4, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    computeNewRound(3, 4, { agent: "design-auditor", status: "In_Progress" }, cr_pass),
+    { review_round: 3, visual_round: 4, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
   // Also pin the zero-prior case (the realistic post-PASS state).
   assert.deepEqual(
-    computeNewRound(0, 0, 0, { agent: "design-auditor", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
-    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    computeNewRound(0, 0, { agent: "design-auditor", status: "In_Progress" }, cr_pass),
+    { review_round: 0, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });
 
@@ -2185,7 +2179,6 @@ test("T-E45-01: qa-engineer:Blocked → pm:In_Progress accepted, no resume_of re
     validateTransition({
       prev: { agent: "qa-engineer", status: "Blocked" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -2214,48 +2207,49 @@ test("T-E45-01: qa-engineer:Blocked row equals exactly {sr-engineer:In_Progress,
 
 // ---------- regression pin: qa-engineer:In_Progress unaffected (no direct pm leak) ----------
 
-test("T-E45-01 (regression pin): qa-engineer:In_Progress row still admits only its three own-agent statuses — no direct pm entry", () => {
-  // WHY: the pm escape belongs to the qa-engineer:Blocked row only. This pins
-  // that the sibling qa-engineer:In_Progress row (the state QA occupies WHILE
-  // reviewing, before it reaches PASS/FAIL/Blocked) has no shortcut to pm —
-  // that would let QA hand off to PM mid-review, skipping the PASS/FAIL/Blocked
-  // decision entirely. (E45)
+test("T-E45-01 (regression pin, E435): qa-engineer:In_Progress row admits only qa-engineer:Blocked and the sr-engineer hand-off — no PASS/FAIL, no direct pm entry", () => {
+  // WHY: the pm escape belongs to the qa-engineer:Blocked row only; the
+  // qa-engineer:In_Progress row (QA writing tests) has no shortcut to pm. E435:
+  // qa-engineer writes tests and is not the judge, so PASS/FAIL leave the row
+  // and the forward edge is the hand-off to sr-engineer. (E45)
   assert.deepEqual(
     ALLOWED_TRANSITIONS.get("qa-engineer:In_Progress"),
     [
-      { agent: "qa-engineer", status: "PASS" },
-      { agent: "qa-engineer", status: "FAIL" },
       { agent: "qa-engineer", status: "Blocked" },
+      { agent: "sr-engineer", status: "In_Progress" },
     ],
-    "qa-engineer:In_Progress must still admit only PASS/FAIL/Blocked — no pm leak",
+    "qa-engineer:In_Progress must admit only Blocked and sr-engineer:In_Progress — no PASS/FAIL, no pm leak",
   );
+  // The removed qa verdict steps are rejected naming the judge (S4/S5 hint).
+  for (const status of ["PASS", "FAIL"]) {
+    const r = validateTransition({
+      prev: { agent: "qa-engineer", status: "In_Progress" },
+      next: { agent: "qa-engineer", status },
+    });
+    assert.equal(r?.error, "TRANSITION_REJECTED", `qa-engineer:${status} must be rejected`);
+    assert.ok(r.hint.endsWith(QA_JUDGE_HINT + IN_FLIGHT_HINT), `qa-engineer:${status} hint names code-reviewer; got ${r.hint}`);
+  }
 });
 
 // ---------- regression pin: round-cap override envelopes unaffected, pinned from this row's direction ----------
 
-test("T-E45-01 (regression pin): qa_round at cap still rejects qa-engineer:Blocked → sr-engineer:In_Progress (QA_ROUND_EXCEEDED, pm-only)", () => {
-  // WHY: round-cap overrides (transitions.ts step 2) outrank the table
-  // lookup (step 4) unconditionally — a target legal at the table level
-  // must still be rejected once qa_round is at cap, exactly as before this
-  // row grew a third entry. The reviewer measured the three cap envelopes
-  // byte-identical across both review rounds; nothing previously pinned
-  // that from THIS row's own direction.
+test("T-E45-01 (regression pin, E435): a stale prev_qa_round=4 no longer caps qa-engineer:Blocked → sr-engineer:In_Progress — the qa round cap is gone (OQ (a))", () => {
+  // WHY: the qa round cap left with qa-engineer's FAIL (E435 OQ (a)); a stale
+  // prev_qa_round from an older client is ignored, so the table-legal edge is
+  // accepted. The review and visual caps below still outrank the table.
   const r = validateTransition({
     prev: { agent: "qa-engineer", status: "Blocked" },
     next: { agent: "sr-engineer", status: "In_Progress" },
     prev_qa_round: 4,
     prev_review_round: 0,
   });
-  assert.ok(r, "transition must be rejected");
-  assert.equal(r.error, "QA_ROUND_EXCEEDED");
-  assert.deepEqual(r.allowed, [{ new_agent: "pm", new_status: "In_Progress" }]);
+  assert.equal(r, null, `expected accept; got ${JSON.stringify(r)}`);
 });
 
 test("T-E45-01 (regression pin): review_round at cap still rejects qa-engineer:Blocked → qa-engineer:In_Progress (REVIEW_ROUND_EXCEEDED, pm-only)", () => {
   const r = validateTransition({
     prev: { agent: "qa-engineer", status: "Blocked" },
     next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 4,
   });
   assert.ok(r, "transition must be rejected");
@@ -2272,7 +2266,6 @@ test("T-E45-01 (regression pin): visual_round at cap still accepts qa-engineer:B
     validateTransition({
       prev: { agent: "qa-engineer", status: "Blocked" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
       prev_visual_round: 6,
     }),
@@ -2365,7 +2358,6 @@ test("T-E53-03(a): release-engineer:In_Progress → release-engineer:Blocked acc
     validateTransition({
       prev: { agent: "release-engineer", status: "In_Progress" },
       next: { agent: "release-engineer", status: "Blocked" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -2381,7 +2373,6 @@ test("T-E53-03(b): release-engineer:Blocked → release-engineer:In_Progress acc
     validateTransition({
       prev: { agent: "release-engineer", status: "Blocked" },
       next: { agent: "release-engineer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -2399,7 +2390,6 @@ test("T-E53-03(c): release-engineer:Blocked → pm:In_Progress accepted (recover
     validateTransition({
       prev: { agent: "release-engineer", status: "Blocked" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -2417,7 +2407,6 @@ test("T-E53-03(d): release-engineer:Blocked → qa-engineer:In_Progress accepted
     validateTransition({
       prev: { agent: "release-engineer", status: "Blocked" },
       next: { agent: "qa-engineer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -2434,7 +2423,6 @@ test("T-E53-03(e): sr-engineer:Blocked → design-auditor:In_Progress accepted (
     validateTransition({
       prev: { agent: "sr-engineer", status: "Blocked" },
       next: { agent: "design-auditor", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -2497,7 +2485,7 @@ function sweepAcceptedEdges() {
   const accepted = [];
   for (const prev of prevTuples) {
     for (const next of nextTuples) {
-      const r = validateTransition({ prev, next, prev_qa_round: 0, prev_review_round: 0 });
+      const r = validateTransition({ prev, next, prev_review_round: 0 });
       if (r === null) accepted.push(`${prev.agent ?? "null"}:${prev.status ?? "null"} -> ${next.agent}:${next.status}`);
     }
   }
@@ -2594,28 +2582,54 @@ const E128_NEW_EDGES_7 = [
   "sr-engineer:Blocked -> sr-engineer:Blocked",
 ].sort();
 
-test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 76 tuples E53+E58+E128 leave standing (durable form of the reviewer's 1056-tuple differential; extended by T-E39-03 for E58's pm:Blocked -> design-auditor:In_Progress edge, and by T-QA-E128-01 for the 7 Blocked->Blocked self-loops)", () => {
+// E435 (one chain, code-reviewer the judge): the 5 old-path edges removed and
+// the 10 new-chain edges added (specs/e435-remove-old-path-architecture.md,
+// New ALLOWED_TRANSITIONS). 76 - 5 + 10 = 81.
+const E435_REMOVED_5 = [
+  "architect:In_Progress -> sr-engineer:In_Progress",
+  "code-reviewer:In_Progress -> qa-engineer:In_Progress",
+  "pm:In_Progress -> sr-engineer:In_Progress",
+  "qa-engineer:In_Progress -> qa-engineer:FAIL",
+  "qa-engineer:In_Progress -> qa-engineer:PASS",
+].sort();
+const E435_ADDED_10 = [
+  "architect:In_Progress -> qa-engineer:In_Progress",
+  "code-reviewer:FAIL -> qa-engineer:In_Progress",
+  "code-reviewer:In_Progress -> code-reviewer:PASS",
+  "code-reviewer:PASS -> design-auditor:In_Progress",
+  "code-reviewer:PASS -> pm:In_Progress",
+  "code-reviewer:PASS -> release-engineer:In_Progress",
+  "code-reviewer:PASS -> researcher:In_Progress",
+  "pm:In_Progress -> qa-engineer:In_Progress",
+  "qa-engineer:In_Progress -> sr-engineer:In_Progress",
+  "sr-engineer:In_Progress -> qa-engineer:In_Progress",
+].sort();
+
+test("T-E53-03(h) (E435): exhaustive matrix sweep — accepted edge set is EXACTLY the 81 tuples E53+E58+E128+E435 leave standing (durable form of the reviewer's 1056-tuple differential; extended by T-E39-03 for E58's pm:Blocked -> design-auditor:In_Progress edge, and by T-QA-E128-01 for the 7 Blocked->Blocked self-loops)", () => {
   // Builds all 1056 (prev, next) tuples from source and pins the accepted set as
   // a literal, so opening or closing any edge fails with a diff. Pinning the
   // accepted set is exhaustive by construction; a list of rejected tuples covers
-  // only the ones someone wrote down. 76 = 69 baseline + 7 Blocked self-loops,
-  // and the sweep reproduces it from source.
-  const EXPECTED = [...E53_BASELINE_69, ...E128_NEW_EDGES_7].sort();
-  assert.equal(EXPECTED.length, 76, "69 baseline + 7 new Blocked self-loops must equal 76");
+  // only the ones someone wrote down. 81 = 69 baseline + 7 Blocked self-loops
+  // - 5 E435 old-path edges + 10 E435 new-chain edges.
+  const EXPECTED = [...E53_BASELINE_69, ...E128_NEW_EDGES_7, ...E435_ADDED_10]
+    .filter((e) => !E435_REMOVED_5.includes(e))
+    .sort();
+  assert.equal(EXPECTED.length, 81, "69 + 7 - 5 + 10 must equal 81");
 
   const sortedAccepted = sweepAcceptedEdges();
-  assert.equal(sortedAccepted.length, 76, `expected exactly 76 accepted edges, got ${sortedAccepted.length}`);
+  assert.equal(sortedAccepted.length, 81, `expected exactly 81 accepted edges, got ${sortedAccepted.length}`);
   assert.deepEqual(
     sortedAccepted,
     EXPECTED,
-    "accepted edge set must match the E53+E58+E128 baseline exactly — any diff here is either an unintended edge opened or an unintended edge closed",
+    "accepted edge set must match the E53+E58+E128+E435 set exactly — any diff here is either an unintended edge opened or an unintended edge closed",
   );
 });
 
-test("T-QA-E128-01(f): differential — accepted-edge-set minus the E53 baseline equals EXACTLY the 7 named Blocked self-loops, with zero removals", () => {
-  // A length-only check misses an edit that swaps one edge for another at 76.
+test("T-QA-E128-01(f) (E435): differential — accepted-edge-set minus the E53 baseline equals EXACTLY the 7 Blocked self-loops plus the 10 E435 edges, and the only removals are the 5 E435 old-path edges", () => {
+  // A length-only check misses an edit that swaps one edge for another at 81.
   // This checks the shape of the change by set subtraction both ways: the fast
-  // path only ever adds same-agent Blocked self-loops.
+  // path only ever adds same-agent Blocked self-loops, and E435 removes exactly
+  // the old-path steps it names.
   const sortedAccepted = sweepAcceptedEdges();
 
   const added = sortedAccepted.filter((e) => !E53_BASELINE_69.includes(e));
@@ -2623,8 +2637,8 @@ test("T-QA-E128-01(f): differential — accepted-edge-set minus the E53 baseline
 
   assert.deepEqual(
     added,
-    E128_NEW_EDGES_7,
-    "accepted-set minus the E53 baseline must equal exactly the 7 named Blocked->Blocked self-loops",
+    [...E128_NEW_EDGES_7, ...E435_ADDED_10].sort(),
+    "accepted-set minus the E53 baseline must equal exactly the 7 Blocked->Blocked self-loops plus the 10 E435 edges",
   );
-  assert.deepEqual(removed, [], "E128 must not remove any edge from the E53 baseline (additive-only cut)");
+  assert.deepEqual(removed, E435_REMOVED_5, "the only edges removed from the E53 baseline are E435's 5 old-path steps");
 });

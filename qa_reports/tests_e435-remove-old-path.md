@@ -170,3 +170,33 @@ Left as is (green on both): the code-reviewer resume accept / wrong-role / legac
 12 red at base, all assertion failures (no syntax/link error): 7 on the unmarked `pm → qa-engineer` edge still needing `resume_of: qa-engineer`, 2 on `pm → sr-engineer` still accepted (pure + integration), 1 on `QA_ROUND_EXCEEDED` from a stale prev_qa_round, 1 on the build-entry gates not arming on pm→qa (CUT_APPROVAL), 1 on the zod enum still accepting `qa-engineer`. Rows under `# T-E435-04` in the manifest. Spot-run: `node --test test/qa-flow.test.mjs` → 153 tests, 106 pass, 47 fail (= 26 T-02 + 9 T-03 + 12 T-04 rows, name-for-name).
 
 Note for T-05: part 4 banner ("release-engineer has a legal write path in and out (T-MATRIX-C13, v3.49.0)") is now at L1897; all 5 remaining old-signature `computeNewRound` calls live there.
+
+## T-E435-05 — `test/qa-flow.test.mjs` part 4 of 4
+
+Sections: "release-engineer has a legal write path in and out (T-MATRIX-C13, v3.49.0)", "design-auditor may open the next feature after a PASS (T-E37-01, v3.94.0)", "qa-engineer:Blocked can escape to pm:In_Progress (T-E45-01, v3.95.0)", "release-engineer:Blocked is reachable … (T-E53-03, v3.98.0, E53)" incl. the exhaustive sweep and the E128 differential. 270 changed lines (142+ / 128−), no a/b split. Placement: existing file, edited in place (brief). All 5 remaining old-signature `computeNewRound` calls re-pinned to `(review, visual, next, prev)`; no old-signature call is left in the file.
+
+### Scenario → Test Map (part 4)
+
+| scenario | exact test name (all in `test/qa-flow.test.mjs`) |
+|---|---|
+| AC2: the judge's PASS opens the release / next feature (re-pins of the qa-engineer:PASS opening edges) | T-MATRIX-C13 (E435): code-reviewer:PASS → release-engineer:In_Progress accepted · T-MATRIX-C13 (E435): code-reviewer:PASS → pm:In_Progress accepted (the next feature opens from the judge's PASS) · T-MATRIX-C13 (E435): code-reviewer:PASS → researcher:In_Progress accepted · T-E37-01 (E435): code-reviewer:PASS → design-auditor:In_Progress accepted |
+| new code-reviewer:PASS key + legacy qa-engineer:PASS exit key (DR-3) | T-MATRIX-C13/E37 (E435): code-reviewer:PASS and the legacy qa-engineer:PASS exit key both list exactly {pm, researcher, release-engineer, design-auditor} |
+| computeNewRound new signature (5 calls in 3 tests) | T-MATRIX-C13 (E435): computeNewRound holds review_round/visual_round steady across code-reviewer:PASS → release-engineer:In_Progress · T-MATRIX-C13 (E435): computeNewRound re-zeros both counters on release-engineer:In_Progress → pm:In_Progress · T-E37-01 (E435): computeNewRound holds review_round/visual_round steady across code-reviewer:PASS → design-auditor:In_Progress |
+| FAIL rows not widened (judge FAIL + legacy qa FAIL) | T-E37-01 (E435): code-reviewer:FAIL → design-auditor:In_Progress REJECTED; the legacy qa-engineer:FAIL exit key stays unwidened (E38 deferral pin) |
+| AC2/AC3 S4/S5 + new qa row | T-E45-01 (regression pin, E435): qa-engineer:In_Progress row admits only qa-engineer:Blocked and the sr-engineer hand-off — no PASS/FAIL, no direct pm entry |
+| OQ (a) qa cap gone | T-E45-01 (regression pin, E435): a stale prev_qa_round=4 no longer caps qa-engineer:Blocked → sr-engineer:In_Progress — the qa round cap is gone (OQ (a)) |
+| whole-table pin (22 keys) | T-E53-03(h) (E435): exhaustive matrix sweep — accepted edge set is EXACTLY the 81 tuples … · T-QA-E128-01(f) (E435): differential — … the 7 Blocked self-loops plus the 10 E435 edges, and the only removals are the 5 E435 old-path edges |
+
+Left as is (green on both): release-engineer closing edge, the two release-engineer rejection/no-wedge tests, the release-engineer:In_Progress row pin, qa-engineer:Blocked → pm accept and row pin, REVIEW/VISUAL cap pins, both E38 lookahead tests, T-E53-03(a)–(g). Stale `prev_qa_round: 0` dropped from every request in the part (incl. the sweep).
+
+### Open Interface Details (part 4)
+
+1. The sweep keeps `E53_BASELINE_69` as the historical literal and adds `E435_REMOVED_5` (pm→sr, architect→sr, code-reviewer→qa, qa:IP→qa:PASS, qa:IP→qa:FAIL) and `E435_ADDED_10` (pm→qa, architect→qa, sr→qa, qa:IP→sr, code-reviewer:IP→code-reviewer:PASS, code-reviewer:FAIL→qa, code-reviewer:PASS→{pm, researcher, release-engineer, design-auditor}), derived from the architecture's 22-key table; 69 + 7 − 5 + 10 = 81. The sweep passes no `prev_sr_return_count`, so the sr-return cap does not fire on sr→qa.
+2. `computeNewRound` with prev `code-reviewer:PASS` holds both counters (the reset branch keys on next = code-reviewer PASS, not prev).
+3. The code-reviewer:FAIL envelope `allowed` order follows the architecture row: sr-engineer, pm, qa-engineer.
+
+### Red Reasons (part 4)
+
+13 red at base, all assertion failures (no syntax/link error): 6 on the missing code-reviewer:PASS key/edges, 3 on the old `computeNewRound` signature (qa_round keys / slot mis-assignment), 1 on the code-reviewer:FAIL row lacking qa-engineer, 1 on the old qa-engineer:In_Progress row, 1 on QA_ROUND_EXCEEDED from a stale prev_qa_round, 2 on the sweep (76 at base vs 81). Rows under `# T-E435-05` in the manifest. Spot-run: `node --test test/qa-flow.test.mjs` → 153 tests, 93 pass, 60 fail (= 26 T-02 + 9 T-03 + 12 T-04 + 13 T-05 rows, name-for-name).
+
+Residual old-path grep over the whole file (`chain_path|test-first|qa_round`): no `chain_path` / `test-first`; every remaining `qa_round` mention is an absence assertion, a stale-input-ignored probe (`prev_qa_round: 4` → no cap), a comment, or one of part 1's two untouched pure-predicate AC-11 sentinel tests. No test asserts a qa-engineer PASS/FAIL write or completion as accepted; `qa-engineer:PASS` / `:FAIL` appear only as legacy exit keys (prev side).
