@@ -16,6 +16,101 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+MAJOR release. It ships nine backlog tickets of the v5.0.0 milestone, landed on `main` in seven
+waves since v4.22.0: E419 and E422 (wave 1), E423 and E431 (wave 2), E432 (wave 3), E433 (wave 4),
+E434 (wave 5), E445 (wave 6) and E435 (wave 7). The base is v4.23.0, a maintenance release cut from
+the `v4.22.0` tag that shipped E444; E444's code, docs and test are on `main` unchanged and are not
+re-listed here. Release gate `specs/release-cd-v5.0.0.md`. Semver: MAJOR, because the routing chain
+changes for every workspace: qa-engineer no longer writes PASS, five old-path transitions are
+rejected, three error codes are removed and one replaces two, the handoff schema drops fields, and
+one `tw_update_state` parameter is gone.
+
+### Upgrade notes — read before upgrading from 4.x
+
+The full guide is `docs/migration-v5.md`.
+
+- **One chain; code-reviewer judges.** The build order is pm, then architect when needed, then
+  qa-engineer (writes the scenario tests first), then sr-engineer (builds to them), then
+  code-reviewer (judges tests and implementation, writes PASS, and alone records
+  `completed_tasks` and calls `tw_complete_task`). qa-engineer no longer writes PASS or FAIL.
+- **Handoff schema 16 → 17**, migrated lazily on first read: `chain_path`, `qa_round` and
+  `qa_rounds_total` are dropped; nothing else in the handoff changes. A `chain_path` or
+  `bookkeeping_write` sent by an old client is ignored, not rejected.
+- **Rejected steps.** The server no longer accepts `pm → sr-engineer`, `architect → sr-engineer`,
+  `code-reviewer → qa-engineer`, `qa-engineer:PASS` or `qa-engineer:FAIL`; the rejection names the
+  code-reviewer route and points at the migration guide. A handoff already sitting at
+  `qa-engineer:PASS` or `qa-engineer:FAIL` can still leave it. `resume_of` accepts only
+  `code-reviewer`. The guide has one row per mid-flight state saying how to finish or restart.
+- **Error codes.** Removed: `QA_ROUND_EXCEEDED` (there is no qa round),
+  `BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE` and `STAMP_PROVENANCE_SUSPECT` (E419).
+  `REVIEWER_COMPLETED_TASKS_REJECTED` and `NON_QA_COMPLETED_TASKS_REJECTED` are replaced by one
+  code, `NON_JUDGE_COMPLETED_TASKS_REJECTED`. Added: `SR_RETURN_CAP_EXCEEDED`; the `sr_return` cap
+  (sr-engineer returns to qa-engineer, 2 per feature) applies to every file-mode feature. Old
+  telemetry rows carrying a removed code show as unregistered codes in `tw_gate_stats`, and the
+  `mean_qa_rounds` metric is gone.
+- **Releases.** A release needs the gate feature closed by `(code-reviewer, PASS)`; the `Release`
+  workflow's `start` checks that tuple.
+- **Re-copy `~/.claude/agents/`.** The qa-engineer template now runs on opus, the qa-visual template is gone
+  and the reviewer-visual template is new (`templates/claude-code-agents/reviewer-visual.md`). Re-copy the
+  templates and delete any stale qa-visual template there. Local rules kept in a skill-qa-visual.md override
+  under .current belong in skill-reviewer-visual.md there; no prompt loads the old name.
+- **Re-stamp `agc-version`.** Run `agc init` (or `agc check` to see what is stale).
+- **SQLite / HTTP mode.** Same transition table and judge; no column or SQLite schema version
+  change. SQLite does not store `sr_return_count`, so the `sr_return` cap is not enforced there.
+
+### Added
+
+- **Ticket file format (E422).** A ticket can be one Markdown file that anyone can work from without
+  this tooling: a field block (id, title, priority, dependencies, paths it may change, whether a
+  scenario needs a device or a person, status) and Given/When/Then scenarios, each with one
+  verification. Format `docs/ticket-format.md`, template `templates/ticket.md`, checker
+  `scripts/check-tickets.mjs` (`npm run check:tickets`), and the optional `ticketDir` key in the
+  workspace config file (default docs/tickets; see `docs/config.md`).
+- **`spec-workshop` prompt (E423, E445).** A thirteenth registered prompt, prompt-only like the
+  integrator: a human-started discussion that turns specs, design sources or a bare idea into
+  rulings, ticket files and a parallel wave table. It asks in dependency order, at most four
+  questions a batch, keeps facts the code can answer apart from decisions only the human can make,
+  and never records its own recommendation as a ruling (`content/skill-spec-workshop.md`).
+- **Design mode `prototype` (E423).** A local prototype export can be a design source, alone or
+  beside Figma (the dual-source rule in `content/skill-design-auditor.md`). An unrecognised declared
+  design mode now arms the visual checks and is named in the rejection.
+
+### Changed
+
+- **Test-first chain (E431–E433, E435).** The constitution and every role SOP describe the one
+  chain above. qa-engineer writes one test per scenario against the public interface and hands the
+  red tests to sr-engineer with `qa_reports/expected-red_<feature>.txt`, or records
+  `qa_reports/no-new-test_<feature>.txt` when existing tests already cover every scenario; the
+  hand-off is rejected with `REPRO_MANIFEST_MISSING` without one of them. sr-engineer may not edit
+  those tests. For a bug ticket sr-engineer writes the reproduction test when qa-engineer could not.
+  The PASS-time evidence checks read the judge's report (E432).
+- **Visual verdict moves to code-reviewer (E434).** `reviewer-visual`, a code-reviewer sub-skill
+  pinned to opus (`content/skill-reviewer-visual.md`), replaces `qa-visual`. Capture and pixel
+  difference are executable checks qa-engineer writes; an accepted over-threshold difference is
+  listed under `## Allowed Differences` with no human stop; visual rejections count in the review
+  round cap.
+
+### Removed
+
+- **Two unused mechanisms (E419).** The `bookkeeping_write` parameter of `tw_update_state`, the
+  stamp-provenance check and the `stampAdvisory` field of `tw_detect_drift`. Neither had fired in
+  any measured workspace.
+- **The old build path (E435).** The pre-v5 transitions, the path marker, qa-engineer's PASS and
+  task-completion authority, and the qa round cap.
+
+### Notes
+
+- Counts: `GATE_REGISTRY` 36 → 33 entries, the write pipeline 19 → 17 steps, 13 tools (one input
+  parameter fewer), 12 → 13 prompts, transition table 21 → 22 keys, `CURRENT_VERSIONS.handoff`
+  15 → 17. No dependency changes.
+- Context size (characters / 4, the measure of `test/context-budget.test.mjs`): full coordinator
+  bundle 19012 to 19063 tokens, design-armed constitution 9387 to 9187, non-design constitution
+  7484 to 7275, lean bundle 5761 to 5969, pm SOP 4791 to 4942, sr-engineer SOP 2816 to 3285; the
+  new spec-workshop SOP is capped at 1415. All 12 compose goldens were re-captured.
+- Not in this release: E448 (the review-evidence check never arms on the test-first chain) is
+  filed for a later release. The live behavioural eval (`npm run eval`) was not run for this
+  release, by human ruling.
+
 ## [4.23.0] - 2026-11-23
 
 MINOR release. It ships one backlog ticket, E444, from a maintenance branch cut at the `v4.22.0`
