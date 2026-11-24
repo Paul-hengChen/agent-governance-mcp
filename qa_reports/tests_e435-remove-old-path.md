@@ -751,3 +751,29 @@ No change needed (left as is):
 ### Red Reasons (T-20)
 
 21 red at base, all for the stated reason (no syntax / link error): 7 are `CURRENT_VERSIONS.handoff` 16 with no v16 -> v17 step (chain / heal stops at 16, refuse-loud names max 16) (T-E435-29); 8 `computeNewRound` re-pins on the old 11-slot signature (7 slot mis-assignment, 1 TypeError reading 'agent') (T-E435-30); 4 writer / parser still emit / read `qa_rounds_total` (T-E435-29); 2 metrics record still carries `qa_rounds` (T-E435-34). No test dropped. Rows under `# T-E435-20` in the manifest. Run: `node --test test/rag-lifecycle.test.mjs test/rag.test.mjs test/success-metrics.test.mjs test/stale-dispatch-detection.test.mjs` → 118 tests, 97 pass, 21 fail = the 21 rows, name for name.
+
+## T-E435-21 — `visual-gate-e2e`, `visual-round-sqlite`, `visual-evidence-gate`, `pixel-gate-attestation`, `baseline-manifest-gate` (AC2, AC9)
+
+Placement: existing files, edited in place (brief). Re-pinned tests carry `E435`. 102 changed test lines (60+ / 42-), under the 300-line cap. Contract: architecture *Interface Contracts* (`computeNewRound(review, visual, next, prev, notes, …)`, `TransitionRequest` without `prev_qa_round`, legacy exit key `qa-engineer:FAIL` kept), *Handoff schema v17*, *SQLite* (column in the DDL, unread; positional `qaRound` slot kept and ignored), build-entry gates arm on `{architect, qa-engineer}`, Rulings (a) drop / (d) SQLite. Scope limit honoured: no visual round counting, `VISUAL_ROUND_EXCEEDED` or visual gate family semantics changed (E420).
+
+### Scenario → Test Map (T-21)
+
+| scenario | exact test name(s) |
+|---|---|
+| `computeNewRound` new signature, visual branch unchanged, no `qa_round` in the result | visual-gate-e2e `AC-6 (E435): Round 6 sentinel — fires on cap-cross from prev=5`, `AC-10 (E435): handler composition — computeNewRound resets visual_round on PM re-entry post-cap` |
+| file-mode writer: judge `code-reviewer` FAIL row round-trips `visual_round`, no `qa_round` field | visual-gate-e2e `AC-7 (E435): visual_round persists across writeState → readback; no qa_round field` |
+| SQLite (AC9): judge rows written by `code-reviewer`; `qa_round` column not read | visual-round-sqlite `AC-8 (E435): writeState(visualRound=4) → parse(...).visual_round === 4; qa_round not read`, `AC-8 (E435): visual_round resets to 0 on the judge's (code-reviewer) PASS write` (+ the increment test's rows re-pinned to code-reviewer) |
+| `VISUAL_ROUND_EXCEEDED` composition without `prev_qa_round` | visual-gate-e2e AC-10 cap tests (names unchanged) |
+| scope-decision build entry `pm -> {architect, qa-engineer}`; `pm -> sr-engineer` not a gated target | visual-evidence-gate `AC-1 (E435): gate FIRES — design armed + pm→qa-engineer build entry + no scope decision`, `AC-6 (E435): gate SILENT for non-build transition target even when design armed`, `Edge (E435): re-entry architect→qa-engineer NOT blocked (non-pm predecessor)` (+ AC-2/AC-3/AC-5/AC-6-status targets moved sr-engineer -> qa-engineer) |
+
+No change needed: `test/pixel-gate-attestation.test.mjs` and `test/baseline-manifest-gate.test.mjs` hold no qa-PASS / closing-role / old-edge / marker / `qa_round` part (pure gate predicates and judge-agnostic registry message strings; their "qa-engineer edit" comments are about the test author, still qa-engineer). Visual-gate-e2e PASS-gate predicate tests (v3.16.0 block, AC-5) are judge-agnostic and stay.
+
+### Open Interface Details (T-21)
+
+1. `VISUAL_ROUND_EXCEEDED`: the AC-10 cap tests keep prev `(qa-engineer, FAIL)` — the kept legacy exit key, i.e. an upgraded workspace sitting at `visual_round` 6 — and only drop `prev_qa_round`; `validateTransition`'s visual cap is prev-agent-independent, so the rejection / pm-only reset are what the new contract still does. Noted, not fixed: through tool writes the cap is unreachable since E435 (`visual_round` ticks only on a qa-engineer FAIL with `visual_fail:`), E420's scope.
+2. AC-6 sentinel keeps the `(qa-engineer, FAIL)` + `visual_fail:` input because the visual branch is unchanged (T-20 E8-C3 precedent).
+3. The visual-evidence-gate scope-decision predicate is a local mirror of the orchestrator guard; its re-pins are green at base and after (a mirror cannot go red), they keep the mirror equal to the new contract.
+
+### Red Reasons (T-21)
+
+4 red at base, all for the stated reason (no syntax / link error): 2 `computeNewRound` re-pins on the old 11-slot signature (TypeError reading 'agent') (T-E435-30); 1 file-mode writer / parser still emit / read `qa_round` (T-E435-29); 1 SQLite parse still reads `qa_round` (T-E435-34). No test dropped. Rows under `# T-E435-21` in the manifest. Run: `node --test test/visual-gate-e2e.test.mjs test/visual-round-sqlite.test.mjs test/visual-evidence-gate.test.mjs test/pixel-gate-attestation.test.mjs test/baseline-manifest-gate.test.mjs` → 168 tests, 164 pass, 4 fail = the 4 rows, name for name.

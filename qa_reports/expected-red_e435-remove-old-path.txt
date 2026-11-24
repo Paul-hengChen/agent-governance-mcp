@@ -426,3 +426,9 @@ test/success-metrics.test.mjs | E8-H3 (E435): parseHandoff sanitises negative/Na
 test/success-metrics.test.mjs | E8-H4 (E435): writeHandoffState ALWAYS serializes review/visual totals into YAML, even when 0; never qa_rounds_total | the writer / parser still emit and read qa_rounds_total at base (schema 16) (T-E435-29)
 test/success-metrics.test.mjs | E8-E1 (E435): full realistic chain — release-engineer terminal-marker write emits exactly one record with the correct shape (no qa_rounds) | metrics record still carries qa_rounds at base (T-E435-34)
 test/success-metrics.test.mjs | E8-E2 (E435): one_pass is true when the review and visual prevState totals are both 0 | metrics record still carries qa_rounds at base (T-E435-34)
+
+# T-E435-21 — visual gate judge re-pins: visual-gate-e2e, visual-round-sqlite, visual-evidence-gate, pixel-gate-attestation, baseline-manifest-gate
+test/visual-gate-e2e.test.mjs | AC-6 (E435): Round 6 sentinel — fires on cap-cross from prev=5 | old 11-slot computeNewRound signature (qa slot first): next read from slot 4, TypeError reading 'agent' (T-E435-30)
+test/visual-gate-e2e.test.mjs | AC-7 (E435): visual_round persists across writeState → readback; no qa_round field | the writer / parser still emit and read qa_round at base (schema 16): qa_round is 0, not undefined (T-E435-29)
+test/visual-gate-e2e.test.mjs | AC-10 (E435): handler composition — computeNewRound resets visual_round on PM re-entry post-cap | old 11-slot computeNewRound signature (qa slot first): next read from slot 4, TypeError reading 'agent' (T-E435-30)
+test/visual-round-sqlite.test.mjs | AC-8 (E435): writeState(visualRound=4) → parse(...).visual_round === 4; qa_round not read | SQLite parse still reads the qa_round column at base: qa_round is 0, not undefined (T-E435-34)
