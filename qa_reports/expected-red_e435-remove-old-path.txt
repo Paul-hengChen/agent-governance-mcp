@@ -41,3 +41,13 @@ test/qa-flow.test.mjs | writeHandoffState ignores the positional qaRound slot: s
 test/qa-flow.test.mjs | writeHandoffState with qaRound omitted writes no qa_round either (E435) | qa_round defaults to 0 (T-E435-29)
 test/qa-flow.test.mjs | parseHandoff backward-compat: missing qa_round frontmatter → no qa_round field (E435) | parser fills qa_round 0 (T-E435-29)
 test/qa-flow.test.mjs | parseHandoff drops a legacy on-disk qa_round (negative here) instead of sanitising it (E435 v16 -> v17) | parser sanitises to 0, no v16 -> v17 drop (T-E435-29)
+# T-E435-03 (qa-engineer): test/qa-flow.test.mjs part 2/4 (T67 / AC-12 + T-MATRIX-A5).
+test/qa-flow.test.mjs | AC-12 (E435 S3): code-reviewer:In_Progress → qa-engineer:In_Progress REJECTED — the judge closes with code-reviewer:PASS | code-reviewer -> qa-engineer still an edge; S3 hint not built (T-E435-30)
+test/qa-flow.test.mjs | AC-12 (E435): sr-engineer cannot skip code-reviewer — sr→code-reviewer:PASS rejected; allowed = review first, qa-engineer only as the test return | unmarked sr-engineer:In_Progress row lacks qa-engineer:In_Progress (T-E435-30)
+test/qa-flow.test.mjs | AC-12 (E435): review_round and visual_round caps are independent; a stale prev_qa_round=4 caps nothing | QA_ROUND_EXCEEDED fires on a stale prev_qa_round; attempted.qa_round emitted (T-E435-30, T-E435-32)
+test/qa-flow.test.mjs | AC-12 (E435): computeNewRound — (code-reviewer, FAIL) increments review_round and its total; visual_round independent | old 11-slot signature: TypeError reading 'agent' (T-E435-30)
+test/qa-flow.test.mjs | AC-12 (E435): computeNewRound — a stale code-reviewer→qa-engineer prev no longer resets review_round (edge gone) | old signature mis-assigns slots (deepEqual mismatch) (T-E435-30)
+test/qa-flow.test.mjs | AC-12 (E435): computeNewRound — (qa-engineer, In_Progress) from sr-engineer does NOT reset review_round | old signature mis-assigns slots (deepEqual mismatch) (T-E435-30)
+test/qa-flow.test.mjs | AC-12 (E435): computeNewRound — (pm, In_Progress) resets review_round and visual_round (re-entry) | old 11-slot signature: TypeError reading 'agent' (T-E435-30)
+test/qa-flow.test.mjs | AC-12 (E435): the judge's terminal step code-reviewer:In_Progress → code-reviewer:PASS is accepted on every feature (regression guard) | code-reviewer:PASS edge only in the marked overlay (T-E435-30)
+test/qa-flow.test.mjs | AC-12 (E435): code-reviewer rows in ALLOWED_TRANSITIONS include the code-reviewer:PASS exit row | no code-reviewer:PASS key in ALLOWED_TRANSITIONS (T-E435-30)

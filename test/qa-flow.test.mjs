@@ -62,6 +62,8 @@ const PM_TO_SR_HINT = (a) =>
   ` The build entry is qa-engineer: hand off ${a}:In_Progress → qa-engineer:In_Progress; qa-engineer writes the scenario tests, or records that the ticket needs no new test, before sr-engineer builds.`;
 const QA_JUDGE_HINT =
   " qa-engineer writes tests and never writes PASS or FAIL: code-reviewer is the judge and writes them from code-reviewer:In_Progress.";
+const REVIEWER_TO_QA_HINT =
+  ' code-reviewer is the judge and closes the feature: approve with code-reviewer:PASS (review_verdict: "APPROVED"), or reject with code-reviewer:FAIL; qa-engineer does not follow code-reviewer.';
 
 // ---------- requireJudge (A — handler-side agent gate; E435: code-reviewer, unconditional) ----------
 
@@ -754,7 +756,6 @@ test("AC-12: sr-engineer:In_Progress → code-reviewer:In_Progress accepted", ()
     validateTransition({
       prev: { agent: "sr-engineer", status: "In_Progress" },
       next: { agent: "code-reviewer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -766,7 +767,6 @@ test("AC-12: code-reviewer:In_Progress → code-reviewer:FAIL accepted (CHANGES_
     validateTransition({
       prev: { agent: "code-reviewer", status: "In_Progress" },
       next: { agent: "code-reviewer", status: "FAIL" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -778,23 +778,28 @@ test("AC-12: code-reviewer:In_Progress → code-reviewer:Blocked accepted", () =
     validateTransition({
       prev: { agent: "code-reviewer", status: "In_Progress" },
       next: { agent: "code-reviewer", status: "Blocked" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
   );
 });
 
-test("AC-12: code-reviewer:In_Progress → qa-engineer:In_Progress accepted (APPROVED handoff)", () => {
-  // The architecture-mandated successful-review handoff path.
-  assert.equal(
-    validateTransition({
-      prev: { agent: "code-reviewer", status: "In_Progress" },
-      next: { agent: "qa-engineer", status: "In_Progress" },
-      prev_qa_round: 0,
-      prev_review_round: 0,
-    }),
-    null,
+test("AC-12 (E435 S3): code-reviewer:In_Progress → qa-engineer:In_Progress REJECTED — the judge closes with code-reviewer:PASS", () => {
+  // WHY: on the one chain code-reviewer is the judge, so its APPROVED review
+  // ends in its own PASS; the old APPROVED hand-off to a qa verdict is gone.
+  // The rejection names the judge's two exits and points an in-flight
+  // feature at docs/migration-v5.md.
+  const r = validateTransition({
+    prev: { agent: "code-reviewer", status: "In_Progress" },
+    next: { agent: "qa-engineer", status: "In_Progress" },
+    prev_review_round: 0,
+  });
+  assert.ok(r, "code-reviewer → qa-engineer must be rejected");
+  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.ok(r.hint.endsWith(REVIEWER_TO_QA_HINT + IN_FLIGHT_HINT), `hint must end with the S3 + in-flight hint; got ${r.hint}`);
+  assert.deepEqual(
+    r.allowed.map((a) => `${a.new_agent}:${a.new_status}`),
+    ["code-reviewer:FAIL", "code-reviewer:Blocked", "code-reviewer:PASS"],
   );
 });
 
@@ -803,7 +808,6 @@ test("AC-12: code-reviewer:FAIL → sr-engineer:In_Progress accepted (Round N+1 
     validateTransition({
       prev: { agent: "code-reviewer", status: "FAIL" },
       next: { agent: "sr-engineer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 1,
     }),
     null,
@@ -815,7 +819,6 @@ test("AC-12: code-reviewer:FAIL → pm:In_Progress accepted (manual escalation)"
     validateTransition({
       prev: { agent: "code-reviewer", status: "FAIL" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 2,
     }),
     null,
@@ -827,7 +830,6 @@ test("AC-12: code-reviewer:Blocked → code-reviewer:In_Progress accepted (unblo
     validateTransition({
       prev: { agent: "code-reviewer", status: "Blocked" },
       next: { agent: "code-reviewer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -839,28 +841,27 @@ test("AC-12: code-reviewer:Blocked → pm:In_Progress accepted (manual escalatio
     validateTransition({
       prev: { agent: "code-reviewer", status: "Blocked" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
   );
 });
 
-test("AC-12: removed sr-engineer→qa-engineer edge rejects with TRANSITION_REJECTED naming code-reviewer", () => {
-  // Why: AC-2 mandates the prior direct edge MUST be rejected; the error
-  // envelope MUST cite the new allowed list so downstream agents can self-correct
-  // to the chain step they missed.
+test("AC-12 (E435): sr-engineer cannot skip code-reviewer — sr→code-reviewer:PASS rejected; allowed = review first, qa-engineer only as the test return", () => {
+  // Why: the build still has to pass through the judge's review. On the one
+  // chain sr→qa-engineer is the return of a test to its author, not a verdict
+  // hop, so the envelope lists code-reviewer:In_Progress first and
+  // qa-engineer:In_Progress last, on every feature (no marker).
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
-    next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
+    next: { agent: "code-reviewer", status: "PASS" },
     prev_review_round: 0,
   });
   assert.ok(r);
   assert.equal(r.error, "TRANSITION_REJECTED");
-  assert.ok(
-    r.allowed.some((a) => a.new_agent === "code-reviewer" && a.new_status === "In_Progress"),
-    `allowed list must contain code-reviewer:In_Progress; got ${JSON.stringify(r.allowed)}`,
+  assert.deepEqual(
+    r.allowed.map((a) => `${a.new_agent}:${a.new_status}`),
+    ["code-reviewer:In_Progress", "sr-engineer:Blocked", "pm:In_Progress", "qa-engineer:In_Progress"],
   );
 });
 
@@ -868,11 +869,10 @@ test("AC-12: removed sr-engineer→qa-engineer edge rejects with TRANSITION_REJE
 
 test("AC-12: review_round=3 + (code-reviewer, FAIL) → REVIEW_ROUND_EXCEEDED (only pm allowed)", () => {
   // Why: the AC-3 circuit breaker — 3 FAILs allowed; the 4th FAIL must force
-  // PM escalation. Symmetric to the qa_round cap.
+  // PM escalation. Since E435 the judge's review_round is the chain's loop cap.
   const r = validateTransition({
     prev: { agent: "code-reviewer", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "FAIL" },
-    prev_qa_round: 0,
     prev_review_round: 4, // cap is REVIEW_ROUND_CAP=4; prev>=cap triggers the gate
   });
   assert.ok(r);
@@ -888,80 +888,78 @@ test("AC-12: review_round cap exceeded — (pm, In_Progress) is the only accepte
     validateTransition({
       prev: { agent: "code-reviewer", status: "FAIL" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 4,
     }),
     null,
   );
 });
 
-test("AC-12: review_round cap independent from qa_round cap", () => {
-  // qa_round=4 + (qa, FAIL) still triggers QA_ROUND_EXCEEDED even when review_round=0.
-  // Documents the AC-3 claim "both counters are checked independently".
-  const r = validateTransition({
-    prev: { agent: "qa-engineer", status: "In_Progress" },
-    next: { agent: "qa-engineer", status: "FAIL" },
-    prev_qa_round: 4,
-    prev_review_round: 0,
-  });
-  assert.ok(r);
-  assert.equal(r.error, "QA_ROUND_EXCEEDED");
+test("AC-12 (E435): review_round and visual_round caps are independent; a stale prev_qa_round=4 caps nothing", () => {
+  // WHY: E435 drops the qa cap (OQ (a)); the two caps left are checked
+  // independently, and neither envelope reports a qa_round any more.
+  const judgeFail = { prev: { agent: "code-reviewer", status: "In_Progress" }, next: { agent: "code-reviewer", status: "FAIL" } };
+  assert.equal(validateTransition({ ...judgeFail, prev_qa_round: 4, prev_review_round: 0 }), null, "no qa cap left to fire");
+  const review = validateTransition({ ...judgeFail, prev_review_round: 4, prev_visual_round: 0 });
+  assert.equal(review?.error, "REVIEW_ROUND_EXCEEDED");
+  assert.ok(!("qa_round" in review.attempted), "no attempted.qa_round (E435)");
+  const visual = validateTransition({ ...judgeFail, prev_review_round: 0, prev_visual_round: 6 });
+  assert.equal(visual?.error, "VISUAL_ROUND_EXCEEDED");
+  assert.ok(!("qa_round" in visual.attempted), "no attempted.qa_round (E435)");
 });
 
 // ---------- AC-12(c) — computeNewRound for review_round ----------
 
-test("AC-12: computeNewRound — (code-reviewer, FAIL) increments review_round, holds qa_round", () => {
-  // Why: a code-reviewer FAIL must increment review_round (AC-3) while qa_round
-  // holds steady — the two counters are independent, and so is visual_round.
-  // hop_count is 1 for the reason in the hop_count note above (role change,
-  // no feature_changed). (d2-server-brake-accounting)
+// E435: computeNewRound(review, visual, next, prev?, notes?, hop?, featureChanged?,
+// reviewTot?, visualTot?) — no qa slots, no qa_round / qa_rounds_total out.
+
+test("AC-12 (E435): computeNewRound — (code-reviewer, FAIL) increments review_round and its total; visual_round independent", () => {
+  // Why: a code-reviewer FAIL must increment review_round (AC-3); visual_round
+  // is a separate counter and holds. hop_count is 1 for the reason in the
+  // hop_count note above (role change, no feature_changed). (d2-server-brake-accounting)
   assert.deepEqual(
-    computeNewRound(2, 0, 0, { agent: "code-reviewer", status: "FAIL" }),
-    { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 1, visual_rounds_total: 0 },
+    computeNewRound(0, 0, { agent: "code-reviewer", status: "FAIL" }),
+    { review_round: 1, visual_round: 0, hop_count: 1, review_rounds_total: 1, visual_rounds_total: 0 },
   );
   assert.deepEqual(
-    computeNewRound(0, 2, 0, { agent: "code-reviewer", status: "FAIL" }),
-    { qa_round: 0, review_round: 3, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 1, visual_rounds_total: 0 },
+    computeNewRound(2, 3, { agent: "code-reviewer", status: "FAIL" }),
+    { review_round: 3, visual_round: 3, hop_count: 1, review_rounds_total: 1, visual_rounds_total: 0 },
   );
 });
 
-test("AC-12: computeNewRound — handoff (code-reviewer→qa-engineer, In_Progress) resets review_round only", () => {
-  // Why: AC-3 mandates reset on successful APPROVAL handoff. qa_round must
-  // be untouched (different lifecycle counter).
+test("AC-12 (E435): computeNewRound — a stale code-reviewer→qa-engineer prev no longer resets review_round (edge gone)", () => {
+  // Why: the APPROVED hand-off to qa-engineer is gone; the judge's own PASS is
+  // the only review-cycle close, so this prev must not clear the cap counter.
   assert.deepEqual(
     computeNewRound(
-      1,
       2,
       0,
       { agent: "qa-engineer", status: "In_Progress" },
       { agent: "code-reviewer", status: "In_Progress" },
     ),
-    { qa_round: 1, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    { review_round: 2, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });
 
-test("AC-12: computeNewRound — (qa-engineer, In_Progress) without code-reviewer prev does NOT reset review_round", () => {
-  // The prev-tuple guard prevents accidental review_round resets on unrelated
-  // qa-loop traffic. Without the guard, any qa:In_Progress write would clear
-  // the counter and defeat the cap.
+test("AC-12 (E435): computeNewRound — (qa-engineer, In_Progress) from sr-engineer does NOT reset review_round", () => {
+  // The sr→qa test return is not a review close; clearing the counter here
+  // would let a build loop past the review cap.
   assert.deepEqual(
     computeNewRound(
-      0,
       2,
       0,
       { agent: "qa-engineer", status: "In_Progress" },
       { agent: "sr-engineer", status: "In_Progress" },
     ),
-    { qa_round: 0, review_round: 2, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    { review_round: 2, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });
 
-test("AC-12: computeNewRound — (pm, In_Progress) resets BOTH counters (re-entry)", () => {
+test("AC-12 (E435): computeNewRound — (pm, In_Progress) resets review_round and visual_round (re-entry)", () => {
   // The unified escape valve — PM re-entry clears the whole loop history.
   // v3.14.0: also resets visual_round.
   assert.deepEqual(
-    computeNewRound(3, 2, 4, { agent: "pm", status: "In_Progress" }),
-    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+    computeNewRound(2, 4, { agent: "pm", status: "In_Progress" }),
+    { review_round: 0, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });
 
@@ -1031,25 +1029,30 @@ test("AC-12: evidence gate verbatim hint string is reachable from compiled hando
 
 // ---------- AC-12(f) — qa-engineer scope safety net ----------
 
-test("AC-12: qa PASS transition unaffected by code-reviewer chain (regression guard)", () => {
-  // Why: the v3.9.0 chain insertion MUST NOT regress the qa terminal step.
-  // The (qa, In_Progress → qa, PASS) edge stays valid.
+test("AC-12 (E435): the judge's terminal step code-reviewer:In_Progress → code-reviewer:PASS is accepted on every feature (regression guard)", () => {
+  // Why: E435 moved the chain's terminal step from qa-engineer to the judge.
+  // The (code-reviewer, In_Progress → code-reviewer, PASS) edge must be valid
+  // with no marker, or no feature could close.
   assert.equal(
     validateTransition({
-      prev: { agent: "qa-engineer", status: "In_Progress" },
-      next: { agent: "qa-engineer", status: "PASS" },
-      prev_qa_round: 0,
+      prev: { agent: "code-reviewer", status: "In_Progress" },
+      next: { agent: "code-reviewer", status: "PASS" },
       prev_review_round: 0,
     }),
     null,
   );
 });
 
-test("AC-12: code-reviewer agent is in ALLOWED_TRANSITIONS keys", () => {
-  // Spot-check the three new agent rows live in the exported map.
+test("AC-12 (E435): code-reviewer rows in ALLOWED_TRANSITIONS include the code-reviewer:PASS exit row", () => {
+  // Spot-check the code-reviewer rows live in the exported map, including the
+  // PASS row a closed feature leaves through (same targets as the legacy qa PASS row).
   assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:In_Progress"));
   assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:FAIL"));
   assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:Blocked"));
+  assert.deepEqual(
+    (ALLOWED_TRANSITIONS.get("code-reviewer:PASS") ?? []).map((c) => `${c.agent}:${c.status}`),
+    ["pm:In_Progress", "researcher:In_Progress", "release-engineer:In_Progress", "design-auditor:In_Progress"],
+  );
 });
 
 // ============================================================================
@@ -1070,7 +1073,6 @@ test("T-MATRIX-A5: release-engineer is a valid agent_id (unknown-agent gate does
   const r = validateTransition({
     prev: { agent: "release-engineer", status: "PASS" },
     next: { agent: "pm", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
   });
   // null means accepted — the agent was recognised and the edge is in ALLOWED.
@@ -1080,12 +1082,11 @@ test("T-MATRIX-A5: release-engineer is a valid agent_id (unknown-agent gate does
 // ---------- allowed edges from release-engineer:PASS (T-MATRIX-A5(b)) ----------
 
 test("T-MATRIX-A5: release-engineer:PASS → pm:In_Progress accepted", () => {
-  // WHY: mirrors qa-engineer:PASS → pm:In_Progress (post-release PM entry).
+  // WHY: mirrors code-reviewer:PASS → pm:In_Progress (post-release PM entry).
   assert.equal(
     validateTransition({
       prev: { agent: "release-engineer", status: "PASS" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -1093,13 +1094,12 @@ test("T-MATRIX-A5: release-engineer:PASS → pm:In_Progress accepted", () => {
 });
 
 test("T-MATRIX-A5: release-engineer:PASS → researcher:In_Progress accepted", () => {
-  // WHY: mirrors qa-engineer:PASS → researcher:In_Progress (next-feature
+  // WHY: mirrors code-reviewer:PASS → researcher:In_Progress (next-feature
   // research path directly from release gate).
   assert.equal(
     validateTransition({
       prev: { agent: "release-engineer", status: "PASS" },
       next: { agent: "researcher", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
     }),
     null,
@@ -1115,7 +1115,6 @@ test("T-MATRIX-A5: release-engineer:PASS → sr-engineer:In_Progress REJECTED", 
   const r = validateTransition({
     prev: { agent: "release-engineer", status: "PASS" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
   });
   assert.ok(r, "transition must be rejected");
