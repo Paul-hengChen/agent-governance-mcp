@@ -379,6 +379,16 @@ test("T-E5-03 content: coord-07 carries step 4a Cheapest-Compliant-Path Intake, 
   assert.match(COORD07, /\(iii\) full chain/, "must enumerate the full-chain classification");
 });
 
+// E435 (T-36 Copy: delete the marker clause only): the mini-chain opens with a plain pm write; no
+// chain_path marker is set on any chain.
+test("T-E5-03 content (E435): coord-07 mini-chain opens with a pm-stamped write carrying no chain_path marker", () => {
+  assert.ok(
+    COORD07.includes("open with a pm-stamped write (`agent_id=\"pm\"`, `status=In_Progress`), then qa-engineer → sr-engineer → code-reviewer"),
+    "the mini-chain sentence with the marker clause deleted",
+  );
+  assert.ok(!COORD07.includes("chain_path"), "coord-07 names no chain_path marker");
+});
+
 test("T-E5-03 content: coord-07 step 4a states the §2/§3 builder ≠ judge hard floor is never bypassed by any classification", () => {
   assert.match(
     COORD07,

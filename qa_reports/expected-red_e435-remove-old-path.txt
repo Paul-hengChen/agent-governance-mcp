@@ -442,3 +442,8 @@ test/e295-hop-cap-and-sop-halves.test.mjs | AC4b (E435): coord-03 hop counter is
 test/e393-builder-judge-core.test.mjs | AC-A3 (E435): const-11 §3.2 enforcement and its rationale restrict status=PASS to code-reviewer with no chain condition | const-11 line 10 and rationale line 149 still say "on the test-first chain `status=PASS` is server-restricted to" at base (T-E435-41)
 test/e393-builder-judge-core.test.mjs | AC-C (E435): named sites restate no bare round number | skill-qa-engineer.md line 13 still names `qa_round` and `QA_ROUND_EXCEEDED` at base (T-E435-32)
 test/skill-evolution-v3.11.test.mjs | AC-10 (E435): schema/versions.ts handoff schema is 17, sqlite stays 2 | CURRENT_VERSIONS.handoff is 16 at base (T-E435-29)
+
+# T-E435-24 — SOP/constitution text pins (2/3): e5-intake-tiering, e407-restatement-citations, e391-prompt-audit-stale-facts (no rows), phase-0-5-sop (no rows), constitution-deliverable-guard
+test/e5-intake-tiering.test.mjs | T-E5-03 content (E435): coord-07 mini-chain opens with a pm-stamped write carrying no chain_path marker | coord-07 line 9 still carries `chain_path: "test-first"` on the mini-chain opening write at base (T-E435-36)
+test/e407-restatement-citations.test.mjs | AC6 (E435): qa ownership bullet is first in Hard rules, counts no qa round, and the cited bullet exists in every composition | skill-qa-engineer.md line 13 tail still names `qa_round` and `QA_ROUND_EXCEEDED` at base (T-E435-32)
+test/constitution-deliverable-guard.test.mjs | A4 (E435): §3.2 enforcement restricts status=PASS to code-reviewer with no test-first chain condition | const-11 line 10 still says "on the test-first chain `status=PASS` is server-restricted to" at base (T-E435-41)

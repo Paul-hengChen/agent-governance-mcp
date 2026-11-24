@@ -828,3 +828,26 @@ Left as is: e16 E16-01…06 (const-08 line 8 Amend-Resume text already names onl
 ### Red Reasons (T-23)
 
 5 red at base, all assertion failures: E16-07 (const-08 still Non-QA label/code, T-33); AC4b (coord-03 `qa_round` sibling, T-32; integrator "qa rounds", T-41); AC-A3 (const-11 / rationale conditional wording, T-41); AC-C (qa SOP `qa_round` / `QA_ROUND_EXCEEDED`, T-32); AC-10 (handoff 16, T-29). Rows under `# T-E435-23` in the manifest. Run: `node --test` on the five files → 39 tests, 34 pass, 5 fail = the 5 rows, name for name.
+
+## T-E435-24 — `e5-intake-tiering`, `e407-restatement-citations`, `e391-prompt-audit-stale-facts`, `phase-0-5-sop`, `constitution-deliverable-guard` (AC7; text pins 2/3)
+
+Placement: existing files, edited in place (brief). Re-titled / new tests carry `(E435)`. 25 changed lines (24+ / 1−) over 3 files; `e391-prompt-audit-stale-facts` and `phase-0-5-sop` need no change.
+
+### Scenario → Test Map (T-24)
+
+| contract text (task) | file | exact test name |
+|---|---|---|
+| coord-07 line 9 mini-chain with the marker clause deleted (T-36 Copy); no `chain_path` in coord-07 | e5 | T-E5-03 content (E435): coord-07 mini-chain opens with a pm-stamped write carrying no chain_path marker |
+| qa SOP line 13 tail "Because you never write FAIL, no qa round is counted; the loops" (T-32 Copy); no `qa_round` / `QA_ROUND_EXCEEDED` in the first Hard rule | e407 | AC6 (E435): qa ownership bullet is first in Hard rules, counts no qa round, and the cited bullet exists in every composition |
+| const-11 line 10 "the judge's PASS, and `status=PASS` is server-restricted to" (T-41 Copy); no "test-first" in the §3.2 enforcement clause | constitution-deliverable-guard | A4 (E435): §3.2 enforcement restricts status=PASS to code-reviewer with no test-first chain condition |
+
+Left as is: e391 all (pins stale facts the contract does not touch: registry stays 33, no "33 gate definitions"; CLAUDE.md sections it reads carry no old-path wording); phase-0-5-sop all (skill-sr-engineer Phase 0.5 / skill-architect Visual Harness unchanged; the architect line 78 marker clause is pinned in `e433-test-first-rules` `COPY.archHandoff`, T-44); e5 config / const-08 auto-tier / coord-03 intake-loop tests (no old-path wording); constitution-deliverable-guard A4 existing tests (already on code-reviewer).
+
+### Open Interface Details (T-24)
+
+1. coord-07 expected text derived by deleting the Copy's marker clause from the current line 9, not invented; const-11 text is the same Copy substitution T-23 used (e393 AC-A3), here scoped to the composed §3.2 enforcement clause.
+2. Gaps: the T-37 Execution Profile sentence is still unpinned in these files (e391 reads other CLAUDE.md sections only); skill-pm step 8 / bugfix marker clauses (T-36) not pinned here — candidate for T-25 or e433 (T-44).
+
+### Red Reasons (T-24)
+
+3 red at base, all assertion failures: T-E5-03 (E435) (coord-07 marker clause, T-36); AC6 (E435) (qa SOP `qa_round` / `QA_ROUND_EXCEEDED`, T-32); A4 (E435) (const-11 conditional wording, T-41). Rows under `# T-E435-24` in the manifest. Run: `node --test` on the five files → 82 tests, 79 pass, 3 fail = the 3 rows, name for name (plus the `constitution-deliverable-guard (v3.27.0)` describe wrapper, red only through its A4 (E435) subtest).
