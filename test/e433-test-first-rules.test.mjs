@@ -548,13 +548,11 @@ test("AC10 (E435): README / architecture / release-cd — chain.docs, qa opus ro
 
 // ------------------------------------------------------------------ AC12
 
-test("AC12 (E435): counts and hygiene — 33 gates, 17 pipeline steps, untouched server files, CLAUDE.md, dist diff, agc check", (t) => {
+test("AC12 (E435): counts and hygiene — 33 gates, 17 pipeline steps, untouched server files, CLAUDE.md, dist diff", (t) => {
+  // No live `agc check` here (E450): adapter-stamp freshness is release-time state, re-checked by the runner's prepare phase.
   assert.equal(GATE_REGISTRY.length, 33, "GATE_REGISTRY 33 entries (E435)");
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17, "UPDATE_STATE_GATE_PIPELINE 17 steps");
   assert.equal(read("CLAUDE.md").split("\n").length - (read("CLAUDE.md").endsWith("\n") ? 1 : 0), 250, "CLAUDE.md is 250 lines");
-
-  const agc = spawnSync(process.execPath, [path.join(ROOT, "bin", "agc-init.mjs"), "check"], { cwd: ROOT, encoding: "utf-8" });
-  assert.equal(agc.status, 0, `agc-init check exits 0: ${agc.stdout}${agc.stderr}`);
 
   if (rangeSkipReason) return t.skip(rangeSkipReason);
   // Closed range base..last content commit: byte-identical means "not in the diff".
