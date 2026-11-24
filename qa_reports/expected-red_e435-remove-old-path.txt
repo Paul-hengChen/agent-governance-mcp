@@ -513,11 +513,7 @@ test/e405-release-docs.test.mjs | AC-D2 (E435) the PRECONDITION_NOT_PASS row and
 # T-E435-40 (qa-engineer): the 8 snapshot rows above are cleared — the 12 compose goldens were re-captured with scripts/capture-constitution-golden.mjs (7 changed) and the context-budget caps / saving floor re-baselined to measured values; all 8 tests green. See ## T-E435-40 in qa_reports/tests_e435-remove-old-path.md.
 
 # T-E435-49 (qa-engineer): voidRefusalMessage (tools/tasks-file.ts) still names qa-engineer in the ledger and both texts; the pinned wording names code-reviewer, the one judge whose FAIL write drops ledger ids (T-E435-50, sr-engineer)
-test/e359-void-refusal-message.test.mjs | AC-E359-1: file mode, row open + ledger holds the id (the E359 state) -> void.refused.ledger, nothing changes
-test/e359-void-refusal-message.test.mjs | AC-E359-2: file mode, row [x] + ledger holds the id -> void.refused.both, nothing changes
-test/e359-void-refusal-message.test.mjs | AC-E359-5 (E435): the step the ledger message names (code-reviewer FAIL write with review_task_ids) really unblocks the void
-test/e359-void-refusal-message.test.mjs | AC-E359-4 (SQLite): row completed=0 + ledger holds id -> void.refused.ledger
-test/e359-void-refusal-message.test.mjs | AC-E359-4 (SQLite): row completed=1 + ledger holds id -> void.refused.both
 
 # T-E435-46 (qa-engineer): tools/role.ts post-chain comment still names the removed qa-engineer:PASS -> release-engineer edge; the pinned line names code-reviewer:PASS, the one chain's judge (T-E435-50, sr-engineer)
-test/e408-core-task-alias-tail.test.mjs | AC6 (E435): role.ts comment reflects transitions.ts (release-engineer opens on the judge's code-reviewer:PASS); map still carries doc-writer and release-engineer
+
+# T-E435-50 (sr-engineer): the 6 rows above (5 e359, 1 e408) are cleared — voidRefusalMessage names code-reviewer in the ledger and both texts and tools/role.ts line 40 names code-reviewer:PASS (commit 6cf540d9); all 6 green in the clean-tree suite run (4579 tests, 4576 pass, 0 fail, 3 skipped).
