@@ -3,11 +3,12 @@
 // (handoff completed_tasks) is feature-scoped and CARRIES FORWARD across same-feature writes.
 // Before: any write that omitted completed_tasks (every coordinator amendment, every non-qa
 // write) emptied the ledger, so tw_detect_drift reported evidence-backed PASSes as drift.
-// Carry-forward has a cost the fix pays: a qa FAIL write now removes its review_task_ids from
+// Carry-forward has a cost the fix pays: the judge's FAIL write removes its review_task_ids from
 // the ledger, otherwise a rolled-back id would stay in it and tw_sync would re-mark it [x].
+// Since E435 the judge (ledger writer, FAIL shrinker, PASS writer) is code-reviewer, never qa-engineer.
 // Spec: specs/e135-handoff-notes-ledger.md AC13-AC20; architecture DR-1..DR-5
-// (specs/e135-handoff-notes-ledger-architecture.md): `[]` == omission, qa non-empty list MERGES,
-// only qa-engineer + FAIL + non-empty review_task_ids shrinks, SQLite is unchanged.
+// (specs/e135-handoff-notes-ledger-architecture.md): `[]` == omission, the judge's non-empty list
+// MERGES, only code-reviewer + FAIL + non-empty review_task_ids shrinks, SQLite is unchanged.
 // Repro discipline: red against a copy of base 2ad039d, green at HEAD.
 
 import { test } from "node:test";
@@ -161,17 +162,17 @@ test("AC15: a direct caller that bypasses zod with completed_tasks undefined is 
 });
 
 // ---------------------------------------------------------------------------
-// AC15 (DR-2) — a qa-engineer non-empty list MERGES (union, on-disk order first, deduped).
+// AC15 (DR-2, E435) — the judge's (code-reviewer) non-empty list MERGES (union, on-disk order first, deduped).
 // ---------------------------------------------------------------------------
-test("AC15: qa-engineer writing [B] with ledger [A] yields [A, B], not [B]", async () => {
+test("AC15 (E435): code-reviewer writing [B] with ledger [A] yields [A, B], not [B]", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A"] });
   qaEvidence(ws, "T-B");
   const r = await handleUpdateState({
     workspace_path: ws,
     active_feature: F,
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-B"],
     pending_notes: ["QA: T-B"],
   });
@@ -179,15 +180,15 @@ test("AC15: qa-engineer writing [B] with ledger [A] yields [A, B], not [B]", asy
   assert.deepEqual(ledgerOf(ws), ["T-A", "T-B"]);
 });
 
-test("AC15: a cumulative list [A, B] on ledger [A] adds only B (no duplicate, on-disk order first)", async () => {
+test("AC15 (E435): a code-reviewer cumulative list [A, B] on ledger [A] adds only B (no duplicate, on-disk order first)", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A"] });
   qaEvidence(ws, "T-B");
   const r = await handleUpdateState({
     workspace_path: ws,
     active_feature: F,
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-B", "T-A"],
     pending_notes: ["QA cumulative"],
   });
@@ -204,21 +205,21 @@ test("AC15: the writer's union dedupes on the trimmed id (writer-level, directiv
     status: "In_Progress",
     completedTasks: ["  T-A  ", "T-B"],
     pendingNotes: ["padded"],
-    lastAgent: "qa-engineer",
+    lastAgent: "code-reviewer",
     completedTasksCarry: { remove: [] },
   });
   assert.deepEqual(ledgerOf(ws), ["T-A", "T-B"]);
 });
 
-test("AC15: a qa PASS carrying only the current ids keeps earlier PASSes on the ledger", async () => {
+test("AC15 (E435): a code-reviewer PASS carrying only the current ids keeps earlier PASSes on the ledger", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
   qaEvidence(ws, "T-C");
   const r = await handleUpdateState({
     workspace_path: ws,
     active_feature: F,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-C"],
     qa_review: "PASS T-C",
     pending_notes: ["QA: T-C PASS"],
@@ -230,9 +231,9 @@ test("AC15: a qa PASS carrying only the current ids keeps earlier PASSes on the 
 // ---------------------------------------------------------------------------
 // AC14 — feature change: new handoff ledger is empty unless the write grows it; archive keeps the old one.
 // ---------------------------------------------------------------------------
-test("AC14: a write naming a different active_feature starts with an empty ledger and archives the old file", async () => {
+test("AC14 (E435): after the judge's code-reviewer:PASS, a write naming a different active_feature starts with an empty ledger and archives the old file", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", status: "PASS", ledger: ["T-A"] });
+  await seed(ws, { agent: "code-reviewer", status: "PASS", ledger: ["T-A"] });
   const r = await handleUpdateState({
     workspace_path: ws,
     active_feature: "e150-other-feature",
@@ -247,9 +248,9 @@ test("AC14: a write naming a different active_feature starts with an empty ledge
   assert.ok(archived.some((t) => t.includes("- [x] T-A")), "the archive copy must still capture the old ledger");
 });
 
-test("AC14: the new feature's own qa write grows its fresh ledger from empty (old ids are not merged in)", async () => {
+test("AC14 (E435): after the judge's code-reviewer:PASS, the new feature starts its fresh ledger from empty (old ids are not merged in)", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", status: "PASS", ledger: ["T-OLD"] });
+  await seed(ws, { agent: "code-reviewer", status: "PASS", ledger: ["T-OLD"] });
   const r1 = await handleUpdateState({
     workspace_path: ws,
     active_feature: "e150-next",
@@ -262,98 +263,97 @@ test("AC14: the new feature's own qa write grows its fresh ledger from empty (ol
 });
 
 // ---------------------------------------------------------------------------
-// AC16 — qa FAIL shrinks by review_task_ids; nothing else does.
+// AC16 (E435) — the judge's (code-reviewer) FAIL shrinks by review_task_ids; nothing else does.
 // ---------------------------------------------------------------------------
 async function qaFail(ws, extra = {}) {
   return handleUpdateState({
     workspace_path: ws,
     active_feature: F,
     status: "FAIL",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     review_task_ids: ["T-B"],
     qa_review: "FAIL T-B: regression",
-    blocking_reason: "QA: T-B FAIL",
+    blocking_reason: "code-reviewer: T-B FAIL",
     pending_notes: ["QA: T-B FAIL"],
     ...extra,
   });
 }
 
-test("AC16: qa FAIL with review_task_ids [B] on ledger [A, B] leaves [A]", async () => {
+test("AC16 (E435): code-reviewer FAIL with review_task_ids [B] on ledger [A, B] leaves [A]", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
   const r = await qaFail(ws);
   assert.ok(!r.isError, text(r));
   assert.deepEqual(ledgerOf(ws), ["T-A"]);
 });
 
-test("AC16: the explicit completed_tasks: [] spelling of the same FAIL write also shrinks", async () => {
+test("AC16 (E435): the explicit completed_tasks: [] spelling of the same FAIL write also shrinks", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
   const r = await qaFail(ws, { completed_tasks: [] });
   assert.ok(!r.isError, text(r));
   assert.deepEqual(ledgerOf(ws), ["T-A"]);
 });
 
-test("AC16 (DR-3): when one FAIL write both lists B in completed_tasks and names it in review_task_ids, removal wins", async () => {
+test("AC16 (DR-3, E435): when one code-reviewer FAIL write both lists B in completed_tasks and names it in review_task_ids, removal wins", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
   qaEvidence(ws, "T-B");
   const r = await qaFail(ws, { completed_tasks: ["T-B"] });
   assert.ok(!r.isError, text(r));
   assert.deepEqual(ledgerOf(ws), ["T-A"]);
 });
 
-test("AC16: a ledger entry that wraps the id in prose is matched on a word boundary (same predicate as tw_sync)", async () => {
+test("AC16 (E435): a ledger entry that wraps the id in prose is matched on a word boundary (same predicate as tw_sync)", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B (PASS, round 2)", "T-B2 unrelated"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B (PASS, round 2)", "T-B2 unrelated"] });
   const r = await qaFail(ws);
   assert.ok(!r.isError, text(r));
   // "T-B2" has no word boundary after "T-B" ("2" is a word char), so it must survive.
   assert.deepEqual(ledgerOf(ws), ["T-A", "T-B2 unrelated"]);
 });
 
-test("AC16: only qa-engineer + FAIL + non-empty review_task_ids shrinks — APPROVED row (qa In_Progress + review_task_ids) never does", async () => {
+test("AC16 (E435): only code-reviewer + FAIL + non-empty review_task_ids shrinks — the judge's APPROVED In_Progress write with review_task_ids never does", async () => {
   const ws = mkWs();
   await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
   qaEvidence(ws, "T-B");
-  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
-  fs.writeFileSync(path.join(ws, "review_reports", "review_T-B.md"), "# Review T-B\n\nAPPROVED.\n");
-  const r = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: F,
-    status: "In_Progress",
-    agent_id: "qa-engineer",
-    review_task_ids: ["T-B"],
-    qa_review: "APPROVED row: reviewing T-B",
-    pending_notes: ["QA: claiming T-B"],
-  });
-  assert.ok(!r.isError, text(r));
-  assert.deepEqual(ledgerOf(ws), ["T-A", "T-B"]);
-});
-
-test("AC16: a qa FAIL that names no review_task_ids cannot remove anything (the write is refused, ledger intact)", async () => {
-  const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B"] });
-  const r = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: F,
-    status: "FAIL",
-    agent_id: "qa-engineer",
-    qa_review: "FAIL without a target",
-    blocking_reason: "QA: FAIL",
-  });
-  assert.ok(r.isError, "QA_REVIEW_TARGET_REQUIRED already refuses this shape");
-  assert.deepEqual(ledgerOf(ws), ["T-A", "T-B"]);
-});
-
-test("AC16: a non-qa agent naming review_task_ids can never shrink the ledger", async () => {
-  const ws = mkWs();
-  await seed(ws, { agent: "sr-engineer", ledger: ["T-A", "T-B"] });
   const r = await handleUpdateState({
     workspace_path: ws,
     active_feature: F,
     status: "In_Progress",
     agent_id: "code-reviewer",
+    review_task_ids: ["T-B"],
+    review_verdict: "APPROVED",
+    pending_notes: ["code-reviewer: approving T-B"],
+  });
+  assert.ok(!r.isError, text(r));
+  assert.deepEqual(ledgerOf(ws), ["T-A", "T-B"]);
+});
+
+test("AC16 (E435): a code-reviewer FAIL that names no review_task_ids cannot remove anything (the write is refused, ledger intact)", async () => {
+  const ws = mkWs();
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
+  const r = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: F,
+    status: "FAIL",
+    agent_id: "code-reviewer",
+    qa_review: "FAIL without a target",
+    blocking_reason: "code-reviewer: FAIL",
+    pending_notes: ["code-reviewer: FAIL"],
+  });
+  assert.ok(r.isError, "QA_REVIEW_TARGET_REQUIRED already refuses this shape");
+  assert.deepEqual(ledgerOf(ws), ["T-A", "T-B"]);
+});
+
+test("AC16 (E435): a non-judge agent (qa-engineer) naming review_task_ids can never shrink the ledger", async () => {
+  const ws = mkWs();
+  await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B"] });
+  const r = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: F,
+    status: "In_Progress",
+    agent_id: "qa-engineer",
     review_task_ids: ["T-B"],
     pending_notes: ["review"],
   });
@@ -362,10 +362,10 @@ test("AC16: a non-qa agent naming review_task_ids can never shrink the ledger", 
 });
 
 for (const order of ["FAIL write first", "rollback first"]) {
-  test(`AC16: qa FAIL + tw_rollback_task + tw_sync (${order}) — B stays out of the ledger and is not re-marked [x]`, async () => {
+  test(`AC16 (E435): code-reviewer FAIL + tw_rollback_task + tw_sync (${order}) — B stays out of the ledger and is not re-marked [x]`, async () => {
     const ws = mkWs();
     writeTasks(ws, [["T-A", true], ["T-B", true]]);
-    await seed(ws, { agent: "qa-engineer", ledger: ["T-A", "T-B"] });
+    await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
     const rollback = () => tool("tw_rollback_task").run({ workspace_path: ws, task_id: "T-B", reason: "QA: T-B FAIL" });
     if (order === "rollback first") {
       await rollback();
@@ -386,25 +386,9 @@ for (const order of ["FAIL write first", "rollback first"]) {
 }
 
 // ---------------------------------------------------------------------------
-// AC17 — the Non-QA Completed-Tasks Gate is unchanged: strict on the incoming list.
+// AC17 (E435) — the Non-Judge Completed-Tasks Gate: strict on the incoming list.
 // ---------------------------------------------------------------------------
-test("AC17: a non-qa write carrying a non-empty completed_tasks is still rejected and the ledger is untouched", async () => {
-  const ws = mkWs();
-  await seed(ws, { agent: "sr-engineer", ledger: ["T-A"] });
-  const r = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: F,
-    status: "In_Progress",
-    agent_id: "code-reviewer",
-    completed_tasks: ["T-NEW"],
-    pending_notes: ["tries to grow the ledger"],
-  });
-  assert.ok(r.isError);
-  assert.match(text(r), /REVIEWER_COMPLETED_TASKS_REJECTED|NON_QA_COMPLETED_TASKS_REJECTED/);
-  assert.deepEqual(ledgerOf(ws), ["T-A"]);
-});
-
-test("AC17: the QA completion-evidence gate still diffs the incoming list against the on-disk set (new id without evidence is refused)", async () => {
+test("AC17 (E435): a non-judge write (qa-engineer included) carrying a non-empty completed_tasks is rejected with NON_JUDGE_COMPLETED_TASKS_REJECTED and the ledger is untouched", async () => {
   const ws = mkWs();
   await seed(ws, { agent: "qa-engineer", ledger: ["T-A"] });
   const r = await handleUpdateState({
@@ -412,6 +396,22 @@ test("AC17: the QA completion-evidence gate still diffs the incoming list agains
     active_feature: F,
     status: "In_Progress",
     agent_id: "qa-engineer",
+    completed_tasks: ["T-NEW"],
+    pending_notes: ["tries to grow the ledger"],
+  });
+  assert.ok(r.isError);
+  assert.match(text(r), /NON_JUDGE_COMPLETED_TASKS_REJECTED/);
+  assert.deepEqual(ledgerOf(ws), ["T-A"]);
+});
+
+test("AC17 (E435): the completion-evidence gate still diffs the judge's incoming list against the on-disk set (new id without evidence is refused)", async () => {
+  const ws = mkWs();
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A"] });
+  const r = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: F,
+    status: "In_Progress",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-NOEVIDENCE"],
     pending_notes: ["no evidence"],
   });
@@ -420,14 +420,14 @@ test("AC17: the QA completion-evidence gate still diffs the incoming list agains
   assert.deepEqual(ledgerOf(ws), ["T-A"]);
 });
 
-test("AC17: ids already on disk need no fresh evidence even when re-sent (cumulative list never re-gates)", async () => {
+test("AC17 (E435): ids already on disk need no fresh evidence from the judge even when re-sent (cumulative list never re-gates)", async () => {
   const ws = mkWs();
-  await seed(ws, { agent: "qa-engineer", ledger: ["T-A"] });
+  await seed(ws, { agent: "code-reviewer", ledger: ["T-A"] });
   const r = await handleUpdateState({
     workspace_path: ws,
     active_feature: F,
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-A"],
     pending_notes: ["cumulative"],
   });
@@ -488,11 +488,11 @@ test("AC19: tools/drift.ts and its dist no longer claim a merged lane's ledger '
   }
 });
 
-test("AC20: the tw_update_state completed_tasks description states the new lifetime (final architecture string) and 'Tasks completed now' is gone", () => {
+test("AC20 (E435): the tw_update_state completed_tasks description is the E435 Copy desc.completed_tasks and 'Tasks completed now' is gone", () => {
   const desc = tool("tw_update_state").inputSchema.properties.completed_tasks.description;
   assert.equal(
     desc,
-    'Task ids the judge has completed for this feature (only agent_id "qa-engineer" may change it; "code-reviewer" on a test-first feature). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; the judge\'s FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
+    'Task ids the judge has completed for this feature. Only agent_id "code-reviewer" may grow it; a non-empty list from any other agent_id is rejected (NON_JUDGE_COMPLETED_TASKS_REJECTED). File mode: a code-reviewer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; the code-reviewer\'s FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
   );
   const src = fs.readFileSync(path.join(PROJECT_ROOT, "tools/registry.ts"), "utf8");
   assert.equal(src.split("Tasks completed now").length - 1, 0);

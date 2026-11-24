@@ -427,3 +427,38 @@ Left as is (green on both): FM2, FM3, SQ2.
 ### Remaining — part 2 (`e150-completed-tasks-carry-forward`, `e139-non-reviewer-verdict`, `e247-pass-tasks-incomplete`)
 
 Planned re-pins: e150 — every ledger writer / FAIL-shrink / PASS seed and write moves from qa-engineer to code-reviewer (AC13–AC17), AC16 APPROVED-row case becomes the judge's self-loop, AC17 regex → `NON_JUDGE_COMPLETED_TASKS_REJECTED`, AC20 description = Copy `desc.completed_tasks`; e139 — AC-E139-2/3 APPROVED row (code-reviewer → qa-engineer edge gone; APPROVED ↔ PASS consistent), AC-E139-8 qa PASS → code-reviewer PASS (qa PASS now a zod refine); e247 — PASS writer `qa-engineer` → `code-reviewer` (`PASS_TASKS_INCOMPLETE` hint "A code-reviewer PASS").
+
+## T-E435-45 (= T-E435-10 part 2) — `test/e150-completed-tasks-carry-forward.test.mjs`, `test/e139-non-reviewer-verdict.test.mjs`, `test/e247-pass-tasks-incomplete.test.mjs` (AC2, AC5)
+
+Placement: existing files, edited in place (brief). Re-titled tests carry `(E435)`. 242 changed lines (135+ / 107-), under the 300-line cap; T-E435-10 is complete with this part.
+
+### Scenario → Test Map (T-45)
+
+| scenario | exact test name(s) |
+|---|---|
+| the judge (code-reviewer) is the ledger writer; its list merges | AC15 (E435): code-reviewer writing [B] … · AC15 (E435): a code-reviewer cumulative list … · AC15 (E435): a code-reviewer PASS carrying only the current ids … |
+| the judge's FAIL shrinks by review_task_ids; nothing else does | AC16 (E435): code-reviewer FAIL with review_task_ids [B] … · the explicit completed_tasks: [] spelling … · AC16 (DR-3, E435) … · word boundary … · no review_task_ids … · FAIL + tw_rollback_task + tw_sync (both orders) |
+| the judge's APPROVED write never shrinks; a non-judge (qa-engineer) never shrinks | AC16 (E435): only code-reviewer + FAIL … (green on both) · AC16 (E435): a non-judge agent (qa-engineer) … (green on both) |
+| step 9 for qa-engineer (AC2) | AC17 (E435): a non-judge write (qa-engineer included) … NON_JUDGE_COMPLETED_TASKS_REJECTED … |
+| evidence gate diffs the judge's list | AC17 (E435): the completion-evidence gate … · AC17 (E435): ids already on disk … |
+| Copy desc.completed_tasks | AC20 (E435) |
+| feature change after the judge's PASS | AC14 (E435) ×2 |
+| review_verdict: code-reviewer -> qa-engineer gone (S3 hint), judge APPROVED PASS lands | AC-E139-2 (E435) |
+| no qa write carries a verdict (removed edge TRANSITION_REJECTED + S3 hint; qa FAIL + S4/S5 hint; qa PASS judge-guarded) | AC-E139-3 (E435) |
+| APPROVED ↔ {PASS, In_Progress}; CHANGES_REQUESTED + PASS mismatch | AC-E139-4 (E435) |
+| rejected before QA_REVIEW_RECORD (qa PASS; judge PASS mismatch) | AC-E139-8 (E435) |
+| PASS_TASKS_INCOMPLETE on the judge's PASS, hint "A code-reviewer PASS" | AC1–AC4, AC7 (E435) in e247 |
+
+Left as is (green on both): e150 AC13 ×6, AC15 `[]` ×4 + bypass-zod, AC15 writer-level dedupe (lastAgent re-stamped only), AC18, AC19; e139 AC-E139-1, -5, -6, -7.
+
+### Open Interface Details (T-45)
+
+1. e139 `upd()` folds a thrown rejection (zod / judge guard reached through `handleUpdateState`) into the result shape, as `test/e396-covers-expected-red.test.mjs` does; qa PASS is asserted by `JUDGE_ONLY` = `requireJudge` text or the `PASS_IDENTITY_REFINE_MESSAGE` prefix, so either layer satisfies it.
+2. AC-E139-3 (c): a qa-engineer FAIL is asserted as `TRANSITION_REJECTED` + `hint.qa_judge` (step 1 precedes step 8), no longer `NON_REVIEWER_VERDICT_REJECTED`.
+3. AC-E139-8: the "forged verdict" second half moves to the judge's PASS carrying `CHANGES_REQUESTED` (step 8 `REVIEW_VERDICT_STATUS_MISMATCH` before step 10), since a code-reviewer APPROVED PASS is no longer forged.
+4. e150 AC16 APPROVED-row case becomes the judge's In_Progress self-loop with `review_verdict: "APPROVED"`; the "non-qa" case becomes a qa-engineer self-loop (the newly non-judge role); AC17 rejection seeds a qa-engineer self-loop.
+5. e150 AC16 "no review_task_ids" write gains `pending_notes` so the base run fails on the assertion, not a `pending_notes is not iterable` crash.
+
+### Red Reasons (T-45)
+
+25 red at base, no syntax / link error: e247 AC1–AC4/AC7 and the e150 code-reviewer PASS case fail on the ZodError thrown inside `handleUpdateState` (the stated behaviour, not a harness fault); every other row fails on an assertion. Causes:code-reviewer PASS throws the pre-pre-flight ZodError (T-E435-31); code-reviewer ledger writes emit `REVIEWER_COMPLETED_TASKS_REJECTED` (T-E435-33); code-reviewer FAIL does not shrink (T-E435-31); code-reviewer:PASS → pm and code-reviewer → qa-engineer edges as at base (T-E435-30); AC20 description (T-E435-35). Rows under `# T-E435-45` in the manifest. Run: `node --test test/e150-completed-tasks-carry-forward.test.mjs test/e139-non-reviewer-verdict.test.mjs test/e247-pass-tasks-incomplete.test.mjs` → 45 tests, 20 pass, 25 fail = the 25 rows, name for name.
