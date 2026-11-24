@@ -75,7 +75,7 @@ None.
 4a. **Visual Harness Gate**<!-- origin:start --> (v3.14.0)<!-- origin:end -->: WHEN `design/<feature>.md` exists AND contains a `## Visual Baselines` H2, AND the spec's task list lacks a `[P0] Build visual-diff harness` task ordered before widget tasks → DO escalate per *Escalation Routes: visual harness task missing* (`next_role=pm`). ELSE continue. Reason: without an owned harness, the visual gate<!-- origin:start --> (R1)<!-- origin:end --> cannot pass even when QA tries.
 5. Produce `specs/<feature>-architecture.md` per the Artifact Schema.
 6. **Open Questions Gate**: WHEN `Open Questions` section is non-empty → DO escalate per *Escalation Routes: open questions*. STOP. Do NOT hand off to qa-engineer with unresolved design questions. ELSE continue.
-7. Otherwise: `tw_update_state(status=In_Progress, next_role="qa-engineer", pending_notes=["Architecture ready"])` — qa-engineer writes the scenario tests against your *Interface Contracts* before sr-engineer builds (`architect → sr-engineer` is closed on a feature marked `chain_path: "test-first"`).
+7. Otherwise: `tw_update_state(status=In_Progress, next_role="qa-engineer", pending_notes=["Architecture ready"])` — qa-engineer writes the scenario tests against your *Interface Contracts* before sr-engineer builds (`architect → sr-engineer` is not an edge).
 
 ## Escalation Routes
 
