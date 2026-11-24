@@ -153,16 +153,17 @@ Derived mirror (see the footnote below) — the authoritative source is `ALLOWED
 | researcher | Blocked | (researcher, In_Progress), (pm, In_Progress) |
 | design-auditor | In_Progress | (pm, In_Progress), (design-auditor, Blocked) |
 | design-auditor | Blocked | (design-auditor, In_Progress), (pm, In_Progress) |
-| pm | In_Progress | (architect, In_Progress), (sr-engineer, In_Progress), (researcher, In_Progress), (design-auditor, In_Progress), (pm, Blocked), (pm, In_Progress) |
+| pm | In_Progress | (architect, In_Progress), (researcher, In_Progress), (design-auditor, In_Progress), (pm, Blocked), (pm, In_Progress), (qa-engineer, In_Progress) |
 | pm | Blocked | (pm, In_Progress), (pm, Blocked), (design-auditor, In_Progress) |
-| architect | In_Progress | (sr-engineer, In_Progress), (architect, Blocked), (pm, In_Progress) |
+| architect | In_Progress | (architect, Blocked), (pm, In_Progress), (qa-engineer, In_Progress) |
 | architect | Blocked | (pm, In_Progress), (architect, In_Progress) |
-| sr-engineer | In_Progress | (code-reviewer, In_Progress), (sr-engineer, Blocked), (pm, In_Progress) |
+| sr-engineer | In_Progress | (code-reviewer, In_Progress), (sr-engineer, Blocked), (pm, In_Progress), (qa-engineer, In_Progress) |
 | sr-engineer | Blocked | (sr-engineer, In_Progress), (pm, In_Progress), (design-auditor, In_Progress) |
-| code-reviewer | In_Progress | (code-reviewer, FAIL), (code-reviewer, Blocked), (qa-engineer, In_Progress) |
-| code-reviewer | FAIL | (sr-engineer, In_Progress), (pm, In_Progress) |
+| code-reviewer | In_Progress | (code-reviewer, FAIL), (code-reviewer, Blocked), (code-reviewer, PASS) |
+| code-reviewer | FAIL | (sr-engineer, In_Progress), (pm, In_Progress), (qa-engineer, In_Progress) |
 | code-reviewer | Blocked | (code-reviewer, In_Progress), (pm, In_Progress) |
-| qa-engineer | In_Progress | (qa-engineer, PASS), (qa-engineer, FAIL), (qa-engineer, Blocked) |
+| code-reviewer | PASS | (pm, In_Progress), (researcher, In_Progress), (release-engineer, In_Progress), (design-auditor, In_Progress) |
+| qa-engineer | In_Progress | (qa-engineer, Blocked), (sr-engineer, In_Progress) |
 | qa-engineer | Blocked | (sr-engineer, In_Progress), (qa-engineer, In_Progress), (pm, In_Progress) |
 | qa-engineer | FAIL | (sr-engineer, In_Progress), (pm, In_Progress) |
 | qa-engineer | PASS | (pm, In_Progress), (researcher, In_Progress), (release-engineer, In_Progress), (design-auditor, In_Progress) |
@@ -170,7 +171,7 @@ Derived mirror (see the footnote below) — the authoritative source is `ALLOWED
 | release-engineer | Blocked | (release-engineer, In_Progress), (pm, In_Progress), (qa-engineer, In_Progress) |
 | release-engineer | PASS | (pm, In_Progress), (researcher, In_Progress) |
 
-*(21 keys — mechanically re-derived from `ALLOWED_TRANSITIONS` in `tools/transitions.ts`/`dist/tools/transitions.js`, E39+E58. Previously this table carried 16 rows — 12 correct, 4 wrong (`null:null` missing both `design-auditor` entries; `researcher:In_Progress` and `pm:In_Progress` each missing exactly `(design-auditor, In_Progress)`; `sr-engineer:In_Progress` naming `(qa-engineer, In_Progress)` — correct when the table was authored, but silently invalidated at v3.9.0 (`7e81cf7`), which extracted the code-reviewer role and changed the source to `(code-reviewer, In_Progress)` without updating this mirror), and 5 missing entirely (`design-auditor:{In_Progress,Blocked}`, `code-reviewer:{In_Progress,FAIL,Blocked}`) — found by code-reviewer during E37 round 1, 2026-07-27. `scripts/check-transitions-sync.mjs` now pins this table against the compiled source so it cannot silently re-drift.)*
+*(22 keys since E435, which folded the old matrix and the test-first overlay into this one table: `code-reviewer:PASS` added, `qa-engineer:FAIL` / `qa-engineer:PASS` kept as legacy exit keys. Earlier: 21 keys — mechanically re-derived from `ALLOWED_TRANSITIONS` in `tools/transitions.ts`/`dist/tools/transitions.js`, E39+E58. Previously this table carried 16 rows — 12 correct, 4 wrong (`null:null` missing both `design-auditor` entries; `researcher:In_Progress` and `pm:In_Progress` each missing exactly `(design-auditor, In_Progress)`; `sr-engineer:In_Progress` naming `(qa-engineer, In_Progress)` — correct when the table was authored, but silently invalidated at v3.9.0 (`7e81cf7`), which extracted the code-reviewer role and changed the source to `(code-reviewer, In_Progress)` without updating this mirror), and 5 missing entirely (`design-auditor:{In_Progress,Blocked}`, `code-reviewer:{In_Progress,FAIL,Blocked}`) — found by code-reviewer during E37 round 1, 2026-07-27. `scripts/check-transitions-sync.mjs` now pins this table against the compiled source so it cannot silently re-drift.)*
 
 **Self-loops** for the *same* agent are allowed implicitly via two explicit named `(prev, next)` status pairs — NOT a `prev.status === next.status` wildcard: `In_Progress→In_Progress` (e.g. sr-engineer doing a multi-step task; `prev.agent === next.agent && prev.status === "In_Progress" && next.status === "In_Progress"`) and, since E128, `Blocked→Blocked` (`prev.agent === next.agent && prev.status === "Blocked" && next.status === "Blocked"`), letting a role in `Blocked` correct its own malformed record — the gap that stranded release-engineer's self-correcting write during the 2026-09-15 E111 release (`TRANSITION_REJECTED — No edge release-engineer:Blocked -> release-engineer:Blocked`). Either pair matching skips the table lookup and accepts. `PASS→PASS` and `FAIL→FAIL` are deliberately excluded: PASS is terminal by design (a `qa-engineer:PASS→PASS` correction is correctly rejected — see E86), and naming the two pairs explicitly keeps that terminality structurally unreachable by this fast path rather than merely untested. This avoids forcing agents to ping-pong through other roles for internal progress writes.
 
