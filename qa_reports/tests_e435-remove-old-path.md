@@ -138,3 +138,35 @@ Left as is (green on both): the 7 remaining AC-12(a) code-reviewer edges, REVIEW
 9 red at base: 3 assertion failures on the old table/caps (S3 edge accepted, sr row lacks qa-engineer, QA_ROUND_EXCEEDED on a stale prev_qa_round), 2 on the missing code-reviewer:PASS edge/key, 4 `computeNewRound` re-pins (2 TypeError reading 'agent', 2 deepEqual mismatch from slot mis-assignment — old signature, not a syntax/link error). Rows under `# T-E435-03` in the manifest. Spot-run: `node --test test/qa-flow.test.mjs` → 152 tests, 117 pass, 35 fail (= 26 T-02 rows + 9 T-03 rows, name-for-name).
 
 Note for T-04/T-05: part 3 now starts 1 line earlier than the T-02 table (banner at L1154; net −1 from this task, incl. the +2-line `REVIEWER_TO_QA_HINT` const at file top). Remaining `computeNewRound` calls with the old signature: parts 3–4 only (5 calls).
+
+## T-E435-04 — `test/qa-flow.test.mjs` part 3 of 4
+
+Sections: "Amend-Resume edge: pm may hand back to the role it interrupted (C1-07)" and "Closed enums and the review-verdict/status consistency check (T-C9-10)". 181 changed lines (109+ / 72−), no a/b split. Placement: existing file, edited in place (brief). No `computeNewRound` calls in this part (all 5 remaining old-signature calls are in part 4).
+
+### Scenario → Test Map (part 3)
+
+| scenario | exact test name (all in `test/qa-flow.test.mjs`) |
+|---|---|
+| resume_of narrows to code-reviewer; pm→qa is ordinary (re-pin of "pm→qa accepted with resume_of: qa-engineer") | C1-07/AC-2 (E435): pm:In_Progress -> qa-engineer:In_Progress accepted with a stale resume_of: qa-engineer — the edge is ordinary, the field is irrelevant (green on both) |
+| envelope `allowed` + Amend-Resume hint, code-reviewer only | C1-07/AC-3 (E435): pm:In_Progress -> code-reviewer:In_Progress REJECTED with next_resume_of absent; only the code-reviewer entry is conditional |
+| AC1 legal build entry (re-pins of the two "pm→qa REJECTED" tests) | C1-07/AC-3 (E435): pm:In_Progress -> qa-engineer:In_Progress ACCEPTED with next_resume_of undefined … · C1-07/AC-3 (E435): … ACCEPTED with resume_of: code-reviewer … |
+| inert legacy token (re-pin) | C1-07/c9 (E435): a legacy 'resume_of: qa-engineer' pending_notes token is inert — pm -> qa-engineer is accepted the same with or without it |
+| AC-8(d) pre-existing pm targets (sr-engineer → qa-engineer) | C1-07/AC-8(d): pm:In_Progress -> qa-engineer:In_Progress still accepted WITHOUT / WITH … (2 generated tests) |
+| AC1 / AC3 S1 | C1-07/AC-8(d) (E435 S1): pm:In_Progress -> sr-engineer:In_Progress REJECTED with or without a resume_of field; the hint names qa-engineer |
+| OQ (a) qa cap gone (re-pin of "qa_round at cap rejects the resume edge") | C1-07 (E435): a stale prev_qa_round=4 does not cap pm -> qa-engineer — the qa round cap is gone (OQ (a)) |
+| build-entry gates arm on pm→qa (re-pins of the qa resume gate-isolation test + both pm→sr positive controls) | C1-07/AC-1 positive control (E435): armed+unattested pm->qa-engineer (no resume_of) trips SCOPE_DECISION_REQUIRED … · C1-07/AC-1 (E435 S1): armed+unattested pm->sr-engineer (SAME state) is TRANSITION_REJECTED with the S1 hint, before any build-entry gate · C1-07/AC-1 positive control (E435): armed pm->qa-engineer with scope_decision set but NO cut_approved trips CUT_APPROVAL_REQUIRED |
+| resume_of enum (AC4) at the zod boundary | T-C9-10/AC-2 (E435): tw_update_state rejects an out-of-enum resume_of (pm, and the pre-v5 qa-engineer) at the zod boundary |
+
+Left as is (green on both): the code-reviewer resume accept / wrong-role / legacy-token / status-guard tests, review_round cap precedence, the code-reviewer resume gate-isolation test and the inert-token integration test, marker single-use, the next_role / review_verdict zod tests, the AC-5 verdict matrix. Re-pinned but green on both: "next status Blocked" probe moved to `code-reviewer:Blocked` with `resume_of: code-reviewer`; the T-C9-10 positive control passes `resume_of: "code-reviewer"` (the one enum value left). Stale `prev_qa_round: 0` dropped from every request in the part.
+
+### Open Interface Details (part 3)
+
+1. The Amend-Resume miss is asserted by the hint substring ` Amend-Resume edge: set resume_of: "code-reviewer" on this write itself` (Copy) and the absence of `IN_FLIGHT_HINT` (not an old-path step).
+2. The pm→sr integration test asserts `TRANSITION_REJECTED` with no `SCOPE_DECISION_REQUIRED` (step 1 precedes step 3), plus `PM_TO_SR_HINT("pm").trim()` and `docs/migration-v5.md` in the reply text.
+3. The resume_of zod rejection is read from the thrown ZodError's `issues[].message` (exact `RESUME_OF_ENUM_MESSAGE`), since the error's `.message` is JSON with escaped quotes.
+
+### Red Reasons (part 3)
+
+12 red at base, all assertion failures (no syntax/link error): 7 on the unmarked `pm → qa-engineer` edge still needing `resume_of: qa-engineer`, 2 on `pm → sr-engineer` still accepted (pure + integration), 1 on `QA_ROUND_EXCEEDED` from a stale prev_qa_round, 1 on the build-entry gates not arming on pm→qa (CUT_APPROVAL), 1 on the zod enum still accepting `qa-engineer`. Rows under `# T-E435-04` in the manifest. Spot-run: `node --test test/qa-flow.test.mjs` → 153 tests, 106 pass, 47 fail (= 26 T-02 + 9 T-03 + 12 T-04 rows, name-for-name).
+
+Note for T-05: part 4 banner ("release-engineer has a legal write path in and out (T-MATRIX-C13, v3.49.0)") is now at L1897; all 5 remaining old-signature `computeNewRound` calls live there.

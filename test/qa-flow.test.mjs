@@ -1154,10 +1154,13 @@ test("T-MATRIX-A5: release-engineer:PASS row is present in ALLOWED_TRANSITIONS (
 // ============================================================================
 // Amend-Resume edge: pm may hand back to the role it interrupted (C1-07)
 // ============================================================================
-// pm:In_Progress -> {code-reviewer, qa-engineer}:In_Progress opens only via the
-// structured `next_resume_of` field, never a pending-notes line, so pm can
-// return to an interrupted role without a detour (specs/pm-repair-resume-routing.md,
-// specs/c9-protocol-fields.md). Covers accept, reject, inert notes, round-cap precedence, gate isolation.
+// pm:In_Progress -> code-reviewer:In_Progress opens only via the structured
+// `next_resume_of` field, never a pending-notes line, so pm can return to an
+// interrupted judge without a detour (specs/pm-repair-resume-routing.md,
+// specs/c9-protocol-fields.md). E435: pm -> qa-engineer is an ordinary edge
+// (qa-engineer is the build entry), so it needs no resume_of and the field
+// cannot open or close it. Covers accept, reject, inert notes, round-cap
+// precedence, gate isolation.
 
 // ---------- AC-2: accept — exact field, exact role ----------
 
@@ -1166,7 +1169,6 @@ test("C1-07/AC-2: pm:In_Progress -> code-reviewer:In_Progress accepted with resu
     validateTransition({
       prev: { agent: "pm", status: "In_Progress" },
       next: { agent: "code-reviewer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
       next_resume_of: "code-reviewer",
     }),
@@ -1174,12 +1176,13 @@ test("C1-07/AC-2: pm:In_Progress -> code-reviewer:In_Progress accepted with resu
   );
 });
 
-test("C1-07/AC-2: pm:In_Progress -> qa-engineer:In_Progress accepted with resume_of: qa-engineer", () => {
+test("C1-07/AC-2 (E435): pm:In_Progress -> qa-engineer:In_Progress accepted with a stale resume_of: qa-engineer — the edge is ordinary, the field is irrelevant", () => {
+  // WHY: a direct caller still passing the pre-v5 value must not change the
+  // outcome of a table edge; step 3.5 only ever adds the code-reviewer path.
   assert.equal(
     validateTransition({
       prev: { agent: "pm", status: "In_Progress" },
       next: { agent: "qa-engineer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
       next_resume_of: "qa-engineer",
     }),
@@ -1195,7 +1198,6 @@ test("C1-07/AC-2/c9: next_resume_of alone is sufficient — the field is indepen
     validateTransition({
       prev: { agent: "pm", status: "In_Progress" },
       next: { agent: "code-reviewer", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
       next_resume_of: "code-reviewer",
     }),
@@ -1205,62 +1207,67 @@ test("C1-07/AC-2/c9: next_resume_of alone is sufficient — the field is indepen
 
 // ---------- AC-3: reject — no field ----------
 
-test("C1-07/AC-3: pm:In_Progress -> code-reviewer:In_Progress REJECTED with next_resume_of absent", () => {
+test("C1-07/AC-3 (E435): pm:In_Progress -> code-reviewer:In_Progress REJECTED with next_resume_of absent; only the code-reviewer entry is conditional", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     // next_resume_of omitted entirely (undefined !== "code-reviewer").
   });
   assert.ok(r);
   assert.equal(r.error, "TRANSITION_REJECTED");
-  // E151: no UNCONDITIONAL code-reviewer/qa-engineer entry (every such entry must carry
-  // `requires`), and the two conditional Amend-Resume entries are present.
+  // E151: no UNCONDITIONAL code-reviewer entry; the one conditional
+  // Amend-Resume entry requires resume_of: code-reviewer. E435: qa-engineer is
+  // an ordinary pm successor now, listed without `requires`, and no entry asks
+  // for resume_of: qa-engineer.
   assert.ok(
-    !r.allowed.some((a) => (a.new_agent === "code-reviewer" || a.new_agent === "qa-engineer") && !a.requires),
-    `no unconditional code-reviewer/qa-engineer entry allowed without resume_of; got ${JSON.stringify(r.allowed)}`,
+    !r.allowed.some((a) => a.new_agent === "code-reviewer" && !a.requires),
+    `no unconditional code-reviewer entry allowed without resume_of; got ${JSON.stringify(r.allowed)}`,
   );
   assert.ok(
-    r.allowed.some((a) => a.new_agent === "code-reviewer" && a.requires?.resume_of === "code-reviewer"),
+    r.allowed.some((a) => a.new_agent === "code-reviewer" && a.new_status === "In_Progress" && a.requires?.resume_of === "code-reviewer"),
     "conditional code-reviewer entry must be present",
   );
   assert.ok(
-    r.allowed.some((a) => a.new_agent === "qa-engineer" && a.requires?.resume_of === "qa-engineer"),
-    "conditional qa-engineer entry must be present",
+    r.allowed.some((a) => a.new_agent === "qa-engineer" && a.new_status === "In_Progress" && !a.requires),
+    `qa-engineer:In_Progress must be an unconditional pm successor; got ${JSON.stringify(r.allowed)}`,
   );
+  assert.ok(
+    !r.allowed.some((a) => a.requires?.resume_of === "qa-engineer"),
+    "no allowed entry may require resume_of: qa-engineer (E435)",
+  );
+  assert.ok(
+    r.hint.includes(' Amend-Resume edge: set resume_of: "code-reviewer" on this write itself'),
+    `the Amend-Resume hint names code-reviewer only; got ${r.hint}`,
+  );
+  assert.ok(!r.hint.includes(IN_FLIGHT_HINT), "a legal-chain resume miss is not an old-path step: no migration hint");
 });
 
-test("C1-07/AC-3: pm:In_Progress -> qa-engineer:In_Progress REJECTED with next_resume_of undefined", () => {
+test("C1-07/AC-3 (E435): pm:In_Progress -> qa-engineer:In_Progress ACCEPTED with next_resume_of undefined — ordinary edge, no resume_of needed", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
   });
-  assert.ok(r);
-  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.equal(r, null, `pm -> qa-engineer is the build entry; got ${JSON.stringify(r)}`);
 });
 
 // ---------- AC-3: reject — field names the wrong role ----------
 
-test("C1-07/AC-3: pm:In_Progress -> qa-engineer:In_Progress REJECTED with resume_of: code-reviewer (wrong role)", () => {
+test("C1-07/AC-3 (E435): pm:In_Progress -> qa-engineer:In_Progress ACCEPTED with resume_of: code-reviewer — a resume_of naming another role cannot close a table edge", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     next_resume_of: "code-reviewer",
   });
-  assert.ok(r);
-  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.equal(r, null, `got ${JSON.stringify(r)}`);
 });
 
 test("C1-07/AC-3: pm:In_Progress -> code-reviewer:In_Progress REJECTED with resume_of: qa-engineer (wrong role)", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     next_resume_of: "qa-engineer",
   });
@@ -1278,7 +1285,6 @@ test("C1-07/c9: well-formed legacy 'resume_of: code-reviewer' pending_notes toke
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     // Legacy shape, no longer a field on TransitionRequest — passed here only
     // to prove the extra/unknown property is silently ignored, not honored.
@@ -1288,23 +1294,18 @@ test("C1-07/c9: well-formed legacy 'resume_of: code-reviewer' pending_notes toke
   assert.equal(r.error, "TRANSITION_REJECTED");
 });
 
-test("C1-07/c9: well-formed legacy 'resume_of: qa-engineer' pending_notes token, with NO next_resume_of field, does NOT open the edge (inert)", () => {
-  const r = validateTransition({
-    prev: { agent: "pm", status: "In_Progress" },
-    next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
-    prev_review_round: 0,
-    next_pending_notes: ["resume_of: qa-engineer"],
-  });
-  assert.ok(r, "a legacy pending_notes-shaped token must NOT open the edge post-c9");
-  assert.equal(r.error, "TRANSITION_REJECTED");
+test("C1-07/c9 (E435): a legacy 'resume_of: qa-engineer' pending_notes token is inert — pm -> qa-engineer is accepted the same with or without it", () => {
+  // WHY: the token neither opens nor closes anything; pm -> qa-engineer is a
+  // table edge since E435, so the outcome is the table's either way.
+  const base = { prev: { agent: "pm", status: "In_Progress" }, next: { agent: "qa-engineer", status: "In_Progress" }, prev_review_round: 0 };
+  assert.equal(validateTransition(base), null, "pm -> qa-engineer is an ordinary edge");
+  assert.equal(validateTransition({ ...base, next_pending_notes: ["resume_of: qa-engineer"] }), null, "the legacy token changes nothing");
 });
 
 test("C1-07/c9: legacy pending_notes token PLUS an unrelated next_resume_of value still rejects (field, not prose, is authoritative)", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     next_pending_notes: ["resume_of: code-reviewer"], // legacy text names the RIGHT role...
     next_resume_of: "qa-engineer", // ...but the structured field names the WRONG one — field wins.
@@ -1319,7 +1320,6 @@ test("C1-07: prev status Blocked (not In_Progress) does NOT open the edge even w
   const r = validateTransition({
     prev: { agent: "pm", status: "Blocked" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     next_resume_of: "code-reviewer",
   });
@@ -1331,7 +1331,6 @@ test("C1-07: next status FAIL (not In_Progress) does NOT open the edge even with
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "FAIL" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     next_resume_of: "code-reviewer",
   });
@@ -1340,12 +1339,12 @@ test("C1-07: next status FAIL (not In_Progress) does NOT open the edge even with
 });
 
 test("C1-07: next status Blocked (not In_Progress) does NOT open the edge even with a valid resume_of field", () => {
+  // E435: resume_of names only code-reviewer, so the probe is code-reviewer:Blocked.
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
-    next: { agent: "qa-engineer", status: "Blocked" },
-    prev_qa_round: 0,
+    next: { agent: "code-reviewer", status: "Blocked" },
     prev_review_round: 0,
-    next_resume_of: "qa-engineer",
+    next_resume_of: "code-reviewer",
   });
   assert.ok(r, "next.status must be In_Progress — Blocked must not qualify for the resume edge");
   assert.equal(r.error, "TRANSITION_REJECTED");
@@ -1353,9 +1352,11 @@ test("C1-07: next status Blocked (not In_Progress) does NOT open the edge even w
 
 // ---------- AC-8(d): pre-existing pm:In_Progress edges unaffected, field-independent ----------
 
+// E435: qa-engineer replaces sr-engineer as the build entry (pm -> sr-engineer
+// is an old-path step, pinned rejected right after this loop).
 const PRE_EXISTING_PM_TARGETS = [
   { agent: "architect", status: "In_Progress" },
-  { agent: "sr-engineer", status: "In_Progress" },
+  { agent: "qa-engineer", status: "In_Progress" },
   { agent: "researcher", status: "In_Progress" },
   { agent: "design-auditor", status: "In_Progress" },
   { agent: "pm", status: "Blocked" },
@@ -1368,7 +1369,6 @@ for (const target of PRE_EXISTING_PM_TARGETS) {
       validateTransition({
         prev: { agent: "pm", status: "In_Progress" },
         next: { agent: target.agent, status: target.status },
-        prev_qa_round: 0,
         prev_review_round: 0,
       }),
       null,
@@ -1383,7 +1383,6 @@ for (const target of PRE_EXISTING_PM_TARGETS) {
       validateTransition({
         prev: { agent: "pm", status: "In_Progress" },
         next: { agent: target.agent, status: target.status },
-        prev_qa_round: 0,
         prev_review_round: 0,
         next_resume_of: "code-reviewer",
       }),
@@ -1392,13 +1391,28 @@ for (const target of PRE_EXISTING_PM_TARGETS) {
   });
 }
 
+test("C1-07/AC-8(d) (E435 S1): pm:In_Progress -> sr-engineer:In_Progress REJECTED with or without a resume_of field; the hint names qa-engineer", () => {
+  // WHY: the old build entry is gone; no resume_of value reopens it, and the
+  // rejection points at qa-engineer plus docs/migration-v5.md for in-flight work.
+  for (const extra of [{}, { next_resume_of: "code-reviewer" }]) {
+    const r = validateTransition({
+      prev: { agent: "pm", status: "In_Progress" },
+      next: { agent: "sr-engineer", status: "In_Progress" },
+      prev_review_round: 0,
+      ...extra,
+    });
+    assert.ok(r, `pm -> sr-engineer must be rejected (${JSON.stringify(extra)})`);
+    assert.equal(r.error, "TRANSITION_REJECTED");
+    assert.ok(r.hint.endsWith(PM_TO_SR_HINT("pm") + IN_FLIGHT_HINT), `S1 hint; got ${r.hint}`);
+  }
+});
+
 // ---------- Round-cap precedence (architecture Test Surface item 7) ----------
 
 test("C1-07: review_round at cap (4) rejects the resume edge even with a valid resume_of field (round cap outranks step 3.5)", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 4,
     next_resume_of: "code-reviewer",
   });
@@ -1406,23 +1420,24 @@ test("C1-07: review_round at cap (4) rejects the resume edge even with a valid r
   assert.equal(r.error, "REVIEW_ROUND_EXCEEDED");
 });
 
-test("C1-07: qa_round at cap (4) rejects the resume edge even with a valid resume_of field (round cap outranks step 3.5)", () => {
+test("C1-07 (E435): a stale prev_qa_round=4 does not cap pm -> qa-engineer — the qa round cap is gone (OQ (a))", () => {
+  // WHY: qa-engineer never writes FAIL, so no qa round is counted; a stale
+  // on-disk value from a pre-v5 handoff must not wedge the build entry.
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
     prev_qa_round: 4,
     prev_review_round: 0,
-    next_resume_of: "qa-engineer",
   });
-  assert.ok(r, "must be rejected despite the valid field");
-  assert.equal(r.error, "QA_ROUND_EXCEEDED");
+  assert.equal(r, null, `no QA_ROUND_EXCEEDED any more; got ${JSON.stringify(r)}`);
 });
 
 // ---------- Gate isolation (AC-1 / AC-8(e)) — integration via handleUpdateState ----------
 // The resume edge must never arm or weaken the Scope Decision and Cut-Approval
-// gates, which fire only on pm -> {architect, sr-engineer}. On an armed workspace
-// with neither attestation, the new edges trip neither gate, and pm -> sr-engineer
-// still trips both (positive control). Runs the real orchestrator.
+// gates, which fire only on pm -> {architect, qa-engineer} (E435: qa-engineer is
+// the build entry; pm -> sr-engineer is gone). On an armed workspace with
+// neither attestation, the code-reviewer resume edge trips neither gate, and
+// pm -> qa-engineer trips both (positive control). Runs the real orchestrator.
 
 function mkGateWorkspace(feature = "c1-gate-fixture") {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twc1gate-"));
@@ -1474,7 +1489,9 @@ test("C1-07/AC-1/AC-8(e)/c9: armed+unattested pm->code-reviewer with resume_of f
   assert.ok(!text.includes("CUT_APPROVAL_REQUIRED"), "Cut-Approval Gate must NOT fire on the resume edge");
 });
 
-test("C1-07/AC-1/AC-8(e)/c9: armed+unattested pm->qa-engineer with resume_of field trips NEITHER gate", async () => {
+test("C1-07/AC-1 positive control (E435): armed+unattested pm->qa-engineer (no resume_of) trips SCOPE_DECISION_REQUIRED — qa-engineer is the build entry", async () => {
+  // WHY: pm -> qa-engineer stopped being a resume edge; it is the build-entry
+  // hop now, so the build-entry gates arm on it like they did on pm -> sr.
   setActiveStorage(new FileHandoffStorage());
   const { ws, feature } = mkGateWorkspace("c1-gate-qa");
   await seedPmInProgress(ws, feature); // no scope_decision, no cut_approved
@@ -1487,13 +1504,11 @@ test("C1-07/AC-1/AC-8(e)/c9: armed+unattested pm->qa-engineer with resume_of fie
     status: "In_Progress",
     agent_id: "qa-engineer",
     completed_tasks: [],
-    pending_notes: ["resuming after PM amendment"],
-    resume_of: "qa-engineer",
+    pending_notes: ["qa-engineer: writing tests"],
   });
   const text = result.content[0].text;
-  assert.ok(!result.isError, `resume edge must not be rejected; got: ${text}`);
-  assert.ok(!text.includes("SCOPE_DECISION_REQUIRED"), "Scope Decision Gate must NOT fire on the resume edge");
-  assert.ok(!text.includes("CUT_APPROVAL_REQUIRED"), "Cut-Approval Gate must NOT fire on the resume edge");
+  assert.ok(result.isError, `the build-entry edge must be gated; got: ${text}`);
+  assert.ok(text.includes("SCOPE_DECISION_REQUIRED"), `Scope Decision Gate must fire on pm->qa-engineer; got: ${text}`);
 });
 
 test("C1-07/c9: armed+unattested pm->code-reviewer with ONLY a legacy pending_notes token (no resume_of field) IS rejected — TRANSITION_REJECTED, not a gate", async () => {
@@ -1522,9 +1537,9 @@ test("C1-07/c9: armed+unattested pm->code-reviewer with ONLY a legacy pending_no
   assert.ok(text.includes("TRANSITION_REJECTED"), `expected TRANSITION_REJECTED; got: ${text}`);
 });
 
-test("C1-07/AC-1 positive control: armed+unattested pm->sr-engineer (SAME state) STILL trips SCOPE_DECISION_REQUIRED", async () => {
-  // Proves the new edge did not weaken the gate: the identical armed/unattested
-  // precondition, on the pre-existing build-entry edge, still fires as before.
+test("C1-07/AC-1 (E435 S1): armed+unattested pm->sr-engineer (SAME state) is TRANSITION_REJECTED with the S1 hint, before any build-entry gate", async () => {
+  // WHY: the old build-entry edge is gone, so step 1 (TRANSITION_VALIDATION)
+  // rejects it before the scope / cut-approval gates (steps 3-4) are reached.
   setActiveStorage(new FileHandoffStorage());
   const { ws, feature } = mkGateWorkspace("c1-gate-positive-scope");
   await seedPmInProgress(ws, feature); // no scope_decision, no cut_approved
@@ -1540,11 +1555,14 @@ test("C1-07/AC-1 positive control: armed+unattested pm->sr-engineer (SAME state)
     pending_notes: [],
   });
   const text = result.content[0].text;
-  assert.ok(result.isError, "the pre-existing gated edge must still be rejected");
-  assert.ok(text.includes("SCOPE_DECISION_REQUIRED"), "Scope Decision Gate must still fire on pm->sr-engineer");
+  assert.ok(result.isError, "pm->sr-engineer must be rejected");
+  assert.ok(text.includes("TRANSITION_REJECTED"), `expected TRANSITION_REJECTED; got: ${text}`);
+  assert.ok(!text.includes("SCOPE_DECISION_REQUIRED"), "the transition check runs before the Scope Decision Gate");
+  assert.ok(text.includes(PM_TO_SR_HINT("pm").trim()), `the hint names qa-engineer as the build entry; got: ${text}`);
+  assert.ok(text.includes("docs/migration-v5.md"), `the hint names docs/migration-v5.md; got: ${text}`);
 });
 
-test("C1-07/AC-1 positive control: armed pm->sr-engineer with scope_decision set but NO cut_approved STILL trips CUT_APPROVAL_REQUIRED", async () => {
+test("C1-07/AC-1 positive control (E435): armed pm->qa-engineer with scope_decision set but NO cut_approved trips CUT_APPROVAL_REQUIRED", async () => {
   // Second gate, isolated: once scope is cleared, the cut-approval gate (which
   // runs next, unconditionally) must still fire on the SAME pre-existing edge —
   // proving the resume edge's marker-consistency check did not fold into or
@@ -1559,13 +1577,13 @@ test("C1-07/AC-1 positive control: armed pm->sr-engineer with scope_decision set
     workspace_path: ws,
     active_feature: feature,
     status: "In_Progress",
-    agent_id: "sr-engineer",
+    agent_id: "qa-engineer",
     completed_tasks: [],
     pending_notes: [],
   });
   const text = result.content[0].text;
-  assert.ok(result.isError, "the pre-existing gated edge must still be rejected");
-  assert.ok(text.includes("CUT_APPROVAL_REQUIRED"), "Cut-Approval Gate must still fire on pm->sr-engineer");
+  assert.ok(result.isError, "the build-entry edge must be gated");
+  assert.ok(text.includes("CUT_APPROVAL_REQUIRED"), `Cut-Approval Gate must fire on pm->qa-engineer; got: ${text}`);
   assert.ok(!text.includes("SCOPE_DECISION_REQUIRED"), "Scope Decision Gate must be clear (already satisfied)");
 });
 
@@ -1645,7 +1663,7 @@ test("T-C9-10/AC-2: tw_update_state rejects an out-of-enum next_role at the zod 
   );
 });
 
-test("T-C9-10/AC-2: tw_update_state rejects an out-of-enum resume_of at the zod boundary", async () => {
+test("T-C9-10/AC-2 (E435): tw_update_state rejects an out-of-enum resume_of (pm, and the pre-v5 qa-engineer) at the zod boundary", async () => {
   await assert.rejects(
     async () => {
       UPDATE_STATE_ENTRY.run({
@@ -1653,11 +1671,30 @@ test("T-C9-10/AC-2: tw_update_state rejects an out-of-enum resume_of at the zod 
         active_feature: "x",
         status: "In_Progress",
         agent_id: "pm",
-        resume_of: "pm", // restricted to code-reviewer | qa-engineer only
+        resume_of: "pm", // E435: restricted to code-reviewer only
       });
     },
     /ZodError|invalid_value|invalid_enum_value/i,
     "an out-of-enum resume_of (e.g. 'pm', 'architect', 'sr-engineer') must be rejected by zod",
+  );
+  // E435: the pre-v5 value qa-engineer is out of the enum too, with a message
+  // telling an old client that pm -> qa-engineer needs no resume_of.
+  let issues = null;
+  try {
+    UPDATE_STATE_ENTRY.run({
+      workspace_path: "/tmp/does-not-matter",
+      active_feature: "x",
+      status: "In_Progress",
+      agent_id: "pm",
+      resume_of: "qa-engineer",
+    });
+  } catch (e) {
+    issues = e.issues ?? [];
+  }
+  assert.ok(issues, "resume_of: qa-engineer must be rejected by zod (E435)");
+  assert.ok(
+    issues.some((i) => i.message === 'resume_of accepts only "code-reviewer"; pm:In_Progress → qa-engineer:In_Progress is an ordinary edge, so omit resume_of there.'),
+    `RESUME_OF_ENUM_MESSAGE expected; got ${JSON.stringify(issues)}`,
   );
 });
 
@@ -1697,7 +1734,7 @@ test("T-C9-10/AC-2: tw_update_state ACCEPTS valid enum values for all three fiel
     completed_tasks: [],
     pending_notes: ["pm: re-evaluating"],
     next_role: "sr-engineer",
-    resume_of: "qa-engineer",
+    resume_of: "code-reviewer", // E435: the one value left in the enum
     review_verdict: "APPROVED",
   });
   // Zod accepted all three enum values (no throw above). The write itself is now refused by the
