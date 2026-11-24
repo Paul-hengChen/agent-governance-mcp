@@ -1,0 +1,9 @@
+{"ts":"2026-11-24T16:22:11.405Z","feature":"e450-release-window-agc-check","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:22:38.358Z","feature":"e450-release-window-agc-check","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:22:56.452Z","feature":"e450-release-window-agc-check","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:23:14.903Z","feature":"e450-release-window-agc-check","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:26:10.948Z","feature":"e450-release-window-agc-check","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:26:40.933Z","feature":"e450-release-window-agc-check","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:27:04.727Z","feature":"e450-release-window-agc-check","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:27:14.018Z","feature":"e450-release-window-agc-check","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-24T16:36:28.226Z","feature":"e450-release-window-agc-check","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
