@@ -554,3 +554,33 @@ Left as is (green on both): e18 CONTENT-2, CONTENT-3; all of `e20-e21-crash-resi
 ### Red Reasons (T-13)
 
 18 red at base, all assertion failures (no syntax / link error): e18 QAEV-1/2/3/4a/SQL, a code-reviewer ledger write is `REVIEWER_COMPLETED_TASKS_REJECTED` (T-E435-33); QAEV-INCIDENT, code-reviewer → qa-engineer still an edge (T-E435-30); drift-skew ×3, e325 ×1, skew text `server max v16` and v17 reported as skew (T-E435-29); e312 ×8, v16 is current so the dropped fields survive the read (T-E435-29). Rows under `# T-E435-13` in the manifest. Run: `node --test test/e18-write-provenance.test.mjs test/e20-e21-crash-resilience.test.mjs test/drift-skew.test.mjs test/e325-drift-version-peek-race.test.mjs test/e312-read-path-race.test.mjs` → 49 tests, 31 pass, 18 fail = the 18 rows, name for name.
+
+## T-E435-14 — `qa-review-scoped-append`, `e23-evidence-schema`, `e161-qa-suite-result`, `e236-rejected-write-evidence`, `e366-sqlite-rejected-write-evidence` (AC2, AC9)
+
+Placement: existing files, edited in place (brief). Re-titled tests carry `E435`. 152 changed lines (80+ / 72-), under the 300-line cap. Contract: architecture *`tools/handoff-orchestrator.ts`* (steps 10–11 judge = `JUDGE_ROLE`; PASS defence-in-depth = `requireJudge`), *`tools/registry.ts`* (PASS refine names code-reviewer), *Handoff schema v17*, Rulings (d) (SQLite runs the same one chain, no marker). Schema-17 conventions from T-E435-12 reused.
+
+### Scenario → Test Map (T-14)
+
+| scenario | exact test name(s) |
+|---|---|
+| the judge's (code-reviewer's) qa_review is recorded only against the named ids, FAIL and PASS, file mode | qa-review-scoped-append FM1/AC1/AC4 (E435) · FM2/AC2 (E435) |
+| a judge qa_review with no target is QA_REVIEW_TARGET_REQUIRED, handler and full dispatch | FM3/AC3 (E435) · FM4 (E435) |
+| AC9: the same recording and target rule in SQLite, judge code-reviewer, no marker | SQ1/AC1/AC4 (E435) · SQ2/AC2 (E435) · SQ3/AC3 (E435) |
+| `qa_suite_result` is recorded on the judge's PASS / FAIL (`— by code-reviewer`), file and SQLite; zod rejects malformed values; it changes no outcome where nothing records; it is undone with a rejected write | e161 AC-E161-2 … AC-E161-8 (E435) |
+| a judge write rejected after QA_REVIEW_RECORD (or whose state write throws) leaves evidence byte-identical; an accepted judge PASS records the unchanged header / section | e236 AC-E236-1 … AC-E236-6 (E435) |
+| AC9: the same undo for SQLite `reports` rows; an accepted judge PASS leaves rows signed `code-reviewer` | e366 AC-E366-1 … AC-E366-3 (E435) |
+| visual / AC-execution envelopes name file path and evidence-schema version on the judge's PASS | e23 AC5-1 … AC5-3 (E435) |
+| a v12 handoff migrates through v16 → v17 (CURRENT 17) inventing no `evidence_schema`; `qa_rounds_total` dropped | e23 AC2-1 (E435) · AC2-2 (E435) (green on both: `?? 17` sanity) |
+
+Left as is (green on both): e161 AC-E161-9, source hygiene; e23 AC1-*, AC3-*, AC4-*, AC6-*; e236 AC-E236-7 and e366 AC-E366-4 (library-level undo, the signer string is data the server never checks; kept `qa-engineer`).
+
+### Open Interface Details (T-14)
+
+1. Pre-existing evidence seeded as data (`# QA review … PASS — by qa-engineer` files in qa-review-scoped-append, `T-OLD` / `T-U` SQLite rows, e236/e366 undo signers) keeps the qa-engineer signer: it models pre-v5 evidence and no gate reads the signer.
+2. e161 AC-E161-6 case `"qa In_Progress"` renamed `"judge In_Progress"` (a code-reviewer self-loop carrying qa_review records nothing); the `sr-engineer` case is unchanged.
+3. e23 AC2-1 registers a v16 → v17 step mirroring the architecture's (`chain_path`, `qa_round`, `qa_rounds_total` dropped), and its sibling-counter assertion moves from `qa_rounds_total` to `review_rounds_total`, plus `"qa_rounds_total" in payload === false`.
+4. Raw schema 12/13 fixtures in e23 keep `qa_round` / `qa_rounds_total` lines (frozen historical text; post-build they migrate away).
+
+### Red Reasons (T-14)
+
+27 red at base, all for the stated reason (no syntax / link error): 21 are a `ZodError` `status="PASS" requires agent_id="qa-engineer"` — a code-reviewer PASS on an unmarked feature never reaches the record or later gates (T-E435-31, T-E435-35); FM1/FM3/FM4/SQ1/SQ3 are assertion failures — the judge at base is qa-engineer, so a code-reviewer FAIL records nothing and QA_REVIEW_TARGET_REQUIRED does not arm (T-E435-31); e23 AC2-1 stops at v16 (T-E435-29). No test dropped. Rows under `# T-E435-14` in the manifest. Run: `node --test test/qa-review-scoped-append.test.mjs test/e23-evidence-schema.test.mjs test/e161-qa-suite-result.test.mjs test/e236-rejected-write-evidence.test.mjs test/e366-sqlite-rejected-write-evidence.test.mjs` → 45 tests, 18 pass, 27 fail = the 27 rows, name for name.

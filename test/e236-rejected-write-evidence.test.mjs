@@ -5,6 +5,8 @@
 // (later gates must see this write's own review), but a write that does not land (a later gate rejects it,
 // or writeState throws) gets its appended section undone, including a file or directory it created.
 // Every case drives the real orchestrator and compares full directory snapshots, not just one file.
+// E435: the judge is code-reviewer on every feature, so the recording writes are code-reviewer writes;
+// AC-E236-7 drives recordReviewInFileUndoable directly, where the signer is plain data.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -37,7 +39,7 @@ async function seedQa(ws, feature, completedTasks = []) {
     status: "In_Progress",
     completedTasks,
     pendingNotes: ["QA: claiming review"],
-    lastAgent: "qa-engineer",
+    lastAgent: "code-reviewer",
   });
   forceSeedStamp(ws);
   resetSession(ws);
@@ -64,7 +66,7 @@ const text = (r) => r.content?.[0]?.text ?? "";
 const PASS_ARGS = (feature, ids, extra = {}) => ({
   active_feature: feature,
   status: "PASS",
-  agent_id: "qa-engineer",
+  agent_id: "code-reviewer",
   completed_tasks: ids,
   review_task_ids: ids,
   pending_notes: ["QA: PASS"],
@@ -77,7 +79,7 @@ function writeManifest(ws, feature) {
   fs.writeFileSync(expectedRedManifestPath(ws, feature), "test/x.test.mjs | a test\n");
 }
 
-test("AC-E236-1: EXPECTED_RED_DIFF_MISSING rejection leaves a pre-existing evidence file byte-identical (the E236 instance)", async () => {
+test("AC-E236-1 (E435): on a code-reviewer PASS, EXPECTED_RED_DIFF_MISSING rejection leaves a pre-existing evidence file byte-identical (the E236 instance)", async () => {
   const ws = mkWorkspace();
   const feature = "e236-1";
   writeManifest(ws, feature);
@@ -91,7 +93,7 @@ test("AC-E236-1: EXPECTED_RED_DIFF_MISSING rejection leaves a pre-existing evide
   assert.ok(before.equals(fs.readFileSync(file)), "file bytes are still exactly B");
 });
 
-test("AC-E236-2: the same rejection with no evidence file leaves no file and nothing else in qa_reports/", async () => {
+test("AC-E236-2 (E435): the same rejection with no evidence file leaves no file and nothing else in qa_reports/", async () => {
   const ws = mkWorkspace();
   const feature = "e236-2";
   writeManifest(ws, feature);
@@ -104,7 +106,7 @@ test("AC-E236-2: the same rejection with no evidence file leaves no file and not
   assert.deepEqual(snapshot(path.join(ws, "qa_reports")), before, "only the manifest remains");
 });
 
-test("AC-E236-3: a write that creates qa_reports/ and is rejected by a later step leaves no qa_reports/", async () => {
+test("AC-E236-3 (E435): a code-reviewer write that creates qa_reports/ and is rejected by a later step leaves no qa_reports/", async () => {
   const ws = mkWorkspace();
   const feature = "e236-3";
   await seedQa(ws, feature);
@@ -156,7 +158,7 @@ const AC4_CASES = [
   },
 ];
 
-test("AC-E236-4: every rejecting step after QA_REVIEW_RECORD leaves evidence files byte-identical", async () => {
+test("AC-E236-4 (E435): every rejecting step after QA_REVIEW_RECORD leaves evidence files byte-identical", async () => {
   for (const c of AC4_CASES) {
     const ws = mkWorkspace("e236-4-");
     const feature = `e236-4-${c.code.toLowerCase().replace(/_/g, "-")}`;
@@ -173,7 +175,7 @@ test("AC-E236-4: every rejecting step after QA_REVIEW_RECORD leaves evidence fil
   }
 });
 
-test("AC-E236-5: a write that passes every gate but whose state write throws (STATE DRIFT) leaves evidence untouched", async () => {
+test("AC-E236-5 (E435): a code-reviewer write that passes every gate but whose state write throws (STATE DRIFT) leaves evidence untouched", async () => {
   const ws = mkWorkspace();
   const feature = "e236-5";
   fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
@@ -197,7 +199,7 @@ test("AC-E236-5: a write that passes every gate but whose state write throws (ST
   assert.deepEqual(snapshot(path.join(ws, "qa_reports")), before, "evidence for both ids (one existing, one new) is restored");
 });
 
-test("AC-E236-6: a PASS whose only evidence is its own qa_review is accepted and records the same header and section as before", async () => {
+test("AC-E236-6 (E435): a code-reviewer PASS whose only evidence is its own qa_review is accepted and records the same header and section as before", async () => {
   const ws = mkWorkspace();
   const feature = "e236-6";
   await seedQa(ws, feature);
@@ -208,11 +210,11 @@ test("AC-E236-6: a PASS whose only evidence is its own qa_review is accepted and
 
   // Reference: what recordReviewInFile (the unchanged public record) writes for the same inputs.
   const ref = mkWorkspace("e236-6ref-");
-  await recordReviewInFile(ref, ["T-E236-X"], "PASS", "qa-engineer", notes);
+  await recordReviewInFile(ref, ["T-E236-X"], "PASS", "code-reviewer", notes);
   const want = fs.readFileSync(path.join(ref, "qa_reports", "review_T-E236-X.md"), "utf-8");
   const norm = (s) => s.replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, "<ISO>");
   assert.equal(norm(got), norm(want));
-  assert.match(got, /^# QA review — T-E236-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by qa-engineer\n\nEverything verified\.\n\n$/m);
+  assert.match(got, /^# QA review — T-E236-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by code-reviewer\n\nEverything verified\.\n\n$/m);
 });
 
 test("AC-E236-7: the undo leaves a file alone when it changed after the append, and never throws", async () => {

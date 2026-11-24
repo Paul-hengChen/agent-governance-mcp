@@ -5,6 +5,8 @@
 // this mirrors test/reviewer-completed-tasks-gate.test.mjs: handleUpdateState
 // against both storage backends.
 // Spec-to-test map: specs/e260h-comment-rationale.md (test/qa-review-scoped-append.test.mjs).
+// E435: code-reviewer is the judge on every feature and in both storage modes, so every
+// recording or rejecting write below is a code-reviewer write from code-reviewer:In_Progress.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -91,14 +93,14 @@ function seedOpenTasksAndPriorEvidence(ws, targetId, otherIds) {
 // among N > 1 open tasks, touches ONLY that task's evidence file (file mode).
 // ---------------------------------------------------------------------------
 
-test("FM1/AC1/AC4: FAIL write with review_task_ids=[T-X] among N open tasks touches ONLY T-X's evidence file — nothing else changes (file mode)", async () => {
+test("FM1/AC1/AC4 (E435): code-reviewer FAIL write with review_task_ids=[T-X] among N open tasks touches ONLY T-X's evidence file — nothing else changes (file mode)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("qrsa-fm1-");
   const targetId = "T-QRSA-TARGET";
   const otherIds = ["T-QRSA-OTHER-1", "T-QRSA-OTHER-2", "T-QRSA-OTHER-3"];
   const priorContent = seedOpenTasksAndPriorEvidence(ws, targetId, otherIds);
 
-  await seedFileState(ws, "qrsa-fm1", "qa-engineer", "In_Progress");
+  await seedFileState(ws, "qrsa-fm1", "code-reviewer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
 
@@ -106,7 +108,7 @@ test("FM1/AC1/AC4: FAIL write with review_task_ids=[T-X] among N open tasks touc
     workspace_path: ws,
     active_feature: "qrsa-fm1",
     status: "FAIL",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: [], // FAIL always has this empty per the Escalation call format
     review_task_ids: [targetId],
     qa_review: "FAIL — full test suite regression, see qa_reports/review_T-QRSA-TARGET.md",
@@ -150,7 +152,7 @@ test("FM1/AC1/AC4: FAIL write with review_task_ids=[T-X] among N open tasks touc
 // unchanged back-compat behavior (file mode).
 // ---------------------------------------------------------------------------
 
-test("FM2/AC2: PASS write with completed_tasks=[T-Y,T-Z] and review_task_ids OMITTED records for exactly T-Y and T-Z (back-compat, file mode)", async () => {
+test("FM2/AC2 (E435): code-reviewer PASS write with completed_tasks=[T-Y,T-Z] and review_task_ids OMITTED records for exactly T-Y and T-Z (back-compat, file mode)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("qrsa-fm2-");
   const otherIds = ["T-QRSA2-OTHER-1"];
@@ -161,7 +163,7 @@ test("FM2/AC2: PASS write with completed_tasks=[T-Y,T-Z] and review_task_ids OMI
     "utf-8",
   );
 
-  await seedFileState(ws, "qrsa-fm2", "qa-engineer", "In_Progress");
+  await seedFileState(ws, "qrsa-fm2", "code-reviewer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
 
@@ -169,7 +171,7 @@ test("FM2/AC2: PASS write with completed_tasks=[T-Y,T-Z] and review_task_ids OMI
     workspace_path: ws,
     active_feature: "qrsa-fm2",
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-QRSA2-Y", "T-QRSA2-Z"],
     // review_task_ids intentionally omitted — must fall back to completed_tasks.
     qa_review: "PASS — all green",
@@ -196,7 +198,7 @@ test("FM2/AC2: PASS write with completed_tasks=[T-Y,T-Z] and review_task_ids OMI
 // records NOTHING (file mode).
 // ---------------------------------------------------------------------------
 
-test("FM3/AC3: qa_review write with review_task_ids AND completed_tasks both empty is REJECTED with QA_REVIEW_TARGET_REQUIRED, recording nothing (file mode)", async () => {
+test("FM3/AC3 (E435): code-reviewer qa_review write with review_task_ids AND completed_tasks both empty is REJECTED with QA_REVIEW_TARGET_REQUIRED, recording nothing (file mode)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("qrsa-fm3-");
   const otherIds = ["T-QRSA3-OTHER-1", "T-QRSA3-OTHER-2"];
@@ -206,7 +208,7 @@ test("FM3/AC3: qa_review write with review_task_ids AND completed_tasks both emp
     "utf-8",
   );
 
-  await seedFileState(ws, "qrsa-fm3", "qa-engineer", "In_Progress");
+  await seedFileState(ws, "qrsa-fm3", "code-reviewer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
 
@@ -214,7 +216,7 @@ test("FM3/AC3: qa_review write with review_task_ids AND completed_tasks both emp
     workspace_path: ws,
     active_feature: "qrsa-fm3",
     status: "FAIL",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: [], // FAIL always has this empty
     // review_task_ids omitted entirely — the exact "forgot to name the reviewed task" shape AC3 describes.
     qa_review: "FAIL — forgot to name the task under review",
@@ -245,11 +247,11 @@ test("FM3/AC3: qa_review write with review_task_ids AND completed_tasks both emp
 
 const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
 
-test("FM4: tw_update_state full dispatch — qa_review with both target fields omitted is rejected with QA_REVIEW_TARGET_REQUIRED, not a crash", async () => {
+test("FM4 (E435): tw_update_state full dispatch — code-reviewer qa_review with both target fields omitted is rejected with QA_REVIEW_TARGET_REQUIRED, not a crash", async () => {
   assert.ok(UPDATE_STATE_ENTRY, "tw_update_state must be registered in TOOL_REGISTRY");
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("qrsa-fm4-");
-  await seedFileState(ws, "qrsa-fm4", "qa-engineer", "In_Progress");
+  await seedFileState(ws, "qrsa-fm4", "code-reviewer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
 
@@ -257,7 +259,7 @@ test("FM4: tw_update_state full dispatch — qa_review with both target fields o
     workspace_path: ws,
     active_feature: "qrsa-fm4",
     status: "FAIL",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     qa_review: "FAIL — no target named",
     pending_notes: ["QA: forgot review_task_ids"],
     // completed_tasks and review_task_ids both omitted — zod defaults completed_tasks to [].
@@ -306,7 +308,7 @@ function reportedTaskIds(dbPath, workspacePath) {
 }
 
 sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matrix", () => {
-  test("SQ1/AC1/AC4: FAIL write with review_task_ids=[T-X] among N open tasks writes EXACTLY 1 reports row (SQLite mode)", async () => {
+  test("SQ1/AC1/AC4 (E435): code-reviewer FAIL write with review_task_ids=[T-X] among N open tasks writes EXACTLY 1 reports row (SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("qrsa-sq1-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -317,11 +319,11 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
         status: "In_Progress",
         completedTasks: [],
         pendingNotes: ["seed"],
-        lastAgent: "qa-engineer",
+        lastAgent: "code-reviewer",
       });
       // Seed N pre-existing report rows for OTHER tasks — the SQLite
       // counterpart of the unrelated review files the old bug appended into.
-      await storage.recordReview(dir, ["T-QRSA-SQL-OTHER-1", "T-QRSA-SQL-OTHER-2"], "PASS", "qa-engineer", "prior unrelated PASS");
+      await storage.recordReview(dir, ["T-QRSA-SQL-OTHER-1", "T-QRSA-SQL-OTHER-2"], "PASS", "code-reviewer", "prior unrelated PASS");
       resetSession(dir);
       storage.readState(dir);
 
@@ -329,7 +331,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
         workspace_path: dir,
         active_feature: "qrsa-sq1",
         status: "FAIL",
-        agent_id: "qa-engineer",
+        agent_id: "code-reviewer",
         completed_tasks: [],
         review_task_ids: ["T-QRSA-SQL-TARGET"],
         qa_review: "FAIL — SQLite mode scoped-append check",
@@ -349,7 +351,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
     }
   });
 
-  test("SQ2/AC2: PASS write with completed_tasks=[T-Y,T-Z], review_task_ids omitted, records for exactly T-Y/T-Z (back-compat, SQLite mode)", async () => {
+  test("SQ2/AC2 (E435): code-reviewer PASS write with completed_tasks=[T-Y,T-Z], review_task_ids omitted, records for exactly T-Y/T-Z (back-compat, SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("qrsa-sq2-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -360,7 +362,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
         status: "In_Progress",
         completedTasks: [],
         pendingNotes: ["seed"],
-        lastAgent: "qa-engineer",
+        lastAgent: "code-reviewer",
       });
       resetSession(dir);
       storage.readState(dir);
@@ -369,7 +371,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
         workspace_path: dir,
         active_feature: "qrsa-sq2",
         status: "PASS",
-        agent_id: "qa-engineer",
+        agent_id: "code-reviewer",
         completed_tasks: ["T-QRSA-SQL-Y", "T-QRSA-SQL-Z"],
         qa_review: "PASS — all green",
         pending_notes: ["QA: PASS"],
@@ -384,7 +386,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
     }
   });
 
-  test("SQ3/AC3: qa_review write with review_task_ids AND completed_tasks both empty is REJECTED with QA_REVIEW_TARGET_REQUIRED, writing ZERO rows (SQLite mode)", async () => {
+  test("SQ3/AC3 (E435): code-reviewer qa_review write with review_task_ids AND completed_tasks both empty is REJECTED with QA_REVIEW_TARGET_REQUIRED, writing ZERO rows (SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("qrsa-sq3-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -395,7 +397,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
         status: "In_Progress",
         completedTasks: [],
         pendingNotes: ["seed"],
-        lastAgent: "qa-engineer",
+        lastAgent: "code-reviewer",
       });
       resetSession(dir);
       storage.readState(dir);
@@ -404,7 +406,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
         workspace_path: dir,
         active_feature: "qrsa-sq3",
         status: "FAIL",
-        agent_id: "qa-engineer",
+        agent_id: "code-reviewer",
         completed_tasks: [],
         qa_review: "FAIL — forgot to name the task under review",
         pending_notes: ["QA: forgot review_task_ids"],
