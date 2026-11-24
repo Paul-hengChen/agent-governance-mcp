@@ -802,3 +802,29 @@ These five already pin the absence of qa-as-visual-judge wording (E433/E434 re-p
 ### Red Reasons (T-22)
 
 0 red. Run: `node --test test/pixel-perfect-design-coverage.test.mjs test/pixel-perfect-visual-compare.test.mjs test/qa-visual-skill-split.test.mjs test/e412-qa-visual-template.test.mjs test/e360-qa-visual-review-task-ids.test.mjs` → 29 tests, 29 pass, 0 fail = 0 rows. Expected to stay green after T-32 / T-36 / T-37 land (see table).
+
+## T-E435-23 — `e16-judge-dispatch-charter`, `e295-hop-cap-and-sop-halves`, `e393-builder-judge-core`, `e380-qa-suite-result-sop`, `skill-evolution-v3.11` (AC7; text pins 1/3)
+
+Placement: existing files, edited in place (brief). Re-titled / new tests carry `(E435)`. 63 changed lines (53+ / 10−) over 4 files; `e380-qa-suite-result-sop` needs no change.
+
+### Scenario → Test Map (T-23)
+
+| contract text (task) | file | exact test name |
+|---|---|---|
+| const-08 line 7 label "Non-Judge Completed-Tasks Gate" + `NON_JUDGE_COMPLETED_TASKS_REJECTED`; old label / both removed ledger codes absent (T-33) | e16 | E16-07 (E435): const-08 §3.1 ledger gate is the Non-Judge Completed-Tasks Gate quoting NON_JUDGE_COMPLETED_TASKS_REJECTED |
+| coord-03 line 9 "a sibling of `review_round`" (T-32); skill-integrator line 189 "review rounds" (T-41); no `qa_round` / "qa rounds" in either | e295 | AC4b (E435): coord-03 hop counter is a sibling of review_round only; integrator roll-up sums review rounds, no qa round |
+| hop-cap probe off the removed `code-reviewer:In_Progress → qa-engineer:In_Progress` edge onto `code-reviewer:FAIL → sr-engineer:In_Progress`; stale `prev_qa_round` out (green on both tables) | e295 | AC2 (E435): (pm, In_Progress) landing at the cap is accepted from code-reviewer/qa-engineer In_Progress; other role edges stay HOP_CAP_EXCEEDED |
+| const-11 line 10 / rationale line 149 per Copy (unconditional PASS restriction), no "on the test-first chain" (T-41) | e393 | AC-A3 (E435): const-11 §3.2 enforcement and its rationale restrict status=PASS to code-reviewer with no chain condition |
+| qa SOP names no `qa_round` / `QA_ROUND_EXCEEDED` (T-32 line 13 Copy) | e393 | AC-C (E435): named sites restate no bare round number |
+| `CURRENT_VERSIONS.handoff` 17 (T-29) | skill-evolution | AC-10 (E435): schema/versions.ts handoff schema is 17, sqlite stays 2 |
+
+Left as is: e16 E16-01…06 (const-08 line 8 Amend-Resume text already names only `code-reviewer`; no Copy row rewrites it); e380 all five (PASS row in skill-code-reviewer.md untouched by T-33, which deletes only the "The marker" bullet; qa SOP size cap only gains headroom); e393 AC-A1/A2/B/B11/C01 (const-05 / const-06 pinned sentences unchanged; Execution Profile line keeps "voids Constitution §3 builder != judge"); skill-evolution c9 sweep (`resume_of: <role>` token shape unchanged).
+
+### Open Interface Details (T-23)
+
+1. const-11 / rationale texts derived by applying the Copy substitution to the current lines (line-wrap kept), not invented; const-08 line 7 pins only the label and code the architecture names, not the rest of the bullet.
+2. Gaps (not pinned here, no Copy text): the T-37 Execution Profile sentence (e393 AC-B11 only checks byte-equality and the §3 anchor, which the Copy keeps); the T-33 "The marker" deletion and T-32 qa SOP lines 13 / 31 are pinned in `e433-test-first-rules` (T-44), not duplicated in e380; const-11 §3.2 enforcement clause also sits in `constitution-deliverable-guard` (T-E435-24).
+
+### Red Reasons (T-23)
+
+5 red at base, all assertion failures: E16-07 (const-08 still Non-QA label/code, T-33); AC4b (coord-03 `qa_round` sibling, T-32; integrator "qa rounds", T-41); AC-A3 (const-11 / rationale conditional wording, T-41); AC-C (qa SOP `qa_round` / `QA_ROUND_EXCEEDED`, T-32); AC-10 (handoff 16, T-29). Rows under `# T-E435-23` in the manifest. Run: `node --test` on the five files → 39 tests, 34 pass, 5 fail = the 5 rows, name for name.

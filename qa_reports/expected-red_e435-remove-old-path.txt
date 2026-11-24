@@ -435,3 +435,10 @@ test/visual-round-sqlite.test.mjs | AC-8 (E435): writeState(visualRound=4) → p
 
 # T-E435-22 — visual SOP/template pins: pixel-perfect-design-coverage, pixel-perfect-visual-compare, qa-visual-skill-split, e412-qa-visual-template, e360-qa-visual-review-task-ids
 # no rows: none of the five files pins old-path wording the E435 contract changes (all already on the E433/E434 code-reviewer visual judge); 29/29 green at base
+
+# T-E435-23 — SOP/constitution text pins (1/3): e16-judge-dispatch-charter, e295-hop-cap-and-sop-halves, e393-builder-judge-core, e380-qa-suite-result-sop (no rows), skill-evolution-v3.11
+test/e16-judge-dispatch-charter.test.mjs | E16-07 (E435): const-08 §3.1 ledger gate is the Non-Judge Completed-Tasks Gate quoting NON_JUDGE_COMPLETED_TASKS_REJECTED | const-08 line 7 is still the Non-QA Completed-Tasks Gate quoting NON_QA_COMPLETED_TASKS_REJECTED at base (T-E435-33)
+test/e295-hop-cap-and-sop-halves.test.mjs | AC4b (E435): coord-03 hop counter is a sibling of review_round only; integrator roll-up sums review rounds, no qa round | coord-03 line 9 still reads "a sibling of `qa_round`/`review_round`" at base (T-E435-32); skill-integrator line 189 "review / qa rounds" (T-E435-41)
+test/e393-builder-judge-core.test.mjs | AC-A3 (E435): const-11 §3.2 enforcement and its rationale restrict status=PASS to code-reviewer with no chain condition | const-11 line 10 and rationale line 149 still say "on the test-first chain `status=PASS` is server-restricted to" at base (T-E435-41)
+test/e393-builder-judge-core.test.mjs | AC-C (E435): named sites restate no bare round number | skill-qa-engineer.md line 13 still names `qa_round` and `QA_ROUND_EXCEEDED` at base (T-E435-32)
+test/skill-evolution-v3.11.test.mjs | AC-10 (E435): schema/versions.ts handoff schema is 17, sqlite stays 2 | CURRENT_VERSIONS.handoff is 16 at base (T-E435-29)
