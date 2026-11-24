@@ -30,6 +30,8 @@ import {
 import { resetSession, markStateRead } from "../dist/guards/session.js";
 import { _clearRegistryForTests, runMigrations, registerMigration } from "../dist/schema/versions.js";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
+import { TOOL_REGISTRY } from "../dist/tools/registry.js";
+import { forceSeedStamp } from "./e148-seed-stamp.mjs";
 
 // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
 // body (including the cut-approval gate's S01/S02 strings) compiles into
@@ -416,7 +418,7 @@ test("S1: gate skips when active storage is not FileHandoffStorage (SQLite-mode 
 // v4 → v5 migration purity (AC-6 / AC-7)
 // ============================================================================
 
-test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_approved)", () => {
+test("M1 (E435): v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_approved); the chain reaches CURRENT (17)", () => {
   // WHY: AC-7 — only schema_version changes; cut_approved MUST NOT be seeded (absence is the
   // unapproved sentinel; a default `true` would bypass the gate for legacy files).
   // The manual chain MUST reach the real CURRENT_VERSIONS.handoff or it clobbers the shared registry
@@ -439,18 +441,19 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
   registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
+  registerMigration({ kind: "handoff", from: 16, to: 17, up: ({ chain_path: _c, qa_round: _q, qa_rounds_total: _t, ...i }) => ({ ...i, schema_version: 17 }) });
 
   const v4payload = { schema_version: 4, active_feature: "old-feat", status: "In_Progress" };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 16, "migration must bump schema_version to CURRENT (16)");
+  assert.equal(result.payload.schema_version, 17, "migration must bump schema_version to CURRENT (17)");
   assert.equal(result.payload.cut_approved, undefined, "v4→v5 migration MUST NOT seed cut_approved");
-  assert.deepEqual(result.applied, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "the v4→v5 step must have been applied (v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, and v14→v15 also run to reach CURRENT)");
+  assert.deepEqual(result.applied, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], "the v4→v5 step must have been applied (every later step, through v16→v17, also runs to reach CURRENT)");
   assert.equal(result.fromVersion, 4, "fromVersion must be 4");
-  assert.equal(result.toVersion, 16, "toVersion must be CURRENT (16)");
+  assert.equal(result.toVersion, 17, "toVersion must be CURRENT (17)");
 });
 
-test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)", () => {
+test("M2 (E435): v4 → v5 migration preserves all existing fields (AC-7 — lossless); v16 → v17 drops only qa_round / qa_rounds_total", () => {
   // WHY: AC-7 — no existing field may be modified or removed. Losslessness is
   // critical so that scope_decision, prd_path, qa_round, etc. survive the bump.
   // Re-baselined for the lane-layout migration (e123a): see M1 comment — chain
@@ -472,6 +475,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
   registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
+  registerMigration({ kind: "handoff", from: 16, to: 17, up: ({ chain_path: _c, qa_round: _q, qa_rounds_total: _t, ...i }) => ({ ...i, schema_version: 17 }) });
 
   const v4payload = {
     schema_version: 4,
@@ -487,11 +491,11 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 16, "schema_version bumped to CURRENT (16)");
+  assert.equal(result.payload.schema_version, 17, "schema_version bumped to CURRENT (17)");
   assert.equal(result.payload.active_feature, "scope-feat", "active_feature preserved");
   assert.equal(result.payload.scope_decision, "single-feature", "scope_decision preserved");
   assert.equal(result.payload.scope_decision_why, "small feature", "scope_decision_why preserved");
-  assert.equal(result.payload.qa_round, 2, "qa_round preserved");
+  assert.equal("qa_round" in result.payload, false, "qa_round dropped by v16→v17 (E435 ruling (a)); the v4→v5 step itself kept it");
   assert.equal(result.payload.review_round, 1, "review_round preserved");
   assert.equal(result.payload.prd_path, "/abs/specs/scope-feat.md", "prd_path preserved");
   assert.equal(result.payload.cut_approved, undefined, "cut_approved still absent (no false/true seeded)");
@@ -503,7 +507,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   assert.equal(result.payload.hop_count, 0, "hop_count seeded to 0 (v8→v9, d2-server-brake-accounting DR-3 — the counter precedent, not the stamp-only-attestation precedent)");
   assert.equal(result.payload.dispatched_at, undefined, "dispatched_at still absent (v9→v10 also stamp-only, no seed, d5-server-side-stale-dispatch-detection DR-7)");
   assert.equal(result.payload.dispatch_mode, undefined, "dispatch_mode still absent (v10→v11 also stamp-only, no seed, e2-bugfix-repro-gate)");
-  assert.equal(result.payload.qa_rounds_total, 0, "qa_rounds_total seeded to 0 (v11→v12, e8-success-telemetry — the counter precedent, same as hop_count)");
+  assert.equal("qa_rounds_total" in result.payload, false, "qa_rounds_total seeded by v11→v12, then dropped by v16→v17 (E435 ruling (a))");
   assert.equal(result.payload.review_rounds_total, 0, "review_rounds_total seeded to 0 (v11→v12, e8-success-telemetry)");
   assert.equal(result.payload.visual_rounds_total, 0, "visual_rounds_total seeded to 0 (v11→v12, e8-success-telemetry)");
   assert.equal(result.payload.evidence_schema, undefined, "evidence_schema still absent (v12→v13 also stamp-only, no seed, e23-evidence-schema-versioning D1 — migration invents no pin)");
@@ -976,19 +980,33 @@ test("XG2: gate clears when prevState is absent/empty/all-resolved (AC-2)", () =
   );
 });
 
-test("XG-both-edges: the orchestrator arm condition covers BOTH pm->architect and pm->sr-engineer (AC-4)", () => {
-  // WHY: AC-4 is this gate's B8-specific requirement — it must fire on the SAME
-  // two edges CUT_APPROVAL_REQUIRED and SCOPE_DECISION_REQUIRED already gate, not
-  // only the sr-engineer edge. We assert against the compiled orchestrator source
-  // (composition-test convention, same as G1-G3/S1 above) that both agent names
-  // appear together with the gate's arm condition and error code.
-  const gateBlock = DIST_INDEX.slice(
-    DIST_INDEX.indexOf("hasUnresolvedRefs(prevState)") - 400,
-    DIST_INDEX.indexOf("EXTERNAL_REFS_UNRESOLVED", DIST_INDEX.indexOf("hasUnresolvedRefs(prevState)")) + 40,
-  );
-  assert.ok(gateBlock.includes('"architect"'), "gate arm condition must include architect");
-  assert.ok(gateBlock.includes('"sr-engineer"'), "gate arm condition must include sr-engineer");
-  assert.ok(gateBlock.includes("EXTERNAL_REFS_UNRESOLVED"), "the located block must be the external-refs gate");
+test("XG-both-edges (E435): the build-entry edges are pm->architect and pm->qa-engineer; pm->sr-engineer is no edge (AC-4)", async () => {
+  // WHY: AC-4 — the external-refs gate fires on the SAME build-entry edges CUT_APPROVAL_REQUIRED and
+  // SCOPE_DECISION_REQUIRED gate. Since E435 those are pm -> {architect, qa-engineer}; pm -> sr-engineer
+  // is not an edge, so it is TRANSITION_REJECTED before any build-entry gate. Driven through the real
+  // tw_update_state entry (public interface) instead of grepping compiled source.
+  const UPD = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
+  const refs = [{ ref: "JIRA-1", state: "unresolved" }];
+  async function attempt(agent) {
+    const ws = tmpWs();
+    setActiveStorage(new FileHandoffStorage());
+    resetSession(ws);
+    markStateRead(ws);
+    await writeHandoffState({
+      workspacePath: ws, activeFeature: "test-feat", status: "In_Progress", completedTasks: [],
+      pendingNotes: ["seed"], lastAgent: "pm", cutApproved: true, scopeDecision: "single-feature", externalRefs: refs,
+    });
+    forceSeedStamp(ws);
+    resetSession(ws);
+    markStateRead(ws);
+    const r = await UPD.run({ workspace_path: ws, active_feature: "test-feat", status: "In_Progress", agent_id: agent, completed_tasks: [], pending_notes: [] });
+    return r.content.map((c) => c.text).join("\n");
+  }
+  assert.match(await attempt("architect"), /EXTERNAL_REFS_UNRESOLVED/, "pm -> architect is a gated build-entry edge");
+  assert.match(await attempt("qa-engineer"), /EXTERNAL_REFS_UNRESOLVED/, "pm -> qa-engineer is a gated build-entry edge");
+  const toSr = await attempt("sr-engineer");
+  assert.match(toSr, /TRANSITION_REJECTED/, "pm -> sr-engineer is no edge");
+  assert.doesNotMatch(toSr, /EXTERNAL_REFS_UNRESOLVED/, "the rejection comes before any build-entry gate");
 });
 
 test("XG-nonpm: non-pm predecessor is never gated, regardless of ledger contents (AC-3)", () => {

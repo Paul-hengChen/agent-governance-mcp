@@ -61,7 +61,7 @@ function readRaw(ws) {
 // AC-1: schema bump v7→v8, stamp-only migration
 // ============================================================================
 
-test("M1: v7 handoff (no dispatch_pins) migrates to v8 on read — field stays undefined, other fields preserved", () => {
+test("M1 (E435): v7 handoff (no dispatch_pins) migrates to v8 on read — field stays undefined, other fields preserved, qa_round dropped at 17", () => {
   // WHY: the no-seed contract. A legacy v7 file (pre-dates the field) must
   // climb to v8 WITHOUT gaining a synthetic dispatch_pins value — absence
   // stays absence ("no pins recorded"). Sibling v7 fields and round counters
@@ -96,11 +96,12 @@ next_role: "sr-engineer"
   // Pre-existing fields preserved.
   assert.equal(state.active_feature, "legacy-v7-feat");
   assert.equal(state.last_agent, "pm");
-  assert.equal(state.qa_round, 1, "qa_round preserved across v7→v8");
+  assert.equal(state.qa_round, undefined, "qa_round survives v7→v8 but v16→v17 drops it (E435 ruling (a))");
+  assert.equal(state.review_round, 0, "sibling counter review_round preserved");
   assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v7→v8");
 });
 
-test("M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk", async () => {
+test("M1b (E435): readHandoffState's fire-and-forget write-back heals the v7 file to CURRENT (17) on disk", async () => {
   // Re-baselined for the lane-layout migration (e123a, qa-owned): CURRENT_VERSIONS.handoff
   // is now 15 (v14→v15 added dispatch_mechanism/dispatch_mechanism_tier,
   // stamp-only, seeds nothing). A v7 file heals all the way to v16 in one
@@ -128,14 +129,14 @@ qa_round: 0
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
   const healed = readRaw(ws);
-  assert.match(healed, /schema_version:\s*16/, "fire-and-forget heal lands the file at CURRENT (v16)");
+  assert.match(healed, /schema_version:\s*17/, "fire-and-forget heal lands the file at CURRENT (v17)");
   assert.match(healed, /hop_count:\s*0/, "the v8→v9 step's seeded hop_count: 0 survives the heal write");
-  assert.match(healed, /qa_rounds_total:\s*0/, "the v11→v12 step's seeded qa_rounds_total: 0 survives the heal write");
+  assert.doesNotMatch(healed, /^qa_round(s_total)?:/m, "v16→v17 drops qa_round and the v11→v12-seeded qa_rounds_total (E435 ruling (a))");
   assert.match(healed, /review_rounds_total:\s*0/, "the v11→v12 step's seeded review_rounds_total: 0 survives the heal write");
   assert.match(healed, /visual_rounds_total:\s*0/, "the v11→v12 step's seeded visual_rounds_total: 0 survives the heal write");
 });
 
-test("M2: future v17 handoff refuses-loud against a v16 server (no silent downgrade)", () => {
+test("M2 (E435): future v18 handoff refuses-loud against a v17 server (no silent downgrade)", () => {
   // WHY: forward-compat safety, mirroring the AC-10(g) protocol-fields (c9)
   // precedent (v7 file against a v6 server; here v17 against v16 — re-baselined
   // for E431 (chain_path/sr_return_count moved CURRENT 15 -> 16), since v16 is now CURRENT and no
@@ -146,7 +147,7 @@ test("M2: future v17 handoff refuses-loud against a v16 server (no silent downgr
   writeRaw(
     ws,
     `---
-schema_version: 17
+schema_version: 18
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -161,16 +162,16 @@ qa_round: 0
   );
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 17 > server max 16/,
-    "v17 file must refuse-loud against a v16 server",
+    /handoff on-disk version 18 > server max 17/,
+    "v18 file must refuse-loud against a v17 server",
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 17 > server max 16/,
+    /on-disk version 18 > server max 17/,
   );
 });
 
-test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)", () => {
+test("M3 (E435): registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)", () => {
   // WHY: pins the migration steps themselves (schema/migrations-handoff.ts), not just their effect through
   // parseHandoff. Re-baselined for the lane-layout migration (e123a): the chain must reach the current
   // version (16) or later reads hit a missing migration step. More: specs/e260e-comment-rationale.md (dispatch-pins.test.mjs).
@@ -191,6 +192,7 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
   registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
+  registerMigration({ kind: "handoff", from: 16, to: 17, up: ({ chain_path: _c, qa_round: _q, qa_rounds_total: _t, ...i }) => ({ ...i, schema_version: 17 }) });
 
   const v7Payload = {
     schema_version: 7,
@@ -199,13 +201,13 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
     next_role: "qa-engineer",
   };
   const result = runMigrations("handoff", v7Payload);
-  assert.deepEqual(result.applied, [8, 9, 10, 11, 12, 13, 14, 15, 16], "the v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, AND v14→v15 steps all run when on-disk version is eight behind CURRENT");
-  assert.equal(result.payload.schema_version, 16, "schema_version bumped to CURRENT (16)");
+  assert.deepEqual(result.applied, [8, 9, 10, 11, 12, 13, 14, 15, 16, 17], "every step from v7→v8 through v16→v17 runs when on-disk version is ten behind CURRENT");
+  assert.equal(result.payload.schema_version, 17, "schema_version bumped to CURRENT (17)");
   assert.equal(result.payload.dispatch_pins, undefined, "v7→v8 seeds no dispatch_pins default (AC-1)");
   assert.equal(result.payload.hop_count, 0, "v8→v9 seeds hop_count: 0 (DR-3)");
   assert.equal(result.payload.dispatched_at, undefined, "v9→v10 seeds no dispatched_at default (d5 DR-7 — absence-is-signal, not hop_count's seed-0)");
   assert.equal(result.payload.dispatch_mode, undefined, "v10→v11 seeds no dispatch_mode default (e2-bugfix-repro-gate — absence-is-signal, same posture as dispatched_at)");
-  assert.equal(result.payload.qa_rounds_total, 0, "v11→v12 seeds qa_rounds_total: 0 (e8-success-telemetry — the counter precedent, same as hop_count)");
+  assert.equal("qa_rounds_total" in result.payload, false, "v11→v12 seeds qa_rounds_total: 0, v16→v17 drops it (E435 ruling (a))");
   assert.equal(result.payload.review_rounds_total, 0, "v11→v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(result.payload.visual_rounds_total, 0, "v11→v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(result.payload.evidence_schema, undefined, "v12→v13 seeds no evidence_schema default (e23-evidence-schema-versioning D1 — absence-is-signal, same posture as dispatched_at/dispatch_mode)");
@@ -840,8 +842,8 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
 // (dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing);
 // was 13 -> 14 under the cut-approval inheritance change, e114 (cut_approved_source,
 // stamp-only, seeds nothing).
-test("sanity: CURRENT_VERSIONS.handoff is 16 (E431 chain_path/sr_return_count)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 16);
+test("sanity (E435): CURRENT_VERSIONS.handoff is 17 (drops chain_path/qa_round/qa_rounds_total)", () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 17);
 });
 
 // ============================================================================

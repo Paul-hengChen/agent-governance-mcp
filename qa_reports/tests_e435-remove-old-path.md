@@ -620,3 +620,29 @@ Left as is (green on both): e154 AC-E154-1/2/3/5; e136 all (AC-E136-4 signer mov
 ### Red Reasons (T-15)
 
 20 red at base, all for the stated reason (no syntax / link error): 6 are a `ZodError` `status="PASS" requires agent_id="qa-engineer"` on a code-reviewer PASS (e32 C3, ac-execution I1–I3b, e154 AC-E154-4; T-E435-31/35); e32 R1/R2/R4/P6a/P6c/ENV-1/ENV-2 hit `REVIEWER_COMPLETED_TASKS_REJECTED` before the evidence gate (T-E435-33); e32 C2/P6b ride the still-open code-reviewer → qa-engineer edge (T-E435-30); repro G6/G7/G8 qa → sr is not an unmarked edge at base (T-E435-30/31); repro R1 registry text names the marker; repro M1 schema 16 (T-E435-29). No test dropped. Rows under `# T-E435-15` in the manifest. Run: `node --test test/e154-multi-covers.test.mjs test/e136-evidence-path-injective.test.mjs test/e32-e33-gate-hardening.test.mjs test/ac-execution.test.mjs test/repro-first-gate.test.mjs` → 69 tests, 49 pass, 20 fail = the 20 rows, name for name.
+
+## T-E435-16 — `cut-approval-gate`, `dispatch-pins`, `e114-cut-approval-inheritance`, `e116-archive-on-feature-change`, `e122-state-render-injection` (AC4)
+
+Placement: existing files, edited in place (brief). Re-titled tests carry `E435`. 134 changed test lines (75+ / 59-), under the 300-line cap. Contract: architecture *Handoff schema v17 (file mode)* (drops `chain_path`, `qa_round`, `qa_rounds_total`), T-31 row (build-entry gates arm on `pm → {architect, qa-engineer}`), Rulings (a) drop. Conventions from T-E435-12/13 reused: hand-registered chains gain the real-shaped `16 → 17` step (`({ chain_path, qa_round, qa_rounds_total, ...i }) => ({ ...i, schema_version: 17 })`, as in e23); absence asserted as `=== undefined` / `"k" in payload === false` / no `^qa_round(s_total)?:` line.
+
+### Scenario → Test Map (T-16)
+
+| scenario | exact test name(s) |
+|---|---|
+| hand-registered v4 chain reaches CURRENT 17; `qa_round` / `qa_rounds_total` dropped by 16 → 17, everything else lossless | cut-approval-gate M1 (E435) · M2 (E435) |
+| external-refs gate fires on pm → architect and pm → qa-engineer; pm → sr-engineer is `TRANSITION_REJECTED` before any build-entry gate (behavioural, replaces the compiled-source grep) | cut-approval-gate XG-both-edges (E435) |
+| v7 file: `qa_round` gone after the climb; heal lands at 17 with no `qa_round` / `qa_rounds_total` line; v18 refuses-loud against a v17 server; isolated chain to 17; CURRENT sanity 17 | dispatch-pins M1 · M1b · M2 · M3 · sanity (all E435) |
+| v13 payload / file climbs to 17 (applied `[14,15,16,17]`), healed file carries no qa_round lines | e114 AC1 (E435) ×2 · AC2 (E435) |
+| verbatim archive and live handoff carry no `qa_round` (writer no longer passes `qaRound`) | e116 AC1 (E435) · AC2 (E435) |
+| rendered state block has no `qa_round` leaf; `review_round` / `hop_count` keep the numeric-leaf check | e122 deep clone / leaf shapes (E435) |
+
+Left as is (green on both): raw legacy fixtures carrying `qa_round: 0` at schema 4–15 (historical shape; still climbs the chain); cut-approval-gate R5 (writer-level `qa-engineer:FAIL` then pm re-entry — pins the cut_approved re-arm, no transition check involved); dispatch-pins P*/W*/Z*/E300*; e114 AC3–AC9, F1/F2; e116 AC3–AC5; all other e122 tests.
+
+### Open Interface Details (T-16)
+
+1. XG-both-edges seeds `pm:In_Progress` with `cut_approved`, `scope_decision: "single-feature"` and one unresolved ref, then drives `tw_update_state` through `TOOL_REGISTRY` (e431 AC8 pattern); pm → sr-engineer asserts `TRANSITION_REJECTED` and no `EXTERNAL_REFS_UNRESOLVED`.
+2. e116 / e122 fixtures drop the `qaRound` option (architecture: option removed) rather than pass an ignored key.
+
+### Red Reasons (T-16)
+
+14 red at base, all for the stated reason (assertion failures, no syntax / link error): 10 are `CURRENT_VERSIONS.handoff` 16 with no v16 → v17 step (chains / heals stop at 16; refuse-loud names max 16) (T-E435-29); e116 AC1/AC2 and e122 leaf shapes see the writer still emitting `qa_round` (T-E435-29); XG-both-edges hits `TRANSITION_REJECTED` on pm → qa-engineer for an unmarked feature (T-E435-30/31). No test dropped. Rows under `# T-E435-16` in the manifest. Run: `node --test test/cut-approval-gate.test.mjs test/dispatch-pins.test.mjs test/e114-cut-approval-inheritance.test.mjs test/e116-archive-on-feature-change.test.mjs test/e122-state-render-injection.test.mjs` → 110 tests, 96 pass, 14 fail = the 14 rows, name for name.
