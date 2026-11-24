@@ -15,7 +15,7 @@ test("E128 repro: release-engineer:Blocked -> release-engineer:Blocked is accept
   const result = validateTransition({
     prev: { agent: "release-engineer", status: "Blocked" },
     next: { agent: "release-engineer", status: "Blocked" },
-    prev_qa_round: 0,
+    prev_review_round: 0,
   });
   assert.equal(
     result,

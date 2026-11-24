@@ -200,3 +200,33 @@ Left as is (green on both): release-engineer closing edge, the two release-engin
 13 red at base, all assertion failures (no syntax/link error): 6 on the missing code-reviewer:PASS key/edges, 3 on the old `computeNewRound` signature (qa_round keys / slot mis-assignment), 1 on the code-reviewer:FAIL row lacking qa-engineer, 1 on the old qa-engineer:In_Progress row, 1 on QA_ROUND_EXCEEDED from a stale prev_qa_round, 2 on the sweep (76 at base vs 81). Rows under `# T-E435-05` in the manifest. Spot-run: `node --test test/qa-flow.test.mjs` → 153 tests, 93 pass, 60 fail (= 26 T-02 + 9 T-03 + 12 T-04 + 13 T-05 rows, name-for-name).
 
 Residual old-path grep over the whole file (`chain_path|test-first|qa_round`): no `chain_path` / `test-first`; every remaining `qa_round` mention is an absence assertion, a stale-input-ignored probe (`prev_qa_round: 4` → no cap), a comment, or one of part 1's two untouched pure-predicate AC-11 sentinel tests. No test asserts a qa-engineer PASS/FAIL write or completion as accepted; `qa-engineer:PASS` / `:FAIL` appear only as legacy exit keys (prev side).
+
+## T-E435-06 — transition-table re-pins (hop-count, e38, e151, e128; visual-round deferred)
+
+Placement: existing files, edited in place (brief). 294 changed lines (152+ / 142−) over 4 files. **`test/visual-round-transitions.test.mjs` deferred**: its re-pin (computeNewRound signature in 8 tests, `qa_round` asserts out, AC-11 return shape without `qa_round` / `qa_rounds_total`, stale `prev_qa_round` out of 4 requests; ≈ 56 lines, 9 reds) took the total to 350, over the 300 cap, so it stops at that file boundary; it needs a follow-up task (no other test in the five depends on it). The visual-round counting behaviour stays untouched there (E420).
+
+### Scenario → Test Map (T-06)
+
+| scenario | file | exact test name(s) |
+|---|---|---|
+| AC4 computeNewRound without the qa slot / qa_round (signature re-pins, behaviour unchanged) | hop-count-transitions | t-compute-role-transition-increments … (E435) · t-compute-first-write-counts … (E435) · t-compute-self-loop-holds … (DR-9, E435) · t-compute-same-agent-status-change-holds … (E435) (now code-reviewer IP → FAIL) · t-compute-feature-reset … (AC-3, E435) (prev code-reviewer:PASS) · t-compute-pm-no-reset … (DR-6, E435) (asserts no qa_round key) · t-compute-persists-across-many-non-role-writes … (E435) · t-gate-landing-from-reviewer-and-qa (E295 AC2, E41, E435) … |
+| AC4 qa cap gone (OQ (a)) | hop-count-transitions | t-precedence-review-round-wins (E435) … (re-pin of t-precedence-qa-round-wins) · t-precedence-existing-round-caps-untouched (E435) … |
+| AC1 old edges avoided in e2e set-ups (green on both) | hop-count-transitions | t-e2e-* climb bounces pm ↔ architect (was pm ↔ sr-engineer); t-crash-file seeds pm → architect → pm, post-crash write architect |
+| judge FAIL/PASS rows (AC2 support), new qa row | e38-next-role-lookahead | L1 (E435) … · S-E37-lo (E435) … · S-E37-hi (ROUND-1 REGRESSION PIN, E435) … · R-QA-IP (ROUND-2 REGRESSION PIN, E435) … |
+| review cap lookahead (re-pin of qa cap), self-loop, never-reject, E28 coexist — green on both | e38-next-role-lookahead | S-ROUNDCAP (E435) … · S-SELFLOOP (E435) … · N-NEVERREJECT (E435) … · C-E28COEXIST (E435) … |
+| AC1 pm row + one conditional entry; AC3 S1/S4 hint on old steps, none on others | e151-resume-of-rejection-hint | AC9 (E435) … · AC11 (E435) … · AC12 (E435) … · AC13 (E435) … · AC14 (E435) … |
+| TransitionRequest without prev_qa_round (green on both) | e128-blocked-self-loop-repro | E128 repro: release-engineer:Blocked -> release-engineer:Blocked is accepted (the incident case, fixed) (request now carries prev_review_round) |
+
+Left as is (green on both): hop t-const, t-gate-* (stale `prev_qa_round: 0` dropped), t-precedence-visual-round-wins (legacy qa-engineer:FAIL exit key as prev), the SQLite crash pair, writeHandoffState round-trips, the negative-hop sanitiser; e38 S-RESUME, R-PM-BLOCKED; e151 AC10.
+
+### Open Interface Details (T-06)
+
+1. Frozen copy constants copied into `e151` (same pattern as `qa-flow.test.mjs` top of file, not imported): `IN_FLIGHT_HINT`, `PM_TO_SR_HINT(a)`, `QA_JUDGE_HINT`. Old-step hints asserted as exact `No edge … ${HINT_STATIC}${stepHint}${IN_FLIGHT_HINT}` (architecture: `hint = base + oldPathStepHint`), so e151 pins the base text too, as it did before.
+2. e151 AC11's wrong-role case keeps a direct `next_resume_of: "qa-engineer"` on pm → code-reviewer (pure call; the zod boundary rejects it on the tool path) and expects the code-reviewer Amend-Resume hint with `received resume_of: "qa-engineer"`.
+3. e38 S-E37 writes `code-reviewer:PASS` with no `review_verdict` / `qa_review` (same bare shape the qa PASS had); if sr's PASS gates need more on a bare workspace, that is a test set-up question to raise, not a contract change.
+4. e38 R-QA-IP seeds `sr-engineer:In_Progress` (the sr → qa test return, `sr_return_count` 0) rather than pm → qa, to keep build-entry gates out of the lookahead probe.
+5. hop e2e climbs use pm ↔ architect (both legal on both tables, build-entry gates cleared by `cut_approved: true` on each pm write), so they stay green across the change instead of going red on the removed pm → sr edge.
+
+### Red Reasons (T-06)
+
+19 red at base, all assertion failures or the old-signature TypeError (no syntax/link error): hop 10 (8 old computeNewRound signature, 2 QA_ROUND_EXCEEDED on a stale prev_qa_round), e38 4 (code-reviewer:FAIL row lacks qa-engineer; code-reviewer PASS ZodError on an unmarked feature ×2; sr → qa rejected unmarked), e151 5 (old pm row / qa conditional entry / no old-step hint / pm → qa needs resume_of). Rows under `# T-E435-06` in the manifest. Spot-run of the five files: 59 tests, 40 pass, 19 fail (= the 19 T-06 rows, name-for-name; visual-round 15/15 and e128 1/1 green, unchanged).
