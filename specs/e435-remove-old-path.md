@@ -40,6 +40,7 @@ The proof commands assume a built tree (`npm run build`). `test/e435-remove-old-
   proof: `node scripts/test-lock.mjs -- npm test` exits 0 with 0 failures.
 - **AC11** — Given the finished branch, then `CLAUDE.md`'s Layout lines (the `transitions.ts` round-cap row, the two "N-step" pipeline mentions) and its Execution Profile sentence that is shared with `templates/agent-adapters/claude.md` are in sync with the code; `node bin/agc-init.mjs check` exits 0; `npm run build` leaves `git status --porcelain dist/` empty; `npm audit --audit-level=high` exits 0; `npm run eval` passes.
   proof: `npm run build && git status --porcelain dist/ && node bin/agc-init.mjs check && npm audit --audit-level=high && npm run eval` prints no `dist/` path and exits 0.
+  **Amended 2026-11-24 (human ruling, option A; lane mailbox to-lane#6):** the live `npm run eval` part is dropped from this wave's definition of done — it needs an API key, costs money and is not run in CI. That part is guarded by `test/eval-assertions.test.mjs` inside `npm test` instead. Whether to run the live eval before the v5.0.0 release is left to a separate human decision.
 
 ## Copy / Strings
 
