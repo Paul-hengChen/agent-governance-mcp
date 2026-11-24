@@ -1295,8 +1295,6 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           prevState,
           prevTuple,
           nextTuple,
-          // The qa round is gone (E435); the context field goes with T-32.
-          prev_qa_round: 0,
           prev_review_round,
           prev_visual_round,
           prev_hop_count,

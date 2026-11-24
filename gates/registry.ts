@@ -9,7 +9,6 @@
 export type GateErrorCode =
   | "AGENT_ID_REQUIRED"
   | "TRANSITION_REJECTED"
-  | "QA_ROUND_EXCEEDED"
   | "REVIEW_ROUND_EXCEEDED"
   | "VISUAL_ROUND_EXCEEDED"
   | "HOP_CAP_EXCEEDED"
@@ -66,8 +65,8 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // Every entry is true except VISUAL_ROUND_EXCEEDED, which only the old path still emits
-  // (no served rule quotes it since E434). SR_RETURN_CAP_EXCEEDED, E431, DISPATCH_PIN_TIER_REJECTED,
+  // Every entry is true except VISUAL_ROUND_EXCEEDED: nothing emits it since E435: its counter
+  // ticks only on a qa-engineer FAIL; E420 owns the visual family (no served rule quotes it since E434). SR_RETURN_CAP_EXCEEDED, E431, DISPATCH_PIN_TIER_REJECTED,
   // E300, and NON_REVIEWER_VERDICT_REJECTED, E139, each shipped false until a content/*.md
   // sentence quoted it — E433 in the qa-engineer and sr-engineer SOPs, E295 in coord-02, E365 in
   // const-08. The field exists so a code-internal gate can opt out without weakening the parity test.
@@ -77,7 +76,6 @@ export interface GateDefinition {
 // errorCode → doc-file mapping, read by test/error-code-contract.test.mjs (specs/c12-registry-field-consumers.md AC2); rows: grep -l '`<CODE>`' content/*.md
 //   AGENT_ID_REQUIRED               skill-qa-engineer.md
 //   TRANSITION_REJECTED             coord-02-host-dispatch.md, skill-qa-engineer.md
-//   QA_ROUND_EXCEEDED               skill-qa-engineer.md
 //   REVIEW_ROUND_EXCEEDED           skill-code-reviewer.md
 //   VISUAL_ROUND_EXCEEDED           (none)
 //   HOP_CAP_EXCEEDED                coord-01-core-head.md, coord-03-core-fallback.md
@@ -111,13 +109,13 @@ export interface GateDefinition {
 //   PASS_TASKS_INCOMPLETE           skill-code-reviewer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
 
-// The 35-gate catalog, in documentation order, grouped by envelope; the one
+// The 34-gate catalog, in documentation order, grouped by envelope; the one
 // tool-boundary entry (DISPATCH_PIN_TIER_REJECTED, raised by zod before the
 // pipeline) stays last. Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the
 // ordered UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
-  // ---- transition-json (codes 1-7, producer: validateTransition) ----
+  // ---- transition-json (codes 1-6, producer: validateTransition) ----
   {
     errorCode: "AGENT_ID_REQUIRED",
     producer: "validateTransition",
@@ -136,16 +134,6 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     armCondition: "always (validateTransition step 4)",
     clearingArtifact: "a legal edge in ALLOWED_TRANSITIONS",
     hintStatic: " in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md.",
-    documentedInProse: true,
-  },
-  {
-    errorCode: "QA_ROUND_EXCEEDED",
-    producer: "validateTransition",
-    envelope: "transition-json",
-    triggerEdge: "prev_qa_round >= 4 and next != (pm,In_Progress)",
-    armCondition: "always (validateTransition step 2)",
-    clearingArtifact: "(pm, In_Progress) reset",
-    hintStatic: " exceeds cap. Only (pm, In_Progress) allowed to reset.",
     documentedInProse: true,
   },
   {
@@ -186,15 +174,15 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E431 — test-first chain only: sr-engineer's third return of the
-    // feature to qa-engineer. Edge-specific (validateTransition step 2.6);
+    // E431 — sr-engineer's third return of the feature to qa-engineer
+    // (every file-mode feature since E435). Edge-specific (validateTransition step 2.6);
     // every other write on the feature is evaluated normally.
     errorCode: "SR_RETURN_CAP_EXCEEDED",
     producer: "validateTransition",
     envelope: "transition-json",
     triggerEdge:
-      "prev_sr_return_count >= 2 on sr-engineer:In_Progress -> qa-engineer:In_Progress, test-first features only (chain_path: test-first, file mode); feature_changed bypasses",
-    armCondition: "opt-in (counter present; marked feature only)",
+      "prev_sr_return_count >= 2 on sr-engineer:In_Progress -> qa-engineer:In_Progress (file mode; SQLite never persists the counter); feature_changed bypasses",
+    armCondition: "opt-in (counter present)",
     clearingArtifact: "(pm, In_Progress) reset (sr_return_count -> 0) or active_feature change",
     hintStatic:
       " — sr-engineer has returned this feature to qa-engineer the maximum 2 times. " +
@@ -202,7 +190,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     // Quoted in the qa-engineer and sr-engineer SOPs since E433.
     documentedInProse: true,
   },
-  // ---- orchestrator-json (codes 8-13, producer: orchestrator) ----
+  // ---- orchestrator-json (codes 7-12, producer: orchestrator) ----
   {
     errorCode: "SCOPE_DECISION_REQUIRED",
     producer: "orchestrator",
@@ -298,7 +286,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "See specs/e10-lease-override.md AC2.",
     documentedInProse: true,
   },
-  // ---- plain-text (codes 14-34, producer: orchestrator) ----
+  // ---- plain-text (codes 13-33, producer: orchestrator) ----
   {
     errorCode: "MISSING_EVIDENCE",
     producer: "orchestrator",
@@ -641,7 +629,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "work) are exempt. See docs/backlog.md E247.",
     documentedInProse: true,
   },
-  // ---- tool-boundary (code 35, producer: zod at tools/registry.ts) ----
+  // ---- tool-boundary (code 34, producer: zod at tools/registry.ts) ----
   {
     // dispatch_pins tier enum (E300): each value must be one of the four tier
     // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no
@@ -681,16 +669,15 @@ export function gate(code: GateErrorCode): GateDefinition {
   return def;
 }
 
-// The 7 codes validateTransition's rejection() may emit. For tests + optional
+// The 6 codes validateTransition's rejection() may emit. For tests + optional
 // Extract<> typing of validateTransition's own return — NOT for re-typing the
-// 17-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
+// 16-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
 // that union carries 10 additional handler-side envelope-consistency codes and
 // must stay byte-identical; non-drift is enforced by a test assertion
 // union ⊆ ALL_GATE_CODES, not by re-sourcing from here).
 export const TRANSITION_GATE_CODES: readonly GateErrorCode[] = [
   "AGENT_ID_REQUIRED",
   "TRANSITION_REJECTED",
-  "QA_ROUND_EXCEEDED",
   "REVIEW_ROUND_EXCEEDED",
   "VISUAL_ROUND_EXCEEDED",
   "HOP_CAP_EXCEEDED",

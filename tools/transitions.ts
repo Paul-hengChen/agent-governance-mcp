@@ -30,9 +30,6 @@ export interface TransitionTuple {
 export interface TransitionRequest {
   prev: TransitionTuple;
   next: TransitionTuple;
-  // Removed by E435 with the qa round cap (T-E435-32 drops the field and the
-  // step-2 override together); optional now so callers can stop passing it.
-  prev_qa_round?: number;
   prev_review_round: number;
   // v3.14.0 — pixel-fidelity sub-loop counter. Caller defaults to 0 if absent
   // for backwards-compat with pre-v3.14 callers (handoff schema v2).
@@ -58,15 +55,14 @@ export interface TransitionRequest {
 export interface TransitionRejection {
   error:
     | "TRANSITION_REJECTED"
-    | "QA_ROUND_EXCEEDED"
     | "REVIEW_ROUND_EXCEEDED"
     | "VISUAL_ROUND_EXCEEDED"
     | "HOP_CAP_EXCEEDED"           // v9 (d2-server-brake-accounting) — produced by
                                     // validateTransition when the feature's persisted
                                     // hop_count has reached HOP_CAP and the incoming
                                     // write is a counted role transition that is not
-                                    // the (pm, In_Progress) landing. Fourth
-                                    // round-style override, sibling of the three
+                                    // the (pm, In_Progress) landing. Third
+                                    // round-style override, sibling of the two
                                     // *_ROUND_EXCEEDED caps.
     | "SR_RETURN_CAP_EXCEEDED"     // E431 — produced by validateTransition when the persisted
                                     // sr_return_count has reached SR_RETURN_CAP and
@@ -138,7 +134,6 @@ export interface TransitionRejection {
     prev_status: string | null;
     new_agent: string | null;
     new_status: string | null;
-    qa_round?: number; // only while a caller still passes prev_qa_round (out in T-E435-32)
     visual_round?: number;
   };
   // `requires` appears only on the conditional Amend-Resume entry of a
@@ -394,10 +389,9 @@ export function allowedSuccessors(key: string): AllowedNext {
   return ALLOWED.get(key) ?? [];
 }
 
-const ROUND_CAP = 4;
 const REVIEW_ROUND_CAP = 4;
 // v3.14.0 — visual_round caps at 6 (5 failed pixel iterations then lock to
-// pm) — symmetric to ROUND_CAP=4 (3 fails then Round 4 lock). Constitution
+// pm) — symmetric to REVIEW_ROUND_CAP=4 (3 fails then Round 4 lock). Constitution
 // §3.1 documents the user-visible "5 rounds" framing; cap=6 reflects the
 // off-by-one between "rounds completed" and "next write index".
 const VISUAL_ROUND_CAP = 6;
@@ -448,7 +442,6 @@ function rejection(
       prev_status: req.prev.status,
       new_agent: req.next.agent,
       new_status: req.next.status,
-      ...(req.prev_qa_round !== undefined && { qa_round: req.prev_qa_round }),
       ...(req.prev_visual_round !== undefined && { visual_round: req.prev_visual_round }),
     },
     allowed: allowed.map((c) => ({ new_agent: c.agent, new_status: c.status })),
@@ -478,18 +471,6 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
   }
 
   // 2. round-cap override
-  // (qa cap: dormant unless a caller still passes prev_qa_round; out in T-E435-32)
-  if ((req.prev_qa_round ?? 0) >= ROUND_CAP) {
-    const onlyAllowed: AllowedNext = [{ agent: "pm", status: "In_Progress" }];
-    const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
-    if (ok) return null;
-    return rejection(
-      req,
-      "QA_ROUND_EXCEEDED",
-      onlyAllowed,
-      `qa_round=${req.prev_qa_round}${gate("QA_ROUND_EXCEEDED").hintStatic}`,
-    );
-  }
   if (req.prev_review_round >= REVIEW_ROUND_CAP) {
     const onlyAllowed: AllowedNext = [{ agent: "pm", status: "In_Progress" }];
     const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
@@ -501,7 +482,7 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
       `review_round=${req.prev_review_round}${gate("REVIEW_ROUND_EXCEEDED").hintStatic}`,
     );
   }
-  // v3.14.0 — visual_round cap. Symmetric to qa_round / review_round.
+  // v3.14.0 — visual_round cap. Symmetric to review_round.
   // Only fires when prev_visual_round is provided AND has reached cap; the
   // counter is opt-in for callers that pre-date v3.14.0.
   const prev_visual_round = req.prev_visual_round ?? 0;
@@ -517,16 +498,16 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     );
   }
 
-  // 2.5 hop-cap override, after the qa/review/visual overrides (their outputs
+  // 2.5 hop-cap override, after the review/visual overrides (their outputs
   // stay byte-identical) and before the self-loop fast path. Fires only when
   // persisted hop_count >= HOP_CAP and the write is a counted role transition
-  // (next.agent !== prev.agent). Same shape as the ROUND_CAP override above
+  // (next.agent !== prev.agent). Same shape as the round-cap override above
   // (E295, E41): the (pm, In_Progress) landing returns null unconditionally
   // HERE — before the self-loop fast path and the table lookup — so it is
   // accepted from every state, including code-reviewer:In_Progress and
   // qa-engineer:In_Progress, which have no table edge to pm (the previous
   // `!(pm landing)` exclusion let those fall through to the table and be
-  // rejected TRANSITION_REJECTED while the same landing under QA_ROUND_EXCEEDED
+  // rejected TRANSITION_REJECTED while the same landing under a round cap
   // was accepted). A feature change resets the count, so it bypasses the
   // check; the landing write does not reset it (D2, DR-6 — computeNewRound is
   // untouched).
@@ -739,7 +720,6 @@ export function computeSrReturnCount(
   return base;
 }
 
-export const ROUND_CAP_EXPORTED = ROUND_CAP;
 export const REVIEW_ROUND_CAP_EXPORTED = REVIEW_ROUND_CAP;
 export const VISUAL_ROUND_CAP_EXPORTED = VISUAL_ROUND_CAP;
 // v9 (d2-server-brake-accounting) — consumed by the T-D2-01B orchestrator
