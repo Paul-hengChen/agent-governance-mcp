@@ -518,3 +518,13 @@ test/e405-release-docs.test.mjs | AC-D1 (E435) release-cd sections, inputs, secr
 test/e405-release-docs.test.mjs | AC-D2 (E435) the PRECONDITION_NOT_PASS row and the re-dispatch line name the judge's (code-reviewer, PASS) only | docs/release-cd.md lines 69 / 95 still carry the two-judge marker wording at base (T-E435-42)
 
 # T-E435-28 — verify-release / release-staging (no change, no rows), eval-assertions (escalation fixture re-pinned to a code-reviewer PASS, green), test/eval fixture handoff (one chain, no qa_round), scenarios.mjs / bundle.mjs (no change). No rows.
+
+# T-E435-39 (sr-engineer): snapshot reds left for T-E435-40 (qa re-captures compose goldens, the skill-manifest golden and the context-budget caps after the E435 content changes in T-32/33/36/37/41).
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt | golden captured before the E435 content edits (T-E435-40)
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt | golden captured before the E435 content edits (T-E435-40)
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt | golden captured before the E435 content edits (T-E435-40)
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt | golden captured before the E435 content edits (T-E435-40)
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt | golden captured before the E435 content edits (T-E435-40)
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant) | monolith golden captured before the E435 const-* edits (T-E435-40)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte | coordinator golden captured before the coord-03 / coord-07 edits (T-E435-40)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7301 ~tok) | design-only strip saving measured 1912 ~tok vs pinned floor 1918 after E435 const-* edits; cap re-baseline (T-E435-40)

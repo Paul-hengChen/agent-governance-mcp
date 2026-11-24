@@ -1114,7 +1114,7 @@ async function handleUpdateStateCore(parsed) {
     if (parsed.status === "PASS") {
         const gate = requireJudge(parsed.agent_id, "tw_update_state(status=PASS)");
         if (!gate.ok) {
-            return { content: [{ type: "text", text: gate.message ?? "blocked" }] };
+            return { content: [{ type: "text", text: gate.message ?? "blocked" }], isError: true };
         }
     }
     const storage = getActiveStorage();

@@ -983,3 +983,45 @@ Open notes for sr:
 - CLAUDE.md 250-line pin and `agc check` in e432 AC14 / e433 AC12 left to T-40; compose goldens and the six context-budget caps re-captured in T-40, not here.
 - Green-on-both guard tests (e438 fences, e177b REPORT_SIGNERS, visual-evidence-gate mirror, legacy exit keys qa-engineer:PASS/FAIL) must STAY green through T-32/33/36/41.
 - VR-20 in verify-release is a known load-sensitive flake; not a manifest row.
+
+## T-E435-39 hand-back to qa
+
+Written by sr-engineer (T-E435-39). Full suite `node scripts/test-lock.mjs -- npm test` at `88218046` (tree clean, after the spec commit): 4579 tests, 4542 pass, 34 fail, 3 skipped. Triage below; after the (A) fixes the 34 reds are 20 (B) + 8 (C) (6 fixed).
+
+### (A) fixed in source (now green)
+
+- `tools/handoff-orchestrator.ts`: the PASS defence-in-depth `requireJudge` rejection returned no `isError: true`, so a qa-engineer PASS that bypasses zod was not reported as an error. Added `isError: true`. Greens: `e139-non-reviewer-verdict` AC-E139-8, `e396-covers-expected-red` E396 I, `gates-expected-red` I3.
+- `gates/registry.ts`: a REPRO_MANIFEST_MISSING comment still named the per-feature path field (e435 AC4 "no source … names chain_path"); a NON_JUDGE comment quoted the two removed ledger codes, which the code-side harvest read as unregistered codes (`error-code-contract` AC-5); the section header read `tool-boundary (code 33, producer: …)` where the architecture comment text is `tool-boundary (code 33)` (`error-code-contract` "E435: … count comments"). All four section headers now read `(codes …) — producer: …`.
+
+### (B) test-side changes (do not edit source; qa re-pin)
+
+| file | test name | why it is a test-side change | what the new pin should be |
+|---|---|---|---|
+| test/e139-non-reviewer-verdict.test.mjs | AC-E139-2 (E435): code-reviewer -> qa-engineer is no longer an edge, even with APPROVED; the judge's own APPROVED PASS is accepted | the S3 hint carries `"APPROVED"` (architecture Copy `hint.reviewer_to_qa`); the envelope is `JSON.stringify`'d into the text, so the quotes are `\"`-escaped and a raw `includes` misses | parse the envelope (`JSON.parse(text.slice(text.indexOf("\n")+1)).hint`) and check `hint.includes(REVIEWER_TO_QA_HINT)`, or match `JSON.stringify(REVIEWER_TO_QA_HINT).slice(1,-1)` |
+| test/e139-non-reviewer-verdict.test.mjs | AC-E139-3 (E435): no qa-engineer write can carry a verdict — self-loop, the removed edge, PASS and FAIL are all rejected | same JSON-escape in part (b) | same as above |
+| test/e32-e33-gate-hardening.test.mjs | C2 (E435): the old APPROVED hand-off shape (qa-engineer after code-reviewer:In_Progress) is TRANSITION_REJECTED with the S3 hint, no evidence gate reached | same JSON-escape | same as above |
+| test/reviewer-completed-tasks-gate.test.mjs | FM4 (E435): a qa-engineer write after code-reviewer:In_Progress is TRANSITION_REJECTED with the judge hint, never a ledger code (file mode) | same JSON-escape | same as above |
+| test/e435-remove-old-path.test.mjs | AC2: qa-engineer status=PASS is rejected and the message names code-reviewer as the judge | called through `entry.run`, the zod 4 error's `.message` is the JSON issue array, so the quotes in `QA_PASS_MSG` are escaped | read `err.issues[0].message` (or the MCP formatter's text) and compare with `QA_PASS_MSG` |
+| test/e435-remove-old-path.test.mjs | AC4: tw_update_state has no chain_path property, resume_of accepts only code-reviewer, an incoming chain_path is stripped | same zod JSON-escape for `RESUME_OF_MSG` | `err.issues[0].message === RESUME_OF_MSG` |
+| test/e435-remove-old-path.test.mjs | AC9: SQLite mode rejects pm -> sr, qa PASS, qa completed_tasks and qa tw_complete_task; code-reviewer PASS accepted; no SQLite version added | same zod JSON-escape on the qa PASS message | as AC2 |
+| test/e435-remove-old-path.test.mjs | AC4: a schema 16 handoff carrying chain_path lazily migrates to 17 with chain_path, qa_round, qa_rounds_total dropped | asserts the disk healed to `schema_version: 17` after `FileHandoffStorage.parse()`; the heal write lives in `readHandoffState` (the `tw_get_state` path) and is fire-and-forget, `parse()` never heals | call `readHandoffState(ws)` and await the heal (poll the file) before the disk assertion, or assert only the in-memory drop |
+| test/e431-test-first-server-path.test.mjs | AC18 (E435): SQLite/HTTP mode runs the one chain: pm -> qa accepted without resume_of (a carried chain_path not persisted), code-reviewer PASS accepted | `SqliteHandoffStorage.readState()` returns a JSON string (interface `readState(): string`), so `.last_agent` is undefined | `storage.parse(dir)?.last_agent` (or `JSON.parse(storage.readState(dir))`) |
+| test/e432-judge-report-checks.test.mjs | AC12 (E435): SQLite runs the evidence gates with code-reviewer the judge; a qa PASS is rejected naming code-reviewer; no SQLite schema change | `sqliteRun` reads `storage.readState(dir)` as an object; it is a string | `storage.parse(dir)` in `sqliteRun` |
+| test/e423-spec-workshop.test.mjs | AC17: qa PASS on a feature whose design declares `mode: mockup` with no Visual Baselines -> VISUAL_BASELINES_REQUIRED naming mode=mockup | a qa-engineer PASS now stops at the judge guard before the visual gate | seed `code-reviewer:In_Progress` and PASS as `code-reviewer` |
+| test/e128-orchestrator-blocked-repair.test.mjs | E128-ORC: sr-engineer self-repairs a malformed Blocked record through the real 19-step pipeline WITHOUT releasing the feature lease | drives the removed pm -> sr-engineer build-entry edge | pm -> qa-engineer (with no-new-test record) -> sr-engineer, then the Blocked self-repair |
+| test/e230-pm-amend-cut-approval.test.mjs | AC2: incident sequence (pm approve, pm dispatch_pins-only amendment, sr-engineer) is NOT rejected CUT_APPROVAL_REQUIRED | same removed pm -> sr-engineer edge | the build entry is qa-engineer: pm approve, pm amendment, qa-engineer not rejected CUT_APPROVAL_REQUIRED |
+| test/e359-void-refusal-message.test.mjs | AC-E359-5: the step the ledger message names (qa FAIL write with review_task_ids) really unblocks the void | a qa-engineer FAIL is no longer an edge (S5). **Source finding too:** `tools/tasks-file.ts` `voidRefusalMessage` still tells the user to "Have qa-engineer remove it … with a FAIL write" (pinned by AC-E359-1..3 `LEDGER`/`BOTH`); not in E435's file list | re-pin `LEDGER`/`BOTH` and AC-5 to a code-reviewer FAIL write; the matching `voidRefusalMessage` text change needs a task row (sr) — pm/qa to decide in or out of E435 |
+| test/cut-approval-gate.test.mjs | R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed | pins `schema_version` 15; handoff is 17 | `CURRENT_VERSIONS.handoff` (17) |
+| test/source-credibility-gate.test.mjs | T11: AC-7 — the E4 gate block carries NO instanceof FileHandoffStorage guard (contrast cut-approval/external-refs) | sanity check looks for the literal `"pm"` in the isolated dist block; the pm pin now lives in `isBuildEntry(prevTuple, nextTuple)` | assert the block calls `isBuildEntry(` instead of containing `"pm"` |
+| test/e409-lite-write-tool-facts.test.mjs | AC2: handleCompleteTask is agent-gated (requireQaEngineer), so lite's server-rejected claim holds | `requireQaEngineer` removed; `handleCompleteTask` uses `requireJudge` (T-E435-46) | `requireJudge` and the content/skill-coordinator-lite line per T-E435-46 |
+| test/e419-retired-write-mechanisms.test.mjs | AC2: the registry has 35 gates and the pipeline 17 steps | registry is 33 after ruling (b) | 33 gates, 17 steps |
+| test/e434-reviewer-visual.test.mjs | AC13: 35 gates, 17 steps, CURRENT_VERSIONS unchanged; transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged; agc check exits 0 | 33 gates; handoff 17; E435 legitimately changes transitions / schema / prompts / CLAUDE.md | closed-range test: pin 33 and the E435 versions, or restrict the byte-identity half to the E434 end sha |
+| test/e178a-integrator-role.test.mjs | AC11: docs/lane-protocol.md §5 — wait armed across every human-approval pause; architect second pre-review; Q3 default | T-E435-38 rewrote the §5 Q3 sentence for the one chain (known collision) | re-pin to the T-38 §5 sentence |
+
+### (C) snapshot (appended to `qa_reports/expected-red_e435-remove-old-path.txt` for T-E435-40)
+
+`compose-equivalence` (6: four `buildPromptForRole(skill-sr-engineer.md, …)` goldens, `SessionStart hook (AGC_DEFAULT_SKILL=full)`, `cat(15 manifest fragments …)` monolith), `skill-manifest` `t-golden-byte-identity`, `context-budget` `AC8/AC-P2-7` (design-only strip saving 1912 vs floor 1918). `e90-golden-capture-completeness` is green.
+
+### Other T-E435-39 results
+
+`npm run build` green (postbuild `check:transitions-sync` OK, 22 keys); `npm audit --audit-level=high` exit 0 (1 low, 6 moderate); `node bin/agc-init.mjs check` exit 0 (comment advisories only); `node scripts/smoke-qa-flow.mjs` 12/12; `npm run eval` not run: `test/eval/run-eval.mjs` needs `ANTHROPIC_API_KEY`, unset here (human/coordinator to run). Deferred as planned: the `tools/role.ts` comment (e408 AC6 pins it; green).

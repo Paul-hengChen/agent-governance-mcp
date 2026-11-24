@@ -45,7 +45,7 @@
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the
 // ordered UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
-    // ---- transition-json (codes 1-6, producer: validateTransition) ----
+    // ---- transition-json (codes 1-6) — producer: validateTransition ----
     {
         errorCode: "AGENT_ID_REQUIRED",
         producer: "validateTransition",
@@ -115,7 +115,7 @@ export const GATE_REGISTRY = [
         // Quoted in the qa-engineer and sr-engineer SOPs since E433.
         documentedInProse: true,
     },
-    // ---- orchestrator-json (codes 7-12, producer: orchestrator) ----
+    // ---- orchestrator-json (codes 7-12) — producer: orchestrator ----
     {
         errorCode: "SCOPE_DECISION_REQUIRED",
         producer: "orchestrator",
@@ -201,7 +201,7 @@ export const GATE_REGISTRY = [
             "See specs/e10-lease-override.md AC2.",
         documentedInProse: true,
     },
-    // ---- plain-text (codes 13-32, producer: orchestrator) ----
+    // ---- plain-text (codes 13-32) — producer: orchestrator ----
     {
         errorCode: "MISSING_EVIDENCE",
         producer: "orchestrator",
@@ -262,10 +262,10 @@ export const GATE_REGISTRY = [
         // Repro-first gate for bugfix tickets: on sr-engineer:In_Progress ->
         // code-reviewer:In_Progress, when prevState.dispatch_mode is "bugfix" and no
         // qa_reports/expected-red_<feature>.txt manifest exists (hasExpectedRedManifest).
-        // E432: also arms on qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress
-        // on a test-first feature (chain_path: test-first) unless
+        // E432/E435: also arms on qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress
+        // on every file-mode feature unless
         // qa_reports/no-new-test_<feature>.txt exists (hasNoNewTestRecord);
-        // marker-specific message, no hintStatic.
+        // that edge has its own message, no hintStatic.
         // Plain-text family, so not in the TransitionRejection["error"] union.
         // Design: specs/e2-bugfix-repro-gate-architecture.md.
         errorCode: "REPRO_MANIFEST_MISSING",
@@ -407,8 +407,8 @@ export const GATE_REGISTRY = [
     {
         // Ledger authorship: only the chain's judge (code-reviewer) may grow
         // completed_tasks; any other identity carrying a non-empty list is rejected
-        // at the write, every storage mode. Replaces REVIEWER_COMPLETED_TASKS_REJECTED
-        // and NON_QA_COMPLETED_TASKS_REJECTED (E435, ruling (b)).
+        // at the write, every storage mode. Replaces the two pre-E435 role-specific
+        // ledger codes (E435, ruling (b)).
         errorCode: "NON_JUDGE_COMPLETED_TASKS_REJECTED",
         producer: "orchestrator",
         envelope: "plain-text",
@@ -494,7 +494,7 @@ export const GATE_REGISTRY = [
             "work) are exempt. See docs/backlog.md E247.",
         documentedInProse: true,
     },
-    // ---- tool-boundary (code 33, producer: zod at tools/registry.ts) ----
+    // ---- tool-boundary (code 33) — producer: zod at tools/registry.ts ----
     {
         // dispatch_pins tier enum (E300): each value must be one of the four tier
         // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no
