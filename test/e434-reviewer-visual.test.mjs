@@ -763,12 +763,11 @@ test("AC11: docs/config.md override list + config.migration directly under it; R
 
 // ================================================================== AC13
 
-test("AC13: 33 gates (E435), 17 steps, CURRENT_VERSIONS = E435's (handoff 17); transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged; agc check exits 0", (t) => {
+test("AC13: 33 gates (E435), 17 steps, CURRENT_VERSIONS = E435's (handoff 17); transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged", (t) => {
+  // No live `agc check` here (E450): adapter-stamp freshness is release-time state, re-checked by the runner's prepare phase.
   assert.equal(GATE_REGISTRY.length, 33, "E435 removed two ledger gates");
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17);
   assert.deepEqual({ ...CURRENT_VERSIONS }, E435_CURRENT_VERSIONS, "only E435's handoff 16 -> 17 moved since E434's base");
-  const agc = spawnSync(process.execPath, [path.join(ROOT, "bin", "agc-init.mjs"), "check"], { cwd: ROOT, encoding: "utf-8" });
-  assert.equal(agc.status, 0, `agc check exits 0: ${agc.stdout}${agc.stderr}`);
 
   const skip = endShaSkipReason();
   if (skip) return t.skip(skip);

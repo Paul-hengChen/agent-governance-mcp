@@ -1,0 +1,5 @@
+# e450-release-window-agc-check: no new test and no red test. Two existing tests were modified; the change removes an assertion, so neither can go red against current code.
+S1 | test/e433-test-first-rules.test.mjs | AC12 (E435): counts and hygiene — 33 gates, 17 pipeline steps, untouched server files, CLAUDE.md, dist diff — live `agc check` exit-0 assert removed (stamp freshness is release-time state; prepare re-checks it as exit 24 ADAPTER_STAMP)
+S1 | test/e434-reviewer-visual.test.mjs | AC13: 33 gates (E435), 17 steps, CURRENT_VERSIONS = E435's (handoff 17); transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged — same removal
+S2 | both tests above | every other assertion is unchanged (gate/pipeline counts, CLAUDE.md line count, closed-range checks, dist scope, rangeSkipReason/endShaSkipReason skip)
+S3 | full suite | node scripts/test-lock.mjs -- npm test: 4576/4579 pass, 3 skipped, 0 fail
