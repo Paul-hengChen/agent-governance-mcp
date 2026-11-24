@@ -366,3 +366,31 @@ Left as is (green on both): AC9 ×2 (lane-status; `REPORT_SIGNERS` keeps qa-engi
 ### Remaining — half b (`test/e433-test-first-rules.test.mjs`, AC10 follows T-E435-42)
 
 Planned re-pins (≈ 60 changed lines): AC1 forbidden list + `chain_path`; AC2 (a) const-06 line 7 → Copy text `` - `status=PASS` and `tw_complete_task` require the chain's judge, `agent_id="code-reviewer"`. ``; AC3 skill-qa-engineer line 13 tail / line 31 Copy texts, no `qa_round` / `QA_ROUND_EXCEEDED` / `chain_path`; AC5 no "**The marker**" bullet / `REVIEWER_COMPLETED_TASKS_REJECTED`; AC6 skill-pm step 8 without `, chain_path="test-first"` and without the "Set the marker" sentence, bugfix without "(with the `chain_path` marker)", skill-architect `` (`architect → sr-engineer` is not an edge) ``, coord-07 mini-chain without the marker clause; AC9 / AC12 live `GATE_REGISTRY.length` 33 (closed-range parts unchanged); AC10 the three `docs/release-cd.md` lines (63, 69, 95) pinned to the architecture's exact texts, `COPY.releaseGate` absent. Open question for half b: none so far — every text is given verbatim by the architecture Copy table (deletions derive the remaining text).
+
+## T-E435-44 (= T-E435-09b) — `test/e433-test-first-rules.test.mjs` (AC2, AC4, AC7)
+
+Placement: existing file, edited in place (brief). Followed the T-09a *Remaining* plan. Re-titled tests carry `(E435)`. 90 changed lines (66+ / 24−).
+
+### Scenario → Test Map (T-44)
+
+| scenario | exact test name(s) |
+|---|---|
+| no marker / `qa_round` / `QA_ROUND_EXCEEDED` / `REVIEWER_COMPLETED_TASKS_REJECTED` in any served bundle (forbidden list) | AC1 (E435): composed `<role>` prompt carries chain.main, no forbidden old-judge or marker string, … ×5 |
+| const-06 line 7 = Copy (T-36) | AC2 (E435): constitution fragments — … (a) |
+| skill-qa-engineer line 13 tail / line 31 = Copy (T-32), no `qa_round` / `QA_ROUND_EXCEEDED` / `chain_path` | AC3 (E435): skill-qa-engineer.md alone makes qa the test author … |
+| no "**The marker**" bullet, no `REVIEWER_COMPLETED_TASKS_REJECTED` (T-33) | AC5 (E435): skill-code-reviewer.md is the chain's judge … |
+| skill-pm step 8 / Set-the-marker / bugfix clause gone; skill-architect Copy; coord-07 mini-chain without the marker (T-36) | AC6 (E435): pm routes architect or qa-engineer with no marker, … |
+| live registry 33 (closed range unchanged) | AC9 (E435) · AC12 (E435) |
+| `docs/release-cd.md` lines 63 / 69 / 95 = Copy (T-42), two-judge wording absent | AC10 (E435): README / architecture / release-cd — … one-judge release gate wording |
+
+Left as is: AC4, AC7, AC8, AC13 (no old-path content). CLAUDE.md 250-line pin and `agc check` in AC12 left to T-E435-40.
+
+### Open Interface Details (T-44)
+
+1. Deletion-only texts with no Copy wording (skill-pm bugfix clause, coord-07 mini-chain) are pinned as absence of the old clause plus the unchanged surrounding fragments, never an invented joined sentence. skill-pm step 8 pins `next_role="architect" or "qa-engineer", pending_notes=[...])` (the Copy deletion of `, chain_path="test-first"` derives it exactly).
+2. Line 95 is pinned as the `PRECONDITION_NOT_PASS` row's meaning cell equal to the Copy text, not by line number; lines 63 / 69 as whole lines of the file.
+3. AC1's `qa_round` absence also covers the rendered handoff data block (schema 17 drops the field, OQ (a) ruling).
+
+### Red Reasons (T-44)
+
+12 red at base, all assertion failures: AC1 ×5 `chain_path` in the composed bundle; AC2 const-06 line 7 marker condition; AC3 qa SOP line 13 / 31; AC5 "The marker" bullet; AC6 pm step 8 marker argument; AC9 / AC12 registry 35; AC10 release-cd two-judge lines. Rows under `# T-E435-44` in the manifest. Run: `node --test test/e433-test-first-rules.test.mjs` → 16 tests, 4 pass, 12 fail = the 12 rows, name for name. T-E435-09 (a + b) is complete.
