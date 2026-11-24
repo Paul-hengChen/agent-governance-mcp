@@ -39,7 +39,7 @@ interface HandoffRow {
   last_agent: string | null;
   completed: string;
   pending: string;
-  qa_round: number | null;
+  // The qa_round column stays in the DDL but is never read (E435).
   prd_path: string | null;
   review_round: number | null;
   visual_round: number | null;
@@ -159,7 +159,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private db: Database.Database;
   private selectStmt: Database.Statement<[string]>;
   private selectLastUpdatedStmt: Database.Statement<[string]>;
-  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number, number, string | null, string | null]>;
+  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, string | null, number, number, number, string | null, string | null]>;
   private txUpsert: (
     workspacePath: string,
     activeFeature: string,
@@ -169,7 +169,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
     lastAgent: string | null,
     completed: string,
     pending: string,
-    qaRound: number,
     prdPath: string | null,
     reviewRound: number,
     visualRound: number,
@@ -254,10 +253,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectLastUpdatedStmt = this.db.prepare<[string]>(
       "SELECT last_updated FROM handoff_state WHERE workspace_path = ?",
     );
-    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number, number, string | null, string | null]>(
+    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, string | null, number, number, number, string | null, string | null]>(
       `INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round, hop_count, scope_decision, scope_decision_why)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, prd_path, review_round, visual_round, hop_count, scope_decision, scope_decision_why)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     this.txUpsert = this.db.transaction(
@@ -270,7 +269,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
         lastAgent: string | null,
         completed: string,
         pending: string,
-        qaRound: number,
         prdPath: string | null,
         reviewRound: number,
         visualRound: number,
@@ -296,7 +294,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
           lastAgent,
           completed,
           pending,
-          qaRound,
           prdPath,
           reviewRound,
           visualRound,
@@ -443,11 +440,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
   parse(workspacePath: string): HandoffState | null {
     const row = this.fetchRow(workspacePath);
     if (!row) return null;
-    const qaRoundRaw = row.qa_round;
-    const qa_round =
-      typeof qaRoundRaw === "number" && Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0
-        ? Math.floor(qaRoundRaw)
-        : 0;
     const reviewRoundRaw = row.review_round;
     const review_round =
       typeof reviewRoundRaw === "number" && Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0
@@ -460,7 +452,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
         : 0;
     // v9 — hop_count counter. Null (pre-ALTER row read before the column
     // backfilled) and malformed values default to 0, matching the file-mode
-    // parser and the three round counters above.
+    // parser and the two round counters above.
     const hopCountRaw = row.hop_count;
     const hop_count =
       typeof hopCountRaw === "number" && Number.isFinite(hopCountRaw) && hopCountRaw >= 0
@@ -477,7 +469,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
       ...(row.scope_decision_why ? { scope_decision_why: row.scope_decision_why } : {}),
       completed_tasks: JSON.parse(row.completed) as string[],
       pending_notes: JSON.parse(row.pending) as string[],
-      qa_round,
       review_round,
       visual_round,
       hop_count,
@@ -516,7 +507,8 @@ export class SqliteHandoffStorage implements HandoffStorage {
     pendingNotes: string[],
     blockingReason?: string,
     lastAgent?: string,
-    qaRound?: number,
+    // Ignored since E435; the slot stays so the later positionals do not shift.
+    _qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
     visualRound?: number,
@@ -534,7 +526,8 @@ export class SqliteHandoffStorage implements HandoffStorage {
     pendingNotes?: string[],
     blockingReason?: string,
     lastAgent?: string,
-    qaRound?: number,
+    // Ignored since E435; the slot stays so the later positionals do not shift.
+    _qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
     visualRound?: number,
@@ -550,7 +543,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
       pendingNotes: pendingNotes ?? [],
       blockingReason,
       lastAgent,
-      qaRound,
       prdPath,
       reviewRound,
       visualRound,
@@ -580,7 +572,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
     const hopCount = opts.hopCount;
     const blockingReason = opts.blockingReason;
     const lastAgent = opts.lastAgent;
-    const qaRound = opts.qaRound;
     const prdPath = opts.prdPath;
     const reviewRound = opts.reviewRound;
     const visualRound = opts.visualRound;
@@ -591,8 +582,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
     const currentLastUpdated = this.fetchLastUpdated(workspacePath);
     verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
 
-    const normalisedRound =
-      Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;
     const normalisedReviewRound =
       Number.isFinite(reviewRound) && (reviewRound as number) >= 0
         ? Math.floor(reviewRound as number)
@@ -601,7 +590,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       Number.isFinite(visualRound) && (visualRound as number) >= 0
         ? Math.floor(visualRound as number)
         : 0;
-    // v9 — hop_count normalisation, identical to the three round counters:
+    // v9 — hop_count normalisation, identical to the two round counters:
     // falsy/absent input (incl. the positional overload) normalises to 0.
     const normalisedHopCount =
       Number.isFinite(hopCount) && (hopCount as number) >= 0
@@ -635,7 +624,6 @@ export class SqliteHandoffStorage implements HandoffStorage {
       lastAgent ?? null,
       JSON.stringify(_completedTasks),
       JSON.stringify(_pendingNotes),
-      normalisedRound,
       effectivePrdPath,
       normalisedReviewRound,
       normalisedVisualRound,

@@ -51,7 +51,6 @@ function handoff(feature, over = {}) {
     next_role: "sr-engineer",
     hop_count: 1,
     review_round: 0,
-    qa_round: 0,
     last_updated: "2026-09-27T00:00:00.000Z",
     pending_notes: [],
     completed_tasks: [],
@@ -59,7 +58,8 @@ function handoff(feature, over = {}) {
   };
 }
 
-/** The decision (c) state line for a handoff, spelled out independently of the tool. */
+/** The decision (c) state line for a handoff, spelled out independently of the tool.
+ *  E435 (ruling (a) drop): schema 17 has no qa_round, so the line ends at review_round. */
 function stateLine(h, prereview) {
   const v = (x) => (x === null || x === undefined || String(x).trim() === "" ? "-" : String(x).trim().replace(/\s+/g, "_"));
   const parts = [
@@ -69,7 +69,6 @@ function stateLine(h, prereview) {
     `next_role=${v(h.next_role)}`,
     `hop=${v(h.hop_count)}`,
     `review_round=${v(h.review_round)}`,
-    `qa_round=${v(h.qa_round)}`,
   ];
   if (prereview !== undefined) parts.push(`cut_prereview=${prereview}`);
   return parts.join(" ");
@@ -156,7 +155,7 @@ async function runWatch(argv, world, { onSleep } = {}) {
 // AC1 — a baseline is printed when the watch starts
 // ---------------------------------------------------------------------------
 
-test("AC1 baseline on start", async () => {
+test("AC1 baseline on start (E435: no qa_round key)", async () => {
   const a = handoff("e901-alpha");
   const b = handoff("e902-beta", { next_role: undefined, status: "Blocked", hop_count: 4, review_round: 2 });
   const world = mkWorld([["alpha", a], ["beta", b]]);
@@ -174,6 +173,7 @@ test("AC1 baseline on start", async () => {
     [...WATCH_STATE_KEYS],
     "state keys in the fixed decision (c) order",
   );
+  assert.deepEqual([...WATCH_STATE_KEYS], ["feature", "status", "last_agent", "next_role", "hop", "review_round"], "E435: qa_round is no watch key");
   assert.equal(r.code, WATCH_EXIT_EXPIRED);
 
   // Defaults: interval 30 s, deadline 29 min (decision (f)).
@@ -209,7 +209,7 @@ test("AC2 transition line", async () => {
   assert.equal(r.code, WATCH_EXIT_EXPIRED);
 });
 
-test("AC2 non-watched field silent", async () => {
+test("AC2 non-watched field silent (E435: a stale qa_round is not watched)", async () => {
   const world = mkWorld([["alpha", handoff("e901-alpha")]]);
   const r = await runWatch(["--watch", "--deadline", "2"], world, {
     onSleep(n, w) {
@@ -220,6 +220,7 @@ test("AC2 non-watched field silent", async () => {
         pending_notes: [`note ${n}`],
         completed_tasks: Array.from({ length: n }, (_, i) => `T-${i}`),
         dispatched_at: `x${n}`,
+        qa_round: n,
       };
     },
   });

@@ -37,7 +37,6 @@ import type {
   ReviewVerdict,
   DispatchMode,
   DispatchMechanism,
-  ChainPath,
   PendingNotesTruncated,
 } from "./handoff-types.js";
 import { READ_VIEW_MARKER_PREFIX } from "./handoff-types.js";
@@ -288,7 +287,9 @@ const NEXT_ROLE_VALUES: readonly string[] = [
   "qa-engineer",
   "release-engineer",
 ];
-const RESUME_OF_VALUES: readonly string[] = ["code-reviewer", "qa-engineer"];
+// Since E435 (v17) only code-reviewer: a stale on-disk `resume_of: qa-engineer`
+// is dropped here like any other malformed value.
+const RESUME_OF_VALUES: readonly string[] = ["code-reviewer"];
 const REVIEW_VERDICT_VALUES: readonly string[] = ["APPROVED", "CHANGES_REQUESTED"];
 // Legal dispatch_mode values, for the same defensive parse-time filtering as
 // the three v7 protocol fields. (E2, handoff schema v11)
@@ -296,9 +297,6 @@ const DISPATCH_MODE_VALUES: readonly string[] = ["feature", "bugfix"];
 // Legal dispatch_mechanism values, for the same defensive parse-time
 // filtering as dispatch_mode above. (E99, v15)
 const DISPATCH_MECHANISM_VALUES: readonly string[] = ["task", "switch_role", "inline"];
-// Legal chain_path values: one member, so any other on-disk value is dropped
-// and reads as the old chain. (E431, v16)
-const CHAIN_PATH_VALUES: readonly string[] = ["test-first"];
 // v15 — bound mirrored from the zod boundary (tools/registry.ts
 // dispatch_mechanism_tier .max(40)); parse-time we only need it to drop a
 // grossly malformed hand-edited value, never to reject.
@@ -510,10 +508,6 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     DISPATCH_MECHANISM_VALUES,
   );
   const dispatchMechanismTier = parseDispatchMechanismTier(frontmatter.dispatch_mechanism_tier);
-  // Test-first chain marker: kept only when it equals "test-first", so a
-  // missing or malformed value reads as the old chain (absence is the signal).
-  // (E431, v16)
-  const chainPath = parseEnumField<ChainPath>(frontmatter.chain_path, CHAIN_PATH_VALUES);
   // sr-engineer -> qa-engineer return counter: kept only when finite and >= 1
   // (floored); anything else is dropped, so absence means 0. (E431, v16)
   const srReturnCountRaw = Number(frontmatter.sr_return_count);
@@ -530,8 +524,6 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     Number.isFinite(evidenceSchemaRaw) && evidenceSchemaRaw >= 1
       ? Math.floor(evidenceSchemaRaw)
       : undefined;
-  const qaRoundRaw = Number(frontmatter.qa_round);
-  const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
   const reviewRoundRaw = Number(frontmatter.review_round);
   const review_round =
     Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0 ? Math.floor(reviewRoundRaw) : 0;
@@ -540,16 +532,13 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0 ? Math.floor(visualRoundRaw) : 0;
   // v9 — hop_count counter (d2-server-brake-accounting). Defaults missing /
   // malformed to 0, the true pre-feature value (DR-3) — identical defensive
-  // posture to the three round counters above.
+  // posture to the round counters above.
   const hopCountRaw = Number(frontmatter.hop_count);
   const hop_count =
     Number.isFinite(hopCountRaw) && hopCountRaw >= 0 ? Math.floor(hopCountRaw) : 0;
   // Cumulative round totals. Missing or malformed values default to 0, the
   // true value before the fields existed (the v11→v12 migration also seeds
   // 0) — the same defensive handling as hop_count, per field. (E8, v12)
-  const qaRoundsTotalRaw = Number(frontmatter.qa_rounds_total);
-  const qa_rounds_total =
-    Number.isFinite(qaRoundsTotalRaw) && qaRoundsTotalRaw >= 0 ? Math.floor(qaRoundsTotalRaw) : 0;
   const reviewRoundsTotalRaw = Number(frontmatter.review_rounds_total);
   const review_rounds_total =
     Number.isFinite(reviewRoundsTotalRaw) && reviewRoundsTotalRaw >= 0
@@ -582,15 +571,12 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     ...(cutApprovedSource && { cut_approved_source: cutApprovedSource }),
     ...(dispatchMechanism && { dispatch_mechanism: dispatchMechanism }),
     ...(dispatchMechanismTier && { dispatch_mechanism_tier: dispatchMechanismTier }),
-    ...(chainPath && { chain_path: chainPath }),
     ...(srReturnCount !== undefined && { sr_return_count: srReturnCount }),
     completed_tasks,
     pending_notes,
-    qa_round,
     review_round,
     visual_round,
     hop_count,
-    qa_rounds_total,
     review_rounds_total,
     visual_rounds_total,
   };
@@ -691,7 +677,6 @@ export function readHandoffState(workspacePath: string): string {
       pendingNotes: state.pending_notes,
       blockingReason: state.blocking_reason,
       lastAgent: state.last_agent,
-      qaRound: state.qa_round,
       prdPath: state.prd_path,
       reviewRound: state.review_round,
       visualRound: state.visual_round,
@@ -703,13 +688,11 @@ export function readHandoffState(workspacePath: string): string {
       hopCount: state.hop_count,
       // v16 — sr_return_count is server-computed and not carried by an
       // omitting write, so the heal must pass it like hopCount or a real
-      // count would be dropped. chain_path needs nothing: the heal is
-      // same-feature and the write layer carries it. (E431)
+      // count would be dropped. (E431)
       srReturnCount: state.sr_return_count,
-      // v12 — same forward-safety for the three cumulative totals: a future
+      // v12 — same forward-safety for the cumulative totals: a future
       // v12→v13 heal must not stamp the new version while dropping real
       // accumulated totals (the v9 hop_count 12th-arg gap, closed at birth).
-      qaRoundsTotal: state.qa_rounds_total,
       reviewRoundsTotal: state.review_rounds_total,
       visualRoundsTotal: state.visual_rounds_total,
       // The heal-write always preserves last_updated: a schema heal is not a

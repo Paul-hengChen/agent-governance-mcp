@@ -1,5 +1,5 @@
 import type { AgentName } from "./transitions.js";
-import type { ExternalRef, ResumeOfTarget, ReviewVerdict, DispatchMode, DispatchMechanism, ChainPath } from "./handoff-types.js";
+import type { ExternalRef, ResumeOfTarget, ReviewVerdict, DispatchMode, DispatchMechanism } from "./handoff-types.js";
 /**
  * v3.15.0 options-object shape for writeHandoffState's modern overload.
  * Prefer this form at all new call sites. The legacy positional signature
@@ -13,12 +13,10 @@ export interface WriteHandoffStateOptions {
     pendingNotes?: string[];
     blockingReason?: string;
     lastAgent?: string;
-    qaRound?: number;
     prdPath?: string;
     reviewRound?: number;
     visualRound?: number;
     hopCount?: number;
-    qaRoundsTotal?: number;
     reviewRoundsTotal?: number;
     visualRoundsTotal?: number;
     scopeDecision?: string;
@@ -37,7 +35,6 @@ export interface WriteHandoffStateOptions {
     cutApprovedSource?: string;
     dispatchMechanism?: DispatchMechanism;
     dispatchMechanismTier?: string;
-    chainPath?: ChainPath;
     srReturnCount?: number;
     preserveLastUpdated?: boolean;
 }
@@ -54,5 +51,5 @@ export declare function writeHandoffState(opts: WriteHandoffStateOptions): Promi
  * `writeHandoffState({ workspacePath, activeFeature, status, ... })`.
  * Positional signature retained for backwards-compat; planned removal in v4.0.0.
  */
-export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number, hopCount?: number): Promise<string>;
+export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, _qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number, hopCount?: number): Promise<string>;
 //# sourceMappingURL=handoff-write.d.ts.map

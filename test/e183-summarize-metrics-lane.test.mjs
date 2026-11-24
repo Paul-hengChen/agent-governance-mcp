@@ -19,7 +19,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = process.env.E183_SCRIPT_UNDER_TEST || path.join(ROOT, "scripts", "summarize-metrics.mjs");
 
-const RECORD = JSON.stringify({ feature: "feat-x", tickets: 2, qa_rounds: 1, review_rounds: 1, visual_rounds: 0, hops: 5, one_pass: true });
+// E435 (OQ (a) drop): new metrics records carry no qa_rounds (qa-engineer never writes FAIL).
+const RECORD = JSON.stringify({ feature: "feat-x", tickets: 2, review_rounds: 1, visual_rounds: 0, hops: 5, one_pass: true });
 
 function mkWs(headContent) {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "e183-ws-"));
@@ -135,4 +136,17 @@ test("AC-E183-6: an existing empty lane file still exits 0 with 'no metrics yet'
   const r = run(ws);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /no metrics yet/);
+});
+
+test("AC-E183-7 (E435): qa_rounds is out of the summary — an older record's qa_rounds is ignored, the mean reads review / visual only", () => {
+  // WHY: OQ (a) drops qa_rounds with the qa round cap; a qa column or mean would report a
+  // counter no live writer fills, and a pre-v5 record's value must not resurface in the retro.
+  const ws = mkWs("ref: refs/heads/feat/e999-x\n");
+  const old = JSON.stringify({ feature: "feat-old", tickets: 1, qa_rounds: 3, review_rounds: 1, visual_rounds: 0, hops: 4, one_pass: false });
+  put(ws, ".current/e999/metrics.jsonl", `${old}\n${RECORD}\n`);
+  const r = run(ws);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /features: 2/);
+  assert.match(r.stdout, /mean rounds: review 1\.00 \/ visual 0\.00/);
+  assert.doesNotMatch(r.stdout, /qa_rounds|\bqa\b/, `no qa term in the output: ${r.stdout}`);
 });

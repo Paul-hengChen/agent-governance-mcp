@@ -91,13 +91,12 @@ export function emitFeatureMetrics(args) {
             ts: new Date().toISOString(),
             feature: args.feature,
             tickets,
-            qa_rounds: args.qaRoundsTotal,
             review_rounds: args.reviewRoundsTotal,
             visual_rounds: args.visualRoundsTotal,
             hops: args.hops,
             // Zero rework of any kind (AC3) — see ROUND SEMANTICS above for why a
             // first-pass-APPROVED round is not counted into these totals.
-            one_pass: args.qaRoundsTotal === 0 && args.reviewRoundsTotal === 0 && args.visualRoundsTotal === 0,
+            one_pass: args.reviewRoundsTotal === 0 && args.visualRoundsTotal === 0,
             released_version,
         };
         fs.mkdirSync(path.dirname(file), { recursive: true });

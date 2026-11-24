@@ -4,20 +4,19 @@
 // region-diff / status cell parsers, and the `covers:` label-line coverage
 // used by gates/qa-review.ts and gates/code-review.ts. The gate predicates
 // live in gates/. It imports nothing from gates/ directly; its one runtime
-// tools/ import, transitions.js (for judgeFor), depends only on
+// tools/ import, transitions.js (for JUDGE_ROLE), depends only on
 // gates/registry.ts, which imports nothing, so the import graph stays acyclic.
 import * as fs from "fs";
 import * as path from "path";
-import { judgeFor } from "./transitions.js";
+import { JUDGE_ROLE } from "./transitions.js";
 const JUDGE_REPORT_DIRNAME = "qa_reports";
-// Pure, no I/O, never throws. chainPath undefined (unmarked, SQLite, or a
-// reader that sees several features) -> qa-engineer.
-export function resolveJudgeReport(workspacePath, chainPath) {
-    return { judge: judgeFor(chainPath), dir: path.join(workspacePath, JUDGE_REPORT_DIRNAME) };
+// Pure, no I/O, never throws.
+export function resolveJudgeReport(workspacePath) {
+    return { judge: JUDGE_ROLE, dir: path.join(workspacePath, JUDGE_REPORT_DIRNAME) };
 }
-// Every identity that can judge a feature. For readers that see reports of
-// several features (lane-status), which cannot pick one by a single marker.
-export const JUDGE_IDENTITIES = [judgeFor(undefined), judgeFor("test-first")];
+// Signers a multi-feature report reader (lane-status) accepts: the judge, and
+// qa-engineer for reports written before v5.0.0 (DR-6).
+export const REPORT_SIGNERS = [JUDGE_ROLE, "qa-engineer"];
 // ---------- task-id → evidence filename stem ----------
 // Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its
 // stem from the task id through this one encoder, so two distinct ids can

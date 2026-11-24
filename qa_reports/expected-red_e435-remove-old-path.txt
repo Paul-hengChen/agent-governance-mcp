@@ -1,0 +1,72 @@
+# E435 expected-red manifest. Format: <test file> | <exact test name> | <reason>
+# Feature-scoped, append-only per task; each sr task clears the rows its change turns green.
+# T-E435-01 (qa-engineer): new scenario file, red until the E435 implementation lands.
+# T-E435-02 (qa-engineer): test/qa-flow.test.mjs part 1/4 (preamble + un-bannered sections, requireJudge .. handoff qa_round removal).
+# T-E435-03 (qa-engineer): test/qa-flow.test.mjs part 2/4 (T67 / AC-12 + T-MATRIX-A5).
+# T-E435-04 (qa-engineer): test/qa-flow.test.mjs part 3/4 (C1-07 Amend-Resume + T-C9-10 closed enums).
+
+# T-E435-05 (qa-engineer): test/qa-flow.test.mjs part 4/4 (T-MATRIX-C13, T-E37-01, T-E45-01, T-E53-03 + E128 sweep).
+
+# T-E435-06 (qa-engineer): transition-table re-pins in hop-count-transitions, e38-next-role-lookahead, e151-resume-of-rejection-hint (+ e128 green-on-both). visual-round-transitions deferred (300-line cap).
+
+# T-E435-43 (qa-engineer): visual-round-transitions re-pin (deferred from T-E435-06): computeNewRound new signature, qa_round out of the result. Visual counting unchanged (E420).
+
+# T-E435-07 (qa-engineer): test/e431-test-first-server-path.test.mjs half 1 (preamble, helpers, AC1-AC11) and test/gates-expected-red.test.mjs I1-I4: marker-free new chain, carried chain_path stripped, old-path steps rejected with the hint, code-reviewer the PASS writer.
+
+# T-E435-08 (qa-engineer): test/e431-test-first-server-path.test.mjs half 2 (AC12-AC18, OVERLAY) and test/e396-covers-expected-red.test.mjs I: one chain, no marker, code-reviewer the judge, schema 17, registry 33 / step 9 renamed, one 22-key table.
+
+# T-E435-09a (qa-engineer): test/e432-judge-report-checks.test.mjs: marker dropped from every seed (judge code-reviewer unconditional, resolver one-arg), NON_JUDGE ledger code, release judge code-reviewer, AC11 base replays -> one-chain scenarios, AC12 SQLite one judge + DDL unchanged, AC14 registry 33 / step 9 renamed / handoff 17. Half b (test/e433-test-first-rules.test.mjs) not yet written.
+
+# T-E435-44 (= T-E435-09b, qa-engineer): test/e433-test-first-rules.test.mjs: marker / qa_round / old ledger code absent from served text, const-06 / skill-qa-engineer / skill-architect / release-cd pinned to the architecture Copy texts, live registry 33. Closed-range parts (AC9, AC12, AC13) unchanged.
+
+# T-E435-10 (qa-engineer, part 1 of 2): test/reviewer-completed-tasks-gate.test.mjs: code-reviewer the only ledger writer, NON_JUDGE_COMPLETED_TASKS_REJECTED exact emit for every non-judge agent_id (qa-engineer added as FM12) in file and SQLite mode, code-reviewer -> qa-engineer edge gone. test/e181-pending-notes-roundtrip.test.mjs re-pinned, green on both (no rows).
+
+# T-E435-45 (= T-E435-10 part 2, qa-engineer): e150 ledger writer / FAIL shrink / PASS seed moved to code-reviewer, AC17 -> NON_JUDGE_COMPLETED_TASKS_REJECTED, AC20 = Copy desc.completed_tasks; e139 APPROVED row gone (code-reviewer -> qa-engineer not an edge), APPROVED <-> PASS consistent, qa PASS judge-guarded; e247 PASS writer code-reviewer + hint 'A code-reviewer PASS'.
+# T-E435-11 (qa-engineer): registry 35 -> 33 (QA_ROUND_EXCEEDED, REVIEWER_COMPLETED_TASKS_REJECTED, NON_QA_COMPLETED_TASKS_REJECTED out; NON_JUDGE_COMPLETED_TASKS_REJECTED in), pipeline step 9 renamed, TRANSITION_GATE_CODES 6, union 16, mapping comment and count comments, tw_gate_stats mean_qa_rounds dropped.
+
+# T-E435-12 (qa-engineer): handoff schema 17 (chain_path, qa_round, qa_rounds_total dropped by the v16 -> v17 step), CURRENT_VERSIONS.handoff 17, positional qaRound slot kept and ignored, PASS refine names code-reviewer, resume_of code-reviewer only.
+
+# T-E435-13 (qa-engineer): judge-only ledger in the evidence gate (QAEV), handoff schema 17 in the drift skew peek and the raced read path.
+
+# T-E435-14 (qa-engineer): evidence recording and its undo with code-reviewer as the judge (file and SQLite), handoff schema 17 in the e23 migration chain.
+
+# T-E435-15 — evidence gate re-pins (e32-e33-gate-hardening, ac-execution, e154-multi-covers, repro-first-gate; e136 green on both)
+
+# T-E435-16 — state fixture re-pins (1/5): cut-approval-gate, dispatch-pins, e114-cut-approval-inheritance, e116-archive-on-feature-change, e122-state-render-injection
+
+# T-E435-17 — state fixture re-pins (2/5): e123b9-lane-flip, e137-rag-render, e177b-lane-status, e178b-lane-watch, e178b-cut-prereview
+
+# T-E435-18
+
+# T-E435-19 — state fixture re-pins (4/5): e31-config-nonfatal, e92-e86-handoff-write-boundary, lane-migrate, prompt-state-footer
+# no red rows: every test in the four files is green at base and stays green under schema 17 (see tests report section T-E435-19)
+
+# T-E435-20 — state fixture re-pins (5/5): rag-lifecycle, rag, success-metrics, stale-dispatch-detection
+
+# T-E435-21 — visual gate judge re-pins: visual-gate-e2e, visual-round-sqlite, visual-evidence-gate, pixel-gate-attestation, baseline-manifest-gate
+
+# T-E435-22 — visual SOP/template pins: pixel-perfect-design-coverage, pixel-perfect-visual-compare, qa-visual-skill-split, e412-qa-visual-template, e360-qa-visual-review-task-ids
+# no rows: none of the five files pins old-path wording the E435 contract changes (all already on the E433/E434 code-reviewer visual judge); 29/29 green at base
+
+# T-E435-23 — SOP/constitution text pins (1/3): e16-judge-dispatch-charter, e295-hop-cap-and-sop-halves, e393-builder-judge-core, e380-qa-suite-result-sop (no rows), skill-evolution-v3.11
+
+# T-E435-24 — SOP/constitution text pins (2/3): e5-intake-tiering, e407-restatement-citations, e391-prompt-audit-stale-facts (no rows), phase-0-5-sop (no rows), constitution-deliverable-guard
+
+# T-E435-25 — content text pins (3/3): token-efficiency, e440-current-rule-wording, e410-task-alias-content-tail (no change), e408-core-task-alias-tail (no change), e438-origin-fenced-labels
+# no rows: the new / re-pinned tests are green at base (resume_of content already names only code-reviewer since E433; E435-edited lines carry no bare label yet) and must stay green after T-E435-32/33/36/41; 82/82 green at base
+
+# T-E435-26 — adapter / CLAUDE.md pins: agc-adapters, e395-claude-md-tail, e444-claude-local-adapter (no rows), e178a-integrator-role (no rows), e436-stale-handoff-paths (no rows)
+
+# T-E435-27 — templates and release re-pins: subagent-templates (no rows), e394-release-script, e394-release-sop (no rows), e405-release-runner, e405-release-docs
+
+# T-E435-28 — verify-release / release-staging (no change, no rows), eval-assertions (escalation fixture re-pinned to a code-reviewer PASS, green), test/eval fixture handoff (one chain, no qa_round), scenarios.mjs / bundle.mjs (no change). No rows.
+
+# T-E435-39 (sr-engineer): snapshot reds left for T-E435-40 (qa re-captures compose goldens, the skill-manifest golden and the context-budget caps after the E435 content changes in T-32/33/36/37/41).
+# T-E435-40 (qa-engineer): the 8 snapshot rows above are cleared — the 12 compose goldens were re-captured with scripts/capture-constitution-golden.mjs (7 changed) and the context-budget caps / saving floor re-baselined to measured values; all 8 tests green. See ## T-E435-40 in qa_reports/tests_e435-remove-old-path.md.
+
+# T-E435-49 (qa-engineer): voidRefusalMessage (tools/tasks-file.ts) still names qa-engineer in the ledger and both texts; the pinned wording names code-reviewer, the one judge whose FAIL write drops ledger ids (T-E435-50, sr-engineer)
+
+# T-E435-46 (qa-engineer): tools/role.ts post-chain comment still names the removed qa-engineer:PASS -> release-engineer edge; the pinned line names code-reviewer:PASS, the one chain's judge (T-E435-50, sr-engineer)
+
+# T-E435-50 (sr-engineer): the 6 rows above (5 e359, 1 e408) are cleared — voidRefusalMessage names code-reviewer in the ledger and both texts and tools/role.ts line 40 names code-reviewer:PASS (commit 6cf540d9); all 6 green in the clean-tree suite run (4579 tests, 4576 pass, 0 fail, 3 skipped).
+# T-E435-50 (sr-engineer, coordinator follow-up): the 448 remaining rows from T-E435-01..46 sections are cleared — each <file> | <test name> mapped to an ok result in the clean-tree suite run after 6cf540d9 (4579 tests, 4576 pass, 0 fail, 3 skipped; none of the 448 among the skipped). Section markers kept as history; the file has 0 open rows.

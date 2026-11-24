@@ -30,7 +30,7 @@ function mkWs(prefix = "e128orc-") {
 // only the edges under test are driven through the real handleUpdateState
 // pipeline. No design/<feature>.md exists in this workspace, so the
 // arm-gated SCOPE_DECISION_REQUIRED gate never fires and cut_approved alone
-// clears CUT_APPROVAL_REQUIRED for the sr-engineer build-entry hop below.
+// clears CUT_APPROVAL_REQUIRED for the qa-engineer build-entry hop below.
 async function seedCutApprovedPm(ws, feature) {
   resetSession(ws);
   markStateRead(ws);
@@ -56,12 +56,23 @@ test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the 
   const feature = "e128orc-incident";
   await seedCutApprovedPm(ws, feature);
 
-  // Hop 1: pm -> sr-engineer (real build-entry hop, driven through the
-  // orchestrator so hop_count actually ticks to 1 via the real pipeline, not
-  // a seeded value).
+  // Hops 1-2: pm -> qa-engineer (the build entry since E435) -> sr-engineer, driven
+  // through the orchestrator so hop_count ticks via the real pipeline, not a seeded
+  // value. The no-new-test record clears REPRO_MANIFEST_MISSING on qa -> sr.
   resetSession(ws);
   markStateRead(ws);
   const entry = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: feature,
+    status: "In_Progress",
+    agent_id: "qa-engineer",
+    completed_tasks: [],
+    pending_notes: ["qa-engineer: no new test needed"],
+  });
+  assert.ok(!entry.isError, `pm -> qa-engineer build-entry hop must succeed: ${entry.content?.[0]?.text}`);
+  fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "qa_reports", `no-new-test_${feature}.txt`), "S1 | covered by the replay itself\n");
+  const build = await handleUpdateState({
     workspace_path: ws,
     active_feature: feature,
     status: "In_Progress",
@@ -69,8 +80,8 @@ test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the 
     completed_tasks: [],
     pending_notes: ["sr-engineer: starting the fix"],
   });
-  assert.ok(!entry.isError, `pm -> sr-engineer build-entry hop must succeed: ${entry.content?.[0]?.text}`);
-  assert.equal(parseHandoff(ws).hop_count, 1, "the build-entry hop must tick hop_count to 1");
+  assert.ok(!build.isError, `qa-engineer -> sr-engineer hop must succeed: ${build.content?.[0]?.text}`);
+  assert.equal(parseHandoff(ws).hop_count, 2, "the two build hops must tick hop_count to 2");
 
   // Hop 2: sr-engineer halts with a malformed payload — the incident's own
   // shape (an argument tag leaked, so pending_notes landed empty and its
@@ -87,7 +98,7 @@ test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the 
   assert.ok(!halt.isError, `the initial (malformed) Blocked write must itself succeed — it is a real halt: ${halt.content?.[0]?.text}`);
   const afterHalt = parseHandoff(ws);
   assert.equal(afterHalt.status, "Blocked");
-  assert.equal(afterHalt.hop_count, 1, "a same-agent status change (In_Progress -> Blocked) is not a role transition and must not tick hop_count");
+  assert.equal(afterHalt.hop_count, 2, "a same-agent status change (In_Progress -> Blocked) is not a role transition and must not tick hop_count");
 
   // Hop 3 (THE FIX UNDER TEST): sr-engineer repairs its OWN Blocked record —
   // same agent, same status. Before the fix this was TRANSITION_REJECTED (no edge
@@ -122,7 +133,7 @@ test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the 
   );
   assert.equal(afterRepair.last_agent, "sr-engineer", "last_agent must still be sr-engineer after its own self-loop");
   // 3: hop_count is untouched by the repair self-loop.
-  assert.equal(afterRepair.hop_count, 1, "hop_count must NOT move across the Blocked->Blocked repair (self-loops are not counted role transitions, DR-9)");
+  assert.equal(afterRepair.hop_count, 2, "hop_count must NOT move across the Blocked->Blocked repair (self-loops are not counted role transitions, DR-9)");
   // 4: no next_role terminal marker was recorded by the repair write itself.
   assert.equal(afterRepair.next_role, undefined, "the repair write must record no next_role terminal marker");
 

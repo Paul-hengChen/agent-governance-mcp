@@ -86,7 +86,7 @@ qa_round: 0
   const report = JSON.parse(detectDrift(ws));
   assert.equal(report.driftDetected, true);
   assert.ok(
-    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v16/.test(d)),
+    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v17/.test(d)),
     `expected handoff skew reason in ${JSON.stringify(report.details)}`,
   );
 });
@@ -151,6 +151,20 @@ qa_round: 0
   const report = JSON.parse(detectDrift(ws));
   const skewReasons = report.details.filter((d) => /Schema version skew/.test(d));
   assert.deepEqual(skewReasons, [], "stale v0 must not be reported as skew");
+});
+
+// ---------- E435 boundary: 17 is current (no skew), 18 is the first future version ----------
+
+test("T32 AC-6 (E435): a schema 17 handoff is current (no skew); schema 18 is reported against server max v17", () => {
+  const v = (n) => `---\nschema_version: ${n}\nactive_feature: "f"\nstatus: "In_Progress"\nlast_updated: "2026-01-01T00:00:00.000Z"\nreview_round: 0\n---\n## ✅ 已完成 (Completed)\n- 無\n## ⚠️ 待辦與交接 (Pending & Handoff Notes)\n- 無\n`;
+  for (const [n, want] of [[17, null], [18, /Schema version skew: handoff on-disk v18 > server max v17/]]) {
+    const ws = mkWorkspace();
+    fs.writeFileSync(path.join(ws, "tasks.md"), "<!-- schema_version: 1 -->\n# Tasks\n\n## Active\n");
+    writeRawHandoffAtLanePath(ws, v(n));
+    const skew = JSON.parse(detectDrift(ws)).details.filter((d) => /Schema version skew/.test(d));
+    if (want) assert.ok(skew.some((d) => want.test(d)), `v${n}: ${JSON.stringify(skew)}`);
+    else assert.deepEqual(skew, [], `v${n} is the server's own version, never skew`);
+  }
 });
 
 // ---------- Empty workspace: no skew claims fabricated ----------
@@ -229,7 +243,7 @@ qa_round: 0
   }, "the unmigrated-flat-workspace skew precheck must no longer throw the raw parser refusal");
   assert.equal(report.driftDetected, true);
   assert.ok(
-    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v16/.test(d)),
+    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v17/.test(d)),
     `expected a graceful handoff skew reason in ${JSON.stringify(report.details)}`,
   );
 });

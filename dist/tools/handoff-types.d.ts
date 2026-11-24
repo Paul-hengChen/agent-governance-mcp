@@ -19,10 +19,9 @@ export interface ExternalRef {
     ref: string;
     state: ExternalRefState;
 }
-export type ResumeOfTarget = "code-reviewer" | "qa-engineer";
+export type ResumeOfTarget = "code-reviewer";
 export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
 export type DispatchMode = "feature" | "bugfix";
-export type ChainPath = "test-first";
 export type DispatchMechanism = "task" | "switch_role" | "inline";
 export interface HandoffState {
     active_feature: string;
@@ -32,11 +31,9 @@ export interface HandoffState {
     last_agent?: string;
     completed_tasks: string[];
     pending_notes: string[];
-    qa_round: number;
     review_round: number;
     visual_round: number;
     hop_count: number;
-    qa_rounds_total?: number;
     review_rounds_total?: number;
     visual_rounds_total?: number;
     prd_path?: string;
@@ -54,7 +51,6 @@ export interface HandoffState {
     evidence_schema?: number;
     dispatch_mechanism?: DispatchMechanism;
     dispatch_mechanism_tier?: string;
-    chain_path?: ChainPath;
     sr_return_count?: number;
 }
 //# sourceMappingURL=handoff-types.d.ts.map

@@ -60,6 +60,17 @@ test("AC-A2: const-11 §3.2 keeps its header, opens with the reviewer-visual ver
   assert.ok(bullets.some((b) => b.startsWith("- **No global-frame metric.")), "no-global-frame bullet kept");
 });
 
+// E435 (T-E435-41 Copy row): there is one chain, so the §3.2 enforcement sentence and its rationale
+// restate the PASS restriction unconditionally; "on the test-first chain" would imply a second chain
+// whose PASS someone else may write (AC7).
+test("AC-A3 (E435): const-11 §3.2 enforcement and its rationale restrict status=PASS to code-reviewer with no chain condition", () => {
+  const c11 = C("const-11-design-chain-32.md");
+  const rat = C("constitution-rationale.md");
+  assert.ok(c11.includes("the judge's PASS, and `status=PASS` is server-restricted to\n  `agent_id=\"code-reviewer\"`"), "const-11 line 10 per Copy");
+  assert.ok(rat.includes("PASS, and `status=PASS` is server-restricted to\n`agent_id=\"code-reviewer\"`"), "rationale line 149 per Copy");
+  for (const [f, t] of [["const-11", c11], ["rationale", rat]]) assert.ok(!t.includes("on the test-first chain"), `${f} names no test-first chain`);
+});
+
 test("AC-B: every builder ≠ judge citation resolves in each composition that loads it", () => {
   const citing = [
     ["const-04-design-surgical.md", "§3 builder ≠ judge", (o) => o.design],
@@ -98,7 +109,7 @@ test("AC-B11: adapter template line equals the CLAUDE.md adapter line", () => {
   assert.ok(!tpl[0].includes("§3.2"), "no stale §3.2");
 });
 
-test("AC-C: named sites restate no bare round number", () => {
+test("AC-C (E435): named sites restate no bare round number", () => {
   // const-06 / 08 / 09 / 12: no bare round-number forms at all.
   for (const f of ["const-06-chain-31-head.md", "const-08-chain-31-mid.md", "const-09-design-chain-vround.md", "const-12-chain-r10-s4.md"]) {
     assert.doesNotMatch(C(f), /Round \d|round \d|>= ?\d|up to \d|\d more rounds/, `${f} has a bare round number`);
@@ -119,7 +130,9 @@ test("AC-C: named sites restate no bare round number", () => {
   // skill-qa-engineer / skill-qa-visual / skill-sr-engineer.
   const qe = C("skill-qa-engineer.md");
   // E433: qa-engineer writes no FAIL, so its qa_round cap rows are gone (C09-C11); the cap it meets is sr_return.
+  // E435 (T-E435-32 Copy): the qa round counter and its code leave the SOP altogether.
   assert.ok(!qe.includes("`qa_round` cap"), "C09-C11 the qa SOP restates no qa_round cap");
+  assert.ok(!/qa_round|QA_ROUND_EXCEEDED/.test(qe), "C09-C11 (E435) the qa SOP names no qa_round counter or QA_ROUND_EXCEEDED");
   assert.ok(qe.includes("counts toward the `sr_return` cap, which the server checks on your claim"), "qa SOP names the sr_return cap");
   // E434: the visual sub-skill (skill-reviewer-visual) has no visual_round cap rows (C12/C13 retired); sr's
   // split route (C14/C15) became the pixel-progress rule, which names the `fix_try` cap.

@@ -30,7 +30,6 @@ function handoff(feature, over = {}) {
     next_role: "sr-engineer",
     hop_count: 1,
     review_round: 0,
-    qa_round: 0,
     last_updated: "2026-09-27T00:00:00.000Z",
     pending_notes: [],
     completed_tasks: [],
@@ -38,7 +37,7 @@ function handoff(feature, over = {}) {
   };
 }
 
-/** The per-lane state line the watch prints, spelled out independently of the tool so a format change is caught (e178b decision (c)). */
+/** The per-lane state line the watch prints, spelled out independently of the tool so a format change is caught (e178b decision (c)). E435: ends at review_round (qa_round watch key out, OQ (a) drop). */
 function stateLine(h) {
   const v = (x) => (x === null || x === undefined || String(x).trim() === "" ? "-" : String(x).trim().replace(/\s+/g, "_"));
   return [
@@ -48,7 +47,6 @@ function stateLine(h) {
     `next_role=${v(h.next_role)}`,
     `hop=${v(h.hop_count)}`,
     `review_round=${v(h.review_round)}`,
-    `qa_round=${v(h.qa_round)}`,
   ].join(" ");
 }
 

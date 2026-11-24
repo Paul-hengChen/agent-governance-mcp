@@ -511,3 +511,17 @@ test("AC6: no persisted-state schema_version bumped (content-only feature)", () 
     "schema/versions.ts must still export CURRENT_VERSIONS (no accidental rename)",
   );
 });
+
+test("E435: no subagent template makes qa-engineer the closing role; code-reviewer's template writes PASS", () => {
+  // WHY: E435 leaves one judge — code-reviewer writes PASS and completes tasks; qa-engineer writes the tests.
+  // A template describing qa-engineer as the verdict or closing role would route a Claude Code user to the old chain.
+  const desc = (role) => (readTemplateRaw(role).match(/^description:\s*(.+)$/m) ?? [])[1] ?? "";
+  assert.match(desc("code-reviewer"), /judge[\s\S]*writes PASS/, "code-reviewer description names the judge and PASS");
+  assert.match(desc("qa-engineer"), /Test author/, "qa-engineer description is the test author");
+  assert.match(desc("qa-engineer"), /never judges/);
+  for (const role of EXPECTED_ROLES) {
+    const raw = readTemplateRaw(role);
+    assert.ok(!/qa-engineer[^\n.]*\b(writes PASS|closes the feature|the judge|verdict)/i.test(raw), `${role}.md: qa-engineer is not the closing role`);
+    assert.ok(!raw.includes("chain_path") && !raw.includes("(qa-engineer, PASS)"), `${role}.md: no marker, no qa-engineer PASS`);
+  }
+});

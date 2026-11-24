@@ -396,7 +396,7 @@ test("AC18 (regression guard): a known mode on a later candidate beats an unknow
 });
 
 // AC17 — end to end through the real orchestrator.
-test("AC17: qa PASS on a feature whose design declares `mode: mockup` with no Visual Baselines -> VISUAL_BASELINES_REQUIRED naming mode=mockup", async () => {
+test("AC17: judge PASS on a feature whose design declares `mode: mockup` with no Visual Baselines -> VISUAL_BASELINES_REQUIRED naming mode=mockup", async () => {
   // WHY: before E423 this design file left the visual checks silently unarmed (adopter report); the PASS-time
   // gate must now reject it and name the unrecognised value so the operator can fix the file.
   const ws = mkWs("e423-e2e-");
@@ -411,8 +411,10 @@ test("AC17: qa PASS on a feature whose design declares `mode: mockup` with no Vi
     activeFeature: feature,
     status: "In_Progress",
     completedTasks: [],
-    pendingNotes: ["QA: claiming review"],
-    lastAgent: "qa-engineer",
+    pendingNotes: ["code-reviewer: claiming review"],
+    // E435: code-reviewer is the only PASS writer; a qa-engineer PASS stops at the judge guard
+    // before the visual gate, so the seed is code-reviewer:In_Progress.
+    lastAgent: "code-reviewer",
   });
   forceSeedStamp(ws);
   resetSession(ws);
@@ -421,10 +423,10 @@ test("AC17: qa PASS on a feature whose design declares `mode: mockup` with no Vi
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-E423-X"],
     review_task_ids: ["T-E423-X"],
-    pending_notes: ["QA: PASS"],
+    pending_notes: ["code-reviewer: PASS"],
     qa_review: "Looks good.",
   });
   const text = r.content?.[0]?.text ?? "";

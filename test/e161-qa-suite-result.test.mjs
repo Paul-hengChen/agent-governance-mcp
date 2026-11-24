@@ -41,7 +41,7 @@ function mkWorkspace(prefix = "e161-") {
   return ws;
 }
 
-async function seedFile(ws, feature, agent = "qa-engineer") {
+async function seedFile(ws, feature, agent = "code-reviewer") {
   setActiveStorage(new FileHandoffStorage());
   resetSession(ws);
   markStateRead(ws);
@@ -60,7 +60,7 @@ async function mkSqlite(feature) {
   setActiveStorage(storage);
   await storage.writeState({
     workspacePath: dir, activeFeature: feature, status: "In_Progress",
-    completedTasks: [], pendingNotes: ["QA: claiming review"], lastAgent: "qa-engineer",
+    completedTasks: [], pendingNotes: ["QA: claiming review"], lastAgent: "code-reviewer",
   });
   resetSession(dir);
   storage.readState(dir);
@@ -93,7 +93,7 @@ function snapshot(dir) {
 const PASS_ARGS = (feature, ids, extra = {}) => ({
   active_feature: feature,
   status: "PASS",
-  agent_id: "qa-engineer",
+  agent_id: "code-reviewer",
   completed_tasks: ids,
   review_task_ids: ids,
   pending_notes: ["QA: PASS"],
@@ -104,7 +104,7 @@ const PASS_ARGS = (feature, ids, extra = {}) => ({
 const evidenceFile = (ws, id) => path.join(ws, "qa_reports", `review_${id}.md`);
 const handoffBytes = (ws) => fs.readFileSync(resolveCurrentLanePaths(ws).handoffPath);
 
-test("AC-E161-2: file mode records the suite line, a blank line, then the trimmed qa_review; heading and file header unchanged", async () => {
+test("AC-E161-2 (E435): code-reviewer PASS/FAIL, file mode records the suite line, a blank line, then the trimmed qa_review; heading and file header unchanged", async () => {
   const ws = mkWorkspace();
   await seedFile(ws, "e161-2");
   const review = "  \nAll ACs verified.\n\n## AC execution log\n| AC | ok |\n\n";
@@ -123,28 +123,28 @@ test("AC-E161-2: file mode records the suite line, a blank line, then the trimme
 
   // The heading and file header are today's format: compare with recordReviewInFile's own output for the same notes.
   const ref = mkWorkspace("e161-2ref-");
-  await recordReviewInFile(ref, ["T-E161-X"], "PASS", "qa-engineer", `${line}\n\n${review.trim()}`);
+  await recordReviewInFile(ref, ["T-E161-X"], "PASS", "code-reviewer", `${line}\n\n${review.trim()}`);
   const want = fs.readFileSync(evidenceFile(ref, "T-E161-X"), "utf-8");
   assert.equal(got.replace(ISO, "<ISO>"), want.replace(ISO, "<ISO>"));
-  assert.match(got, /^# QA review — T-E161-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by qa-engineer\n\nsuite-result: /);
+  assert.match(got, /^# QA review — T-E161-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by code-reviewer\n\nsuite-result: /);
 
   // FAIL records it too (the record step fires on PASS and FAIL alike).
   const ws2 = mkWorkspace("e161-2f-");
   await seedFile(ws2, "e161-2f");
   const rf = await handleUpdateState({
     workspace_path: ws2,
-    active_feature: "e161-2f", status: "FAIL", agent_id: "qa-engineer", completed_tasks: [],
+    active_feature: "e161-2f", status: "FAIL", agent_id: "code-reviewer", completed_tasks: [],
     review_task_ids: ["T-E161-F"], pending_notes: ["QA: FAIL"], qa_review: "2144 of 2146.",
     qa_suite_result: { passed: 2144, total: 2146 },
   });
   assert.ok(!rf.isError, `FAIL with the field must be accepted; got: ${text(rf)}`);
   assert.match(
     fs.readFileSync(evidenceFile(ws2, "T-E161-F"), "utf-8"),
-    /— FAIL — by qa-engineer\n\nsuite-result: 2144\/2146 passed \(server-recorded from qa_suite_result\)\n\n2144 of 2146\.\n\n$/,
+    /— FAIL — by code-reviewer\n\nsuite-result: 2144\/2146 passed \(server-recorded from qa_suite_result\)\n\n2144 of 2146\.\n\n$/,
   );
 });
 
-test("AC-E161-3: SQLite records the same composed text in every reports row's notes (with and without command)", async (t) => {
+test("AC-E161-3 (E435): a code-reviewer PASS in SQLite records the same composed text in every reports row's notes (with and without command)", async (t) => {
   if (!SqliteHandoffStorage) return t.skip("no better-sqlite3");
   for (const [suite, line] of [
     [{ passed: 10, total: 12, command: "npm test" }, "suite-result: 10/12 passed (server-recorded from qa_suite_result; command: npm test)"],
@@ -166,14 +166,14 @@ test("AC-E161-3: SQLite records the same composed text in every reports row's no
   }
 });
 
-test("AC-E161-4: without qa_suite_result the evidence bytes (file) and notes (SQLite) are exactly the pre-E161 record", async (t) => {
+test("AC-E161-4 (E435): a code-reviewer PASS without qa_suite_result the evidence bytes (file) and notes (SQLite) are exactly the pre-E161 record", async (t) => {
   const ws = mkWorkspace();
   await seedFile(ws, "e161-4");
   const review = "  Untrimmed, as before.\n\n";
   const r = await handleUpdateState({ workspace_path: ws, ...PASS_ARGS("e161-4", ["T-E161-N"], { qa_review: review }) });
   assert.ok(!r.isError, text(r));
   const ref = mkWorkspace("e161-4ref-");
-  await recordReviewInFile(ref, ["T-E161-N"], "PASS", "qa-engineer", review);
+  await recordReviewInFile(ref, ["T-E161-N"], "PASS", "code-reviewer", review);
   assert.equal(
     fs.readFileSync(evidenceFile(ws, "T-E161-N"), "utf-8").replace(ISO, "<ISO>"),
     fs.readFileSync(evidenceFile(ref, "T-E161-N"), "utf-8").replace(ISO, "<ISO>"),
@@ -218,7 +218,7 @@ const BAD = [
   ["command over 200 chars", { passed: 1, total: 2, command: "x".repeat(201) }],
 ];
 
-test("AC-E161-5: every malformed qa_suite_result is rejected at the zod boundary with the handoff and evidence unchanged", async () => {
+test("AC-E161-5 (E435): on a code-reviewer PASS every malformed qa_suite_result is rejected at the zod boundary with the handoff and evidence unchanged", async () => {
   const ws = mkWorkspace();
   await seedFile(ws, "e161-5");
   const handoffBefore = handoffBytes(ws);
@@ -247,16 +247,16 @@ test("AC-E161-5: every malformed qa_suite_result is rejected at the zod boundary
   }
 });
 
-test("AC-E161-6: where QA_REVIEW_RECORD does not record, the field changes no outcome, records nothing and never reaches the handoff", async () => {
+test("AC-E161-6 (E435): where QA_REVIEW_RECORD does not record, the field changes no outcome, records nothing and never reaches the handoff", async () => {
   const suite = { passed: 9, total: 9, command: "npm test" };
   const norm = (s, ws) => s.split(ws).join("<WS>").replace(ISO, "<ISO>");
   const cases = [
     // non-qa agent_id carrying qa_review
     { name: "non-qa agent", seedAgent: "sr-engineer", args: { active_feature: "e161-6a", status: "In_Progress", agent_id: "sr-engineer", completed_tasks: [], pending_notes: ["sr"], qa_review: "prose" } },
     // qa In_Progress (not PASS/FAIL) carrying qa_review
-    { name: "qa In_Progress", seedAgent: "qa-engineer", args: { active_feature: "e161-6b", status: "In_Progress", agent_id: "qa-engineer", completed_tasks: [], pending_notes: ["QA: wip"], qa_review: "wip" } },
+    { name: "judge In_Progress", seedAgent: "code-reviewer", args: { active_feature: "e161-6b", status: "In_Progress", agent_id: "code-reviewer", completed_tasks: [], pending_notes: ["QA: wip"], qa_review: "wip" } },
     // qa PASS without qa_review
-    { name: "no qa_review", seedAgent: "qa-engineer", args: { active_feature: "e161-6c", status: "PASS", agent_id: "qa-engineer", completed_tasks: [], pending_notes: ["QA: PASS"] } },
+    { name: "no qa_review", seedAgent: "code-reviewer", args: { active_feature: "e161-6c", status: "PASS", agent_id: "code-reviewer", completed_tasks: [], pending_notes: ["QA: PASS"] } },
   ];
   for (const c of cases) {
     const out = [];
@@ -275,9 +275,9 @@ test("AC-E161-6: where QA_REVIEW_RECORD does not record, the field changes no ou
   const rej = [];
   for (const withField of [false, true]) {
     const ws = mkWorkspace("e161-6r-");
-    await seedFile(ws, "e161-6d", "qa-engineer");
+    await seedFile(ws, "e161-6d", "code-reviewer");
     const r = await handleUpdateState({
-      workspace_path: ws, active_feature: "e161-6d", status: "PASS", agent_id: "qa-engineer",
+      workspace_path: ws, active_feature: "e161-6d", status: "PASS", agent_id: "code-reviewer",
       completed_tasks: ["T-UNEVIDENCED"], review_task_ids: ["T-UNEVIDENCED"], pending_notes: ["QA: PASS"],
       ...(withField ? { qa_suite_result: suite } : {}),
     });
@@ -294,7 +294,7 @@ test("AC-E161-6: where QA_REVIEW_RECORD does not record, the field changes no ou
   assert.doesNotMatch(handoffBytes(ws).toString("utf-8"), /qa_suite_result|suite-result/);
 });
 
-test("AC-E161-7: a PASS carrying the field that a later step rejects leaves the suite line undone with the rest of the record", async (t) => {
+test("AC-E161-7 (E435): a code-reviewer PASS carrying the field that a later step rejects leaves the suite line undone with the rest of the record", async (t) => {
   // File mode: EXPECTED_RED_DIFF_MISSING rejects after QA_REVIEW_RECORD.
   const ws = mkWorkspace();
   const feature = "e161-7";
@@ -327,7 +327,7 @@ test("AC-E161-7: a PASS carrying the field that a later step rejects leaves the 
   }
 });
 
-test("AC-E161-8: passed < total is recorded verbatim and is not a rejection", async (t) => {
+test("AC-E161-8 (E435): on a code-reviewer PASS, passed < total is recorded verbatim and is not a rejection", async (t) => {
   const ws = mkWorkspace();
   await seedFile(ws, "e161-8");
   const r = await handleUpdateState({

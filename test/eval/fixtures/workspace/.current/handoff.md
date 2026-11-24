@@ -3,9 +3,8 @@ schema_version: 8
 active_feature: "eval-fixture-feature"
 status: "In_Progress"
 last_updated: "2026-01-01T00:00:00.000Z"
-last_agent: "pm"
+last_agent: "qa-engineer"
 next_role: "sr-engineer"
-qa_round: 0
 review_round: 0
 visual_round: 0
 ---
@@ -15,7 +14,7 @@ visual_round: 0
 - (none)
 
 ## Pending & Handoff Notes
-- pm: T-EVAL-01 spec ready — implement per specs/eval-fixture-feature.md
+- qa-engineer: T-EVAL-01 tests ready (E435: one chain pm -> qa -> sr) — implement per specs/eval-fixture-feature.md
 
 ---
 > System Note: Frozen eval fixture (specs/d4-behavioral-eval-harness.md AC-8).

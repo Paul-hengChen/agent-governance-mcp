@@ -4,6 +4,8 @@
 // and REPRO_MANIFEST_MISSING, which blocks a bugfix-mode sr-engineer ->
 // code-reviewer handoff until qa_reports/expected-red_<feature>.txt exists. The
 // manifest predicate is unchanged (see test/gates-expected-red.test.mjs).
+// E435: the qa-engineer -> sr-engineer hand-off check (E432) runs on every file-mode
+// feature, no chain_path marker (G6-G8, R1).
 // Spec-to-test map: specs/e260h-comment-rationale.md (test/repro-first-gate.test.mjs).
 
 import { test } from "node:test";
@@ -21,7 +23,8 @@ import { resetSession, markStateRead } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { handleUpdateState } from "../dist/tools/handoff-orchestrator.js";
 import { TOOL_REGISTRY } from "../dist/tools/registry.js";
-import { expectedRedManifestPath } from "../dist/gates/expected-red.js";
+import { expectedRedManifestPath, noNewTestRecordPath } from "../dist/gates/expected-red.js";
+import { GATE_REGISTRY } from "../dist/gates/registry.js";
 import { CURRENT_VERSIONS } from "../dist/schema/versions.js";
 import { forceSeedStamp } from "./e148-seed-stamp.mjs";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
@@ -249,7 +252,7 @@ test("Z1: tw_update_state rejects an out-of-enum dispatch_mode value at the zod 
 // Migration v10 -> v11 only stamps the version on an old (v10) on-disk file (test label M1)
 // ============================================================================
 
-test("M1: a hand-written v10 handoff file migrates to v11 on read — dispatch_mode stays absent (no seed), sibling fields preserved", () => {
+test("M1 (E435): a hand-written v10 handoff file migrates to v11 on read — dispatch_mode stays absent (no seed), sibling fields preserved; v16 -> v17 drops qa_round / qa_rounds_total", () => {
   const ws = mkWs("repro-m1-");
   resetSession(ws);
   writeRaw(
@@ -282,7 +285,9 @@ next_role: "sr-engineer"
   // Re-baselined for the success-telemetry schema bump (e8-success-telemetry): the
   // file also climbs v11->v12, seeding the three new cumulative totals to 0
   // (same as the hop_count counter before them).
-  assert.equal(state.qa_rounds_total, 0, "v11->v12 seeds qa_rounds_total: 0 (e8-success-telemetry)");
+  // E435 (handoff schema 17): the climb continues v16->v17, which drops qa_round and qa_rounds_total.
+  assert.equal(state.qa_rounds_total, undefined, "v16->v17 drops qa_rounds_total (E435)");
+  assert.equal(state.qa_round, undefined, "v16->v17 drops qa_round (E435)");
   assert.equal(state.review_rounds_total, 0, "v11->v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.visual_rounds_total, 0, "v11->v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
   // Re-baselined for the evidence-schema versioning bump (e23-evidence-schema-versioning):
@@ -299,7 +304,7 @@ next_role: "sr-engineer"
   // (absence-is-signal, same posture as cut_approved_source/evidence_schema
   // above).
   assert.equal(state.dispatch_mechanism, undefined, "v14->v15 must NOT seed dispatch_mechanism (absence-is-signal, e123a-lane-layout-migration)");
-  assert.equal(CURRENT_VERSIONS.handoff, 16, "sanity: this server's CURRENT handoff version is 15");
+  assert.equal(CURRENT_VERSIONS.handoff, 17, "sanity: this server's CURRENT handoff version is 17 (E435)");
 });
 
 // ============================================================================
@@ -406,6 +411,83 @@ test("G4 (AC6): the sr-engineer -> pm Blocked escape edge is NEVER gated by REPR
   assert.ok(!result.isError, `the Blocked escape to pm must never be gated by REPRO_MANIFEST_MISSING: ${result.content?.[0]?.text}`);
 });
 
+
+// ============================================================================
+// E435: the qa-engineer -> sr-engineer hand-off check on every file-mode feature
+// (no chain_path marker; architecture step 7, message "Hand-off ...")
+// ============================================================================
+
+async function seedQaState(ws, feature, status) {
+  resetSession(ws);
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: feature,
+    status,
+    completedTasks: [],
+    pendingNotes: ["qa-engineer: tests written"],
+    lastAgent: "qa-engineer",
+  });
+  forceSeedStamp(ws);
+  resetSession(ws);
+  markStateRead(ws);
+}
+
+const srBuild = (ws, feature) => handleUpdateState({
+  workspace_path: ws,
+  active_feature: feature,
+  status: "In_Progress",
+  agent_id: "sr-engineer",
+  completed_tasks: [],
+  pending_notes: ["sr-engineer: building"],
+});
+
+test("G6 (E435): qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress with neither the manifest nor the no-new-test record is BLOCKED with REPRO_MANIFEST_MISSING on an unmarked feature", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  for (const status of ["In_Progress", "Blocked"]) {
+    const ws = mkWs("repro-g6-");
+    const feature = `g6-${status.toLowerCase()}`;
+    await seedQaState(ws, feature, status);
+    const result = await srBuild(ws, feature);
+    const t = result.content?.[0]?.text ?? "";
+    assert.ok(result.isError, `qa-engineer:${status} -> sr must be blocked without either file: ${t}`);
+    assert.match(t, /REPRO_MANIFEST_MISSING/);
+    assert.ok(t.includes(`Hand-off qa-engineer → sr-engineer needs the red-test manifest at ${expectedRedManifestPath(ws, feature)}`), t);
+    assert.ok(t.includes(noNewTestRecordPath(ws, feature)), `names the no-new-test record path: ${t}`);
+    assert.ok(!/test-first/i.test(t), `no marker wording left: ${t}`);
+    assert.equal(parseHandoff(ws).last_agent, "qa-engineer", "no state written");
+  }
+});
+
+test("G7 (E435): the same unmarked hand-off is accepted once the manifest, or the no-new-test record, exists", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("repro-g7a-");
+  await seedQaState(ws, "g7a-feat", "In_Progress");
+  writeManifest(ws, "g7a-feat");
+  const a = await srBuild(ws, "g7a-feat");
+  assert.ok(!a.isError, `manifest clears: ${a.content?.[0]?.text}`);
+  assert.equal(parseHandoff(ws).last_agent, "sr-engineer");
+
+  const ws2 = mkWs("repro-g7b-");
+  await seedQaState(ws2, "g7b-feat", "In_Progress");
+  fs.mkdirSync(path.join(ws2, "qa_reports"), { recursive: true });
+  fs.writeFileSync(noNewTestRecordPath(ws2, "g7b-feat"), "AC1 | covered by test/x.test.mjs\n", "utf-8");
+  const b = await srBuild(ws2, "g7b-feat");
+  assert.ok(!b.isError, `no-new-test record clears: ${b.content?.[0]?.text}`);
+  assert.equal(parseHandoff(ws2).last_agent, "sr-engineer");
+});
+
+test("R1 (E435): GATE_REGISTRY REPRO_MANIFEST_MISSING names both trigger edges with no marker condition", () => {
+  const def = GATE_REGISTRY.find((g) => g.errorCode === "REPRO_MANIFEST_MISSING");
+  assert.equal(
+    def.triggerEdge,
+    "sr-engineer:In_Progress -> code-reviewer:In_Progress (bugfix), or qa-engineer:In_Progress|Blocked -> sr-engineer:In_Progress (file-mode only)",
+  );
+  for (const field of ["triggerEdge", "armCondition", "clearingArtifact"]) {
+    assert.ok(!/resolveChainPath|chain_path|test-first/.test(def[field]), `${field} keeps no marker condition: ${def[field]}`);
+  }
+});
+
 // ============================================================================
 // REPRO_MANIFEST_MISSING orchestrator gate — SQLite storage mode (file-mode
 // only per DR-5: dispatch_mode is never persisted in SQLite, so the gate
@@ -446,6 +528,29 @@ sqliteDescribe("SQLite mode: REPRO_MANIFEST_MISSING never arms", () => {
       assert.ok(!result.isError, `SQLite mode must never arm REPRO_MANIFEST_MISSING: ${result.content?.[0]?.text}`);
       const parsed = storage.parse(dir);
       assert.equal(parsed.dispatch_mode, undefined, "SqliteHandoffStorage must never persist dispatch_mode (DR-5, mirrors dispatch_pins)");
+    } finally {
+      setActiveStorage(new FileHandoffStorage());
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  test("G8 (E435): SQLite mode never arms the qa-engineer -> sr-engineer hand-off check either (file-mode only); the step itself is an edge there", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "repro-sql-g8-"));
+    try {
+      const storage = new SqliteHandoffStorage(path.join(dir, "agc.db"));
+      setActiveStorage(storage);
+      await storage.writeState({
+        workspacePath: dir,
+        activeFeature: "g8-sql-feat",
+        status: "In_Progress",
+        completedTasks: [],
+        pendingNotes: ["qa-engineer: tests written (sqlite mode)"],
+        lastAgent: "qa-engineer",
+      });
+      resetSession(dir);
+      storage.readState(dir);
+      const result = await srBuild(dir, "g8-sql-feat");
+      assert.ok(!result.isError, `SQLite: qa -> sr accepted with no manifest: ${result.content?.[0]?.text}`);
     } finally {
       setActiveStorage(new FileHandoffStorage());
       try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}

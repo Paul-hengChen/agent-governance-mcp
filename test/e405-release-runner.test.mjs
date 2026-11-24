@@ -43,7 +43,7 @@ const GIT_ENV = {
 
 // ---------------------------------------------------------------- fixture
 
-const PASS_HANDOFF = '---\nschema_version: 15\nactive_feature: "feat"\nstatus: "PASS"\nlast_updated: "2026-11-04T00:00:07.123Z"\nlast_agent: "qa-engineer"\n---\n# Handoff State\n\n## Pending & Handoff Notes\n- qa-engineer: PASS\n';
+const PASS_HANDOFF = '---\nschema_version: 15\nactive_feature: "feat"\nstatus: "PASS"\nlast_updated: "2026-11-04T00:00:07.123Z"\nlast_agent: "code-reviewer"\n---\n# Handoff State\n\n## Pending & Handoff Notes\n- code-reviewer: PASS\n';
 const CHANGELOG = "# Changelog\n\n## [Unreleased]\n\n### Added\n- feat (E7)\n\n## [1.2.3] - 2026-10-01\n\n- older\n";
 const BACKLOG = "# Backlog\n\n| id | desc |\n|---|---|\n| E7 | **DONE** feature seven, not yet released |\n| E8 | open thing, not yet released |\n| E9 | **DONE** done and shipped v1.0.0 |\n";
 const GHSA = "GHSA-aaaa-bbbb-cccc";
@@ -248,13 +248,13 @@ test("AC-R6 pure advisory and AC-R7 pure done-mark helpers", () => {
   assert.equal(next, BACKLOG.replace("| E7 | **DONE** feature seven, not yet released |", "| E7 | **DONE** feature seven, shipped v1.2.4 |"));
 });
 
-test("AC-R8 commitMessage: derived summary (OQ2), body lines, no trailer", () => {
+test("AC-R8 (E435) commitMessage: derived summary (OQ2), body lines, no trailer, the judge is code-reviewer by default", () => {
   const m = (tickets) => rel.commitMessage({ version: "1.2.4", oldVersion: "1.2.3", bump: "patch", activeFeature: "feat", tickets });
   assert.equal(m(["E7", "E6"]).split("\n")[0], "chore(release): v1.2.4 — feat (E7, E6)");
   assert.equal(m(undefined).split("\n")[0], "chore(release): v1.2.4 — feat");
   assert.equal(m("none").split("\n")[0], "chore(release): v1.2.4 — feat");
   assert.ok(!/Co-Authored-By|Generated with/i.test(m(["E7"])), "no attribution trailer");
-  assert.match(m(["E7"]), /Release gate: feat \(qa-engineer PASS committed to main\)\.\nTickets: E7\.\nBump: patch from v1\.2\.3\./);
+  assert.match(m(["E7"]), /Release gate: feat \(code-reviewer PASS committed to main\)\.\nTickets: E7\.\nBump: patch from v1\.2\.3\./);
 });
 
 test("AC-E1 classifyCiState and AC-R9 readBackMismatch: the verdict tables", () => {
@@ -277,10 +277,13 @@ test("AC-E1 classifyCiState and AC-R9 readBackMismatch: the verdict tables", () 
 
 // ---------------------------------------------------------------- AC-R1
 
-test("AC-R1 the main handoff must be (qa-engineer, PASS) before anything is written", async () => {
+test("AC-R1 (E435) the main handoff must be (code-reviewer, PASS) before anything is written; a qa-engineer PASS is not a release gate", async () => {
   const absent = [
     ["not PASS", '---\nschema_version: 15\nactive_feature: "feat"\nstatus: "In_Progress"\nlast_updated: "2026-11-04T00:00:00.000Z"\nlast_agent: "release-engineer"\n---\n# H\n'],
-    ["wrong agent", PASS_HANDOFF.replace('last_agent: "qa-engineer"', 'last_agent: "sr-engineer"')],
+    ["wrong agent", PASS_HANDOFF.replace('last_agent: "code-reviewer"', 'last_agent: "sr-engineer"')],
+    // E435: no historical fallback and no marker branch (architecture Decision Records, "Release gate").
+    ["qa-engineer PASS", PASS_HANDOFF.replace('last_agent: "code-reviewer"', 'last_agent: "qa-engineer"')],
+    ["qa-engineer PASS, old marker", PASS_HANDOFF.replace('last_agent: "code-reviewer"', 'chain_path: "test-first"\nlast_agent: "qa-engineer"')],
     ["no active_feature", PASS_HANDOFF.replace('active_feature: "feat"\n', "")],
     ["unsafe active_feature", PASS_HANDOFF.replace('active_feature: "feat"', 'active_feature: "../x"')],
   ];
@@ -307,7 +310,7 @@ test("AC-R1 the main handoff must be (qa-engineer, PASS) before anything is writ
   // The tuple names itself in the detail.
   const fx = mkFixture();
   fx.put(".current/_primary/handoff.md", PASS_HANDOFF.replace('status: "PASS"', 'status: "Blocked"'));
-  assert.match(stopOf(await run(fx, startArgs(fx))), /\(qa-engineer, Blocked\)/);
+  assert.match(stopOf(await run(fx, startArgs(fx))), /is \(code-reviewer, Blocked\), expected \(code-reviewer, PASS\)/);
 });
 
 test("AC-R1 given PASS the handoff is copied byte for byte outside the root before the opening write and handed to prepare as --state", async () => {
@@ -558,7 +561,7 @@ test("AC-R8 commit message file outside the root, derived summary, no trailer", 
   assert.equal(text.split("\n")[0], "chore(release): v1.2.4 — feat (E7)", "<active_feature> (<ids>)");
   assert.ok(!/Co-Authored-By|Generated with/i.test(text), "no attribution trailer");
   assert.ok(!text.includes(fx.root) && !/\/(Users|home)\//.test(text), "no repository path in the message");
-  assert.match(text, /^Release gate: feat \(qa-engineer PASS committed to main\)\.$/m);
+  assert.match(text, /^Release gate: feat \(code-reviewer PASS committed to main\)\.$/m);
   // `version` is the last write of start; the workflow reads it for $GITHUB_OUTPUT.
   assert.equal(fs.readFileSync(path.join(fx.work, "version"), "utf-8"), "1.2.4\n");
   const wrote = [...r.out.matchAll(/^release: \[s\d+\] wrote .*[/\\](\S+)$/gm)].map((m) => m[1]);

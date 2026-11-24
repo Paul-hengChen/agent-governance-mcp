@@ -54,7 +54,6 @@ async function writeHandoffStateCore(opts) {
     const pendingNotes = opts.pendingNotes ?? [];
     const blockingReason = opts.blockingReason;
     const lastAgent = opts.lastAgent;
-    const qaRound = opts.qaRound;
     const prdPath = opts.prdPath;
     const reviewRound = opts.reviewRound;
     const visualRound = opts.visualRound;
@@ -96,16 +95,13 @@ async function writeHandoffStateCore(opts) {
     // v12 — cumulative round totals. Left undefined by the legacy positional
     // overload's packing (architecture DR: it deliberately does NOT grow); the
     // always-emit blocks below normalise undefined to 0.
-    const qaRoundsTotal = opts.qaRoundsTotal;
     const reviewRoundsTotal = opts.reviewRoundsTotal;
     const visualRoundsTotal = opts.visualRoundsTotal;
     // Left undefined by the legacy positional overload's packing (the
     // heal-write call site always uses the options object directly; a
     // positional caller always gets a fresh stamp). (E10)
     const preserveLastUpdated = opts.preserveLastUpdated;
-    // v16 — test-first marker (carried by the same-feature preserve clause
-    // below) and the server-computed sr-return counter (never carried).
-    const chainPath = opts.chainPath;
+    // v16 — the server-computed sr-return counter (never carried).
     const srReturnCount = opts.srReturnCount;
     // Hoist required strings to the names the body below already uses.
     const _activeFeature = activeFeature;
@@ -204,11 +200,6 @@ async function writeHandoffStateCore(opts) {
         // re-witnessed on every PM bounce. Absence means non-inherited.
         let effectiveCutApprovedSource = cutApprovedSource;
         const cutApprovedSourceNeedsExisting = cutApprovedSource === undefined;
-        // chain_path: the dispatch_mode rule. The marker is permanent for the
-        // feature (no clearing value), so an omitting write carries it; a feature
-        // change drops it. Absence means the old chain. (E431)
-        let effectiveChainPath = chainPath;
-        const chainPathNeedsExisting = chainPath === undefined;
         // Archive-on-feature-change needs the on-disk active_feature on every
         // write, even when a caller sets all six fields above and does not set
         // preserveLastUpdated, so this flag only forces the read to happen.
@@ -227,7 +218,6 @@ async function writeHandoffStateCore(opts) {
             dispatchModeNeedsExisting ||
             evidenceSchemaNeedsExisting ||
             cutApprovedSourceNeedsExisting ||
-            chainPathNeedsExisting ||
             preserveLastUpdated === true ||
             archiveCheckNeedsExisting) {
             existing = parseHandoff(workspacePath);
@@ -266,11 +256,6 @@ async function writeHandoffStateCore(opts) {
                 // v14 clauses (2)/(3): carry the value forward only within the same feature.
                 effectiveCutApprovedSource =
                     existing?.active_feature === _activeFeature ? existing?.cut_approved_source : undefined;
-            }
-            if (chainPathNeedsExisting) {
-                // v16: carry the marker forward only within the same feature.
-                effectiveChainPath =
-                    existing?.active_feature === _activeFeature ? existing?.chain_path : undefined;
             }
         }
         // completed_tasks ledger (E150). With the orchestrator's carry directive,
@@ -405,10 +390,6 @@ async function writeHandoffStateCore(opts) {
         // (the dispatch_mode / scope_decision absence-is-signal emit posture).
         if (effectiveCutApprovedSource)
             frontmatterData.cut_approved_source = effectiveCutApprovedSource;
-        // v16 — chain_path: emit only on a marked feature. Absence === the old
-        // chain, so an unmarked feature's file never gains the key. (E431)
-        if (effectiveChainPath === "test-first")
-            frontmatterData.chain_path = effectiveChainPath;
         // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
         // semantics). Deliberately NOT joined to the existing-state preserve read
         // above — carrying a stale single-hop directive forward would be a
@@ -436,10 +417,8 @@ async function writeHandoffStateCore(opts) {
             frontmatterData.dispatch_mechanism = dispatchMechanism;
         if (dispatchMechanismTier)
             frontmatterData.dispatch_mechanism_tier = dispatchMechanismTier;
-        // Always emit qa_round (even 0) so the field is discoverable; falsy
-        // input (undefined/NaN) normalises to 0.
-        const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
-        frontmatterData.qa_round = normalisedRound;
+        // Always emit the round counters (even 0) so the fields are discoverable;
+        // falsy input (undefined/NaN) normalises to 0.
         const normalisedReviewRound = Number.isFinite(reviewRound) && reviewRound >= 0
             ? Math.floor(reviewRound)
             : 0;
@@ -455,14 +434,10 @@ async function writeHandoffStateCore(opts) {
             ? Math.floor(hopCount)
             : 0;
         frontmatterData.hop_count = normalisedHopCount;
-        // v12 — always emit the three cumulative totals (even 0) so the fields are
+        // v12 — always emit the cumulative totals (even 0) so the fields are
         // discoverable and the v11→v12 migration-heal write persists the seeded
         // counters (the hop_count v9 emit posture, per field). Falsy input
         // normalises to 0.
-        const normalisedQaRoundsTotal = Number.isFinite(qaRoundsTotal) && qaRoundsTotal >= 0
-            ? Math.floor(qaRoundsTotal)
-            : 0;
-        frontmatterData.qa_rounds_total = normalisedQaRoundsTotal;
         const normalisedReviewRoundsTotal = Number.isFinite(reviewRoundsTotal) && reviewRoundsTotal >= 0
             ? Math.floor(reviewRoundsTotal)
             : 0;
@@ -472,8 +447,8 @@ async function writeHandoffStateCore(opts) {
             : 0;
         frontmatterData.visual_rounds_total = normalisedVisualRoundsTotal;
         // v16 — sr_return_count: emit only when > 0 (unlike the always-emitted
-        // counters above), so an unmarked feature, which can never make a
-        // test-first return, never carries the key. Falsy input means 0. (E431)
+        // counters above), so a feature that never made a return never carries
+        // the key. Falsy input means 0. (E431)
         const normalisedSrReturnCount = Number.isFinite(srReturnCount) && srReturnCount >= 0
             ? Math.floor(srReturnCount)
             : 0;
@@ -509,7 +484,10 @@ ${pendingList}
 // Thin ~10-line dispatcher: pick the call shape from the first argument and
 // hand off to writeHandoffStateCore right away — no gate or preserve logic lives
 // at this boundary; it is all in the core above. (E36)
-export function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound, hopCount) {
+export function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, 
+// Ignored since handoff schema v17 (E435); the slot stays so the later
+// positionals do not shift.
+_qaRound, prdPath, reviewRound, visualRound, hopCount) {
     if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
         return writeHandoffStateCore(workspacePathOrOpts);
     }
@@ -521,7 +499,6 @@ export function writeHandoffState(workspacePathOrOpts, activeFeature, status, co
         pendingNotes: pendingNotes ?? [],
         blockingReason,
         lastAgent,
-        qaRound,
         prdPath,
         reviewRound,
         visualRound,

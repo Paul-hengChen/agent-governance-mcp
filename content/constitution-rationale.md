@@ -113,7 +113,7 @@ accepted.
 by design, so the server verifies what it can: a completion claim must be backed by on-disk
 evidence regardless of who stamps it. The QA Completion-Evidence gate diffs an incoming
 write by the chain's judge (code-reviewer) against the on-disk set, so ids another role
-persisted earlier would contribute no difference and slip past it — the Non-QA Completed-Tasks
+persisted earlier would contribute no difference and slip past it — the Non-Judge Completed-Tasks
 gate closes that prefill door upstream. Its predicate is strict (any non-empty list, not a set-difference)
 because a set-difference is exactly the shape of that bypass, and it has no exemptions
 because an exemption on this class of check is the hole that reopened once already (E32).
@@ -146,7 +146,7 @@ divergence classes — and only inside the `## Allowed Differences` section of
 author) MAY pass context — baseline paths, Figma node ids, route, canonical-state setup —
 but MUST NOT define, relax, or pre-accept any visual difference. The enforcement is
 structural rather than content-sniffing: the visual report is consulted only on the judge's
-PASS, and on the test-first chain `status=PASS` is server-restricted to
+PASS, and `status=PASS` is server-restricted to
 `agent_id="code-reviewer"`, so the report and its `## Allowed Differences` are owned by the
 judge at PASS time by construction. A coordinator-authored accept-policy injected into a
 dispatch prompt is **void**.

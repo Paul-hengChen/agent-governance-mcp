@@ -91,7 +91,6 @@ console.table(
   records.map((r) => ({
     feature: String(r.feature ?? "(unknown)"),
     tickets: num(r.tickets),
-    qa_rounds: num(r.qa_rounds),
     review_rounds: num(r.review_rounds),
     visual_rounds: num(r.visual_rounds),
     hops: num(r.hops),
@@ -101,11 +100,12 @@ console.table(
 );
 
 // Legend (E52): the round columns are REWORK counts, not rounds-run — only a
-// QA FAIL / CHANGES_REQUESTED / visual FAIL increments them, per
+// CHANGES_REQUESTED / visual FAIL increments them (an older record's qa_rounds
+// is ignored, E435), per
 // specs/e8-success-telemetry.md AC3. Printed with the table because five
 // consecutive readers misread these columns as review effort.
 console.log(
-  "legend — qa/review/visual_rounds count REWORK only (FAIL / CHANGES_REQUESTED); " +
+  "legend — review/visual_rounds count REWORK only (CHANGES_REQUESTED / visual FAIL); " +
     "a first-pass-approved round reads 0 by design. one_pass = zero rework.",
 );
 
@@ -115,7 +115,7 @@ const mean = (field) => (records.reduce((sum, r) => sum + num(r[field]), 0) / to
 
 console.log(
   `aggregate — features: ${total}, one-pass rate: ${((onePassCount / total) * 100).toFixed(1)}% ` +
-    `(${onePassCount}/${total}), mean rounds: qa ${mean("qa_rounds")} / review ${mean("review_rounds")} / ` +
+    `(${onePassCount}/${total}), mean rounds: review ${mean("review_rounds")} / ` +
     `visual ${mean("visual_rounds")}, mean hops: ${mean("hops")}`,
 );
 

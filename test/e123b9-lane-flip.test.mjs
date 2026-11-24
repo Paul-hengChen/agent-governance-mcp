@@ -26,6 +26,7 @@ import {
 } from "../dist/tools/lane-paths.js";
 import { resetSession, markStateRead } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
+import { CURRENT_VERSIONS } from "../dist/schema/versions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const TEST_DIR = path.dirname(__filename);
@@ -39,12 +40,14 @@ const CRASH_WORKER = path.join(TEST_DIR, "_e123b9-crash-worker.mjs");
 // Shared fixture / verification helpers
 // ---------------------------------------------------------------------------
 
+// E435: the fixture sits at CURRENT (17 after the bump) and carries no qa_round line (schema 17
+// drops it), so no schema heal rewrites it mid-test.
 function mkFlatFixture(prefix = "e123b9-flip-") {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
   fs.writeFileSync(
     path.join(ws, ".current", "handoff.md"),
-    `---\nschema_version: 16\nactive_feature: "e123b9-flip-fixture"\nstatus: "In_Progress"\nlast_updated: "2026-01-01T00:00:00.000Z"\nlast_agent: "pm"\nqa_round: 0\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`,
+    `---\nschema_version: ${CURRENT_VERSIONS.handoff}\nactive_feature: "e123b9-flip-fixture"\nstatus: "In_Progress"\nlast_updated: "2026-01-01T00:00:00.000Z"\nlast_agent: "pm"\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`,
   );
   return ws;
 }
@@ -424,10 +427,10 @@ test("AC8 Round 2: the WIRED trigger (readHandoffState, via a standalone node pr
     const lineDiffs = [];
     for (let i = 0; i < Math.max(beforeLines.length, afterLines.length); i++) {
       if (beforeLines[i] === afterLines[i]) continue;
-      const isToleratedSchemaBump = /^schema_version:\s*\d+$/.test(beforeLines[i] ?? "") && /^schema_version:\s*16$/.test(afterLines[i] ?? "");
+      const isToleratedSchemaBump = /^schema_version:\s*\d+$/.test(beforeLines[i] ?? "") && new RegExp(`^schema_version:\\s*${CURRENT_VERSIONS.handoff}$`).test(afterLines[i] ?? "");
       if (!isToleratedSchemaBump) lineDiffs.push(`line ${i}: ${JSON.stringify(beforeLines[i])} -> ${JSON.stringify(afterLines[i])}`);
     }
-    assert.deepEqual(lineDiffs, [], `handoff.md must differ ONLY by the schema_version heal landing at CURRENT (v16) — unexpected line diffs: ${JSON.stringify(lineDiffs, null, 2)}`);
+    assert.deepEqual(lineDiffs, [], `handoff.md must differ ONLY by the schema_version heal landing at CURRENT (v${CURRENT_VERSIONS.handoff}) — unexpected line diffs: ${JSON.stringify(lineDiffs, null, 2)}`);
   }
 
   console.log(`[AC8 Round 2] file count (pre-migration snapshot): ${fileCount}`);
@@ -455,7 +458,7 @@ const AC21_LAST_UPDATED = "2026-01-01T00:00:00.000Z";
 const AC21_SIDECAR_FILES = ["telemetry.jsonl", "metrics.jsonl", "usage.jsonl", "dispatch.jsonl"];
 
 function ac21HandoffContent() {
-  return `---\nschema_version: 16\nactive_feature: "${AC21_ACTIVE_FEATURE}"\nstatus: "In_Progress"\nlast_updated: "${AC21_LAST_UPDATED}"\nlast_agent: "pm"\nqa_round: 0\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`;
+  return `---\nschema_version: ${CURRENT_VERSIONS.handoff}\nactive_feature: "${AC21_ACTIVE_FEATURE}"\nstatus: "In_Progress"\nlast_updated: "${AC21_LAST_UPDATED}"\nlast_agent: "pm"\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`;
 }
 
 function ac21LinesToBuf(lines) {
@@ -531,7 +534,7 @@ function ac21BuildFixture(prefix, { handoff, sidecars = {} }) {
 }
 
 // One canonical parsed reference state (fields only — not JSON-view shaped)
-// to deep-equal the settled fixtures against. schema_version 16 is CURRENT
+// to deep-equal the settled fixtures against. schema_version is CURRENT (E435: 17, no qa_round)
 // (matching every other fixture in this file), so no schema-migration heal
 // write ever fires here and last_updated after a plain READ is untouched.
 let _ac21Gold;

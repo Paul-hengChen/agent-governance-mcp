@@ -4,7 +4,6 @@
 // authoritative matrix. Any change here MUST be mirrored in the design doc.
 
 import { gate } from "../gates/registry.js";
-import type { ChainPath } from "./handoff-types.js"; // type-only: runtime graph unchanged
 
 export type AgentName =
   | "pm"
@@ -31,7 +30,6 @@ export interface TransitionTuple {
 export interface TransitionRequest {
   prev: TransitionTuple;
   next: TransitionTuple;
-  prev_qa_round: number;
   prev_review_round: number;
   // v3.14.0 — pixel-fidelity sub-loop counter. Caller defaults to 0 if absent
   // for backwards-compat with pre-v3.14 callers (handoff schema v2).
@@ -42,7 +40,7 @@ export interface TransitionRequest {
   // which was removed with no fallback — legacy pending_notes tokens are
   // inert (DR-2/DR-6). computeNewRound still takes pending_notes as its own
   // separate parameter for the visual_fail: check; that path is unrelated.
-  next_resume_of?: "code-reviewer" | "qa-engineer";
+  next_resume_of?: "code-reviewer";
   // v9 (d2-server-brake-accounting) — hop-cap inputs. Opt-in (mirrors
   // prev_visual_round): a caller that omits them defaults prev_hop_count=0 →
   // the gate stays dormant. The orchestrator derives both from prevState +
@@ -50,31 +48,23 @@ export interface TransitionRequest {
   // reads active_feature itself, only the boolean the orchestrator computes).
   prev_hop_count?: number;
   feature_changed?: boolean;
-  // E431 (test-first chain) — all optional; omitting all three reproduces the
-  // old-path result exactly. prev_chain_path is the persisted marker of the
-  // SAME feature (the caller passes undefined on feature change and in SQLite
-  // mode); next_chain_path is the incoming write's chain_path (undefined in
-  // SQLite mode); prev_sr_return_count is the persisted counter (default 0).
-  prev_chain_path?: ChainPath;
-  next_chain_path?: ChainPath;
+  // E431 — the persisted sr_return_count (default 0; SQLite never persists it).
   prev_sr_return_count?: number;
 }
 
 export interface TransitionRejection {
   error:
     | "TRANSITION_REJECTED"
-    | "QA_ROUND_EXCEEDED"
     | "REVIEW_ROUND_EXCEEDED"
     | "VISUAL_ROUND_EXCEEDED"
     | "HOP_CAP_EXCEEDED"           // v9 (d2-server-brake-accounting) — produced by
                                     // validateTransition when the feature's persisted
                                     // hop_count has reached HOP_CAP and the incoming
                                     // write is a counted role transition that is not
-                                    // the (pm, In_Progress) landing. Fourth
-                                    // round-style override, sibling of the three
+                                    // the (pm, In_Progress) landing. Third
+                                    // round-style override, sibling of the two
                                     // *_ROUND_EXCEEDED caps.
-    | "SR_RETURN_CAP_EXCEEDED"     // E431 — produced by validateTransition on a
-                                    // test-first feature when the persisted
+    | "SR_RETURN_CAP_EXCEEDED"     // E431 — produced by validateTransition when the persisted
                                     // sr_return_count has reached SR_RETURN_CAP and
                                     // the write is the sr-engineer:In_Progress ->
                                     // qa-engineer:In_Progress return. Edge-specific:
@@ -144,60 +134,39 @@ export interface TransitionRejection {
     prev_status: string | null;
     new_agent: string | null;
     new_status: string | null;
-    qa_round: number;
     visual_round?: number;
   };
-  // `requires` appears only on the conditional Amend-Resume entries of a
-  // rejected pm:In_Progress -> {code-reviewer, qa-engineer}:In_Progress write:
-  // the edge exists, but only when the write's own resume_of names that role.
+  // `requires` appears only on the conditional Amend-Resume entry of a
+  // rejected pm:In_Progress -> code-reviewer:In_Progress write: the edge
+  // exists, but only when the write's own resume_of names code-reviewer.
   allowed: Array<{
     new_agent: AgentName;
     new_status: StatusName;
-    requires?: { resume_of: "code-reviewer" | "qa-engineer" };
+    requires?: { resume_of: "code-reviewer" };
   }>;
   hint: string;
 }
 
 // ----- agent-id helper (shared with handler-side defense) -----
 
-export function requireQaEngineer(
-  agentId: string | undefined,
-  toolName: string,
-): AgentGateResult {
-  if (agentId === "qa-engineer") return { ok: true };
+/** The chain's one judge: writes PASS / FAIL, completed_tasks and tw_complete_task. (E435) */
+export const JUDGE_ROLE = "code-reviewer" as const;
+export type JudgeRole = typeof JUDGE_ROLE;
+
+// Appended to a rejection of a step the pre-v5 chain allowed. (E435)
+export const MIGRATION_HINT =
+  " If this feature started on the pre-v5 chain, docs/migration-v5.md says how to finish or restart it.";
+
+/** Judge gate: only code-reviewer passes, on every feature. (E435) */
+export function requireJudge(agentId: string | undefined, toolName: string): AgentGateResult {
+  if (agentId === JUDGE_ROLE) return { ok: true };
   const who = agentId ? `"${agentId}"` : "unidentified agent (agent_id not set)";
   return {
     ok: false,
     message:
-      `⛔ BLOCKED: ${toolName} is reserved for qa-engineer. Called by ${who}. ` +
-      `Hand off to qa-engineer and pass agent_id="qa-engineer".`,
-  };
-}
-
-/** The role that judges a feature: code-reviewer on a test-first feature, else qa-engineer. (E431) */
-export function judgeFor(chainPath?: ChainPath): "qa-engineer" | "code-reviewer" {
-  return chainPath === "test-first" ? "code-reviewer" : "qa-engineer";
-}
-
-/**
- * Judge gate per marker. Unmarked: requireQaEngineer, byte-identical. On a
- * test-first feature only code-reviewer passes; the message mirrors the
- * qa-engineer one. (E431)
- */
-export function requireJudge(
-  agentId: string | undefined,
-  toolName: string,
-  chainPath?: ChainPath,
-): AgentGateResult {
-  if (chainPath !== "test-first") return requireQaEngineer(agentId, toolName);
-  if (agentId === "code-reviewer") return { ok: true };
-  const who = agentId ? `"${agentId}"` : "unidentified agent (agent_id not set)";
-  return {
-    ok: false,
-    message:
-      `⛔ BLOCKED: ${toolName} is reserved for code-reviewer on a test-first feature ` +
-      `(chain_path: test-first). Called by ${who}. ` +
-      `Hand off to code-reviewer and pass agent_id="code-reviewer".`,
+      `⛔ BLOCKED: ${toolName} is reserved for code-reviewer, the chain's judge. Called by ${who}. ` +
+      `Hand off to code-reviewer and pass agent_id="code-reviewer".` +
+      (agentId === "qa-engineer" ? MIGRATION_HINT : ""),
   };
 }
 
@@ -236,13 +205,16 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     { agent: "design-auditor", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
   ]],
+  // E435 — one chain: pm -> (architect) -> qa-engineer (writes the scenario
+  // tests) -> sr-engineer -> code-reviewer (judges, writes PASS). qa-engineer
+  // is the build entry; pm/architect -> sr-engineer is gone.
   ["pm:In_Progress", [
     { agent: "architect", status: "In_Progress" },
-    { agent: "sr-engineer", status: "In_Progress" },
     { agent: "researcher", status: "In_Progress" },
     { agent: "design-auditor", status: "In_Progress" },
     { agent: "pm", status: "Blocked" },
     { agent: "pm", status: "In_Progress" },
+    { agent: "qa-engineer", status: "In_Progress" },
   ]],
   ["pm:Blocked", [
     { agent: "pm", status: "In_Progress" },
@@ -255,9 +227,9 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     { agent: "design-auditor", status: "In_Progress" },
   ]],
   ["architect:In_Progress", [
-    { agent: "sr-engineer", status: "In_Progress" },
     { agent: "architect", status: "Blocked" },
     { agent: "pm", status: "In_Progress" },
+    { agent: "qa-engineer", status: "In_Progress" },
   ]],
   ["architect:Blocked", [
     { agent: "pm", status: "In_Progress" },
@@ -267,6 +239,9 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     { agent: "code-reviewer", status: "In_Progress" },
     { agent: "sr-engineer", status: "Blocked" },
     { agent: "pm", status: "In_Progress" },
+    // sr-engineer returns a test it cannot build to to its author (capped by
+    // SR_RETURN_CAP, step 2.6).
+    { agent: "qa-engineer", status: "In_Progress" },
   ]],
   ["sr-engineer:Blocked", [
     { agent: "sr-engineer", status: "In_Progress" },
@@ -280,20 +255,28 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["code-reviewer:In_Progress", [
     { agent: "code-reviewer", status: "FAIL" },
     { agent: "code-reviewer", status: "Blocked" },
-    { agent: "qa-engineer", status: "In_Progress" },
+    { agent: "code-reviewer", status: "PASS" },
   ]],
   ["code-reviewer:FAIL", [
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
+    // a rejection for a test defect goes to the test's author
+    { agent: "qa-engineer", status: "In_Progress" },
   ]],
   ["code-reviewer:Blocked", [
     { agent: "code-reviewer", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
   ]],
+  // The judge's PASS: same openers as the legacy qa-engineer:PASS key below.
+  ["code-reviewer:PASS", [
+    { agent: "pm", status: "In_Progress" },
+    { agent: "researcher", status: "In_Progress" },
+    { agent: "release-engineer", status: "In_Progress" },
+    { agent: "design-auditor", status: "In_Progress" },
+  ]],
   ["qa-engineer:In_Progress", [
-    { agent: "qa-engineer", status: "PASS" },
-    { agent: "qa-engineer", status: "FAIL" },
     { agent: "qa-engineer", status: "Blocked" },
+    { agent: "sr-engineer", status: "In_Progress" },
   ]],
   ["qa-engineer:Blocked", [
     { agent: "sr-engineer", status: "In_Progress" },
@@ -301,11 +284,12 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     // pm escape edge, matching the six peer <role>:Blocked rows and the
     // qa-engineer:FAIL -> pm edge: QA may write Blocked for a spec defect
     // (e.g. assertions against a superseded design source), where pass would
-    // falsify evidence and FAIL would blame a correct build and charge
-    // qa_round. No resume_of requirement on this OUTBOUND edge, like its
+    // falsify evidence and FAIL would blame a correct build. No resume_of requirement on this OUTBOUND edge, like its
     // peers. Mirrored in specs/qa-flow-enforcement-architecture.md. (E45)
     { agent: "pm", status: "In_Progress" },
   ]],
+  // Legacy exit keys (E435): no edge reaches qa-engineer:FAIL / :PASS any
+  // more, but a handoff left there by the pre-v5 chain must still leave it.
   ["qa-engineer:FAIL", [
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
@@ -357,81 +341,57 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
 
 export const ALLOWED_TRANSITIONS = ALLOWED;
 
-// ----- test-first overlay (E431) -----
-// A feature marked chain_path: "test-first" runs pm -> (architect) ->
-// qa-engineer (writes the scenario tests) -> sr-engineer -> code-reviewer
-// (judges, writes PASS). ALLOWED above stays the old chain unchanged; the
-// overlay below is applied inside validateTransition only when the request
-// says the feature is marked. Mirrored in
-// specs/qa-flow-enforcement-architecture.md.
+// The zod refine messages for a PASS by the wrong agent. Exported so the tool
+// boundary and the orchestrator's defence-in-depth emit the same text. (E435)
+export const PASS_IDENTITY_REFINE_MESSAGE = 'status="PASS" requires agent_id="code-reviewer"';
+export const QA_PASS_REFINE_MESSAGE =
+  `${PASS_IDENTITY_REFINE_MESSAGE}: code-reviewer is the judge; qa-engineer writes tests and never writes PASS.` +
+  MIGRATION_HINT;
 
-// Edges a test-first feature gains. None of these exists in ALLOWED, so an
-// unmarked feature can never take one.
-const TEST_FIRST_OPENS: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
-  ["pm:In_Progress",            [{ agent: "qa-engineer",   status: "In_Progress" }]],
-  ["architect:In_Progress",     [{ agent: "qa-engineer",   status: "In_Progress" }]],
-  ["qa-engineer:In_Progress",   [{ agent: "sr-engineer",   status: "In_Progress" }]],
-  ["sr-engineer:In_Progress",   [{ agent: "qa-engineer",   status: "In_Progress" }]],
-  ["code-reviewer:In_Progress", [{ agent: "code-reviewer", status: "PASS" }]],
-  ["code-reviewer:FAIL",        [{ agent: "qa-engineer",   status: "In_Progress" }]],
-  ["code-reviewer:PASS", [
-    { agent: "pm", status: "In_Progress" },
-    { agent: "researcher", status: "In_Progress" },
-    { agent: "release-engineer", status: "In_Progress" },
-    { agent: "design-auditor", status: "In_Progress" },
-  ]],
-]);
-// Edges a test-first feature loses. Each exists in ALLOWED.
-const TEST_FIRST_CLOSES: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
-  ["pm:In_Progress",            [{ agent: "sr-engineer", status: "In_Progress" }]],
-  ["architect:In_Progress",     [{ agent: "sr-engineer", status: "In_Progress" }]],
-  ["code-reviewer:In_Progress", [{ agent: "qa-engineer", status: "In_Progress" }]],
-  ["qa-engineer:In_Progress",   [
-    { agent: "qa-engineer", status: "PASS" },
-    { agent: "qa-engineer", status: "FAIL" },
-  ]],
-]);
-export const TEST_FIRST_OVERLAY = { opens: TEST_FIRST_OPENS, closes: TEST_FIRST_CLOSES } as const;
-
-// The zod refine message for a PASS by the wrong agent. Exported so the tool
-// boundary and the orchestrator's code-reviewer guard emit the same text.
-export const PASS_IDENTITY_REFINE_MESSAGE = 'status="PASS" requires agent_id="qa-engineer"';
+const PM_TO_SR_HINT = (a: string): string =>
+  ` The build entry is qa-engineer: hand off ${a}:In_Progress → qa-engineer:In_Progress; ` +
+  `qa-engineer writes the scenario tests, or records that the ticket needs no new test, before sr-engineer builds.`;
+const REVIEWER_TO_QA_HINT =
+  ` code-reviewer is the judge and closes the feature: approve with code-reviewer:PASS ` +
+  `(review_verdict: "APPROVED"), or reject with code-reviewer:FAIL; qa-engineer does not follow code-reviewer.`;
+const QA_JUDGE_HINT =
+  ` qa-engineer writes tests and never writes PASS or FAIL: code-reviewer is the judge and writes them ` +
+  `from code-reviewer:In_Progress.`;
 
 /**
- * The writes that may carry chain_path on a feature not yet marked: (i) any
- * pm write, or (ii) the entry write pm:In_Progress / architect:In_Progress ->
- * qa-engineer:In_Progress.
+ * Steps the pre-v5 chain allowed and E435 removed (S1-S5). A rejection of one
+ * of them appends its hint plus MIGRATION_HINT; keyed on the step only.
  */
-export function isChainPathSetPoint(prev: TransitionTuple, next: TransitionTuple): boolean {
-  if (next.agent === "pm") return true;
-  return (
-    next.agent === "qa-engineer" &&
-    next.status === "In_Progress" &&
-    prev.status === "In_Progress" &&
-    (prev.agent === "pm" || prev.agent === "architect")
+export const REMOVED_OLD_PATH_STEPS: ReadonlyArray<{
+  prev: TransitionTuple | "any";
+  next: TransitionTuple;
+  hint: string;
+}> = [
+  { prev: { agent: "pm", status: "In_Progress" }, next: { agent: "sr-engineer", status: "In_Progress" }, hint: PM_TO_SR_HINT("pm") + MIGRATION_HINT },
+  { prev: { agent: "architect", status: "In_Progress" }, next: { agent: "sr-engineer", status: "In_Progress" }, hint: PM_TO_SR_HINT("architect") + MIGRATION_HINT },
+  { prev: { agent: "code-reviewer", status: "In_Progress" }, next: { agent: "qa-engineer", status: "In_Progress" }, hint: REVIEWER_TO_QA_HINT + MIGRATION_HINT },
+  { prev: "any", next: { agent: "qa-engineer", status: "PASS" }, hint: QA_JUDGE_HINT + MIGRATION_HINT },
+  { prev: "any", next: { agent: "qa-engineer", status: "FAIL" }, hint: QA_JUDGE_HINT + MIGRATION_HINT },
+];
+
+/** The in-flight hint for a removed old-path step, else null. */
+export function oldPathStepHint(prev: TransitionTuple, next: TransitionTuple): string | null {
+  const same = (a: TransitionTuple, b: TransitionTuple): boolean =>
+    a.agent === b.agent && a.status === b.status;
+  const hit = REMOVED_OLD_PATH_STEPS.find(
+    (s) => same(s.next, next) && (s.prev === "any" || same(s.prev, prev)),
   );
+  return hit ? hit.hint : null;
 }
 
-/**
- * Effective successors of a matrix key. Unmarked (chainPath undefined): the
- * ALLOWED entry itself, as today. Test-first: the ALLOWED entries minus the
- * overlay's closes (ALLOWED order kept), then its opens in overlay order.
- */
-export function allowedSuccessors(key: string, chainPath?: ChainPath): AllowedNext {
-  const base = ALLOWED.get(key) ?? [];
-  if (chainPath !== "test-first") return base;
-  const closes = TEST_FIRST_CLOSES.get(key) ?? [];
-  const opens = TEST_FIRST_OPENS.get(key) ?? [];
-  return [
-    ...base.filter((c) => !closes.some((x) => x.agent === c.agent && x.status === c.status)),
-    ...opens,
-  ];
+/** Successors of a matrix key (empty for an unknown key). */
+export function allowedSuccessors(key: string): AllowedNext {
+  return ALLOWED.get(key) ?? [];
 }
 
-const ROUND_CAP = 4;
 const REVIEW_ROUND_CAP = 4;
 // v3.14.0 — visual_round caps at 6 (5 failed pixel iterations then lock to
-// pm) — symmetric to ROUND_CAP=4 (3 fails then Round 4 lock). Constitution
+// pm) — symmetric to REVIEW_ROUND_CAP=4 (3 fails then Round 4 lock). Constitution
 // §3.1 documents the user-visible "5 rounds" framing; cap=6 reflects the
 // off-by-one between "rounds completed" and "next write index".
 const VISUAL_ROUND_CAP = 6;
@@ -445,7 +405,7 @@ const VISUAL_ROUND_CAP = 6;
 // re-entry (DR-6), so after the gate fires autonomous dispatch stays frozen
 // at the (pm, In_Progress) landing until a human re-scopes into a new feature.
 const HOP_CAP = 14;
-// E431 — test-first chain: max sr-engineer:In_Progress -> qa-engineer:In_Progress
+// E431 — max sr-engineer:In_Progress -> qa-engineer:In_Progress
 // returns per feature (sr_return_count). Edge-specific, unlike the round caps:
 // only the third return is rejected (SR_RETURN_CAP_EXCEEDED, only pm may take
 // it), and every other write on the feature is evaluated normally. Resets on
@@ -482,7 +442,6 @@ function rejection(
       prev_status: req.prev.status,
       new_agent: req.next.agent,
       new_status: req.next.status,
-      qa_round: req.prev_qa_round,
       ...(req.prev_visual_round !== undefined && { visual_round: req.prev_visual_round }),
     },
     allowed: allowed.map((c) => ({ new_agent: c.agent, new_status: c.status })),
@@ -493,11 +452,11 @@ function rejection(
 /**
  * Validate a (prev -> next) transition against the routing matrix: null on
  * accept, else a rejection envelope the caller surfaces as MCP error content.
- * Precedence: 1 agent_id required; 1.5 test-first marker check; 2 round-cap
- * override; 2.5 hop-cap override (only the pm landing passes; landing does
- * not reset the count); 2.6 sr-return cap (test-first only, one edge); 3
- * self-loop fast path (two named pairs); 3.5 Amend-Resume edge; 4 table
- * lookup (with the test-first overlay on a marked feature).
+ * Precedence: 1 agent_id required; 2 round-cap override; 2.5 hop-cap
+ * override (only the pm landing passes; landing does not reset the count);
+ * 2.6 sr-return cap (one edge); 3 self-loop fast path (two named pairs); 3.5
+ * Amend-Resume edge; 4 table lookup (a removed old-path step gets the
+ * migration hint).
  */
 export function validateTransition(req: TransitionRequest): TransitionRejection | null {
   // 1. agent_id required
@@ -511,39 +470,7 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     return rejection(req, "TRANSITION_REJECTED", [], `Unknown status "${req.next.status}".`);
   }
 
-  // 1.5 test-first marker check (E431). Marked = the feature's persisted
-  // marker, or the incoming marker on a set point. An incoming marker on an
-  // unmarked feature anywhere else is rejected under TRANSITION_REJECTED
-  // (no new code); `allowed` is the unmarked successor list of prev. A
-  // redundant marker on an already-marked feature is a no-op. Unreachable
-  // when next_chain_path is undefined, so old callers see no change.
-  const nextMarks =
-    req.next_chain_path === "test-first" && isChainPathSetPoint(req.prev, req.next);
-  const marked = req.prev_chain_path === "test-first" || nextMarks;
-  if (req.next_chain_path !== undefined && req.prev_chain_path === undefined && !nextMarks) {
-    return rejection(
-      req,
-      "TRANSITION_REJECTED",
-      ALLOWED.get(keyOf(req.prev)) ?? [],
-      `chain_path: "test-first" can be set only by a pm write or on the entry write ` +
-        `pm:In_Progress / architect:In_Progress → qa-engineer:In_Progress; this feature is ` +
-        `on the old path (${keyOf(req.prev)} → ${keyOf(req.next)}). Omit chain_path, or ` +
-        `route to pm (pm:In_Progress) to move the feature to the test-first path.`,
-    );
-  }
-
   // 2. round-cap override
-  if (req.prev_qa_round >= ROUND_CAP) {
-    const onlyAllowed: AllowedNext = [{ agent: "pm", status: "In_Progress" }];
-    const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
-    if (ok) return null;
-    return rejection(
-      req,
-      "QA_ROUND_EXCEEDED",
-      onlyAllowed,
-      `qa_round=${req.prev_qa_round}${gate("QA_ROUND_EXCEEDED").hintStatic}`,
-    );
-  }
   if (req.prev_review_round >= REVIEW_ROUND_CAP) {
     const onlyAllowed: AllowedNext = [{ agent: "pm", status: "In_Progress" }];
     const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
@@ -555,7 +482,7 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
       `review_round=${req.prev_review_round}${gate("REVIEW_ROUND_EXCEEDED").hintStatic}`,
     );
   }
-  // v3.14.0 — visual_round cap. Symmetric to qa_round / review_round.
+  // v3.14.0 — visual_round cap. Symmetric to review_round.
   // Only fires when prev_visual_round is provided AND has reached cap; the
   // counter is opt-in for callers that pre-date v3.14.0.
   const prev_visual_round = req.prev_visual_round ?? 0;
@@ -571,16 +498,16 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     );
   }
 
-  // 2.5 hop-cap override, after the qa/review/visual overrides (their outputs
+  // 2.5 hop-cap override, after the review/visual overrides (their outputs
   // stay byte-identical) and before the self-loop fast path. Fires only when
   // persisted hop_count >= HOP_CAP and the write is a counted role transition
-  // (next.agent !== prev.agent). Same shape as the ROUND_CAP override above
+  // (next.agent !== prev.agent). Same shape as the round-cap override above
   // (E295, E41): the (pm, In_Progress) landing returns null unconditionally
   // HERE — before the self-loop fast path and the table lookup — so it is
   // accepted from every state, including code-reviewer:In_Progress and
   // qa-engineer:In_Progress, which have no table edge to pm (the previous
   // `!(pm landing)` exclusion let those fall through to the table and be
-  // rejected TRANSITION_REJECTED while the same landing under QA_ROUND_EXCEEDED
+  // rejected TRANSITION_REJECTED while the same landing under a round cap
   // was accepted). A feature change resets the count, so it bypasses the
   // check; the landing write does not reset it (D2, DR-6 — computeNewRound is
   // untouched).
@@ -603,12 +530,11 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
 
   // 2.6 sr-return cap (E431), after the round and hop caps so those codes
   // report first. Edge-specific: only the sr-engineer:In_Progress ->
-  // qa-engineer:In_Progress return on a marked feature is checked; every
+  // qa-engineer:In_Progress return is checked; every
   // other write on the feature is evaluated normally. A feature change
   // resets the count, so it bypasses the check.
   const prev_sr_return_count = req.prev_sr_return_count ?? 0;
   if (
-    marked &&
     !req.feature_changed &&
     req.prev.agent === "sr-engineer" &&
     req.prev.status === "In_Progress" &&
@@ -637,9 +563,10 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     return null;
   }
 
-  // 3.5 Amend-Resume Edge: opens pm:In_Progress -> {code-reviewer,
-  // qa-engineer}:In_Progress ONLY when the structured resume_of field (passed
-  // as next_resume_of) names that exact role; otherwise the table rejects.
+  // 3.5 Amend-Resume Edge: opens pm:In_Progress -> code-reviewer:In_Progress
+  // ONLY when the structured resume_of field (passed as next_resume_of) names
+  // code-reviewer; otherwise the table rejects. (pm -> qa-engineer is an
+  // ordinary table edge since E435.)
   // Legacy `resume_of: <role>` pending_notes lines are inert. Whether the role
   // was really stranded is PM-attested; the server checks only field/target
   // consistency. Pure, storage-agnostic. (C1)
@@ -647,31 +574,24 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     req.prev.agent === "pm" &&
     req.prev.status === "In_Progress" &&
     req.next.status === "In_Progress" &&
-    (req.next.agent === "code-reviewer" || req.next.agent === "qa-engineer") &&
-    req.next_resume_of === req.next.agent
+    req.next.agent === "code-reviewer" &&
+    req.next_resume_of === "code-reviewer"
   ) {
     return null; // accept
   }
 
-  // 4. table lookup. Unmarked: ALLOWED itself. Marked: ALLOWED with the
-  // test-first overlay applied; a rejected edge the overlay closed says so.
+  // 4. table lookup. A removed old-path step (S1-S5) gets the in-flight
+  // migration hint; a legal step never reaches here. (E435)
   const key = keyOf(req.prev);
-  const allowed = allowedSuccessors(key, marked ? "test-first" : undefined);
+  const allowed = allowedSuccessors(key);
   const accepted = allowed.some((c) => c.agent === req.next.agent && c.status === req.next.status);
   if (accepted) return null;
-  const closedByMarker =
-    marked &&
-    (TEST_FIRST_CLOSES.get(key) ?? []).some(
-      (c) => c.agent === req.next.agent && c.status === req.next.status,
-    );
   const base = rejection(
     req,
     "TRANSITION_REJECTED",
     allowed,
     `No edge ${key} → ${keyOf(req.next)}${gate("TRANSITION_REJECTED").hintStatic}` +
-      (closedByMarker
-        ? " This feature is on the test-first path (chain_path: test-first), which closes this edge."
-        : ""),
+      (oldPathStepHint(req.prev, req.next) ?? ""),
   );
   // A judge resuming after a PM amendment without a matching resume_of lands
   // here, and the static table never lists the resume edge, so the envelope
@@ -679,10 +599,9 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
   if (
     req.prev.agent === "pm" &&
     req.prev.status === "In_Progress" &&
-    req.next.status === "In_Progress" &&
-    (req.next.agent === "code-reviewer" || req.next.agent === "qa-engineer")
+    req.next.agent === "code-reviewer" &&
+    req.next.status === "In_Progress"
   ) {
-    const role = req.next.agent;
     const received =
       req.next_resume_of === undefined ? "absent" : JSON.stringify(req.next_resume_of);
     return {
@@ -690,18 +609,11 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
       allowed: [
         ...base.allowed,
         { new_agent: "code-reviewer", new_status: "In_Progress", requires: { resume_of: "code-reviewer" } },
-        { new_agent: "qa-engineer", new_status: "In_Progress", requires: { resume_of: "qa-engineer" } },
       ],
       hint:
-        `${base.hint} Amend-Resume edge: set resume_of: "${role}" on this write itself ` +
+        `${base.hint} Amend-Resume edge: set resume_of: "code-reviewer" on this write itself ` +
         `(the resuming write, not only the PM amendment) to open pm:In_Progress → ` +
-        `${role}:In_Progress; received resume_of: ${received}.` +
-        // AC9 (E431): a qa-engineer landing here may have meant the
-        // test-first entry, which this edge also opens on a marked feature.
-        (role === "qa-engineer"
-          ? ` Test-first entry: set chain_path: "test-first" on the entry write instead ` +
-            `(needs an approved cut; no resume_of).`
-          : ""),
+        `code-reviewer:In_Progress; received resume_of: ${received}.`,
     };
   }
   return base;
@@ -710,14 +622,13 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
 /**
  * New round counters from the prior counters and the incoming and prev
  * tuples, returned together so callers persist them as one. The per-cycle
- * qa/review/visual rounds tick on their FAIL (visual only with a
- * `visual_fail:` note) and reset when their cycle closes or on
- * (pm, In_Progress); hop_count ticks on a role change; the *_rounds_total
- * mirrors and hop_count reset only on feature change.
+ * review/visual rounds tick on their FAIL (visual only with a `visual_fail:`
+ * note) and reset when their cycle closes or on (pm, In_Progress); hop_count
+ * ticks on a role change; the *_rounds_total mirrors and hop_count reset only
+ * on feature change. No qa round since E435.
  * Full table: specs/e260b-rationale.md (tools/transitions.ts)
  */
 export function computeNewRound(
-  prev_qa_round: number,
   prev_review_round: number,
   prev_visual_round: number,
   next: TransitionTuple,
@@ -725,37 +636,20 @@ export function computeNewRound(
   next_pending_notes?: ReadonlyArray<string>,
   prev_hop_count = 0,
   feature_changed = false,
-  prev_qa_rounds_total = 0,
   prev_review_rounds_total = 0,
   prev_visual_rounds_total = 0,
 ): {
-  qa_round: number;
   review_round: number;
   visual_round: number;
   hop_count: number;
-  qa_rounds_total: number;
   review_rounds_total: number;
   visual_rounds_total: number;
 } {
-  let qa_round = prev_qa_round;
   let review_round = prev_review_round;
   let visual_round = prev_visual_round;
-  if (next.agent === "qa-engineer" && next.status === "FAIL") qa_round = prev_qa_round + 1;
-  else if (next.agent === "qa-engineer" && next.status === "PASS") qa_round = 0;
-  else if (next.agent === "pm" && next.status === "In_Progress") qa_round = 0;
-
   if (next.agent === "code-reviewer" && next.status === "FAIL") review_round = prev_review_round + 1;
-  else if (
-    next.agent === "qa-engineer" &&
-    next.status === "In_Progress" &&
-    prev?.agent === "code-reviewer" &&
-    prev.status === "In_Progress"
-  ) {
-    review_round = 0;
-  } else if (next.agent === "code-reviewer" && next.status === "PASS") {
-    // E431 — test-first chain: code-reviewer's PASS closes the review cycle,
-    // as qa-engineer's PASS closes the qa cycle. Unreachable on an unmarked
-    // feature (code-reviewer:PASS is not an old-path edge).
+  else if (next.agent === "code-reviewer" && next.status === "PASS") {
+    // The judge's PASS closes the review cycle.
     review_round = 0;
   } else if (next.agent === "pm" && next.status === "In_Progress") {
     review_round = 0;
@@ -763,7 +657,8 @@ export function computeNewRound(
 
   // v3.14.0 visual_round logic. Only ticks on qa-engineer FAIL accompanied by
   // a `visual_fail:` token in pending_notes; pure test-logic FAILs leave the
-  // counter untouched.
+  // counter untouched. Since E435 no edge reaches qa-engineer FAIL / PASS, so
+  // these branches are dormant (E420 owns the visual family).
   const hasVisualFailToken =
     Array.isArray(next_pending_notes) &&
     next_pending_notes.some((n) => typeof n === "string" && n.trim().startsWith("visual_fail:"));
@@ -787,11 +682,8 @@ export function computeNewRound(
 
   // Cumulative totals. Base is `feature_changed ? 0 : prev_total`
   // (hop_count's reset rule); each FAIL predicate is copied verbatim from
-  // the per-cycle branches above (qa_round / review_round / visual_round) so
-  // the two families can never diverge on which event counts. (E8, v12)
-  const qaTotBase = feature_changed ? 0 : prev_qa_rounds_total;
-  const qa_rounds_total =
-    next.agent === "qa-engineer" && next.status === "FAIL" ? qaTotBase + 1 : qaTotBase;
+  // the per-cycle branches above so the two families can never diverge on
+  // which event counts. (E8, v12)
   const revTotBase = feature_changed ? 0 : prev_review_rounds_total;
   const review_rounds_total =
     next.agent === "code-reviewer" && next.status === "FAIL" ? revTotBase + 1 : revTotBase;
@@ -801,24 +693,13 @@ export function computeNewRound(
       ? visTotBase + 1
       : visTotBase;
 
-  return {
-    qa_round,
-    review_round,
-    visual_round,
-    hop_count,
-    qa_rounds_total,
-    review_rounds_total,
-    visual_rounds_total,
-  };
+  return { review_round, visual_round, hop_count, review_rounds_total, visual_rounds_total };
 }
 
 /**
  * New sr_return_count (E431): sr-engineer:In_Progress -> qa-engineer:In_Progress
- * returns on a test-first feature. Base is 0 on feature change; (pm,
- * In_Progress) resets to 0; the return pair adds 1; anything else carries.
- * Pure and marker-free: the return edge is reachable only on a marked feature
- * (validateTransition step 4 rejects it otherwise). Kept out of
- * computeNewRound so that function's return shape is unchanged.
+ * returns. Base is 0 on feature change; (pm, In_Progress) resets to 0; the
+ * return pair adds 1; anything else carries. Kept out of computeNewRound.
  */
 export function computeSrReturnCount(
   prev_sr_return_count: number,
@@ -839,7 +720,6 @@ export function computeSrReturnCount(
   return base;
 }
 
-export const ROUND_CAP_EXPORTED = ROUND_CAP;
 export const REVIEW_ROUND_CAP_EXPORTED = REVIEW_ROUND_CAP;
 export const VISUAL_ROUND_CAP_EXPORTED = VISUAL_ROUND_CAP;
 // v9 (d2-server-brake-accounting) — consumed by the T-D2-01B orchestrator

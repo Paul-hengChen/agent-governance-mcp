@@ -31,15 +31,29 @@ test("AC1: const-01 Limits row and HOP_CAP are both 14 (feature-scoped reset rat
   assert.match(rd("tools/transitions.ts"), /HOP_CAP\s*=\s*14/);
 });
 
-test("AC2: (pm, In_Progress) landing at the cap is accepted from code-reviewer/qa-engineer In_Progress; other role edges stay HOP_CAP_EXCEEDED", () => {
-  const b = { prev_qa_round: 0, prev_review_round: 0, prev_visual_round: 0, prev_hop_count: 14, feature_changed: false };
+test("AC2 (E435): (pm, In_Progress) landing at the cap is accepted from code-reviewer/qa-engineer In_Progress; other role edges stay HOP_CAP_EXCEEDED", () => {
+  const b = { prev_review_round: 0, prev_visual_round: 0, prev_hop_count: 14, feature_changed: false };
   const to = (agent, status, nAgent, nStatus, extra = {}) =>
     validateTransition({ ...b, ...extra, prev: { agent, status }, next: { agent: nAgent, status: nStatus } });
   assert.equal(to("code-reviewer", "In_Progress", "pm", "In_Progress"), null);
   assert.equal(to("qa-engineer", "In_Progress", "pm", "In_Progress"), null);
-  assert.equal(to("code-reviewer", "In_Progress", "qa-engineer", "In_Progress")?.error, "HOP_CAP_EXCEEDED");
+  // E435: code-reviewer:In_Progress -> qa-engineer:In_Progress is no longer an edge, so the "other role
+  // edge" probe is the rejection route code-reviewer:FAIL -> sr-engineer:In_Progress, legal on both tables.
+  assert.equal(to("code-reviewer", "FAIL", "sr-engineer", "In_Progress")?.error, "HOP_CAP_EXCEEDED");
   assert.equal(to("sr-engineer", "In_Progress", "sr-engineer", "In_Progress"), null, "self-loop still skips the gate");
-  assert.equal(to("code-reviewer", "In_Progress", "qa-engineer", "In_Progress", { feature_changed: true }), null, "feature change still bypasses");
+  assert.equal(to("code-reviewer", "FAIL", "sr-engineer", "In_Progress", { feature_changed: true }), null, "feature change still bypasses");
+});
+
+// E435 (OQ (a) ruling: qa_round dropped): the served hop-counter note and the integrator roll-up stop
+// naming a qa round. Texts from the architecture's T-32 (coord-03 line 9) and T-41 (skill-integrator
+// line 189) rows; the rest of each sentence is unchanged.
+test("AC4b (E435): coord-03 hop counter is a sibling of review_round only; integrator roll-up sums review rounds, no qa round", () => {
+  assert.equal(count(COORD03, "(a sibling of `review_round`)"), 1, "coord-03 hop note names review_round as the only sibling");
+  assert.ok(!COORD03.includes("qa_round"), "coord-03 names no qa_round");
+  const rollup = INTEGRATOR.split("\n").find((l) => l.startsWith("4. **Roll-up**"));
+  assert.ok(rollup, "integrator keeps its Roll-up step");
+  assert.ok(rollup.includes("sum tickets, hops and review rounds per lane against the caps"), "roll-up sums review rounds");
+  assert.ok(!/qa rounds|qa_round/.test(INTEGRATOR), "skill-integrator names no qa round");
 });
 
 test("AC3: d2 specs end with the E295 amendment section (the base body is pinned by git history, not a fixture read, per the E77 meta-test)", () => {

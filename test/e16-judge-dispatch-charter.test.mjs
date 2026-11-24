@@ -125,3 +125,18 @@ test("E16-06: coord-03 Amend-Resume relay escalation row points to the Constitut
     "coord-03 must NOT duplicate the const-08 trust-mechanics sentence — pointer only, single-sourced in the constitution",
   );
 });
+
+// ---------------------------------------------------------------------------
+// E435 (T-E435-33, OQ (b) ruling): the const-08 ledger gate sits one bullet above the charter. The
+// judge is code-reviewer on every feature, so the gate is named for the judge and quotes the code that
+// replaces the two removed ledger codes; the old qa-named label and code must not survive (AC7).
+// ---------------------------------------------------------------------------
+test("E16-07 (E435): const-08 §3.1 ledger gate is the Non-Judge Completed-Tasks Gate quoting NON_JUDGE_COMPLETED_TASKS_REJECTED", () => {
+  const bullet = CONST08.split("\n").find((l) => l.includes("completed_tasks") && l.includes("COMPLETED_TASKS_REJECTED"));
+  assert.ok(bullet, "const-08 keeps its ledger-gate bullet");
+  assert.ok(bullet.startsWith("- **Non-Judge Completed-Tasks Gate"), "bullet label names the judge (architecture T-33 row)");
+  assert.ok(bullet.includes("`NON_JUDGE_COMPLETED_TASKS_REJECTED`"), "bullet quotes the new code");
+  for (const old of ["Non-QA Completed-Tasks Gate", "NON_QA_COMPLETED_TASKS_REJECTED", "REVIEWER_COMPLETED_TASKS_REJECTED"]) {
+    assert.ok(!CONST08.includes(old), `const-08 no longer carries ${old}`);
+  }
+});

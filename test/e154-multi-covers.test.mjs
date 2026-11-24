@@ -12,6 +12,7 @@ import * as path from "node:path";
 
 import { parseCoversIds, COVERS_LINE_RE } from "../dist/tools/evidence-file.js";
 import { hasEvidenceInFile } from "../dist/gates/qa-review.js";
+import { hasCodeReviewEvidenceInFile } from "../dist/gates/code-review.js";
 import { writeHandoffState } from "../dist/tools/handoff.js";
 import { markStateRead, resetSession } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
@@ -57,30 +58,19 @@ test("AC-E154-3: exactly one covers: line keeps today's output, within-line dupl
   assert.deepEqual(parseCoversIds("covers: A, A\ncovers: B\n"), ["A", "A", "B"]);
 });
 
-test("AC-E154-4: a second covers: line satisfies the review-evidence gate and the QA completion-evidence gate", async () => {
-  // Review side: APPROVED row (qa-engineer on code-reviewer:In_Progress) naming Y, covered only by line 2.
+test("AC-E154-4 (E435): a second covers: line satisfies the code-review evidence lookup and the judge's (code-reviewer's) completion-evidence gate", async () => {
+  // Review side: the review_reports/ lookup reads line 2. Library level since E435: the
+  // MISSING_REVIEW_EVIDENCE gate is dormant (its only edge, code-reviewer -> qa-engineer, is gone).
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("e154-rev-");
-  await seedState(ws, "e154-rev", "code-reviewer", "In_Progress");
   fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
   fs.writeFileSync(path.join(ws, "review_reports", "review_T-E154-A.md"), "covers: T-E154-A\n\nround 2\n\ncovers: T-E154-Y\n");
-  resetSession(ws);
-  markStateRead(ws);
-  const r1 = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: "e154-rev",
-    status: "In_Progress",
-    agent_id: "qa-engineer",
-    completed_tasks: [],
-    review_task_ids: ["T-E154-Y"],
-    review_verdict: "APPROVED",
-    pending_notes: ["code-reviewer: APPROVED"],
-  });
-  assert.ok(!r1.isError, `second-line coverage must clear MISSING_REVIEW_EVIDENCE; got: ${r1.content?.[0]?.text}`);
+  assert.deepEqual(hasCodeReviewEvidenceInFile(ws, ["T-E154-Y"]).present, ["T-E154-Y"]);
+  assert.deepEqual(hasCodeReviewEvidenceInFile(ws, ["T-E154-Z"]).missing, ["T-E154-Z"]);
 
-  // QA side: PASS completing Y, covered only by line 2 of a qa_reports file.
+  // Judge side: code-reviewer PASS completing Y, covered only by line 2 of a qa_reports file.
   const ws2 = mkWorkspace("e154-qa-");
-  await seedState(ws2, "e154-qa", "qa-engineer", "In_Progress");
+  await seedState(ws2, "e154-qa", "code-reviewer", "In_Progress");
   fs.mkdirSync(path.join(ws2, "qa_reports"), { recursive: true });
   fs.writeFileSync(path.join(ws2, "qa_reports", "review_T-E154-A.md"), "covers: T-E154-A\n\ncovers: T-E154-Y\n");
   resetSession(ws2);
@@ -89,9 +79,9 @@ test("AC-E154-4: a second covers: line satisfies the review-evidence gate and th
     workspace_path: ws2,
     active_feature: "e154-qa",
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-E154-Y"],
-    pending_notes: ["QA: PASS"],
+    pending_notes: ["code-reviewer: PASS"],
   });
   assert.ok(!r2.isError, `second-line coverage must clear QA_COMPLETION_EVIDENCE_MISSING; got: ${r2.content?.[0]?.text}`);
   assert.deepEqual(hasEvidenceInFile(ws2, ["T-E154-Y"]).present, ["T-E154-Y"]);

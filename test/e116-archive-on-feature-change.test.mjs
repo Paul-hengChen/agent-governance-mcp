@@ -67,7 +67,7 @@ async function write(ws, opts) {
 // AC1 — archive captures the outgoing ledger verbatim on feature change
 // ============================================================================
 
-test("AC1: archive captures the outgoing ledger verbatim on feature change", async () => {
+test("AC1 (E435): archive captures the outgoing ledger verbatim on feature change (schema 17: no qa_round line)", async () => {
   const ws = mkWs();
 
   await write(ws, {
@@ -77,7 +77,6 @@ test("AC1: archive captures the outgoing ledger verbatim on feature change", asy
     completedTasks: ["T-1", "T-2"],
     pendingNotes: ["note-a", "note-b"],
     hopCount: 5,
-    qaRound: 2,
     reviewRound: 1,
     visualRound: 3,
   });
@@ -121,7 +120,7 @@ test("AC1: archive captures the outgoing ledger verbatim on feature change", asy
   const archived = parseFrontmatter(archivedText);
   assert.equal(archived.active_feature, "e116-old");
   assert.equal(archived.hop_count, 5);
-  assert.equal(archived.qa_round, 2);
+  assert.equal(archived.qa_round, undefined, "schema 17 writes no qa_round, so the verbatim archive carries none (E435 ruling (a))");
   assert.equal(archived.review_round, 1);
   assert.equal(archived.visual_round, 3);
   assert.equal(archived.last_updated, preState.last_updated, "archived last_updated must match the pre-overwrite value exactly");
@@ -138,7 +137,7 @@ test("AC1: archive captures the outgoing ledger verbatim on feature change", asy
 // preserving state across a feature change must fail this test (E116).
 // ============================================================================
 
-test("AC2: live handoff still resets on feature change — six feature-scoped fields carry forward same-feature, drop on feature change", async () => {
+test("AC2 (E435): live handoff still resets on feature change — six feature-scoped fields carry forward same-feature, drop on feature change", async () => {
   const ws = mkWs();
 
   // Write 1: establish a full ledger, including all six feature-scoped
@@ -157,7 +156,6 @@ test("AC2: live handoff still resets on feature change — six feature-scoped fi
     evidenceSchema: 2,
     cutApprovedSource: "inherited:parent-x",
     hopCount: 5,
-    qaRound: 2,
     reviewRound: 1,
     visualRound: 3,
   });
@@ -177,13 +175,13 @@ test("AC2: live handoff still resets on feature change — six feature-scoped fi
   assert.equal(sameFeatureState.dispatch_mode, "bugfix", "same-feature write must carry dispatch_mode forward when omitted");
   assert.equal(sameFeatureState.evidence_schema, 2, "same-feature write must carry evidence_schema forward when omitted");
   assert.equal(sameFeatureState.cut_approved_source, "inherited:parent-x", "same-feature write must carry cut_approved_source forward when omitted");
-  // hop_count/qa_round/review_round/visual_round are NOT preserved-if-omitted
+  // hop_count/review_round/visual_round are NOT preserved-if-omitted
   // (they always normalize to 0 on any write that omits them, feature change
   // or not) — sanity-checked here so the archive-fires assertion below is
   // read as being about the ARCHIVE, not about this unrelated always-reset
   // behavior.
   assert.equal(sameFeatureState.hop_count, 0);
-  assert.equal(sameFeatureState.qa_round, 0);
+  assert.equal(sameFeatureState.qa_round, undefined, "schema 17 has no qa_round (E435 ruling (a))");
   assert.equal(sameFeatureState.review_round, 0);
   assert.equal(sameFeatureState.visual_round, 0);
 
@@ -201,7 +199,6 @@ test("AC2: live handoff still resets on feature change — six feature-scoped fi
     evidenceSchema: 2,
     cutApprovedSource: "inherited:parent-x",
     hopCount: 5,
-    qaRound: 2,
     reviewRound: 1,
     visualRound: 3,
   });
@@ -210,13 +207,13 @@ test("AC2: live handoff still resets on feature change — six feature-scoped fi
     activeFeature: "e116-tension-v2", // active_feature CHANGES here
     status: "In_Progress",
     lastAgent: "sr-engineer",
-    // all six fields, and all four counters, omitted
+    // all six fields, and all three counters, omitted
   });
 
   const liveState = parseHandoff(ws);
   assert.equal(liveState.active_feature, "e116-tension-v2");
   assert.equal(liveState.hop_count, 0, "hop_count must reset to 0 on feature change");
-  assert.equal(liveState.qa_round, 0, "qa_round must reset to 0 on feature change");
+  assert.equal(liveState.qa_round, undefined, "schema 17 has no qa_round on either side of a feature change (E435 ruling (a))");
   assert.equal(liveState.review_round, 0, "review_round must reset to 0 on feature change");
   assert.equal(liveState.visual_round, 0, "visual_round must reset to 0 on feature change");
   assert.equal(liveState.cut_approved, undefined, "cut_approved must DROP on feature change — the archive is additive, it must not weaken this reset");

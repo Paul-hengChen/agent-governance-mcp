@@ -23,8 +23,11 @@ function body(src, name) {
 const tasks = read("tools/tasks.ts");
 const lite = read("content/skill-coordinator-lite.md");
 
-test("AC2: handleCompleteTask is agent-gated (requireQaEngineer), so lite's server-rejected claim holds", () => {
-  assert.match(body(tasks, "handleCompleteTask"), /requireQaEngineer\(/, FIX);
+test("AC2 (E435): handleCompleteTask is agent-gated (requireJudge), so lite's server-rejected claim holds", () => {
+  // E435: the one chain's judge gate is requireJudge; the qa-only gate was removed.
+  const b = body(tasks, "handleCompleteTask");
+  assert.match(b, /requireJudge\(/, FIX);
+  assert.doesNotMatch(b, /requireQaEngineer\(/, "the removed qa-only gate must not return (E435)");
 });
 
 for (const [fn, tool] of [
@@ -35,7 +38,7 @@ for (const [fn, tool] of [
   test(`AC2: ${fn} runs enforcePreFlight and no agent gate, so ${tool} is SOP-forbidden only`, () => {
     const b = body(tasks, fn);
     assert.match(b, new RegExp(`enforcePreFlight\\([^)]*"${tool}"`), `${fn} keeps pre-flight`);
-    assert.doesNotMatch(b, /requireQaEngineer\(|requireAgent|\.agent_id/, `${fn} gained an agent gate; ${FIX}`);
+    assert.doesNotMatch(b, /requireJudge\(|requireQaEngineer\(|requireAgent|\.agent_id/, `${fn} gained an agent gate; ${FIX}`);
   });
 }
 

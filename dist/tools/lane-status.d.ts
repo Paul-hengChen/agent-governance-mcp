@@ -51,7 +51,6 @@ export interface LaneStatusRow {
     lastUpdated: string | null;
     hopCount: number | null;
     reviewRound: number | null;
-    qaRound: number | null;
     /** completed_tasks from the handoff; [] when unreadable. */
     completedTasks: string[];
     commits: LaneCommits;
@@ -109,8 +108,8 @@ export interface ComputeLaneStatusOptions {
 }
 /** One cap comparison. `capName` is the REAL exported constant name. */
 export interface CapCheck {
-    metric: "hop" | "review_round" | "qa_round";
-    capName: "HOP_CAP_EXPORTED" | "REVIEW_ROUND_CAP_EXPORTED" | "ROUND_CAP_EXPORTED";
+    metric: "hop" | "review_round";
+    capName: "HOP_CAP_EXPORTED" | "REVIEW_ROUND_CAP_EXPORTED";
     cap: number;
     value: number;
     over: boolean;
@@ -120,7 +119,6 @@ export interface RollupTotals {
     tickets: number;
     hop: number;
     reviewRounds: number;
-    qaRounds: number;
 }
 export interface SameFeatureRollup {
     mode: "feature";
@@ -129,7 +127,7 @@ export interface SameFeatureRollup {
     matchingLanes: LaneStatusRow[];
     /** Every lane in the report, for context. */
     allLanes: LaneStatusRow[];
-    /** tickets/hop from computeFeatureRollup; review/qa rounds summed here. */
+    /** tickets/hop from computeFeatureRollup; review rounds summed here. */
     totals: RollupTotals;
     capChecks: CapCheck[];
     evidenceMismatches: LaneStatusRow[];
@@ -284,7 +282,7 @@ export declare const WATCH_EXIT_USAGE = 64;
 /** Hex characters of sha256(state line) carried in --baseline (decision (d)). */
 export declare const WATCH_FINGERPRINT_LENGTH = 12;
 /** Watched keys, in state-line order (decision (c)). */
-export declare const WATCH_STATE_KEYS: readonly ["feature", "status", "last_agent", "next_role", "hop", "review_round", "qa_round"];
+export declare const WATCH_STATE_KEYS: readonly ["feature", "status", "last_agent", "next_role", "hop", "review_round"];
 /** Decision (c)'s optional last key, present only under --mailbox-root. */
 export declare const WATCH_PREREVIEW_KEY = "cut_prereview";
 /** State line of a `--lanes`-named lane that matches no worktree. */

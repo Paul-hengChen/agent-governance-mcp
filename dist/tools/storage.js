@@ -11,7 +11,10 @@ export class FileHandoffStorage {
     readState(workspacePath) {
         return readHandoffState(workspacePath);
     }
-    writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+    writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, 
+    // Ignored since handoff schema v17 (E435); the slot stays so the later
+    // positionals do not shift.
+    _qaRound, prdPath, reviewRound, visualRound) {
         // Dual-dispatch body: "if object → options path; else pack positionals
         // → options → call", targeting the ONE real options-object
         // writeHandoffState implementation directly (not its own positional
@@ -27,7 +30,6 @@ export class FileHandoffStorage {
             pendingNotes: pendingNotes ?? [],
             blockingReason,
             lastAgent,
-            qaRound,
             prdPath,
             reviewRound,
             visualRound,

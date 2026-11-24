@@ -374,3 +374,10 @@ test("AC-L1 the 69 ids are the ids the history file cites", () => {
   const cited = [...new Set(HISTORY.match(/\bE[0-9]+[a-z]?\b/g))].sort();
   assert.deepEqual([...ALL_IDS].sort(), cited);
 });
+
+test("AC-P6 (E435) the SOP names one release judge: (code-reviewer, PASS), no qa-engineer PASS, no marker", () => {
+  // WHY: release.mjs accepts only (code-reviewer, PASS) (architecture "Release gate"); an SOP that still named a
+  // qa-engineer PASS or the chain_path marker would send release-engineer to a gate the script refuses.
+  assert.ok(SOP.includes("| precondition not met (step 1) | Blocked | `release-engineer: refused — tuple is <agent, status>, not (code-reviewer, PASS)` |"), "precondition row names the judge");
+  assert.ok(!SOP.includes("(qa-engineer, PASS)") && !SOP.includes("chain_path"), "no qa-engineer release gate, no marker");
+});

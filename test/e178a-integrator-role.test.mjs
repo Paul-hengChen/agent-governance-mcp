@@ -319,7 +319,7 @@ test("AC10: SOP execution stage — mailbox + cut pre-review formalized", () => 
   assert.ok(SOP.includes("Message format, lane-side rules and the report format: `docs/lane-protocol.md` §5 and §6 — the only copy; a repo's own lane rules live in the addendum named by `laneProtocolAddendum`."));
 });
 
-test("AC11: docs/lane-protocol.md §5 — wait armed across every human-approval pause; architect second pre-review; Q3 default", () => {
+test("AC11 (E435): docs/lane-protocol.md §5 — wait armed across every human-approval pause; architect second pre-review; Q3 default", () => {
   assert.ok(
     LANE_PROTOCOL.includes("每一次等人類核准的停頓，等待都要保持掛著"),
     "§5 rule 3 must say the wait stays armed across EVERY human-approval pause, not just role hops",
@@ -329,10 +329,11 @@ test("AC11: docs/lane-protocol.md §5 — wait armed across every human-approval
     "§5 must state architect-hop lanes pre-review twice (PM cut, then architect's Open Questions)",
   );
   assert.ok(
-    LANE_PROTOCOL.includes("即使 PM 接著只派單一角色的 judge（例如只派 qa）也一樣") &&
+    LANE_PROTOCOL.includes("即使 PM 接著只派單一角色的 judge（例如只派 code-reviewer）也一樣") &&
       LANE_PROTOCOL.includes("（qa 直派的 mini-chain，不寫 spec）不送 cut"),
-    "§5 must state the Q3 default: a single-role qa lane sends a cut iff its PM hop wrote a spec; a no-PM lane sends none",
+    "§5 must state the Q3 default (E435: code-reviewer, the one judge, is the single-role example): a cut is sent iff the PM hop wrote a spec; a no-PM lane sends none",
   );
+  assert.ok(!LANE_PROTOCOL.includes("（例如只派 qa）"), "E435: qa is no longer the judge example in §5");
 });
 
 test("AC12: SOP decision-rights table — integrator-alone vs always-the-human, with the recommendation rule", () => {

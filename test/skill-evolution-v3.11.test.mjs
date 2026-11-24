@@ -63,21 +63,22 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
   // v3.11 constraint: doc-writer is a content-only role and must NOT appear in the
   // ALLOWED_TRANSITIONS state machine — it has no qa-flow routing.
   // v3.28.0 (A5 matrix fix): release-engineer WAS deliberately added to transitions.ts
-  // as a terminal PASS role so the state machine can route qa-engineer:PASS →
-  // release-engineer:In_Progress without a human-break. This is an intentional
+  // as a terminal PASS role so the state machine can route the judge's PASS
+  // (code-reviewer:PASS since E435) → release-engineer:In_Progress without a human-break. This is an intentional
   // promotion of release-engineer from "human decision" to a first-class chain role.
   const transitionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "tools", "transitions.ts"), "utf-8");
   assert.doesNotMatch(transitionsTs, /doc-writer/, "doc-writer must NOT be in transitions.ts (content-only role, no qa-flow routing)");
   assert.match(transitionsTs, /release-engineer/, "release-engineer MUST be in transitions.ts (v3.28.0 A5 matrix promotion — terminal PASS role)");
 });
 
-test("AC-10: schema/versions.ts schema versions track e123a-lane-layout-migration bump", () => {
+test("AC-10 (E435): schema/versions.ts handoff schema is 17, sqlite stays 2", () => {
   // Each handoff bump from v6 to v16 added frontmatter fields (most stamp-only,
-  // seeding nothing); sqlite stays at 2 because only hop_count reached SQLite,
+  // seeding nothing); v17 (E435) drops chain_path, qa_round and qa_rounds_total.
+  // sqlite stays at 2 because only hop_count reached SQLite,
   // via an idempotent ALTER with no schema_meta bump.
   // Version history: specs/e260h-comment-rationale.md (test/skill-evolution-v3.11.test.mjs).
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*16,/, "CURRENT_VERSIONS.handoff must be 16 (E431 chain_path/sr_return_count bump)");
+  assert.match(versionsTs, /handoff:\s*17,/, "CURRENT_VERSIONS.handoff must be 17 (E435 drops chain_path/qa_round/qa_rounds_total)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 

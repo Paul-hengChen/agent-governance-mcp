@@ -268,7 +268,6 @@ function fixtureState(prdPath) {
     last_updated: "x",
     completed_tasks: [],
     pending_notes: [],
-    qa_round: 0,
     review_round: 0,
     visual_round: 0,
     prd_path: prdPath,

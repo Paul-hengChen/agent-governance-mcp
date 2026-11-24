@@ -8,7 +8,6 @@ export interface UpdateStateGateContext {
     readonly prevState: HandoffState | null;
     readonly prevTuple: TransitionTuple;
     readonly nextTuple: TransitionTuple;
-    readonly prev_qa_round: number;
     readonly prev_review_round: number;
     readonly prev_visual_round: number;
     readonly prev_hop_count: number;

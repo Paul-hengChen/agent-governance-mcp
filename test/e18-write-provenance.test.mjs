@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
 // Tests for the QA-evidence write gate, QA_COMPLETION_EVIDENCE_MISSING (backlog E18;
-// T-E18-02; spec = the E18 section of docs/backlog.md). It closes an identity-swap hole: a
-// code-reviewer's write stamped qa-engineer pre-filled completed_tasks. Cases QAEV-*, CONTENT-*;
+// T-E18-02; spec = the E18 section of docs/backlog.md). It closed an identity-swap hole: a
+// code-reviewer's write stamped qa-engineer pre-filled completed_tasks (E435: code-reviewer is the judge). Cases QAEV-*, CONTENT-*;
 // E32 regression pins live in test/e32-e33-gate-hardening.test.mjs.
 // Rationale: specs/e260f-comment-rationale.md (test/e18-write-provenance.test.mjs).
 
@@ -82,13 +82,15 @@ function mkSqliteWorkspace(prefix = "e18-sql-") {
 }
 
 // ===========================================================================
-// QA-evidence gate (fix b) — QA_COMPLETION_EVIDENCE_MISSING
+// QA-evidence gate (fix b) — QA_COMPLETION_EVIDENCE_MISSING. E435: code-reviewer is the only
+// ledger writer (a qa-engineer ledger write is NON_JUDGE_COMPLETED_TASKS_REJECTED, pinned in
+// test/reviewer-completed-tasks-gate.test.mjs FM12), so the evidence gate diffs the judge's list.
 // ===========================================================================
 
-test("QAEV-1: a qa-engineer self-loop write adding a NEW completed_tasks id with NO evidence on disk is rejected, naming the missing id", async () => {
+test("QAEV-1 (E435): a code-reviewer self-loop write adding a NEW completed_tasks id with NO evidence on disk is rejected, naming the missing id", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e18-qaev1-");
-  await seedFileState(ws, "e18-qaev1-feat", "qa-engineer", "In_Progress");
+  await seedFileState(ws, "e18-qaev1-feat", "code-reviewer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
 
@@ -96,9 +98,9 @@ test("QAEV-1: a qa-engineer self-loop write adding a NEW completed_tasks id with
     workspace_path: ws,
     active_feature: "e18-qaev1-feat",
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-QAEV1-01"],
-    pending_notes: ["qa-engineer: claiming completion with no evidence yet"],
+    pending_notes: ["code-reviewer: claiming completion with no evidence yet"],
   });
   assert.ok(result.isError, "an unevidenced new completed_tasks id must be rejected");
   assert.match(result.content[0].text, /QA_COMPLETION_EVIDENCE_MISSING/);
@@ -106,10 +108,10 @@ test("QAEV-1: a qa-engineer self-loop write adding a NEW completed_tasks id with
   assert.deepEqual(parseHandoff(ws).completed_tasks, [], "the incumbent completed_tasks list must remain untouched after rejection");
 });
 
-test("QAEV-2: the SAME write, once per-id evidence exists on disk, is ACCEPTED", async () => {
+test("QAEV-2 (E435): the SAME code-reviewer write, once per-id evidence exists on disk, is ACCEPTED", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e18-qaev2-");
-  await seedFileState(ws, "e18-qaev2-feat", "qa-engineer", "In_Progress");
+  await seedFileState(ws, "e18-qaev2-feat", "code-reviewer", "In_Progress");
   writeQaEvidence(ws, "T-QAEV2-01");
   resetSession(ws);
   markStateRead(ws);
@@ -118,20 +120,20 @@ test("QAEV-2: the SAME write, once per-id evidence exists on disk, is ACCEPTED",
     workspace_path: ws,
     active_feature: "e18-qaev2-feat",
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-QAEV2-01"],
-    pending_notes: ["qa-engineer: completion backed by evidence"],
+    pending_notes: ["code-reviewer: completion backed by evidence"],
   });
   assert.ok(!result.isError, `a completed_tasks id with per-id evidence present must be accepted: ${result.content?.[0]?.text}`);
   assert.deepEqual(parseHandoff(ws).completed_tasks, ["T-QAEV2-01"]);
 });
 
-test("QAEV-3: a cumulative list-back (only ids ALREADY on disk, no new ones) is NOT gated even with zero evidence", async () => {
+test("QAEV-3 (E435): a code-reviewer cumulative list-back (only ids ALREADY on disk, no new ones) is NOT gated even with zero evidence", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e18-qaev3-");
   resetSession(ws);
   markStateRead(ws);
-  // Seed a qa-engineer state that ALREADY carries T-QAEV3-01 as completed —
+  // Seed a judge state that ALREADY carries T-QAEV3-01 as completed —
   // no evidence file written for it (the write that first completed it is
   // out of scope for this test; only the "no NEW ids" set-difference matters).
   await writeHandoffState({
@@ -140,7 +142,7 @@ test("QAEV-3: a cumulative list-back (only ids ALREADY on disk, no new ones) is 
     status: "In_Progress",
     completedTasks: ["T-QAEV3-01"],
     pendingNotes: ["seed — already completed"],
-    lastAgent: "qa-engineer",
+    lastAgent: "code-reviewer",
   });
   // Force the seed's last_updated off the wall clock so a live timestamp can
   // never randomly look hand-authored (E148) — see test/e148-seed-stamp.mjs.
@@ -152,22 +154,19 @@ test("QAEV-3: a cumulative list-back (only ids ALREADY on disk, no new ones) is 
     workspace_path: ws,
     active_feature: "e18-qaev3-feat",
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-QAEV3-01"], // passed back verbatim, no new id added
-    pending_notes: ["qa-engineer: cumulative list-back, nothing new"],
+    pending_notes: ["code-reviewer: cumulative list-back, nothing new"],
   });
   assert.ok(!result.isError, `passing back the same (already-on-disk) id list must never gate: ${result.content?.[0]?.text}`);
 });
 
-test("QAEV-4a (E32 amendment): the OLD sanctioned APPROVED-row shape — completed_tasks manifest + review_reports evidence, NO qa_reports — is now REJECTED (exemption removed)", async () => {
+test("QAEV-4a (E32 amendment, E435): a code-reviewer APPROVED write with a completed_tasks manifest backed only by review_reports (NO qa_reports) is REJECTED", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e18-qaev4a-");
   await seedFileState(ws, "e18-qaev4a-feat", "code-reviewer", "In_Progress");
-  // review_reports/ evidence would have satisfied the pre-existing
-  // MISSING_REVIEW_EVIDENCE gate on this edge under the OLD contract —
-  // deliberately NO qa_reports/ evidence. Under the amended contract this
-  // shape (completed_tasks non-empty on a qa-engineer write, no per-id QA
-  // evidence) is rejected UNCONDITIONALLY: no edge/status/verdict exemption.
+  // review_reports/ evidence backs nothing for the ledger; deliberately NO qa_reports/
+  // evidence. The gate has no edge/status/verdict exemption, so APPROVED does not clear it.
   writeCodeReviewEvidence(ws, "T-QAEV4-01");
   resetSession(ws);
   markStateRead(ws);
@@ -176,29 +175,25 @@ test("QAEV-4a (E32 amendment): the OLD sanctioned APPROVED-row shape — complet
     workspace_path: ws,
     active_feature: "e18-qaev4a-feat",
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-QAEV4-01"],
     review_verdict: "APPROVED",
-    pending_notes: ["code-reviewer: APPROVED, handing to qa-engineer"],
+    pending_notes: ["code-reviewer: APPROVED, ledger prefill without a report"],
   });
   assert.ok(
     result.isError,
-    `the E32 amendment removes the APPROVED-row exemption entirely — this OLD shape must now be REJECTED: ${result.content?.[0]?.text}`,
+    `no APPROVED-row exemption: review_reports evidence alone must be REJECTED: ${result.content?.[0]?.text}`,
   );
   assert.match(result.content[0].text, /QA_COMPLETION_EVIDENCE_MISSING/);
   assert.deepEqual(parseHandoff(ws).completed_tasks, [], "the ledger must stay unpolluted — the manifest write never lands");
 });
 
-test("QAEV-4b (E32 amendment): the AMENDED APPROVED-row shape — review_task_ids manifest, completed_tasks EMPTY — is ACCEPTED, ledger stays []", async () => {
+test("QAEV-4b (E32 amendment, E435): the judge's APPROVED self-loop — review_task_ids manifest, completed_tasks EMPTY — is ACCEPTED, ledger stays []", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e18-qaev4b-");
   await seedFileState(ws, "e18-qaev4b-feat", "code-reviewer", "In_Progress");
-  // Amended contract: review scope travels ONLY in the transient
-  // review_task_ids field; completed_tasks stays empty on the APPROVED row.
-  // review_reports/ evidence satisfies MISSING_REVIEW_EVIDENCE (which now
-  // reads review_task_ids); QA_COMPLETION_EVIDENCE_MISSING never arms
-  // because completed_tasks is empty (nothing grows).
-  writeCodeReviewEvidence(ws, "T-QAEV4-02");
+  // Review scope travels ONLY in the transient review_task_ids field; completed_tasks
+  // stays empty, so QA_COMPLETION_EVIDENCE_MISSING never arms (nothing grows).
   resetSession(ws);
   markStateRead(ws);
 
@@ -206,77 +201,78 @@ test("QAEV-4b (E32 amendment): the AMENDED APPROVED-row shape — review_task_id
     workspace_path: ws,
     active_feature: "e18-qaev4b-feat",
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: [],
     review_task_ids: ["T-QAEV4-02"],
     review_verdict: "APPROVED",
-    pending_notes: ["code-reviewer: APPROVED, handing to qa-engineer"],
+    pending_notes: ["code-reviewer: APPROVED, scope in review_task_ids"],
   });
   assert.ok(
     !result.isError,
-    `the amended compliant shape (review_task_ids + empty completed_tasks) must be ACCEPTED: ${result.content?.[0]?.text}`,
+    `the compliant shape (review_task_ids + empty completed_tasks) must be ACCEPTED: ${result.content?.[0]?.text}`,
   );
-  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "review scope must NOT persist into completed_tasks under the amended contract");
+  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "review scope must NOT persist into completed_tasks");
 });
 
 // ---------------------------------------------------------------------------
-// Incident replay (E5 identity swap): a legitimate APPROVED handoff with an empty
-// completed_tasks manifest, then a SECOND self-looped write still stamped qa-engineer that
-// pre-fills completed_tasks with zero qa_reports evidence. Its prevTuple is (qa-engineer,
-// In_Progress), not (code-reviewer, In_Progress), so it never lands on the exempt APPROVED-row
-// edge: the gate closes the hole the exemption cannot (docs/backlog.md incident (b)).
+// Incident replay (E5 identity swap), E435 shape: after the judge's legitimate APPROVED
+// self-loop, the old swap (a write stamped qa-engineer) is no longer an edge, and a
+// same-session judge write pre-filling completed_tasks with zero qa_reports evidence is still
+// refused by the evidence gate (docs/backlog.md incident (b)).
 // ---------------------------------------------------------------------------
 
-test("QAEV-INCIDENT: the exact E5 identity-swap replay (APPROVED write, then a self-looped qa-engineer pre-fill with zero evidence) is REJECTED", async () => {
+test("QAEV-INCIDENT (E435): after the judge's APPROVED write, the qa-engineer-stamped swap is TRANSITION_REJECTED and the judge's zero-evidence pre-fill is QA_COMPLETION_EVIDENCE_MISSING", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e18-qaev-incident-");
   await seedFileState(ws, "e5-replay-feat", "code-reviewer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
+  const ids = ["T-E5-01", "T-E5-02", "T-E5-03"];
 
-  // Write 1 — the LEGITIMATE APPROVED handoff (code-reviewer:In_Progress ->
-  // qa-engineer:In_Progress), empty completed_tasks manifest (review-scope
-  // list, not yet the actual completion ids).
+  // Write 1 — the LEGITIMATE APPROVED self-loop, empty completed_tasks.
   const approved = await handleUpdateState({
     workspace_path: ws,
     active_feature: "e5-replay-feat",
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: [],
+    review_task_ids: ids,
     review_verdict: "APPROVED",
-    pending_notes: ["code-reviewer: APPROVED T-E5-01/02/03 (verdict returned inline)"],
+    pending_notes: ["code-reviewer: APPROVED T-E5-01/02/03"],
   });
   assert.ok(!approved.isError, `sanity: the legitimate APPROVED write must succeed: ${approved.content?.[0]?.text}`);
-  assert.equal(parseHandoff(ws).last_agent, "qa-engineer", "sanity: on-disk last_agent is now qa-engineer after the APPROVED write");
 
-  // Write 2 — the IMPERSONATION write: same session, no intervening
-  // tw_get_state read, still agent_id="qa-engineer", now pre-filling the real
-  // completion ids with zero qa_reports evidence on disk anywhere.
-  const impersonation = await handleUpdateState({
+  // Write 2a — the original swap: stamped qa-engineer; code-reviewer:In_Progress -> qa-engineer is gone.
+  const swap = await handleUpdateState({
     workspace_path: ws,
     active_feature: "e5-replay-feat",
     status: "In_Progress",
     agent_id: "qa-engineer",
-    completed_tasks: ["T-E5-01", "T-E5-02", "T-E5-03"],
+    completed_tasks: ids,
     pending_notes: ["qa-engineer: pre-filling completion (the incident shape)"],
   });
-  assert.ok(
-    impersonation.isError,
-    `the E5 impersonation write shape must now be rejected: ${impersonation.content?.[0]?.text}`,
-  );
-  assert.match(impersonation.content[0].text, /QA_COMPLETION_EVIDENCE_MISSING/);
-  for (const id of ["T-E5-01", "T-E5-02", "T-E5-03"]) {
-    assert.match(impersonation.content[0].text, new RegExp(id), `rejection must name ${id} among the missing ids`);
+  assert.ok(swap.isError, `the qa-engineer-stamped swap must be rejected: ${swap.content?.[0]?.text}`);
+  assert.match(swap.content[0].text, /TRANSITION_REJECTED/);
+
+  // Write 2b — the same pre-fill stamped by the judge, zero qa_reports evidence anywhere.
+  const prefill = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "e5-replay-feat",
+    status: "In_Progress",
+    agent_id: "code-reviewer",
+    completed_tasks: ids,
+    pending_notes: ["code-reviewer: pre-filling completion with no report"],
+  });
+  assert.ok(prefill.isError, `the zero-evidence judge pre-fill must be rejected: ${prefill.content?.[0]?.text}`);
+  assert.match(prefill.content[0].text, /QA_COMPLETION_EVIDENCE_MISSING/);
+  for (const id of ids) {
+    assert.match(prefill.content[0].text, new RegExp(id), `rejection must name ${id} among the missing ids`);
   }
-  assert.deepEqual(
-    parseHandoff(ws).completed_tasks,
-    [],
-    "the impersonated ids must NOT land in completed_tasks — tasks.md/handoff must stay unpolluted",
-  );
+  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "the pre-filled ids must NOT land in completed_tasks");
 });
 
-sqliteDescribe("QAEV-SQL: SQLite mode — an unevidenced qa-engineer self-loop completion add is NOT gated (file-mode-only gate)", () => {
-  test("QAEV-SQL: SQLite-mode self-loop add with zero reports rows is accepted", async () => {
+sqliteDescribe("QAEV-SQL (E435): SQLite mode — an unevidenced judge self-loop completion add is NOT gated (file-mode-only gate)", () => {
+  test("QAEV-SQL (E435): SQLite-mode code-reviewer self-loop add with zero reports rows is accepted", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("e18-qaevsql-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -287,7 +283,7 @@ sqliteDescribe("QAEV-SQL: SQLite mode — an unevidenced qa-engineer self-loop c
         status: "In_Progress",
         completedTasks: [],
         pendingNotes: ["seed"],
-        lastAgent: "qa-engineer",
+        lastAgent: "code-reviewer",
       });
       resetSession(dir);
       storage.readState(dir);
@@ -296,9 +292,9 @@ sqliteDescribe("QAEV-SQL: SQLite mode — an unevidenced qa-engineer self-loop c
         workspace_path: dir,
         active_feature: "e18-sql-qa-feat",
         status: "In_Progress",
-        agent_id: "qa-engineer",
+        agent_id: "code-reviewer",
         completed_tasks: ["T-E18-SQL-01"],
-        pending_notes: ["qa-engineer: SQLite mode, no reports row exists yet"],
+        pending_notes: ["code-reviewer: SQLite mode, no reports row exists yet"],
       });
       assert.ok(!result.isError, `SQLite mode must ignore QA_COMPLETION_EVIDENCE_MISSING entirely: ${result.content?.[0]?.text}`);
       assert.doesNotMatch(result.content?.[0]?.text ?? "", /QA_COMPLETION_EVIDENCE_MISSING/);

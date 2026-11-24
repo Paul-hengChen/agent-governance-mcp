@@ -451,9 +451,10 @@ test("AC-4 (t-ac4-sentinel-not-persisted): [object Object] is never written to h
 // Regression guards — pre-existing refines must still fire
 // ---------------------------------------------------------------------------
 
-test("regression (t-reg-pass-requires-qa-engineer): status=PASS without agent_id=qa-engineer is rejected", async () => {
+test("regression (t-reg-pass-requires-code-reviewer, E435): status=PASS without agent_id=code-reviewer is rejected at the zod boundary naming code-reviewer", async () => {
   // Why: the original PASS/agent_id refine (added before this feature) must
-  // not have been disturbed by the two new .refine() additions.
+  // not have been disturbed by the two new .refine() additions. Since E435
+  // code-reviewer is the only judge, so the refine names it.
   const ws = mkWorkspace();
 
   const responses = await callServer([
@@ -469,14 +470,12 @@ test("regression (t-reg-pass-requires-qa-engineer): status=PASS without agent_id
   const res = findById(responses, 110);
   assert.ok(res, "must receive a response for id=110");
   const text = res?.result?.content?.[0]?.text ?? "";
-  const isError = res?.result?.isError === true || res?.error != null;
-  // Either the Zod refine fires (❌ Invalid arguments containing the PASS message)
-  // or the defense-in-depth handler gate fires (both are acceptable rejections).
-  const rejected =
-    isError ||
-    text.includes('status="PASS" requires agent_id="qa-engineer"') ||
-    text.includes("qa-engineer");
-  assert.ok(rejected, `PASS by sr-engineer must be rejected — got: ${text.slice(0, 300)}`);
+  // The zod refine fires first, before pre-flight: PASS_IDENTITY_REFINE_MESSAGE.
+  assert.ok(
+    text.includes('agent_id: status="PASS" requires agent_id="code-reviewer"'),
+    `PASS by sr-engineer must be rejected naming code-reviewer — got: ${text.slice(0, 300)}`,
+  );
+  assert.ok(!text.includes('requires agent_id="qa-engineer"'), "the pre-E435 qa-engineer wording is gone");
 });
 
 test("regression (t-reg-prd-path-traversal): prd_path outside workspace_path is rejected", async () => {

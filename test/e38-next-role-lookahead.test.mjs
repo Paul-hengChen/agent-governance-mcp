@@ -42,7 +42,6 @@ async function seedAndRead(opts) {
     pendingNotes: ["seed"],
     lastAgent: opts.lastAgent,
     hopCount: opts.hopCount ?? 0,
-    qaRound: opts.qaRound ?? 0,
     reviewRound: opts.reviewRound ?? 0,
     visualRound: opts.visualRound ?? 0,
     ...(opts.seed ?? {}),
@@ -84,13 +83,14 @@ function remedyOf(warning) {
 }
 
 // ============================================================================
-// L1: fires correctly on the live 2026-07-23 shape
+// L1: fires correctly on the live 2026-07-23 shape. E435: the FAIL is the
+// judge's (code-reviewer); qa-engineer never writes FAIL.
 // ============================================================================
 
-test("L1: qa-engineer:FAIL + next_role=design-auditor warns, remedy names pm:In_Progress and sr-engineer:In_Progress", async () => {
-  const ws = await seedAndRead({ lastAgent: "qa-engineer", status: "In_Progress", hopCount: 3 });
+test("L1 (E435): code-reviewer:FAIL + next_role=design-auditor warns, remedy names pm, sr-engineer and qa-engineer In_Progress", async () => {
+  const ws = await seedAndRead({ lastAgent: "code-reviewer", status: "In_Progress", hopCount: 3 });
   const result = await runUpdate(ws, {
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     status: "FAIL",
     blocking_reason: "e38 L1 probe FAIL",
     next_role: "design-auditor",
@@ -99,24 +99,25 @@ test("L1: qa-engineer:FAIL + next_role=design-auditor warns, remedy names pm:In_
   assert.ok(Array.isArray(envelope.warnings) && envelope.warnings.length === 1, "exactly one warning expected");
   const warning = envelope.warnings[0];
   assert.match(warning, /next_role="design-auditor"/);
-  assert.match(warning, /qa-engineer:FAIL/, "warning must name the state just written");
+  assert.match(warning, /code-reviewer:FAIL/, "warning must name the state just written");
   const remedy = remedyOf(warning);
   assert.match(remedy, /pm:In_Progress/, "remedy must name pm:In_Progress");
   assert.match(remedy, /sr-engineer:In_Progress/, "remedy must name sr-engineer:In_Progress");
+  assert.match(remedy, /qa-engineer:In_Progress/, "remedy must name the test-defect route back to qa-engineer (E435 code-reviewer:FAIL row)");
 });
 
 // ============================================================================
-// S-E37-lo / S-E37-hi: silent on the legal qa-engineer:PASS -> design-auditor
-// edge, at hop 2 AND hop 10. Hop 10 matters most: a hardcoded
+// S-E37-lo / S-E37-hi: silent on the legal code-reviewer:PASS -> design-auditor
+// edge (E435: the judge's PASS; was qa-engineer:PASS), at hop 2 AND hop 10. Hop 10 matters most: a hardcoded
 // feature_changed:false computed a SMALLER allowed set at the hop cap and
 // warned wrongly on exactly this edge, repeating as a warning the false
 // rejection that making this edge legal had just removed. (E37)
 // ============================================================================
 
-test("S-E37-lo: qa-engineer:PASS + next_role=design-auditor is silent at hop_count=2", async () => {
-  const ws = await seedAndRead({ lastAgent: "qa-engineer", status: "In_Progress", hopCount: 2 });
+test("S-E37-lo (E435): code-reviewer:PASS + next_role=design-auditor is silent at hop_count=2", async () => {
+  const ws = await seedAndRead({ lastAgent: "code-reviewer", status: "In_Progress", hopCount: 2 });
   const result = await runUpdate(ws, {
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     status: "PASS",
     qa_review: undefined,
     next_role: "design-auditor",
@@ -125,14 +126,14 @@ test("S-E37-lo: qa-engineer:PASS + next_role=design-auditor is silent at hop_cou
   assert.equal(envelope.warnings, undefined, "E37 edge must stay silent below hop cap");
 });
 
-test("S-E37-hi (ROUND-1 REGRESSION PIN): qa-engineer:PASS + next_role=design-auditor is silent at hop_count=10 (HOP_CAP)", async () => {
-  // PASS from qa-engineer:In_Progress is a same-agent status change, not a
+test("S-E37-hi (ROUND-1 REGRESSION PIN, E435): code-reviewer:PASS + next_role=design-auditor is silent at hop_count=10 (HOP_CAP)", async () => {
+  // PASS from code-reviewer:In_Progress is a same-agent status change, not a
   // role transition (DR-9) — hop_count does NOT increment on this write, so
   // seeding hopCount=10 reproduces new_hop_count=10 exactly, the counters
   // effectiveAllowedSuccessors is evaluated against.
-  const ws = await seedAndRead({ lastAgent: "qa-engineer", status: "In_Progress", hopCount: 10 });
+  const ws = await seedAndRead({ lastAgent: "code-reviewer", status: "In_Progress", hopCount: 10 });
   const result = await runUpdate(ws, {
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     status: "PASS",
     next_role: "design-auditor",
   });
@@ -166,10 +167,11 @@ test("S-RESUME: pm:In_Progress + next_role=code-reviewer is silent (resume_of wh
   );
 });
 
-test("S-ROUNDCAP: qa_round at cap collapses the allowed set to pm alone, and next_role=pm is silent", async () => {
-  const ws = await seedAndRead({ lastAgent: "qa-engineer", status: "In_Progress", qaRound: 3 });
+test("S-ROUNDCAP (E435): review_round at cap collapses the allowed set to pm alone, and next_role=pm is silent", async () => {
+  // E435: the qa round cap is gone; the review round cap is the one a judge FAIL charges.
+  const ws = await seedAndRead({ lastAgent: "code-reviewer", status: "In_Progress", reviewRound: 3 });
   const result = await runUpdate(ws, {
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     status: "FAIL",
     blocking_reason: "e38 round-cap probe",
     next_role: "pm",
@@ -178,16 +180,15 @@ test("S-ROUNDCAP: qa_round at cap collapses the allowed set to pm alone, and nex
   assert.equal(
     envelope.warnings,
     undefined,
-    "new_qa_round reaches 4 (ROUND_CAP) on this write; the collapsed effective set is {pm:In_Progress} " +
+    "new_review_round reaches 4 (REVIEW_ROUND_CAP) on this write; the collapsed effective set is {pm:In_Progress} " +
       "exactly, and next_role=pm names it, so this must stay silent",
   );
 });
 
-test("S-SELFLOOP: sr-engineer:In_Progress self-loop (next_role=sr-engineer) is silent", async () => {
-  // pm:In_Progress -> sr-engineer:In_Progress needs an approved ticket cut
-  // (CUT_APPROVAL_REQUIRED), which is unrelated to the lookahead warning, so
-  // the seed sets it.
-  const ws = await seedAndRead({ lastAgent: "pm", status: "In_Progress", seed: { cutApproved: true } });
+test("S-SELFLOOP (E435): sr-engineer:In_Progress self-loop (next_role=sr-engineer) is silent", async () => {
+  // E435: pm -> sr-engineer is no longer an edge, so the seed is sr-engineer
+  // itself and the write under test is the true In_Progress self-loop.
+  const ws = await seedAndRead({ lastAgent: "sr-engineer", status: "In_Progress" });
   const result = await runUpdate(ws, {
     agent_id: "sr-engineer",
     status: "In_Progress",
@@ -209,8 +210,10 @@ test("S-SELFLOOP: sr-engineer:In_Progress self-loop (next_role=sr-engineer) is s
 // named, not merely that the string is non-empty.
 // ============================================================================
 
-test("R-QA-IP (ROUND-2 REGRESSION PIN): qa-engineer:In_Progress remedy names PASS/FAIL/Blocked, excludes the self-loop", async () => {
-  const ws = await seedAndRead({ lastAgent: "code-reviewer", status: "In_Progress" });
+test("R-QA-IP (ROUND-2 REGRESSION PIN, E435): qa-engineer:In_Progress remedy names Blocked and the sr-engineer hand-off, no PASS/FAIL, excludes the self-loop", async () => {
+  // E435: qa-engineer is reached from sr-engineer (the test return), not from
+  // code-reviewer, and its row is {qa-engineer:Blocked, sr-engineer:In_Progress}.
+  const ws = await seedAndRead({ lastAgent: "sr-engineer", status: "In_Progress" });
   const result = await runUpdate(ws, {
     agent_id: "qa-engineer",
     status: "In_Progress",
@@ -219,14 +222,14 @@ test("R-QA-IP (ROUND-2 REGRESSION PIN): qa-engineer:In_Progress remedy names PAS
   const envelope = envelopeOf(result);
   assert.ok(Array.isArray(envelope.warnings) && envelope.warnings.length === 1);
   const remedy = remedyOf(envelope.warnings[0]);
-  assert.match(remedy, /qa-engineer:PASS/);
-  assert.match(remedy, /qa-engineer:FAIL/);
   assert.match(remedy, /qa-engineer:Blocked/);
+  assert.match(remedy, /sr-engineer:In_Progress/);
+  assert.doesNotMatch(remedy, /qa-engineer:(PASS|FAIL)/, "qa-engineer is not the judge (E435)");
   assert.doesNotMatch(
     remedy,
     /qa-engineer:In_Progress/,
     "the exact (agent,status) pair just written (the true self-loop) must be excluded from the remedy, " +
-      "but the real same-agent STATUS CHANGES above must survive — round 2's bug was excluding ALL of them",
+      "but the real same-agent STATUS CHANGE above must survive — round 2's bug was excluding ALL of them",
   );
   assert.notEqual(remedy, "(none — no successor is currently reachable from this state)");
 });
@@ -256,13 +259,13 @@ test("R-PM-BLOCKED (ROUND-2 REGRESSION PIN): pm:Blocked remedy names pm:In_Progr
 // with a next_role that is not just wrong but wildly implausible.
 // ============================================================================
 
-test("N-NEVERREJECT: a write carrying a bogus next_role still succeeds and still persists", async () => {
-  const ws = await seedAndRead({ lastAgent: "qa-engineer", status: "In_Progress", hopCount: 1 });
+test("N-NEVERREJECT (E435): a write carrying a bogus next_role still succeeds and still persists", async () => {
+  const ws = await seedAndRead({ lastAgent: "code-reviewer", status: "In_Progress", hopCount: 1 });
   const result = await runUpdate(ws, {
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     status: "FAIL",
     blocking_reason: "e38 never-reject probe",
-    next_role: "release-engineer", // not in {sr-engineer, pm} — the actual allowed set
+    next_role: "release-engineer", // not in {sr-engineer, pm, qa-engineer} — the actual allowed set
   });
   assert.ok(!result.isError, "the write itself must never be rejected by the advisory");
   const envelope = JSON.parse(result.content[0].text);
@@ -275,7 +278,7 @@ test("N-NEVERREJECT: a write carrying a bogus next_role still succeeds and still
   const persisted = storage.parse(ws);
   assert.equal(persisted.active_feature, FEATURE);
   assert.equal(persisted.status, "FAIL");
-  assert.equal(persisted.last_agent, "qa-engineer");
+  assert.equal(persisted.last_agent, "code-reviewer");
 });
 
 // ============================================================================
@@ -284,18 +287,18 @@ test("N-NEVERREJECT: a write carrying a bogus next_role still succeeds and still
 // `warnings`, neither clobbering the other. (E28, E38)
 // ============================================================================
 
-test("C-E28COEXIST: a single write triggering both a shrink warning and a lookahead advisory yields both, uncorrupted", async () => {
+test("C-E28COEXIST (E435): a single write triggering both a shrink warning and a lookahead advisory yields both, uncorrupted", async () => {
   const ws = await seedAndRead({
-    lastAgent: "qa-engineer",
+    lastAgent: "code-reviewer",
     status: "In_Progress",
     seed: { dispatchPins: { "sr-engineer": "fable", "release-engineer": "opus" } },
   });
   const result = await runUpdate(ws, {
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     status: "FAIL",
     blocking_reason: "e38/e28 coexistence probe",
     dispatch_pins: { "sr-engineer": "fable" }, // drops release-engineer -> shrink warning (E28)
-    next_role: "design-auditor", // not in {sr-engineer, pm} for qa-engineer:FAIL -> lookahead warning (E38)
+    next_role: "design-auditor", // not in {sr-engineer, pm, qa-engineer} for code-reviewer:FAIL -> lookahead warning (E38)
   });
   const envelope = envelopeOf(result);
   assert.ok(Array.isArray(envelope.warnings), "warnings array must be present");
