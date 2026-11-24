@@ -450,3 +450,8 @@ test/constitution-deliverable-guard.test.mjs | A4 (E435): §3.2 enforcement rest
 
 # T-E435-25 — content text pins (3/3): token-efficiency, e440-current-rule-wording, e410-task-alias-content-tail (no change), e408-core-task-alias-tail (no change), e438-origin-fenced-labels
 # no rows: the new / re-pinned tests are green at base (resume_of content already names only code-reviewer since E433; E435-edited lines carry no bare label yet) and must stay green after T-E435-32/33/36/41; 82/82 green at base
+
+# T-E435-26 — adapter / CLAUDE.md pins: agc-adapters, e395-claude-md-tail, e444-claude-local-adapter (no rows), e178a-integrator-role (no rows), e436-stale-handoff-paths (no rows)
+test/agc-adapters.test.mjs | E101 (E435): claude.md's judge-dispatch sentence names code-reviewer as the in-context judge and qa-engineer as the test author (Copy) | templates/agent-adapters/claude.md still reads "subagent tool): judging in-context voids" at base (T-E435-37)
+test/e395-claude-md-tail.test.mjs | AC-E395-7 (E435): CLAUDE.md and the claude.md adapter template carry the same Execution Profile sentence, naming code-reviewer as the in-context judge | CLAUDE.md / claude.md bullet still has the old "judging in-context" clause, not the Copy sentence, at base (T-E435-37)
+test/e395-claude-md-tail.test.mjs | AC-E395-8 (E435): the tools/transitions.ts Layout row names no qa ROUND_CAP; the pipeline stays 17-step | CLAUDE.md line 78 still names `ROUND_CAP=4` at base (T-E435-37)

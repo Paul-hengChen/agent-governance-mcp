@@ -844,6 +844,17 @@ test("E101: templates/agent-adapters/claude.md states the judge-dispatch obligat
   }
 });
 
+test("E101 (E435): claude.md's judge-dispatch sentence names code-reviewer as the in-context judge and qa-engineer as the test author (Copy)", () => {
+  // Why: on the single judge path code-reviewer is the only judge; qa-engineer is still
+  // Task-dispatched, but as the test author kept out of the builder's context. The old
+  // "judging in-context" clause lumped both roles together as judges.
+  const claudeTpl = fs.readFileSync(path.join(PROJECT_ROOT, "templates", "agent-adapters", "claude.md"), "utf-8");
+  const sentence =
+    "`code-reviewer` and `qa-engineer` MUST be dispatched via `Task` (agc's shorthand for Claude Code's `Agent` subagent tool): code-reviewer judging in-context, or qa-engineer writing the tests in the builder's context, voids Constitution §3 builder != judge, and the downgrade is invisible to every gate in `GATE_REGISTRY`.";
+  assert.equal(claudeTpl.split(sentence).length - 1, 1, "claude.md carries the Copy sentence exactly once");
+  assert.ok(!claudeTpl.includes("subagent tool): judging in-context voids"), "the old clause naming no judge is gone");
+});
+
 // --- dogfood payoff (the mechanism must actually pay off) -------------------
 
 test("E100 dogfood payoff: agc-init-written host:\"claude-code\" flows through to hostCapabilitiesFor().taskTool === true via the real loadConfig() pipeline", async () => {

@@ -84,3 +84,32 @@ test("AC-E395-6: the npm test comment names the most recent release by date, not
   const testing = CLAUDE.split("## Testing changes")[1] ?? "";
   assert.equal(count(testing, "suite-result:"), 1, "suite-result: occurs once in the Testing changes section");
 });
+
+// E435 (specs/e435-remove-old-path-architecture.md, Copy "Execution Profile sentence" + T-37 row):
+// the single judge path leaves no bare qa round cap, and code-reviewer is the judge whose
+// in-context run the Execution Profile forbids; qa-engineer is forbidden from writing the
+// tests in the builder's context. The pipeline stays 17 steps (OQ (b)).
+const E435_EXEC_PROFILE =
+  "`code-reviewer` and `qa-engineer` MUST be dispatched via `Task` (agc's shorthand for Claude Code's `Agent` subagent tool): code-reviewer judging in-context, or qa-engineer writing the tests in the builder's context, voids Constitution §3 builder != judge, and the downgrade is invisible to every gate in `GATE_REGISTRY`.";
+const execProfileBullet = (s) => s.split("\n").find((l) => l.startsWith("- Subagent dispatch:"));
+
+test("AC-E395-7 (E435): CLAUDE.md and the claude.md adapter template carry the same Execution Profile sentence, naming code-reviewer as the in-context judge", () => {
+  const tpl = fs.readFileSync(path.join(ROOT, "templates", "agent-adapters", "claude.md"), "utf-8");
+  const mine = execProfileBullet(CLAUDE);
+  const theirs = execProfileBullet(tpl);
+  assert.ok(mine && theirs, "both files carry the Subagent dispatch bullet");
+  assert.equal(mine, theirs, "CLAUDE.md and templates/agent-adapters/claude.md carry the identical bullet");
+  assert.equal(count(mine, E435_EXEC_PROFILE), 1, "the bullet carries the Copy sentence verbatim");
+  assert.ok(!mine.includes("`Agent` subagent tool): judging in-context voids"), "the old unqualified judge clause is gone");
+  assert.ok(mine.startsWith("- Subagent dispatch: invoking `/teamwork` (or any agc role prompt) IS the user's standing request"), "rest of the bullet unchanged (head)");
+  assert.ok(mine.endsWith("may still run in-context under budget pressure — no independence property is at stake there."), "rest of the bullet unchanged (tail)");
+});
+
+test("AC-E395-8 (E435): the tools/transitions.ts Layout row names no qa ROUND_CAP; the pipeline stays 17-step", () => {
+  const row = layoutLines().filter((l) => l.startsWith("tools/transitions.ts "));
+  assert.equal(row.length, 1, "one tools/transitions.ts row");
+  assert.equal(row[0], "tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6, SR_RETURN_CAP=2)");
+  assert.equal(CLAUDE.match(/(?<![A-Z_])ROUND_CAP=/g), null, "no bare ROUND_CAP= anywhere in CLAUDE.md");
+  assert.equal(count(CLAUDE, "the 17-step"), 2, "both pipeline mentions still say 17-step");
+  assert.equal(CLAUDE.match(/\b1[0-9]-step\b/g).length, 2, "no other step count is named");
+});

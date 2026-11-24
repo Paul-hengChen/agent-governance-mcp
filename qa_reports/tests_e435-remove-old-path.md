@@ -876,3 +876,26 @@ Left as is: e410 all — its line-number pins (const-05:9, const-08:2/5, skill-p
 ### Red Reasons (T-25)
 
 No red tests: both new tests and the re-pinned fixture are green at base and must stay green after T-E435-32/33/36/41 (guards against a rewrite that strips a fence, adds a bare label, or reintroduces a qa-engineer resume target). `# T-E435-25` comment block in the manifest, no rows. Run: `node --test` on the five files → 82 tests, 82 pass, 0 fail.
+
+## T-E435-26 — `agc-adapters`, `e395-claude-md-tail`, `e444-claude-local-adapter`, `e178a-integrator-role`, `e436-stale-handoff-paths` (AC7, AC11)
+
+Placement: existing files, edited in place (brief). New tests carry `(E435)`. 3 new tests over 2 files; `e444`, `e178a`, `e436` need no change. Closes the T-23 / T-24 gap: the T-37 Execution Profile sentence is now pinned verbatim.
+
+### Scenario → Test Map (T-26)
+
+| contract text (task) | file | exact test name |
+|---|---|---|
+| Execution Profile sentence (Copy, T-37) in `templates/agent-adapters/claude.md`, exactly once; old "subagent tool): judging in-context voids" clause absent | agc-adapters | E101 (E435): claude.md's judge-dispatch sentence names code-reviewer as the in-context judge and qa-engineer as the test author (Copy) |
+| `CLAUDE.md` and `claude.md` carry the identical "- Subagent dispatch:" bullet holding the Copy sentence; head and tail of the bullet unchanged ("rest of the bullet unchanged") | e395 | AC-E395-7 (E435): CLAUDE.md and the claude.md adapter template carry the same Execution Profile sentence, naming code-reviewer as the in-context judge |
+| `CLAUDE.md` line 78 → `round caps (REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6, SR_RETURN_CAP=2)`, no bare `ROUND_CAP=`; lines 48/62 stay "the 17-step" (OQ (b): pipeline 17), no other step count | e395 | AC-E395-8 (E435): the tools/transitions.ts Layout row names no qa ROUND_CAP; the pipeline stays 17-step |
+
+Left as is: agc-adapters E101 (its `code-reviewer … qa-engineer … MUST … Task` regex and standing-request check still hold under the Copy); e444 all (uses the template as an opaque block, no sentence or line-count pin); e178a all (no Execution Profile / round-cap pin; its lane-protocol §5 "只派單一角色的 judge（例如只派 qa）" pin is a cut-routing sentence with no Copy row, outside T-38's "only `qa_round` / qa-closing sentences" scope); e436 all (CLAUDE.md line pins 13/44/64/195/220 do not move: T-37 edits lines 78 and 247 in place). The `agc-version` stamp is not pinned or changed; CLAUDE.md line-count limits untouched (T-E435-40 re-checks).
+
+### Open Interface Details (T-26)
+
+1. Sentence pinned is the architecture's Copy row "Execution Profile sentence (T-37)" verbatim; nothing invented. Bullet head/tail anchors are the current text the Copy says stays unchanged.
+2. Bare-cap check is `/(?<![A-Z_])ROUND_CAP=/` so `REVIEW_ROUND_CAP=4` / `VISUAL_ROUND_CAP=6` do not trip it.
+
+### Red Reasons (T-26)
+
+3 red at base, all assertion failures: E101 (E435) and AC-E395-7 (E435) (old "judging in-context" clause, T-37); AC-E395-8 (E435) (line 78 `ROUND_CAP=4`, T-37). Rows under `# T-E435-26` in the manifest. Run: `node --test` on the five files → 89 tests, 86 pass, 3 fail = the 3 rows, name for name.
