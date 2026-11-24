@@ -128,6 +128,10 @@ const FROZEN_PATHS = ["tools/transitions.ts", "CLAUDE.md", "schema", "prompts"];
 const BASE_DIST_OTHER_BLOBS = "67ebb84f3381e4790c733a272386c66113098837cc56915740251e640aecb242";
 const DIST_ALLOWED = /^dist\/(gates\/registry|gates\/visual|tools\/evidence-file|tools\/handoff-orchestrator)\./;
 const BASE_CURRENT_VERSIONS = { handoff: 16, tasks: 2, sqlite: 2, config: 2 };
+// E435 (specs/e435-remove-old-path.md) later removed two ledger gates (35 -> 33) and bumped handoff 16 -> 17.
+// E434 moved neither; the live pins carry E435's values, and E434's own "unchanged" half is the closed
+// LANE_END_SHA range below, which still reads E434's end commit.
+const E435_CURRENT_VERSIONS = { ...BASE_CURRENT_VERSIONS, handoff: 17 };
 
 // null while the lane builds: the digest checks read the live tree. T-E434-08 sets it to the lane's last
 // content commit, after which they read that fixed commit (closed range) and skip loudly if it is unreachable.
@@ -759,10 +763,10 @@ test("AC11: docs/config.md override list + config.migration directly under it; R
 
 // ================================================================== AC13
 
-test("AC13: 35 gates, 17 steps, CURRENT_VERSIONS unchanged; transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged; agc check exits 0", (t) => {
-  assert.equal(GATE_REGISTRY.length, 35);
+test("AC13: 33 gates (E435), 17 steps, CURRENT_VERSIONS = E435's (handoff 17); transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged; agc check exits 0", (t) => {
+  assert.equal(GATE_REGISTRY.length, 33, "E435 removed two ledger gates");
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17);
-  assert.deepEqual({ ...CURRENT_VERSIONS }, BASE_CURRENT_VERSIONS, "no schema version moved");
+  assert.deepEqual({ ...CURRENT_VERSIONS }, E435_CURRENT_VERSIONS, "only E435's handoff 16 -> 17 moved since E434's base");
   const agc = spawnSync(process.execPath, [path.join(ROOT, "bin", "agc-init.mjs"), "check"], { cwd: ROOT, encoding: "utf-8" });
   assert.equal(agc.status, 0, `agc check exits 0: ${agc.stdout}${agc.stderr}`);
 

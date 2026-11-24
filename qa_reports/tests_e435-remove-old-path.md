@@ -1066,3 +1066,30 @@ Placement: existing files only (brief). All five (B) rows accepted as test-side;
 ### Results
 
 `node --test` on the five files: 98/98 pass, 0 skipped (SQLite present). Two rows cleared from `qa_reports/expected-red_e435-remove-old-path.txt` (e431 AC18, e432 AC12); e423/e128/e230 had no manifest rows.
+
+## T-E435-49 hand-back re-pins part 3 (qa-engineer, R3 (b))
+
+Placement: existing files only (brief). All five (B) rows accepted as test-side; no SR-BUG. The e359 row carries a source change for sr (T-E435-50).
+
+| file | test | re-pin |
+|---|---|---|
+| test/e359-void-refusal-message.test.mjs | `LEDGER` / `BOTH` constants (AC-E359-1, -2, -4 SQLite ledger/both), AC-E359-5 (renamed "(E435) … code-reviewer FAIL write …") | message names code-reviewer; AC-5 seeds `code-reviewer:In_Progress` and writes `code-reviewer` FAIL with `review_verdict: CHANGES_REQUESTED`, `review_task_ids: ["T-B"]`; ledger empties, void succeeds |
+| test/cut-approval-gate.test.mjs | R-schema-1 | `schema_version` matched against `CURRENT_VERSIONS.handoff` (17), not a literal |
+| test/source-credibility-gate.test.mjs | T11 | sanity check: the isolated gate block calls `isBuildEntry(` (was the literal `"pm"`) |
+| test/e419-retired-write-mechanisms.test.mjs | AC2 (renamed "33 gates (E435)") | 33 gates, 17 steps |
+| test/e434-reviewer-visual.test.mjs | AC13 (renamed "33 gates (E435) … handoff 17") | live pins 33 gates, 17 steps, `CURRENT_VERSIONS` = base with handoff 17; the byte-identity half already reads the closed `LANE_END_SHA` range, unchanged |
+
+### Open Interface Details
+
+- `voidRefusalMessage` new wording (sr implements in `tools/tasks-file.ts`, T-E435-50): only the role name changes, `qa-engineer` -> `code-reviewer`, in the ledger and both branches; the row branch is byte-unchanged. Exact texts (`<id>` = the task id):
+  - ledger: `Task <id> is already completed and cannot be voided — the task list shows it open, but the handoff completed_tasks ledger still records it. Have code-reviewer remove it first with a FAIL write (tw_update_state) carrying review_task_ids=[<id>]; then void it.`
+  - both: `Task <id> is already completed and cannot be voided — to undo it, roll it back (tw_rollback_task) and have code-reviewer remove it from the handoff completed_tasks ledger with a FAIL write (tw_update_state) carrying review_task_ids=[<id>]; then void it.`
+  - Reason: the E359 invariant is "the text names the step that clears the state"; on the one chain that step is the judge's (code-reviewer) FAIL with `review_task_ids`. SQLite returns the same bytes (AC-E359-4), so one shared function change covers both modes.
+
+### Red Reasons
+
+- e359 AC-E359-1, -2, -5, -4 (SQLite ledger), -4 (SQLite both): `voidRefusalMessage` still says "Have qa-engineer remove it …" / "have qa-engineer remove it from …" (T-E435-50). AC-5's FAIL/void steps were verified green with the message assertion relaxed in a throwaway probe (deleted).
+
+### Results
+
+`node --test` on the five files: 97 tests, 92 pass, 5 fail (exactly the five e359 rows above), 0 skipped (SQLite present). Five rows added to `qa_reports/expected-red_e435-remove-old-path.txt`, tagged T-E435-50.

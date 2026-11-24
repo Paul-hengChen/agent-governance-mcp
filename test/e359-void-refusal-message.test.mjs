@@ -31,12 +31,15 @@ const sqliteTest = (name, fn) =>
   SqliteHandoffStorage ? test(name, fn) : test(name, { skip: "better-sqlite3 not installed" }, () => {});
 
 // Copy / Strings (spec), quoted verbatim: the contract under test.
+// E435 (T-E435-49): the ledger and both texts name code-reviewer, the one judge whose FAIL write with
+// review_task_ids removes an id from completed_tasks; a qa-engineer FAIL is no longer an edge. Only the
+// role name moved; every other byte is the E359 text.
 const ROW = (id) =>
   `Task ${id} is already completed and cannot be voided — roll it back first (tw_rollback_task) if it needs to be undone.`;
 const LEDGER = (id) =>
-  `Task ${id} is already completed and cannot be voided — the task list shows it open, but the handoff completed_tasks ledger still records it. Have qa-engineer remove it first with a FAIL write (tw_update_state) carrying review_task_ids=[${id}]; then void it.`;
+  `Task ${id} is already completed and cannot be voided — the task list shows it open, but the handoff completed_tasks ledger still records it. Have code-reviewer remove it first with a FAIL write (tw_update_state) carrying review_task_ids=[${id}]; then void it.`;
 const BOTH = (id) =>
-  `Task ${id} is already completed and cannot be voided — to undo it, roll it back (tw_rollback_task) and have qa-engineer remove it from the handoff completed_tasks ledger with a FAIL write (tw_update_state) carrying review_task_ids=[${id}]; then void it.`;
+  `Task ${id} is already completed and cannot be voided — to undo it, roll it back (tw_rollback_task) and have code-reviewer remove it from the handoff completed_tasks ledger with a FAIL write (tw_update_state) carrying review_task_ids=[${id}]; then void it.`;
 
 const F = "e359-void-probe";
 
@@ -111,9 +114,10 @@ test("AC-E359-1/2/3 boundary: a ledger holding only a prefix-similar id (T-B2) d
   assert.equal(result.success, true, "word-boundary match: T-B2 in the ledger must not block voiding T-B");
 });
 
-test("AC-E359-5: the step the ledger message names (qa FAIL write with review_task_ids) really unblocks the void", async () => {
+test("AC-E359-5 (E435): the step the ledger message names (code-reviewer FAIL write with review_task_ids) really unblocks the void", async () => {
+  // E435: the judge is code-reviewer; its CHANGES_REQUESTED (status=FAIL) is the write that drops ids.
   const ws = mkWs("- [ ] T-A first\n- [ ] T-B second\n");
-  await seedLedger(ws, ["T-B"], "qa-engineer");
+  await seedLedger(ws, ["T-B"], "code-reviewer");
   const refused = JSON.parse(await voidTask(ws, "T-B", "mis-cut"));
   assert.equal(refused.error, LEDGER("T-B"));
 
@@ -121,11 +125,12 @@ test("AC-E359-5: the step the ledger message names (qa FAIL write with review_ta
     workspace_path: ws,
     active_feature: F,
     status: "FAIL",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
+    review_verdict: "CHANGES_REQUESTED",
     review_task_ids: ["T-B"],
     qa_review: "FAIL T-B: row rolled back off-SOP",
-    blocking_reason: "QA: T-B FAIL",
-    pending_notes: ["QA: T-B FAIL"],
+    blocking_reason: "code-reviewer: T-B FAIL",
+    pending_notes: ["code-reviewer: T-B FAIL"],
   });
   assert.ok(!fail.isError, fail.content?.[0]?.text);
   assert.deepEqual(parseHandoff(ws).completed_tasks, [], "FAIL write removed T-B from the ledger");

@@ -28,7 +28,7 @@ import {
   FileHandoffStorage,
 } from "../dist/tools/storage.js";
 import { resetSession, markStateRead } from "../dist/guards/session.js";
-import { _clearRegistryForTests, runMigrations, registerMigration } from "../dist/schema/versions.js";
+import { _clearRegistryForTests, runMigrations, registerMigration, CURRENT_VERSIONS } from "../dist/schema/versions.js";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 import { TOOL_REGISTRY } from "../dist/tools/registry.js";
 import { forceSeedStamp } from "./e148-seed-stamp.mjs";
@@ -121,7 +121,9 @@ test("R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed
   // evidence-schema versioning, e23 (evidence_schema pin, stamp-only, seeds
   // nothing). Re-baselined for the lane-layout migration (e123a): bumped 14->15
   // (dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing).
-  assert.match(raw, /schema_version:\s*16/, "schema_version must be 15 (e123a-lane-layout-migration)");
+  // E435: pinned to CURRENT_VERSIONS.handoff (17 after the v16 -> v17 qa_round drop) so a stamp-only bump
+  // no longer needs a re-baseline here; the invariant is "the write stamps the current version".
+  assert.match(raw, new RegExp(`schema_version:\\s*${CURRENT_VERSIONS.handoff}\\b`), `schema_version must be CURRENT_VERSIONS.handoff (${CURRENT_VERSIONS.handoff})`);
   assert.match(raw, /cut_approved:\s*true/, "cut_approved must be emitted as true");
 });
 
