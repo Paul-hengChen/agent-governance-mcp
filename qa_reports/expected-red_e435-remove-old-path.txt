@@ -393,3 +393,10 @@ test/e178b-lane-watch.test.mjs | AC4 expiry and re-arm command | WATCH_STATE_KEY
 test/e178b-lane-watch.test.mjs | AC5 re-arm round trip | WATCH_STATE_KEYS still ends with qa_round at base, so every state line carries qa_round=- (T-E435-42)
 test/e178b-lane-watch.test.mjs | AC6 argument rules | WATCH_STATE_KEYS still ends with qa_round at base, so every state line carries qa_round=- (T-E435-42)
 test/e178b-lane-watch.test.mjs | AC15 prereview transition | WATCH_STATE_KEYS still ends with qa_round at base, so every state line carries qa_round=- (T-E435-42)
+
+# T-E435-18
+test/e183-summarize-metrics-lane.test.mjs | AC-E183-7 (E435): qa_rounds is out of the summary — an older record's qa_rounds is ignored, the mean reads review / visual only | scripts/summarize-metrics.mjs still prints a qa_rounds column and "mean rounds: qa X /" at base (T-E435-34)
+test/e22-stale-notify.test.mjs | S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no schema bump; the dedupe cursor lives entirely in the watch-file, not in handoff state) | CURRENT_VERSIONS.handoff is 16 at base, no v16 -> v17 step (T-E435-29)
+test/e223-watch-rearm-gone.test.mjs | AC1 gone key on start in the default set | WATCH_STATE_KEYS still ends with qa_round at base, so every state line carries qa_round=- (T-E435-42)
+test/e223-watch-rearm-gone.test.mjs | AC2 gone ordering | WATCH_STATE_KEYS still ends with qa_round at base, so every state line carries qa_round=- (T-E435-42)
+test/e223-watch-rearm-gone.test.mjs | AC3 gone keys are not carried | WATCH_STATE_KEYS still ends with qa_round at base, so the state line and its re-arm fingerprint differ (T-E435-42)

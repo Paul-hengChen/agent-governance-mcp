@@ -19,6 +19,7 @@ import {
   resolveStoredPrdPath,
 } from "../dist/tools/handoff-parse.js";
 import { resetSession } from "../dist/guards/session.js";
+import { CURRENT_VERSIONS } from "../dist/schema/versions.js";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 
 function mkWorkspace(prefix = "e235a-") {
@@ -47,19 +48,18 @@ function writeRaw(ws, content) {
   fs.writeFileSync(path.join(ws, ".current", "handoff.md"), content, "utf-8");
 }
 
-// Minimal v15 (CURRENT_VERSIONS.handoff) raw fixture builder — schema_version
+// Minimal CURRENT_VERSIONS.handoff raw fixture builder (E435: no literal, no qa_round line) — schema_version
 // already at CURRENT so readAndMigrate applies zero migrations (no heal
 // write, no unrelated field-default noise), mirroring the v3/v5 legacy
 // fixtures in test/handoff-migration.test.mjs but pinned at the current
 // version so this file's assertions are about prd_path alone.
 function rawFixture({ prdPathLine }) {
   return `---
-schema_version: 15
+schema_version: ${CURRENT_VERSIONS.handoff}
 active_feature: "e235a-fixture-feat"
 status: "In_Progress"
 last_updated: "2026-09-28T00:00:00.000Z"
 last_agent: "pm"
-qa_round: 0
 review_round: 0
 visual_round: 0
 hop_count: 0

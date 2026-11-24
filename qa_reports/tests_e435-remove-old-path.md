@@ -674,3 +674,29 @@ No change needed (left as is): `test/e137-rag-render.test.mjs` (a storage stub's
 ### Red Reasons (T-17)
 
 11 red at base, all assertion failures for the stated reason (no syntax / link error): e177b AC4/AC6, lane-status still sums / cap-checks / renders `qa_round` (T-E435-42); e178b-lane-watch ×9, `WATCH_STATE_KEYS` still ends with `qa_round`, so every state line carries `qa_round=-` (and AC4's re-arm fingerprint differs) (T-E435-42). No test dropped. Rows under `# T-E435-17` in the manifest. Run: `node --test test/e123b9-lane-flip.test.mjs test/e137-rag-render.test.mjs test/e177b-lane-status.test.mjs test/e178b-lane-watch.test.mjs test/e178b-cut-prereview.test.mjs` → 69 tests, 58 pass, 11 fail = the 11 rows, name for name.
+
+## T-E435-18 — `e183-summarize-metrics-lane`, `e223-watch-rearm-gone`, `e22-stale-notify`, `e235a-relative-prd-path` (AC4)
+
+Placement: existing files, edited in place (brief). New / re-pinned tests carry `E435`. 30 changed test lines (21+ / 9-), under the 300-line cap. Contract: architecture *Handoff schema v17 (file mode)*, *Metrics sidecar* (new records carry no `qa_rounds`; older records' value ignored), T-34 row (`scripts/summarize-metrics.mjs`: `mean rounds: review X / visual Y`, qa term out), T-42 row (watch key out), Rulings (a) drop. Conventions from T-E435-16/17 reused (fixtures at `CURRENT_VERSIONS.handoff` with no `qa_round` line; absence as no `qa_round` text).
+
+### Scenario → Test Map (T-18)
+
+| scenario | exact test name(s) |
+|---|---|
+| summarize-metrics output has no qa column / qa mean; a pre-v5 record's `qa_rounds` is ignored; mean reads `review X / visual Y` | e183 `AC-E183-7 (E435): qa_rounds is out of the summary — …` (new) |
+| new-shape metrics record (no `qa_rounds`) still summarized on every lane-resolution path | e183 AC-E183-1…6 (shared `RECORD` fixture re-shaped; green on both) |
+| watch state line ends at `review_round` for gone-key / re-arm flows | e223 AC1 gone key on start, AC2 gone ordering, AC3 gone keys are not carried (handoff fixture and independent `stateLine` drop `qa_round`) |
+| handoff schema is 17 (E435 bump, not E22's) | e22 `S1: sanity — …` (literal 16 → 17) |
+| stale-dispatch fixture at CURRENT with no `qa_round` line | e22 `writeRawHandoff` (U*/I*/E29*, green on both) |
+| prd_path fixture at CURRENT with no `qa_round` line (was a literal 15 labelled "CURRENT") | e235a AC1–AC4 (green on both; `parseHandoff` never heals, AC3 byte-equality unaffected) |
+
+No test dropped. Other e223 tests (AC4+) green on both: they print no state line for a present lane or compare only gone-key output.
+
+### Open Interface Details (T-18)
+
+1. AC-E183-7 pins the mean text as `mean rounds: review 1.00 / visual 0.00` (architecture T-34 Copy, the script's existing `toFixed(2)`), and absence as no `qa_rounds` / word `qa` anywhere in stdout (so the legend's `qa/review/visual_rounds` must lose its qa term too).
+2. e235a now imports `CURRENT_VERSIONS` from `dist/schema/versions.js` (e22 convention) instead of a literal, so the "already at CURRENT, zero migrations" premise holds on both sides.
+
+### Red Reasons (T-18)
+
+5 red at base, all assertion failures for the stated reason (no syntax / link error): e183 AC-E183-7, summarize-metrics still prints the `qa_rounds` column and `mean rounds: qa …` (T-E435-34); e22 S1, `CURRENT_VERSIONS.handoff` 16 (T-E435-29); e223 AC1/AC2/AC3, `WATCH_STATE_KEYS` still ends with `qa_round`, so state lines carry `qa_round=-` and AC3's re-arm fingerprint differs (T-E435-42). Rows under `# T-E435-18` in the manifest. Run: `node --test test/e183-summarize-metrics-lane.test.mjs test/e223-watch-rearm-gone.test.mjs test/e22-stale-notify.test.mjs test/e235a-relative-prd-path.test.mjs` → 53 tests, 48 pass, 5 fail = the 5 rows, name for name.

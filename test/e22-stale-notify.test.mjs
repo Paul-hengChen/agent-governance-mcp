@@ -60,7 +60,6 @@ active_feature: "e22-fixture-feat"
 status: "In_Progress"
 last_updated: "${staleStamp}"
 last_agent: "coordinator"
-qa_round: 0
 review_round: 0
 visual_round: 0
 next_role: "${nextRole}"
@@ -484,7 +483,8 @@ test("I9: armed config but the watch-file's target path is an existing directory
 // ============================================================================
 
 test("S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no schema bump; the dedupe cursor lives entirely in the watch-file, not in handoff state)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 16, "E22 must not have bumped the handoff schema version");
+  // E435 re-pin: 17 is the E435 bump (chain_path / qa_round / qa_rounds_total dropped), not E22's.
+  assert.equal(CURRENT_VERSIONS.handoff, 17, "E22 must not have bumped the handoff schema version");
   // The config schema is at 2 for an unrelated reason (the init artifacts flag,
   // e106-init-artifacts-flag); this pins the current value, not that the notify left it
   // at 1.
