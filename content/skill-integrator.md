@@ -186,7 +186,7 @@ The five verifier constraints<!-- origin:start --> (E192)<!-- origin:end --> hol
 1. **New tickets**: lane `pending-tickets.md` blocks are allocated by `agc feature finish <lane> --shipped --base integ/<feature>` in stage 6 — the single writer<!-- origin:start --> (E124)<!-- origin:end -->; one lane at a time, never in parallel. You allocate only findings that live in no lane file AND clear the filing bar (a confirmed defect that will make users go wrong, or one the human asks for; a defect a lane of this wave introduced goes back to that lane, never filed), full row in `docs/backlog.md`; a reviewer's or QA's `recommended` / `optional` items are listed in the wave report, not filed. Place both kinds in the queue file at their correct position; default after the current milestone unless a remaining wave depends on it.
 2. **Wiring tickets**: open each item in the manifest's after-integration section.
 3. **Done-marks** on the backlog rows, citing each evidence path as it exists at write time (coord-03 *Evidence-Citation Convention*). Before the bookkeeping commit, run the repo's bookkeeping check when the addendum names one, and require exit 0.
-4. **Roll-up**: sum tickets, hops and review / qa rounds per lane against the caps (`node <agc install>/scripts/lane-status.mjs --rollup <feature-id>`, or `--lanes a,b,…`; caps are per lane, totals are informational). Present it to the human.
+4. **Roll-up**: sum tickets, hops and review rounds per lane against the caps (`node <agc install>/scripts/lane-status.mjs --rollup <feature-id>`, or `--lanes a,b,…`; caps are per lane, totals are informational). Present it to the human.
 5. **Plan document**: tick the DoD items; record the close box (date, merge sha, exceptions).
 
 ## Stage 6 — `main` and teardown
