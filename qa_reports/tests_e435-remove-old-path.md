@@ -230,3 +230,26 @@ Left as is (green on both): hop t-const, t-gate-* (stale `prev_qa_round: 0` drop
 ### Red Reasons (T-06)
 
 19 red at base, all assertion failures or the old-signature TypeError (no syntax/link error): hop 10 (8 old computeNewRound signature, 2 QA_ROUND_EXCEEDED on a stale prev_qa_round), e38 4 (code-reviewer:FAIL row lacks qa-engineer; code-reviewer PASS ZodError on an unmarked feature ×2; sr → qa rejected unmarked), e151 5 (old pm row / qa conditional entry / no old-step hint / pm → qa needs resume_of). Rows under `# T-E435-06` in the manifest. Spot-run of the five files: 59 tests, 40 pass, 19 fail (= the 19 T-06 rows, name-for-name; visual-round 15/15 and e128 1/1 green, unchanged).
+
+## T-E435-43 — visual-round-transitions re-pin (deferred from T-E435-06)
+
+Placement: existing file `test/visual-round-transitions.test.mjs`, edited in place (brief). The visual-round counting rules are not changed (E420): each test keeps its counter inputs and expectations, and only the call shape moves.
+
+### Scenario → Test Map (T-43)
+
+| scenario | file | exact test name(s) |
+|---|---|---|
+| AC4 computeNewRound without the qa slot, no `qa_round` in the result | visual-round-transitions | AC-8: (qa-engineer, FAIL) + visual_fail: token → visual_round increments (E435) · AC-8: (qa-engineer, FAIL) without visual_fail: → visual_round held (E435) · AC-8: (qa-engineer, FAIL) + visual_fail: increments from prior count (E435) · AC-8: (qa-engineer, PASS) resets visual_round to 0 (E435) · AC-8: (pm, In_Progress) resets visual_round to 0 (PM re-entry) (E435) · AC-8: other writes hold visual_round unchanged (E435) · AC-11: visual_fail token detection is whitespace-robust (E435) · AC-11: visual_fail token NOT confused with substring matches (E435) |
+| AC4 return shape without `qa_round` / `qa_rounds_total` (OQ (a) drop) | visual-round-transitions | AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards compat) (E435): `{ review_round: 1, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 }` |
+| AC1 TransitionRequest without `prev_qa_round` (green on both) | visual-round-transitions | AC-8: visual_round >= cap → only (pm, In_Progress) is accepted · AC-8: visual_round at cap allows (pm, In_Progress) · AC-9: at visual_round=3, (sr-engineer → pm, In_Progress) is accepted · AC-9: split escalation also allowed at rounds 4 and 5 (Round 3-5 window): stale `prev_qa_round: 0` removed from the 4 requests |
+
+Left as is (green on both): AC-8 VISUAL_ROUND_CAP exported as 6. The prev tuples `qa-engineer:FAIL` in the two cap tests stay: the cap check runs before the table lookup, and the visual family belongs to E420.
+
+### Open Interface Details (T-43)
+
+1. Brief said "8 tests" for the signature re-pin; the file has 9 computeNewRound callers (8 AC-8/AC-11 behaviour tests plus the AC-11 shape test), all moved to the new signature. Red count 9.
+2. The two AC-8 FAIL tests that asserted `qa_round === 1` now assert `"qa_round" in result === false` (same pattern as hop t-compute-pm-no-reset).
+
+### Red Reasons (T-43)
+
+9 red at base, all with the old-signature TypeError `Cannot read properties of undefined (reading 'agent')` (the new call puts `next` in the old prev_visual_round slot, so the old `next` slot is undefined). No syntax or link errors. Rows under `# T-E435-43` in the manifest. File run: 14 tests, 5 pass, 9 fail = the 9 T-43 rows, name for name.
