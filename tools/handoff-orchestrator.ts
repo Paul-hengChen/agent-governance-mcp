@@ -620,48 +620,38 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
         }
         // Authorship half: review_verdict belongs to the code-reviewer, so any
         // other identity carrying it is rejected; otherwise a forged APPROVED
-        // would move auto-routing on to qa. The one legal non-reviewer carrier
-        // is the APPROVED handoff the code-reviewer stamps agent_id=qa-engineer,
-        // recognised from the server-derived on-disk prevTuple (the same edge
-        // MISSING_REVIEW_EVIDENCE arms on), never from a client field. Disjoint
-        // from the branch above (it splits on agent_id). File mode only: SQLite
-        // never persists review_verdict, so nothing downstream reads a forgery.
+        // could steer auto-routing. No edge exemption (E435: the APPROVED
+        // handoff to qa-engineer is gone). Disjoint from the branch above (it
+        // splits on agent_id). File mode only: SQLite never persists
+        // review_verdict, so nothing downstream reads a forgery.
         if (
           ctx.storage instanceof FileHandoffStorage &&
           parsed.review_verdict &&
           parsed.agent_id &&
           parsed.agent_id !== "code-reviewer"
         ) {
-          const isApprovedHandoff =
-            ctx.prevTuple.agent === "code-reviewer" &&
-            ctx.prevTuple.status === "In_Progress" &&
-            ctx.nextTuple.agent === "qa-engineer" &&
-            ctx.nextTuple.status === "In_Progress" &&
-            parsed.review_verdict === "APPROVED";
-          if (!isApprovedHandoff) {
-            return {
-              content: [{
-                type: "text" as const,
-                text:
-                  `⛔ NON_REVIEWER_VERDICT_REJECTED: review_verdict=${parsed.review_verdict} ` +
-                  `on an agent_id=${parsed.agent_id} write. ` +
-                  gate("NON_REVIEWER_VERDICT_REJECTED").hintStatic,
-              }],
-              isError: true,
-            };
-          }
+          return {
+            content: [{
+              type: "text" as const,
+              text:
+                `⛔ NON_REVIEWER_VERDICT_REJECTED: review_verdict=${parsed.review_verdict} ` +
+                `on an agent_id=${parsed.agent_id} write. ` +
+                gate("NON_REVIEWER_VERDICT_REJECTED").hintStatic,
+            }],
+            isError: true,
+          };
         }
       return null;
     },
   },
   {
-    name: "REVIEWER_COMPLETED_TASKS_REJECTED",
-    codes: ["REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"],
+    name: "NON_JUDGE_COMPLETED_TASKS_REJECTED",
+    codes: ["NON_JUDGE_COMPLETED_TASKS_REJECTED"],
     run: (ctx) => {
       const { parsed } = ctx;
         // code-reviewer is the judge: any other identity carrying a non-empty
         // completed_tasks is rejected. Reads only the incoming args (every
-        // storage mode). (E431, E435; T-E435-33 renames the code and its text.)
+        // storage mode). (E40, E435)
         if (
           parsed.agent_id &&
           parsed.agent_id !== JUDGE_ROLE &&
@@ -671,11 +661,9 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
             content: [{
               type: "text" as const,
               text:
-                `⛔ NON_QA_COMPLETED_TASKS_REJECTED: completed_tasks=` +
-                `[${parsed.completed_tasks.join(", ")}] on an agent_id=${parsed.agent_id} write ` +
-                `on a test-first feature (chain_path: test-first). Only agent_id=code-reviewer, ` +
-                `this feature's judge, may grow completed_tasks (or complete tasks through ` +
-                `tw_complete_task). Omit completed_tasks (or pass []) on this write.`,
+                `⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=` +
+                `[${parsed.completed_tasks.join(", ")}] on an agent_id=${parsed.agent_id} write. ` +
+                gate("NON_JUDGE_COMPLETED_TASKS_REJECTED").hintStatic,
             }],
             isError: true,
           };

@@ -13,7 +13,6 @@ Final reply: `Done. Review in review_reports/review_<task-id>.md.`
 ## Hard rules
 - **Clean context**: Read ONLY the diff vs base (tests and implementation), the ticket file's `## Scenarios`, `specs/<feature>.md`, `specs/<feature>-architecture.md` if present, your own earlier reports, and the test-author data<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: `qa_reports/expected-red_<feature>.txt`, `qa_reports/no-new-test_<feature>.txt`, `qa_reports/tests_<feature>.md`. Do NOT read sr-engineer's `pending_notes` commentary or prior implementation chatter — they bias the verdict. The whole point of this role is independence.
 - **Recommended (not enforced)**: when feasible, run this role on a different model than sr-engineer (different model = different blind spots). Flag in the review report if you suspect same-model bias.
-- **The marker**: your PASS, `completed_tasks` and `tw_complete_task` need the `chain_path: "test-first"` marker pm sets; without it the server rejects them (`completed_tasks` on a code-reviewer write: `REVIEWER_COMPLETED_TASKS_REJECTED`). Stop and report; never set the marker yourself.
 
 ## Artifact
 Two files per round (`<task-id>` from `tasks.md`), both append-only: later rounds append a `## Round N — <verdict> — by code-reviewer` section, never overwrite.
