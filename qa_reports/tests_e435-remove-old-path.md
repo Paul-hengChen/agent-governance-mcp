@@ -1093,3 +1093,28 @@ Placement: existing files only (brief). All five (B) rows accepted as test-side;
 ### Results
 
 `node --test` on the five files: 97 tests, 92 pass, 5 fail (exactly the five e359 rows above), 0 skipped (SQLite present). Five rows added to `qa_reports/expected-red_e435-remove-old-path.txt`, tagged T-E435-50.
+
+## T-E435-46 hand-back re-pins part 4 (qa-engineer, R3 (b))
+
+Placement: existing files only (brief). The e409 and e178a rows are test-side; the e408 row carries a source comment change for sr (T-E435-50). No SR-BUG.
+
+| file | test | re-pin |
+|---|---|---|
+| test/e409-lite-write-tool-facts.test.mjs | AC2 (renamed "(E435) … (requireJudge)") | `handleCompleteTask` body matches `requireJudge(` and not `requireQaEngineer(`; the SOP-forbidden handlers must not gain `requireJudge(` either. The lite "Server-read-only" line is unchanged (`tw_complete_task` stays server-rejected) |
+| test/e178a-integrator-role.test.mjs | AC11 (renamed "(E435) …") | §5 cut pre-review sentence pinned to T-E435-38's text `即使 PM 接著只派單一角色的 judge（例如只派 code-reviewer）也一樣`; asserts `（例如只派 qa）` is gone; the no-PM-lane clause `（qa 直派的 mini-chain，不寫 spec）不送 cut` is unchanged in the doc and still pinned |
+| test/e408-core-task-alias-tail.test.mjs | AC6 (renamed "(E435) …") | fifth comment line re-pinned (below); asserts `tools/role.ts` contains no `qa-engineer:PASS` |
+
+### Open Interface Details
+
+- `tools/role.ts` post-chain comment, fifth line (sr implements, T-E435-50; only this line changes, lines 1–4 byte-unchanged):
+  - old: `  // qa-engineer:PASS -> release-engineer:In_Progress edge there (v3.49.0, C13).`
+  - new: `  // code-reviewer:PASS -> release-engineer:In_Progress edge there (the chain's judge).`
+  - Reason: architecture transition table opens release-engineer on `code-reviewer:PASS`; the comment keeps its WHAT (the edge that opens the role) and WHY (the judge closes the chain), one line, and drops the stale version tag that dated the removed edge.
+
+### Red Reasons
+
+- e408 AC6: `tools/role.ts` line 40 still reads `qa-engineer:PASS -> release-engineer:In_Progress … (v3.49.0, C13)` (T-E435-50).
+
+### Results
+
+`node --test` on the three files: 31 tests, 30 pass, 1 fail (exactly e408 AC6), 0 skipped. One row added to `qa_reports/expected-red_e435-remove-old-path.txt`, tagged T-E435-50.

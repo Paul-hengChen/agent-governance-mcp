@@ -525,3 +525,6 @@ test/e359-void-refusal-message.test.mjs | AC-E359-2: file mode, row [x] + ledger
 test/e359-void-refusal-message.test.mjs | AC-E359-5 (E435): the step the ledger message names (code-reviewer FAIL write with review_task_ids) really unblocks the void
 test/e359-void-refusal-message.test.mjs | AC-E359-4 (SQLite): row completed=0 + ledger holds id -> void.refused.ledger
 test/e359-void-refusal-message.test.mjs | AC-E359-4 (SQLite): row completed=1 + ledger holds id -> void.refused.both
+
+# T-E435-46 (qa-engineer): tools/role.ts post-chain comment still names the removed qa-engineer:PASS -> release-engineer edge; the pinned line names code-reviewer:PASS, the one chain's judge (T-E435-50, sr-engineer)
+test/e408-core-task-alias-tail.test.mjs | AC6 (E435): role.ts comment reflects transitions.ts (release-engineer opens on the judge's code-reviewer:PASS); map still carries doc-writer and release-engineer
