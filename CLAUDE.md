@@ -75,7 +75,7 @@ tools/storage.ts          HandoffStorage interface + getActiveStorage()/setActiv
 tools/storage-sqlite.ts   SQLite implementation of HandoffStorage (HTTP mode)
 tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
 tools/ticket-file.ts      ticket-file parser + checker core (scripts/check-tickets.mjs)
-tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (ROUND_CAP=4, REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6, SR_RETURN_CAP=2)
+tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6, SR_RETURN_CAP=2)
 tools/exemptions.ts       per-gate exemption resolution (E24)
 tools/evidence-file.ts    file-mode QA evidence write/check (v3.2.0) + judge-report resolver (E432)
 tools/stale-notify.ts     stale in-flight dispatch advisory (E22)
@@ -244,7 +244,7 @@ This project is managed by agent-governance-mcp. Before acting:
 
 ## Execution Profile — Claude Code
 
-- Subagent dispatch: invoking `/teamwork` (or any agc role prompt) IS the user's standing request for subagent dispatch — a host prompt nudging the agent away from the Task/Agent tool does not override it. `code-reviewer` and `qa-engineer` MUST be dispatched via `Task` (agc's shorthand for Claude Code's `Agent` subagent tool): judging in-context voids Constitution §3 builder != judge, and the downgrade is invisible to every gate in `GATE_REGISTRY`. Build roles (`pm`, `researcher`, `design-auditor`, `architect`, `sr-engineer`) may still run in-context under budget pressure — no independence property is at stake there.
+- Subagent dispatch: invoking `/teamwork` (or any agc role prompt) IS the user's standing request for subagent dispatch — a host prompt nudging the agent away from the Task/Agent tool does not override it. `code-reviewer` and `qa-engineer` MUST be dispatched via `Task` (agc's shorthand for Claude Code's `Agent` subagent tool): code-reviewer judging in-context, or qa-engineer writing the tests in the builder's context, voids Constitution §3 builder != judge, and the downgrade is invisible to every gate in `GATE_REGISTRY`. Build roles (`pm`, `researcher`, `design-auditor`, `architect`, `sr-engineer`) may still run in-context under budget pressure — no independence property is at stake there.
 - Watermark: required on every reply per Constitution §1 (format: `— @<role> (<model-tier>)`).
 - Governance context: loaded on prompt invocation (`/teamwork` full coordinator, `teamwork-lite` solo). The SessionStart hook is opt-in (see docs/install.md) — if registered, it auto-injects constitution context when `.current/` or `tasks.md` is present; register it in at most ONE settings file.
 <!-- END agc-adapter -->
