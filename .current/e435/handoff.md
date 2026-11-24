@@ -2,7 +2,7 @@
 schema_version: 16
 active_feature: "e435-remove-old-path"
 status: "In_Progress"
-last_updated: "2026-11-24T12:35:28.796Z"
+last_updated: "2026-11-24T12:56:49.857Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e435-remove-old-path.md"
 scope_decision: "single-feature"
@@ -17,7 +17,7 @@ dispatch_pins:
 evidence_schema: 2
 chain_path: "test-first"
 next_role: "sr-engineer"
-dispatched_at: "2026-11-24T12:35:28.796Z"
+dispatched_at: "2026-11-24T12:56:49.857Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -34,13 +34,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E435-30 done (not yet judged): tools/transitions.ts one 22-key ALLOWED in contract order (pm/architect -> sr, code-reviewer -> qa, qa In_Progress -> PASS/FAIL out; code-reviewer:PASS key added; qa-engineer:PASS/FAIL legacy exit keys kept); overlay, set-point check, judgeFor, requireQaEngineer, step 1.5 and marker request fields removed; JUDGE_ROLE, MIGRATION_HINT, QA_PASS_REFINE_MESSAGE, PASS_IDENTITY_REFINE_MESSAGE (code-reviewer), REMOVED_OLD_PATH_STEPS S1-S5 + oldPathStepHint at the step-4 miss.
-- sr-engineer: T-30 cont.: requireJudge(agentId, toolName) unconditional (+MIGRATION_HINT for qa-engineer); allowedSuccessors(key); sr-return cap unconditional; Amend-Resume code-reviewer only (next_resume_of / requires narrowed); computeNewRound(review, visual, next, prev, notes, hop, feature_changed, review_total, visual_total), no qa slots, no code-reviewer -> qa reset. tools/tasks.ts: handleCompleteTask = requireJudge(agent_id, 'tw_complete_task'). specs/qa-flow-enforcement-architecture.md: Matrix table 22 rows + footnote count only (checked equal to a scratch emit; section prose left for T-39).
-- sr-engineer: kept for T-32 per assignment: ROUND_CAP, ROUND_CAP_EXPORTED, QA_ROUND_EXCEEDED union member, step-2 qa override; prev_qa_round now OPTIONAL (dormant unless passed), attempted.qa_round emitted only when passed. Rows with a stale prev_qa_round=4 (incl. qa-flow T-E45-01 stale-cap row, tagged T-30 only) stay red until T-32.
-- sr-engineer: COLLISION for qa (no manifest row): test/e409-lite-write-tool-facts.test.mjs 'AC2: handleCompleteTask is agent-gated (requireQaEngineer)...' asserts /requireQaEngineer\(/ in handleCompleteTask; the contract removes requireQaEngineer, so it is red from this commit. Needs a qa re-pin to /requireJudge\(/ before the unit is judged.
-- sr-engineer: diff 133 added / 238 deleted (371 > 300 budget; excess is deletions of the overlay and old functions).
-- sr-engineer: tsc red (compile unit); my files clean. Remaining: tools/evidence-file.ts:12 ChainPath, :13 judgeFor (T-31); tools/handoff-orchestrator.ts:15 judgeFor, :21 isChainPathSetPoint, :57 ChainPath, :228/:237/:305 chain_path, :293/:1350/:1617 resume_of qa-engineer, :444/:490/:540/:590 allowedSuccessors 2 args, :1398 requireJudge 3 args, :1407/:1492 qa_round, :1421/:1503/:1710 qa_rounds_total, :1516 computeNewRound 11 args (T-31); tools/lane-status.ts:599/:1345 qa_round (T-42); tools/storage-sqlite.ts:480, :553, :583 and tools/storage.ts:164 qaRound (T-34).
-- sr-engineer: T-30 expected-red rows (118 green-by) not verifiable until the unit builds at T-35.
+- sr-engineer: T-E435-31 done (not yet judged): tools/handoff-orchestrator.ts marker plumbing out (readPersistedChainPath, resolveChainPath, exitChainPath, isTestFirstEntryTarget, pre-pre-flight code-reviewer-PASS ZodError, chain_path step-1 inputs, chainPath write arg). Steps 3-6 arm via isBuildEntry on pm:In_Progress -> {architect, qa-engineer}:In_Progress, allowed = allowedSuccessors("pm:In_Progress"). Step 7 qa -> sr hand-off check on every file-mode feature ('Hand-off qa-engineer → sr-engineer ...'). Step 8 APPROVED consistent with In_Progress or PASS unconditionally. Steps 10-11 judge = resolveJudgeReport(ws).judge (code-reviewer); QA_COMPLETION_EVIDENCE_MISSING always uses gate().hintStatic.
+- sr-engineer: T-31 cont.: requireJudge 2-arg; ledger-remove and RAG GC use JUDGE_ROLE; qa_round / qa_rounds_total reads, the Round-4 sentinel and the qaRound/qaRoundsTotal write args out; computeNewRound 9-arg; effectiveAllowedSuccessors without qa_round or marker, assumeResumeOf code-reviewer only. Incoming resume_of narrowed to code-reviewer at step 1 and at the write (zod still admits qa-engineer until T-35); incoming chain_path ignored (no code reads it). Unused zod import removed.
+- sr-engineer: T-31 cont.: tools/evidence-file.ts resolveJudgeReport(workspacePath) one-arg -> {judge: JUDGE_ROLE, dir}; JudgeIdentity/JUDGE_IDENTITIES out, REPORT_SIGNERS = [JUDGE_ROLE, "qa-engineer"] in. scripts/release.mjs: releaseJudge -> const RELEASE_JUDGE = "code-reviewer"; precondition, preInputs, notPass default, commitMessage default and the s11 call use it (no fallback).
+- sr-engineer: left for later tasks (placeholders, each commented): ctx.prev_qa_round: 0 (T-32 drops the pipeline field); emitFeatureMetrics qaRoundsTotal: 0 (T-34 drops the arg); step 9 is judge-only unconditionally but still emits NON_QA_COMPLETED_TASKS_REJECTED with the old text that names chain_path, codes [REVIEWER_COMPLETED_TASKS_REJECTED, NON_QA_COMPLETED_TASKS_REJECTED], step name unchanged (T-33 renames to NON_JUDGE_COMPLETED_TASKS_REJECTED and rewrites the text); NON_REVIEWER_VERDICT_REJECTED APPROVED-handoff exception left (T-33; dead now, its edge is gone).
+- sr-engineer: diff 97 added / 294 deleted across 3 files (391 > 300 budget; the excess is deletions of the marker plumbing and the dead non-test-first branches).
+- sr-engineer: tsc red (compile unit); my files clean. Remaining: tools/lane-status.ts:19 JUDGE_IDENTITIES -> REPORT_SIGNERS, :599/:1345 qa_round (T-42); tools/storage-sqlite.ts:480 qa_round, :553/:583 qaRound and tools/storage.ts:164 qaRound (T-34). No test collision found in T-31 scope; expected-red rows cannot be checked until the unit builds at T-35.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
