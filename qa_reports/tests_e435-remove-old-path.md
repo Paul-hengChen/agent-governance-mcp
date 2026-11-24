@@ -296,3 +296,38 @@ Left as is (green on both): gates-expected-red U1–U13, I5, I5b (predicates and
 ### Red Reasons (T-07)
 
 29 red at base, all assertion failures (no syntax / link error): e431 25 (unmarked table lacks the new edges / code-reviewer:PASS key; carried `chain_path` stored; `resume_of: qa-engineer` valid; qa-engineer PASS and `tw_complete_task` accepted; schema 16), gates-expected-red 4 (code-reviewer PASS rejected by the orchestrator's ZodError `requires agent_id="qa-engineer"` on an unmarked feature). Rows under `# T-E435-07` in the manifest. Run: `node --test test/e431-test-first-server-path.test.mjs test/gates-expected-red.test.mjs` → 58 tests, 29 pass, 29 fail = the 29 rows, name for name (half 2: 14 tests, all green, untouched; gates U1–U13, I5, I5b green).
+
+## T-E435-08 — `test/e431-test-first-server-path.test.mjs` half 2, `test/e396-covers-expected-red.test.mjs`
+
+Placement: existing files, edited in place (brief). Half 2 per the T-07 split (AC12–AC18 + OVERLAY, L518–end); half 1 untouched. Changed lines: e431 254 (157+ / 97−), e396 37 (25+ / 12−); 291 total. Every test keeps its AC id; titles carry `(E435)`.
+
+### Scenario → Test Map (T-08)
+
+| scenario | file | exact test name(s) |
+|---|---|---|
+| one chain, counters (re-pin of "old chain … unchanged"); S1/S3 hints | e431 | AC12 (E435): the one chain pm -> qa -> sr -> code-reviewer -> code-reviewer PASS keeps its counters; … |
+| architect variant + code-reviewer FAIL loop (re-pin of the qa FAIL loop); S5 | e431 | AC12 (E435): pm -> architect -> qa -> sr variant and the code-reviewer FAIL -> sr loop keep their counters; a qa-engineer FAIL is rejected with the S5 hint |
+| bugfix + code-reviewer Amend-Resume; AC4 dropped fields | e431 | AC12 (E435): bugfix-mode run and the code-reviewer Amend-Resume behave as before, storing no dropped field |
+| test-first edges open with no marker; S1–S5 closed with hints (re-pin of "new edges closed unmarked") | e431 | AC12 (E435): every test-first edge is open with no marker; the five removed old-path steps S1-S5 are closed with their hints |
+| bugfix repro + code-reviewer PASS transition, no marker | e431 | AC13 (E435): … |
+| AC2 tw_complete_task (Copy `requireJudge`, + in-flight hint for qa only) | e431 | AC14 (E435): code-reviewer completes the task; qa-engineer rejected … · AC14 (E435): another role (sr-engineer) is rejected … no migration hint … |
+| AC2 completed_tasks, Ruling (b) `NON_JUDGE_COMPLETED_TASKS_REJECTED` | e431 | AC15 (E435): code-reviewer completed_tasks allowed, qa-engineer's rejected … · AC15 (E435): a non-empty completed_tasks from sr-engineer or pm is rejected … |
+| AC4 schema 17, Ruling (a) drop | e431 | AC16 (E435): a v15 handoff migrates to schema 17: … |
+| registry 33 / pipeline 17, step 9 renamed; sr-return cap unconditional | e431 | AC17 (E435): registry has 33 entries … · AC17 (E435): hop cap 14 outranks the sr-return cap, which applies with no marker |
+| OQ (d) SQLite runs the one chain | e431 | AC18 (E435): SQLite/HTTP mode runs the one chain: … |
+| one 22-key table (re-pin of the overlay mirror) | e431 | OVERLAY (E435): one 22-key ALLOWED_TRANSITIONS equals the frozen contract table in order, … |
+| AC2 judge on the covers:/expected-red evidence path | e396 | E396 I: … (code-reviewer the judge; a qa-engineer PASS is rejected naming code-reviewer, E435) |
+
+Left as is (green on both): e396 U1, U2 (predicate only, no writer identity).
+
+### Open Interface Details (T-08)
+
+1. OVERLAY freezes the architecture's 22-key table as `TABLE_22` and pins `T.ALLOWED_TRANSITIONS` to it entry for entry, in order; the doc mirror (`## ALLOWED_TRANSITIONS Matrix`) is compared per key as a sorted set (the `check-transitions-sync` semantics), plus the two `### Opened/Closed on a test-first feature` headings absent (T-39).
+2. `NON_JUDGE_COMPLETED_TASKS_REJECTED` asserted by the emit prefix `⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=` plus the full Copy `hintStatic` (frozen `NON_JUDGE_HINT`); AC17 pins the registry entry's `hintStatic` to the same constant.
+3. `tw_complete_task` texts: `Called by "<agent>"` keeps today's quoted form; the in-flight hint is appended for `qa-engineer` only (Copy `requireJudge`).
+4. e396 I: a shared `passFrom(agent)` seeds `<agent>:In_Progress` and writes the PASS; it now also asserts the code-reviewer PASS is accepted (at base the qa PASS was fully accepted, probed), so the test cannot pass vacuously on a rejection that merely lacks `EXPECTED_RED_DIFF_MISSING`.
+5. AC12's one-chain run uses `recordNoNewTest` for the qa → sr hand-off and a code-reviewer PASS with `review_verdict: "APPROVED"`, `completed_tasks` and `qa_review` (evidence via `QA_REVIEW_RECORD`).
+
+### Red Reasons (T-08)
+
+15 red at base, all assertion failures (no syntax / link error): e431 half 2 all 14 (unmarked new edges rejected; `qa_round` stored; `tw_complete_task` / ledger texts name qa-engineer and the old codes; schema 16; registry 35; overlay still exported, 21-key table), e396 I (code-reviewer PASS rejected by the orchestrator's ZodError). Rows under `# T-E435-08` in the manifest. Run: `node --test test/e431-test-first-server-path.test.mjs test/e396-covers-expected-red.test.mjs` → 42 tests, 2 pass, 40 fail = the 40 rows for these two files (25 T-07 + 15 T-08), name for name.

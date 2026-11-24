@@ -517,53 +517,68 @@ test("AC11 (E435): feature-change write out of code-reviewer:PASS that carries c
 
 // ---------------------------------------------------------------- AC12
 
+// E435: one chain for every feature, nothing marks it, and the dropped counters stay dropped.
 const NOTHING_NEW = (s) => {
-  assert.equal(s.chain_path, undefined, "old path carries no chain_path");
-  assert.ok(!s.sr_return_count, "old path carries no sr_return_count");
+  assert.equal(s.chain_path, undefined, "no chain_path on any feature");
+  assert.equal(s.qa_round, undefined, "qa_round dropped (schema 17)");
+  assert.equal(s.qa_rounds_total, undefined, "qa_rounds_total dropped (schema 17)");
 };
 
-test("AC12: old chain pm -> sr -> code-reviewer -> qa -> PASS unchanged (counters, no new fields)", async () => {
+test("AC12 (E435): the one chain pm -> qa -> sr -> code-reviewer -> code-reviewer PASS keeps its counters; the old pm -> sr and code-reviewer -> qa steps are rejected with their hints", async () => {
+  // Why: the old chain's happy path is now the new chain's; its counters behave as before, minus qa_round.
   const ws = mkWs("e431-ac12a-");
   await seed(ws, F, "pm", "In_Progress");
-  for (const agent of ["sr-engineer", "code-reviewer", "qa-engineer"]) {
+  recordNoNewTest(ws);
+  for (const agent of ["qa-engineer", "sr-engineer", "code-reviewer"]) {
     const r = await upd(ws, w(agent, "In_Progress"));
     assert.ok(!rejected(r), `${agent}: ${text(r)}`);
   }
   assert.equal(state(ws).hop_count, 3);
-  const pass = await upd(ws, w("qa-engineer", "PASS", { completed_tasks: ["T-1"], review_task_ids: ["T-1"], qa_review: "ok" }));
-  assert.ok(!rejected(pass), `qa PASS accepted on the old path: ${text(pass)}`);
+  const pass = await upd(ws, w("code-reviewer", "PASS", { review_verdict: "APPROVED", completed_tasks: ["T-1"], review_task_ids: ["T-1"], qa_review: "ok" }));
+  assert.ok(!rejected(pass), `code-reviewer PASS accepted: ${text(pass)}`);
   const s = state(ws);
   assert.equal(s.status, "PASS");
-  assert.equal(s.qa_round, 0);
+  assert.equal(s.last_agent, "code-reviewer");
   assert.equal(s.review_round, 0);
   assert.equal(s.visual_round, 0);
   NOTHING_NEW(s);
-  // The judge hand-offs stay closed here: code-reviewer -> qa is the old edge, code-reviewer PASS is not.
+  // The two old-path steps are closed and point at docs/migration-v5.md.
   const ws2 = mkWs("e431-ac12a2-");
-  await seed(ws2, F, "code-reviewer", "In_Progress");
-  const old = await upd(ws2, w("qa-engineer", "In_Progress"));
-  assert.ok(!rejected(old), "code-reviewer -> qa is the old-path edge");
+  await seed(ws2, F, "pm", "In_Progress");
+  const s1 = await upd(ws2, w("sr-engineer", "In_Progress"));
+  assert.ok(rejected(s1) && envelope(s1).hint.endsWith(PM_TO_SR_HINT("pm") + IN_FLIGHT_HINT), `S1: ${text(s1)}`);
+  const ws3 = mkWs("e431-ac12a3-");
+  await seed(ws3, F, "code-reviewer", "In_Progress");
+  const s3 = await upd(ws3, w("qa-engineer", "In_Progress"));
+  assert.ok(rejected(s3) && envelope(s3).hint.endsWith(REVIEWER_TO_QA_HINT + IN_FLIGHT_HINT), `S3: ${text(s3)}`);
 });
 
-test("AC12: pm -> architect -> sr variant and the qa FAIL -> sr loop keep their counters", async () => {
+test("AC12 (E435): pm -> architect -> qa -> sr variant and the code-reviewer FAIL -> sr loop keep their counters; a qa-engineer FAIL is rejected with the S5 hint", async () => {
   const ws = mkWs("e431-ac12b-");
   await seed(ws, F, "pm", "In_Progress");
-  for (const agent of ["architect", "sr-engineer", "code-reviewer", "qa-engineer"]) {
+  recordNoNewTest(ws);
+  for (const agent of ["architect", "qa-engineer"]) {
+    const r = await upd(ws, w(agent, "In_Progress"));
+    assert.ok(!rejected(r), `${agent}: ${text(r)}`);
+  }
+  // qa-engineer writes tests, never a verdict: its FAIL is the removed step S5.
+  const qaFail = await upd(ws, w("qa-engineer", "FAIL", { blocking_reason: "bug" }));
+  assert.ok(rejected(qaFail) && envelope(qaFail).hint.endsWith(QA_JUDGE_HINT + IN_FLIGHT_HINT), `S5: ${text(qaFail)}`);
+  for (const agent of ["sr-engineer", "code-reviewer"]) {
     const r = await upd(ws, w(agent, "In_Progress"));
     assert.ok(!rejected(r), `${agent}: ${text(r)}`);
   }
   assert.equal(state(ws).hop_count, 4);
-  const fail = await upd(ws, w("qa-engineer", "FAIL", { blocking_reason: "bug", review_task_ids: ["T-1"], qa_review: "found a bug" }));
-  assert.ok(!rejected(fail), `qa FAIL: ${text(fail)}`);
-  assert.equal(state(ws).qa_round, 1);
+  const fail = await upd(ws, w("code-reviewer", "FAIL", { blocking_reason: "bug", review_verdict: "CHANGES_REQUESTED" }));
+  assert.ok(!rejected(fail), `code-reviewer FAIL: ${text(fail)}`);
+  assert.equal(state(ws).review_round, 1);
   const back = await upd(ws, w("sr-engineer", "In_Progress"));
   assert.ok(!rejected(back), `FAIL -> sr: ${text(back)}`);
-  assert.equal(state(ws).qa_round, 1);
-  assert.equal(state(ws).review_round, 0);
+  assert.equal(state(ws).review_round, 1);
   NOTHING_NEW(state(ws));
 });
 
-test("AC12: bugfix-mode run and the Amend-Resume hand-back behave as before", async () => {
+test("AC12 (E435): bugfix-mode run and the code-reviewer Amend-Resume behave as before, storing no dropped field", async () => {
   const ws = mkWs("e431-ac12c-");
   await seed(ws, F, "sr-engineer", "In_Progress", { dispatchMode: "bugfix" });
   const r = await upd(ws, w("code-reviewer", "In_Progress"));
@@ -582,9 +597,10 @@ test("AC12: bugfix-mode run and the Amend-Resume hand-back behave as before", as
   NOTHING_NEW(state(ws2));
 });
 
-test("AC12: every new edge stays closed on an unmarked feature", () => {
-  const base = { prev_qa_round: 0, prev_review_round: 0 };
-  const closed = [
+test("AC12 (E435): every test-first edge is open with no marker; the five removed old-path steps S1-S5 are closed with their hints", () => {
+  const base = { prev_review_round: 0 };
+  const open = [
+    [["pm", "In_Progress"], ["qa-engineer", "In_Progress"]],
     [["architect", "In_Progress"], ["qa-engineer", "In_Progress"]],
     [["qa-engineer", "In_Progress"], ["sr-engineer", "In_Progress"]],
     [["sr-engineer", "In_Progress"], ["qa-engineer", "In_Progress"]],
@@ -592,17 +608,29 @@ test("AC12: every new edge stays closed on an unmarked feature", () => {
     [["code-reviewer", "FAIL"], ["qa-engineer", "In_Progress"]],
     [["code-reviewer", "PASS"], ["pm", "In_Progress"]],
   ];
-  for (const [[pa, ps], [na, ns]] of closed) {
+  for (const [[pa, ps], [na, ns]] of open) {
     const r = validateTransition({ ...base, prev: { agent: pa, status: ps }, next: { agent: na, status: ns } });
-    assert.equal(r?.error, "TRANSITION_REJECTED", `${pa}:${ps} -> ${na}:${ns} must stay closed unmarked`);
+    assert.equal(r, null, `${pa}:${ps} -> ${na}:${ns} open on every feature`);
+  }
+  const removed = [
+    [["pm", "In_Progress"], ["sr-engineer", "In_Progress"], PM_TO_SR_HINT("pm")],
+    [["architect", "In_Progress"], ["sr-engineer", "In_Progress"], PM_TO_SR_HINT("architect")],
+    [["code-reviewer", "In_Progress"], ["qa-engineer", "In_Progress"], REVIEWER_TO_QA_HINT],
+    [["qa-engineer", "In_Progress"], ["qa-engineer", "PASS"], QA_JUDGE_HINT],
+    [["qa-engineer", "In_Progress"], ["qa-engineer", "FAIL"], QA_JUDGE_HINT],
+  ];
+  for (const [[pa, ps], [na, ns], hint] of removed) {
+    const r = validateTransition({ ...base, prev: { agent: pa, status: ps }, next: { agent: na, status: ns } });
+    assert.equal(r?.error, "TRANSITION_REJECTED", `${pa}:${ps} -> ${na}:${ns} removed`);
+    assert.ok(r.hint.endsWith(hint + IN_FLIGHT_HINT), `${pa}:${ps} -> ${na}:${ns} hint: ${r.hint}`);
   }
 });
 
 // ---------------------------------------------------------------- AC13
 
-test("AC13: marked bugfix sr -> code-reviewer needs the repro manifest; later code-reviewer PASS passes the transition check", async () => {
+test("AC13 (E435): bugfix sr -> code-reviewer needs the repro manifest; code-reviewer PASS then passes the transition check (no marker)", async () => {
   const ws = mkWs("e431-ac13-");
-  await seed(ws, F, "sr-engineer", "In_Progress", { chainPath: "test-first", dispatchMode: "bugfix" });
+  await seed(ws, F, "sr-engineer", "In_Progress", { dispatchMode: "bugfix" });
   const before = handoffBytes(ws);
   const r = await upd(ws, w("code-reviewer", "In_Progress"));
   assert.ok(rejected(r));
@@ -616,7 +644,7 @@ test("AC13: marked bugfix sr -> code-reviewer needs the repro manifest; later co
     validateTransition({
       prev: { agent: "code-reviewer", status: "In_Progress" },
       next: { agent: "code-reviewer", status: "PASS" },
-      prev_qa_round: 0, prev_review_round: 0, prev_chain_path: "test-first",
+      prev_review_round: 0,
     }),
     null,
   );
@@ -624,93 +652,83 @@ test("AC13: marked bugfix sr -> code-reviewer needs the repro manifest; later co
 
 // ---------------------------------------------------------------- AC14
 
-async function ledgerWs(chainPath) {
+async function ledgerWs() {
   const ws = mkWs("e431-ac14-");
-  await seed(ws, F, "code-reviewer", "In_Progress", chainPath ? { chainPath } : {});
+  await seed(ws, F, "code-reviewer", "In_Progress");
   resetSession(ws); markStateRead(ws);
   await ADD.run({ workspace_path: ws, task_id: "T-1", description: "one" });
   return ws;
 }
 
-test("AC14: marked feature: code-reviewer completes the task, qa-engineer rejected naming code-reviewer (Copy verbatim)", async () => {
-  const ws = await ledgerWs("test-first");
+const COMPLETE_BLOCKED = (who) =>
+  `⛔ BLOCKED: tw_complete_task is reserved for code-reviewer, the chain's judge. Called by "${who}". Hand off to code-reviewer and pass agent_id="code-reviewer".`;
+
+test("AC14 (E435): code-reviewer completes the task; qa-engineer rejected naming code-reviewer plus the migration hint (Copy verbatim)", async () => {
+  const ws = await ledgerWs();
   const qa = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "qa-engineer" });
-  assert.equal(
-    text(qa),
-    '⛔ BLOCKED: tw_complete_task is reserved for code-reviewer on a test-first feature (chain_path: test-first). Called by "qa-engineer". Hand off to code-reviewer and pass agent_id="code-reviewer".',
-  );
+  assert.equal(text(qa), COMPLETE_BLOCKED("qa-engineer") + IN_FLIGHT_HINT);
   const cr = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "code-reviewer" });
   assert.match(text(cr), /"marked":"completed"/);
 });
 
-test("AC14: unmarked feature: qa-engineer completes, code-reviewer rejected with today's text", async () => {
-  const ws = await ledgerWs(null);
+test("AC14 (E435): another role (sr-engineer) is rejected naming code-reviewer with no migration hint; code-reviewer then completes", async () => {
+  // Why: the in-flight hint is for the pre-v5 judge only; no other role ever completed tasks.
+  const ws = await ledgerWs();
+  const sr = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "sr-engineer" });
+  assert.equal(text(sr), COMPLETE_BLOCKED("sr-engineer"));
   const cr = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "code-reviewer" });
-  assert.equal(
-    text(cr),
-    '⛔ BLOCKED: tw_complete_task is reserved for qa-engineer. Called by "code-reviewer". Hand off to qa-engineer and pass agent_id="qa-engineer".',
-  );
-  const qa = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "qa-engineer" });
-  assert.match(text(qa), /"marked":"completed"/);
+  assert.match(text(cr), /"marked":"completed"/);
 });
 
 // ---------------------------------------------------------------- AC15
 
-test("AC15: marked write path: code-reviewer completed_tasks allowed, qa-engineer's rejected, APPROVED PASS ok, FAIL removes ids", async () => {
+const NON_JUDGE_HINT =
+  "completed_tasks on a write not stamped agent_id=code-reviewer is ledger pollution: only code-reviewer, the chain's judge, may grow completed_tasks (or complete tasks through tw_complete_task), backed by the QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or pass []) on this write. See docs/backlog.md E40.";
+const nonJudgeRejected = (r) =>
+  text(r).includes("⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=") && text(r).includes(NON_JUDGE_HINT);
+
+test("AC15 (E435): code-reviewer completed_tasks allowed, qa-engineer's rejected NON_JUDGE_COMPLETED_TASKS_REJECTED, APPROVED PASS ok, FAIL removes ids (no marker)", async () => {
   const ws = mkWs("e431-ac15a-");
-  await seed(ws, F, "code-reviewer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws, F, "code-reviewer", "In_Progress");
   const cr = await upd(ws, w("code-reviewer", "FAIL", { completed_tasks: ["T-1"], blocking_reason: "x", review_verdict: "CHANGES_REQUESTED" }));
-  assert.ok(!text(cr).includes("REVIEWER_COMPLETED_TASKS_REJECTED"), `got: ${text(cr)}`);
+  assert.ok(!text(cr).includes("COMPLETED_TASKS_REJECTED"), `got: ${text(cr)}`);
 
   const ws2 = mkWs("e431-ac15b-");
-  await seed(ws2, F, "qa-engineer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws2, F, "qa-engineer", "In_Progress");
   const qa = await upd(ws2, w("qa-engineer", "In_Progress", { completed_tasks: ["T-1"] }));
   assert.ok(rejected(qa));
-  assert.match(text(qa), /NON_QA_COMPLETED_TASKS_REJECTED/);
-  assert.match(text(qa), /code-reviewer/);
+  assert.ok(nonJudgeRejected(qa), `got: ${text(qa)}`);
 
   const ws3 = mkWs("e431-ac15c-");
-  await seed(ws3, F, "code-reviewer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws3, F, "code-reviewer", "In_Progress");
   const pass = await upd(ws3, w("code-reviewer", "PASS", { review_verdict: "APPROVED", qa_review: "ok", review_task_ids: ["T-9"] }));
   assert.ok(!text(pass).includes("REVIEW_VERDICT_STATUS_MISMATCH"), `got: ${text(pass)}`);
 
   const ws4 = mkWs("e431-ac15d-");
-  await seed(ws4, F, "code-reviewer", "In_Progress", { chainPath: "test-first", completedTasks: ["T-1", "T-2"] });
+  await seed(ws4, F, "code-reviewer", "In_Progress", { completedTasks: ["T-1", "T-2"] });
   const fail = await upd(ws4, w("code-reviewer", "FAIL", { review_task_ids: ["T-1"], blocking_reason: "redo", review_verdict: "CHANGES_REQUESTED" }));
   assert.ok(!rejected(fail), `FAIL: ${text(fail)}`);
   const done = state(ws4).completed_tasks.join("|");
   assert.ok(!done.includes("T-1") && done.includes("T-2"), `T-1 removed, T-2 kept; got ${done}`);
 });
 
-test("AC15: unmarked write path behaves as today for each of the four", async () => {
-  const ws = mkWs("e431-ac15e-");
-  await seed(ws, F, "code-reviewer", "In_Progress");
-  const cr = await upd(ws, w("code-reviewer", "FAIL", { completed_tasks: ["T-1"], blocking_reason: "x", review_verdict: "CHANGES_REQUESTED" }));
-  assert.match(text(cr), /REVIEWER_COMPLETED_TASKS_REJECTED/);
-
-  const ws2 = mkWs("e431-ac15f-");
-  await seed(ws2, F, "qa-engineer", "In_Progress");
-  const qa = await upd(ws2, w("qa-engineer", "In_Progress", { completed_tasks: ["T-1"] }));
-  assert.ok(!text(qa).includes("NON_QA_COMPLETED_TASKS_REJECTED"), "qa is not role-rejected on the old path");
-  assert.match(text(qa), /QA_COMPLETION_EVIDENCE_MISSING/, "today: only the per-id evidence check applies");
-
-  const ws3 = mkWs("e431-ac15g-");
-  await seed(ws3, F, "code-reviewer", "In_Progress");
-  const pass = await upd(ws3, w("code-reviewer", "PASS", { review_verdict: "APPROVED", qa_review: "ok", review_task_ids: ["T-9"] }));
-  assert.ok(rejected(pass), "code-reviewer PASS stays rejected unmarked");
-  assert.match(text(pass), /qa-engineer/);
-
-  const ws4 = mkWs("e431-ac15h-");
-  await seed(ws4, F, "code-reviewer", "In_Progress", { completedTasks: ["T-1", "T-2"] });
-  const fail = await upd(ws4, w("code-reviewer", "FAIL", { review_task_ids: ["T-1"], blocking_reason: "redo", review_verdict: "CHANGES_REQUESTED" }));
-  assert.ok(!rejected(fail), `FAIL: ${text(fail)}`);
-  assert.ok(state(ws4).completed_tasks.join("|").includes("T-1"), "no ledger removal for a code-reviewer FAIL unmarked");
+test("AC15 (E435): a non-empty completed_tasks from sr-engineer or pm is rejected NON_JUDGE_COMPLETED_TASKS_REJECTED, no state written; the two removed ledger codes are never emitted", async () => {
+  // Why: the old split (code-reviewer barred, qa evidence-checked) is one rule now — only the judge grows the ledger.
+  for (const agent of ["sr-engineer", "pm"]) {
+    const ws = mkWs("e431-ac15e-");
+    await seed(ws, F, agent, "In_Progress");
+    const before = handoffBytes(ws);
+    const r = await upd(ws, w(agent, "In_Progress", { completed_tasks: ["T-1"] }));
+    assert.ok(rejected(r) && nonJudgeRejected(r), `${agent}: ${text(r)}`);
+    assert.doesNotMatch(text(r), /REVIEWER_COMPLETED_TASKS_REJECTED|NON_QA_COMPLETED_TASKS_REJECTED/);
+    assert.equal(handoffBytes(ws), before, "no state written");
+  }
 });
 
 // ---------------------------------------------------------------- AC16
 
-test("AC16: v15 handoff migrates to schema 16 with no chain_path / sr_return_count seeded; versions pinned", async () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 16);
+test("AC16 (E435): a v15 handoff migrates to schema 17: no chain_path / sr_return_count seeded, qa_round / qa_rounds_total dropped; versions pinned", async () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 17);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);
   const ws = mkWs("e431-ac16-");
   const p = resolveCurrentLanePaths(ws).handoffPath;
@@ -729,20 +747,33 @@ test("AC16: v15 handoff migrates to schema 16 with no chain_path / sr_return_cou
   const s = state(ws);
   assert.equal(s.chain_path, undefined);
   assert.equal(s.sr_return_count, undefined);
+  assert.equal(s.qa_round, undefined, "qa_round dropped on read");
+  assert.equal(s.qa_rounds_total, undefined, "qa_rounds_total dropped on read");
   assert.equal(s.active_feature, F);
-  // The next real write persists the migrated stamp; the old path stays unmarked and uncounted.
+  // The next real write persists the migrated stamp, unmarked, with the dropped counters gone.
   const r = await upd(ws, w("pm", "In_Progress"));
   assert.ok(!rejected(r), text(r));
   const raw = fs.readFileSync(p, "utf-8");
-  assert.match(raw, /^schema_version: 16$/m);
+  assert.match(raw, /^schema_version: 17$/m);
   assert.doesNotMatch(raw, /^chain_path:/m);
   assert.doesNotMatch(raw, /^sr_return_count:/m);
+  assert.doesNotMatch(raw, /^qa_rounds?(_total)?:/m);
 });
 
 // ---------------------------------------------------------------- AC17
 
-test("AC17: registry has 35 entries incl. SR_RETURN_CAP_EXCEEDED (shape pinned); pipeline 17 steps; HOP_CAP 14; comment fixed", () => {
-  assert.equal(GATE_REGISTRY.length, 35);
+test("AC17 (E435): registry has 33 entries incl. SR_RETURN_CAP_EXCEEDED (shape pinned) and NON_JUDGE_COMPLETED_TASKS_REJECTED, the three removed codes gone; pipeline 17 steps, step 9 renamed; HOP_CAP 14; comment fixed", () => {
+  assert.equal(GATE_REGISTRY.length, 33);
+  const codes = GATE_REGISTRY.map((g) => g.errorCode);
+  for (const gone of ["QA_ROUND_EXCEEDED", "REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"]) {
+    assert.ok(!codes.includes(gone), `${gone} removed`);
+  }
+  const nj = GATE_REGISTRY.find((g) => g.errorCode === "NON_JUDGE_COMPLETED_TASKS_REJECTED");
+  assert.ok(nj, "NON_JUDGE_COMPLETED_TASKS_REJECTED registered");
+  assert.equal(nj.producer, "orchestrator");
+  assert.equal(nj.envelope, "plain-text");
+  assert.equal(nj.documentedInProse, true);
+  assert.equal(nj.hintStatic, NON_JUDGE_HINT);
   const e = GATE_REGISTRY.find((g) => g.errorCode === "SR_RETURN_CAP_EXCEEDED");
   assert.ok(e, "SR_RETURN_CAP_EXCEEDED registered");
   assert.equal(e.producer, "validateTransition");
@@ -758,7 +789,7 @@ test("AC17: registry has 35 entries incl. SR_RETURN_CAP_EXCEEDED (shape pinned);
     [
       "TRANSITION_VALIDATION", "FEATURE_LEASE", "SCOPE_DECISION_REQUIRED", "CUT_APPROVAL_REQUIRED",
       "EXTERNAL_REFS_UNRESOLVED", "SOURCE_CREDIBILITY_UNVERIFIED", "REPRO_MANIFEST_MISSING",
-      "REVIEW_VERDICT_STATUS_MISMATCH", "REVIEWER_COMPLETED_TASKS_REJECTED", "QA_REVIEW_RECORD",
+      "REVIEW_VERDICT_STATUS_MISMATCH", "NON_JUDGE_COMPLETED_TASKS_REJECTED", "QA_REVIEW_RECORD",
       "QA_COMPLETION_EVIDENCE_MISSING", "PASS_TASKS_INCOMPLETE", "PASS_MISSING_EVIDENCE",
       "PASS_VISUAL_SUBGATES", "PASS_EXPECTED_RED_DIFF", "PASS_AC_EXECUTION_LOG", "MISSING_REVIEW_EVIDENCE",
     ],
@@ -775,26 +806,24 @@ test("AC17: registry has 35 entries incl. SR_RETURN_CAP_EXCEEDED (shape pinned);
   assert.match(comment, /before\s+or\s+after any round cap/);
 });
 
-test("AC17: hop cap 14 outranks the sr-return cap on a marked feature", () => {
+test("AC17 (E435): hop cap 14 outranks the sr-return cap, which applies with no marker", () => {
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0, prev_review_round: 0, prev_hop_count: 14,
-    prev_chain_path: "test-first", prev_sr_return_count: 2,
+    prev_review_round: 0, prev_hop_count: 14, prev_sr_return_count: 2,
   });
   assert.equal(r?.error, "HOP_CAP_EXCEEDED");
   const below = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0, prev_review_round: 0, prev_hop_count: 13,
-    prev_chain_path: "test-first", prev_sr_return_count: 2,
+    prev_review_round: 0, prev_hop_count: 13, prev_sr_return_count: 2,
   });
   assert.equal(below?.error, "SR_RETURN_CAP_EXCEEDED");
 });
 
 // ---------------------------------------------------------------- AC18
 
-test("AC18: SQLite/HTTP mode ignores chain_path: pm -> qa without resume_of and code-reviewer PASS rejected as today", async (t) => {
+test("AC18 (E435): SQLite/HTTP mode runs the one chain: pm -> qa accepted without resume_of (a carried chain_path not persisted), code-reviewer PASS accepted", async (t) => {
   if (!SqliteHandoffStorage) return t.skip("better-sqlite3 not installed");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "e431-sq-"));
   const storage = new SqliteHandoffStorage(path.join(dir, "agc.db"));
@@ -813,8 +842,8 @@ test("AC18: SQLite/HTTP mode ignores chain_path: pm -> qa without resume_of and 
       workspace_path: dir, completed_tasks: [], pending_notes: [],
       ...w("qa-engineer", "In_Progress", { chain_path: "test-first" }),
     });
-    assert.ok(rejected(r), "marker ignored: pm -> qa without resume_of rejected");
-    assert.match(text(r), /TRANSITION_REJECTED/);
+    assert.ok(!rejected(r), `pm -> qa is an ordinary edge in SQLite too: ${text(r)}`);
+    assert.equal(storage.readState(dir)?.last_agent, "qa-engineer");
     assert.equal(storage.readState(dir)?.chain_path, undefined, "marker not persisted");
 
     await reseed("code-reviewer");
@@ -822,19 +851,45 @@ test("AC18: SQLite/HTTP mode ignores chain_path: pm -> qa without resume_of and 
     try {
       p = await UPD.run({
         workspace_path: dir, completed_tasks: [], pending_notes: [],
-        ...w("code-reviewer", "PASS", { chain_path: "test-first", qa_review: "x", review_task_ids: ["T-1"] }),
+        ...w("code-reviewer", "PASS", { chain_path: "test-first", review_verdict: "APPROVED", qa_review: "x", review_task_ids: ["T-1"] }),
       });
     } catch (err) {
       p = { isError: true, content: [{ type: "text", text: err.message }] };
     }
-    assert.ok(rejected(p), "code-reviewer PASS rejected as today");
+    assert.ok(!rejected(p), `code-reviewer is the judge in SQLite too: ${text(p)}`);
   } finally {
     setActiveStorage(new FileHandoffStorage());
     try { storage.close(); } catch {}
   }
 });
 
-// ---------------------------------------------------------------- overlay doc mirror (blueprint OQ9)
+// ---------------------------------------------------------------- one table, doc mirror (blueprint OQ9; E435)
+
+// E435 architecture "New ALLOWED_TRANSITIONS (22 keys)", frozen: the old marked effective table, entry for entry, in order.
+const TABLE_22 = `
+null:null = pm:In_Progress pm:Blocked researcher:In_Progress researcher:Blocked design-auditor:In_Progress design-auditor:Blocked
+researcher:In_Progress = pm:In_Progress pm:Blocked researcher:Blocked design-auditor:In_Progress
+researcher:Blocked = researcher:In_Progress pm:In_Progress
+design-auditor:In_Progress = pm:In_Progress design-auditor:Blocked
+design-auditor:Blocked = design-auditor:In_Progress pm:In_Progress
+pm:In_Progress = architect:In_Progress researcher:In_Progress design-auditor:In_Progress pm:Blocked pm:In_Progress qa-engineer:In_Progress
+pm:Blocked = pm:In_Progress pm:Blocked design-auditor:In_Progress
+architect:In_Progress = architect:Blocked pm:In_Progress qa-engineer:In_Progress
+architect:Blocked = pm:In_Progress architect:In_Progress
+sr-engineer:In_Progress = code-reviewer:In_Progress sr-engineer:Blocked pm:In_Progress qa-engineer:In_Progress
+sr-engineer:Blocked = sr-engineer:In_Progress pm:In_Progress design-auditor:In_Progress
+code-reviewer:In_Progress = code-reviewer:FAIL code-reviewer:Blocked code-reviewer:PASS
+code-reviewer:FAIL = sr-engineer:In_Progress pm:In_Progress qa-engineer:In_Progress
+code-reviewer:Blocked = code-reviewer:In_Progress pm:In_Progress
+code-reviewer:PASS = pm:In_Progress researcher:In_Progress release-engineer:In_Progress design-auditor:In_Progress
+qa-engineer:In_Progress = qa-engineer:Blocked sr-engineer:In_Progress
+qa-engineer:Blocked = sr-engineer:In_Progress qa-engineer:In_Progress pm:In_Progress
+qa-engineer:FAIL = sr-engineer:In_Progress pm:In_Progress
+qa-engineer:PASS = pm:In_Progress researcher:In_Progress release-engineer:In_Progress design-auditor:In_Progress
+release-engineer:In_Progress = pm:In_Progress release-engineer:Blocked
+release-engineer:Blocked = release-engineer:In_Progress pm:In_Progress qa-engineer:In_Progress
+release-engineer:PASS = pm:In_Progress researcher:In_Progress`
+  .trim().split("\n").map((l) => l.split(" = ")).map(([k, v]) => [k, v.split(" ")]);
 
 function parseOverlayTable(md, heading) {
   const start = md.indexOf(heading);
@@ -852,10 +907,15 @@ function parseOverlayTable(md, heading) {
   return out;
 }
 
-test("OVERLAY: the qa-flow-enforcement-architecture tables equal the exported TEST_FIRST_OVERLAY", () => {
+test("OVERLAY (E435): one 22-key ALLOWED_TRANSITIONS equals the frozen contract table in order, and its doc mirror equals it; no TEST_FIRST_OVERLAY, no overlay tables", () => {
+  // Why: the old matrix plus overlay collapsed into one table; a second table anywhere would let the paths drift apart again.
+  assert.equal(TEST_FIRST_OVERLAY, undefined, "TEST_FIRST_OVERLAY no longer exported");
+  const src = [...T.ALLOWED_TRANSITIONS.entries()].map(([k, v]) => [k, v.map((e) => `${e.agent}:${e.status}`)]);
+  assert.equal(src.length, 22);
+  assert.deepEqual(src, TABLE_22);
   const md = fs.readFileSync(path.join(ROOT, "specs", "qa-flow-enforcement-architecture.md"), "utf-8");
-  const opens = parseOverlayTable(md, "### Opened on a test-first feature");
-  const closes = parseOverlayTable(md, "### Closed on a test-first feature");
-  assert.deepEqual([...opens.entries()], [...TEST_FIRST_OVERLAY.opens.entries()]);
-  assert.deepEqual([...closes.entries()], [...TEST_FIRST_OVERLAY.closes.entries()]);
+  const doc = [...parseOverlayTable(md, "## ALLOWED_TRANSITIONS Matrix").entries()]
+    .map(([k, v]) => [k, v.map((e) => `${e.agent}:${e.status}`).sort()]);
+  assert.deepEqual(new Map(doc), new Map(TABLE_22.map(([k, v]) => [k, [...v].sort()])), "doc matrix mirrors the one table");
+  assert.ok(!md.includes("### Opened on a test-first feature") && !md.includes("### Closed on a test-first feature"), "overlay tables gone");
 });
