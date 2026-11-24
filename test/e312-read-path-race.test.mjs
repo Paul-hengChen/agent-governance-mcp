@@ -24,7 +24,7 @@ const cjsFs = createRequire(import.meta.url)("node:fs");
 const FEATURE = "e312-race-fixture";
 
 function body(feature) {
-  return `---\nschema_version: 15\nactive_feature: "${feature}"\nstatus: "In_Progress"\nlast_updated: "2026-01-01T00:00:00.000Z"\nlast_agent: "pm"\nqa_round: 0\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`;
+  return `---\nschema_version: 16\nactive_feature: "${feature}"\nstatus: "In_Progress"\nlast_updated: "2026-01-01T00:00:00.000Z"\nlast_agent: "pm"\nchain_path: "test-first"\nqa_round: 0\nqa_rounds_total: 0\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`;
 }
 
 // layout: "flat" (only .current/handoff.md) or "lane" (only the lane handoff.md).
@@ -91,6 +91,10 @@ const readers = {
 function assertFixtureState(state, why) {
   assert.ok(state, `${why}: reader returned no state`);
   assert.equal(state.active_feature, FEATURE, `${why}: wrong state`);
+  // E435 (AC4): the raced read still runs the v16 -> v17 step, so the dropped fields are gone.
+  for (const k of ["chain_path", "qa_round", "qa_rounds_total"]) {
+    assert.equal(state[k], undefined, `${why}: ${k} must be dropped by the v16 -> v17 migration`);
+  }
 }
 
 // Sweep every injection point so the test does not depend on how many existsSync calls

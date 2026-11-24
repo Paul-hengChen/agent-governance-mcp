@@ -524,3 +524,33 @@ Left as is (green on both): schema-versions overwrite test (gains a 16→17 regi
 ### Red Reasons (T-12)
 
 28 red at base, all assertion failures (no syntax / link error): `CURRENT_VERSIONS.handoff` is 16 and no v16 → v17 step exists, so writes / heals stamp 16, the chain keeps `qa_round` / `qa_rounds_total`, and v17 files are refused (T-E435-29); the writer still emits `qa_round` from the positional slot (T-E435-29, T-E435-34 for `FileHandoffStorage`); the PASS refine still names qa-engineer (T-E435-35). Rows under `# T-E435-12` in the manifest. Run: `node --test test/handoff-migration.test.mjs test/schema-versions.test.mjs test/handoff-versioning.test.mjs test/handoff-write-arg-guard.test.mjs test/writestate-options-object.test.mjs` → 84 tests, 56 pass, 28 fail = the 28 rows, name for name.
+
+## T-E435-13 — `e18-write-provenance`, `e20-e21-crash-resilience`, `drift-skew`, `e325-drift-version-peek-race`, `e312-read-path-race` (AC4, AC2)
+
+Placement: existing files, edited in place (brief). New / re-titled tests carry `E435`. 177 changed lines (103+ / 74-), under the 300-line cap. Contract: architecture *Handoff schema v17 (file mode)*, *Error codes* (step 9 `NON_JUDGE_COMPLETED_TASKS_REJECTED`, `QA_COMPLETION_EVIDENCE_MISSING` judge-only), Rulings (a), (b); schema-17 conventions from T-E435-12 reused (frozen raw v16 text, absence asserted as `state[k] === undefined`).
+
+### Scenario → Test Map (T-13)
+
+| scenario | exact test name(s) |
+|---|---|
+| the evidence gate diffs the judge's (code-reviewer's) list: unevidenced new id rejected, evidenced accepted, list-back not gated | e18 QAEV-1 (E435) · QAEV-2 (E435) · QAEV-3 (E435) |
+| no APPROVED exemption: review_reports evidence alone does not back a judge ledger write | e18 QAEV-4a (E32 amendment, E435) |
+| the judge's APPROVED self-loop keeps review scope out of the ledger | e18 QAEV-4b (E32 amendment, E435) — green on both (positive control) |
+| E5 identity-swap replay: qa-engineer-stamped swap is not an edge (TRANSITION_REJECTED); the judge's zero-evidence pre-fill is refused | e18 QAEV-INCIDENT (E435) |
+| AC9 SQLite: the judge's unevidenced ledger write is accepted (gate file-mode only) | e18 QAEV-SQL (E435) |
+| `CURRENT_VERSIONS.handoff` 17 in the skew peek: text says `server max v17`; v17 is never skew, v18 is | drift-skew T32 AC-6 (future handoff), AC8 (flat), T32 AC-6 (E435) boundary |
+| the skew peek under a flat/lane rename race never reports a v17 file as skew | e325 AC-E325-1 (E435) |
+| the raced read path (both readers, every injection point) still runs v16 → v17: `chain_path`, `qa_round`, `qa_rounds_total` gone | e312 (i) R1 forward, (i) R1/R2 sweep, (ii) reverse, (iii) R2 both directions — × parseHandoff, readHandoffState |
+
+Left as is (green on both): e18 CONTENT-2, CONTENT-3; all of `e20-e21-crash-resilience` (the E20/E21 SOP lines it pins are not touched by E435 — the T-32 skill-qa-engineer.md edits are line 13 tail and line 31, neither pinned here); drift-skew tasks / config / heal / empty / short-circuit; e325 other tests (v999 fixtures); e312 (iv).
+
+### Open Interface Details (T-13)
+
+1. e312 fixture moves from schema 15 to a frozen schema 16 text carrying `chain_path: "test-first"`, `qa_round`, `qa_rounds_total`, so the raced read still exercises a migration step after the build (v15 → v17 would too, but v16 is the step E435 adds). At base v16 is current, so no migration runs there; post-build race-plus-migration coverage is unchanged.
+2. e325 `body()` drops its `qa_round: 0` line (a v17 file carries none); the v999 fixtures are unaffected.
+3. QAEV-INCIDENT keeps both halves of the old replay: the qa-engineer stamp (now TRANSITION_REJECTED, step 1 precedes step 9) and the evidence gate on the same pre-fill, moved to the judge's stamp. A qa-engineer ledger self-loop (`NON_JUDGE_COMPLETED_TASKS_REJECTED`) is not re-pinned here: covered by `test/reviewer-completed-tasks-gate.test.mjs` FM12 and `test/e150-completed-tasks-carry-forward.test.mjs` AC17 (E435).
+4. QAEV-4b drops its `review_reports/` evidence file (it backs nothing since `MISSING_REVIEW_EVIDENCE` is dormant; completed_tasks is empty so no gate arms).
+
+### Red Reasons (T-13)
+
+18 red at base, all assertion failures (no syntax / link error): e18 QAEV-1/2/3/4a/SQL, a code-reviewer ledger write is `REVIEWER_COMPLETED_TASKS_REJECTED` (T-E435-33); QAEV-INCIDENT, code-reviewer → qa-engineer still an edge (T-E435-30); drift-skew ×3, e325 ×1, skew text `server max v16` and v17 reported as skew (T-E435-29); e312 ×8, v16 is current so the dropped fields survive the read (T-E435-29). Rows under `# T-E435-13` in the manifest. Run: `node --test test/e18-write-provenance.test.mjs test/e20-e21-crash-resilience.test.mjs test/drift-skew.test.mjs test/e325-drift-version-peek-race.test.mjs test/e312-read-path-race.test.mjs` → 49 tests, 31 pass, 18 fail = the 18 rows, name for name.
