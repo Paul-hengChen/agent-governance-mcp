@@ -1,8 +1,8 @@
 // Coded by @qa-engineer
 // Pins for specs/e139-evidence-verdict-integrity.md E139 (AC-E139-1..6, AC-E139-8).
-// Invariant: review_verdict is the code-reviewer's field. Only an agent_id=code-reviewer write, or the
-// single APPROVED handoff stamped qa-engineer on code-reviewer:In_Progress -> qa-engineer:In_Progress,
-// may carry it (file mode). A forged verdict is rejected before QA_REVIEW_RECORD, so it cannot even leave
+// Invariant: review_verdict is the code-reviewer's field. Only an agent_id=code-reviewer write may carry
+// it (file mode). Since E435 code-reviewer is the chain's judge and closes the feature itself (APPROVED
+// with PASS), so the old APPROVED hand-off to qa-engineer is no longer an edge. A forged verdict is rejected before QA_REVIEW_RECORD, so it cannot even leave
 // evidence behind. Drives the real orchestrator, as test/reviewer-completed-tasks-gate.test.mjs does.
 
 import { test } from "node:test";
@@ -54,6 +54,22 @@ async function seed(ws, feature, agent, status) {
 
 const handoffBytes = (ws) => fs.readFileSync(resolveCurrentLanePaths(ws).handoffPath);
 const text = (r) => r.content?.[0]?.text ?? "";
+// A TRANSITION_REJECTED reply is "⛔ <CODE>\n<JSON envelope>"; the hint lives in the envelope's top-level `hint`
+// field (architecture: "the in-flight hint lives in `hint`"), so parse it rather than text-search escaped JSON.
+const envelope = (r) => JSON.parse(text(r).slice(text(r).indexOf("\n") + 1));
+// A rejection may be thrown (tool-boundary / judge guard) rather than returned; fold both into one shape.
+async function upd(args) {
+  try {
+    return await handleUpdateState(args);
+  } catch (err) {
+    return { isError: true, content: [{ type: "text", text: `⛔ ${err.message}` }] };
+  }
+}
+const JUDGE_ONLY = /reserved for code-reviewer, the chain's judge|status="PASS" requires agent_id="code-reviewer"/;
+const REVIEWER_TO_QA_HINT =
+  'code-reviewer is the judge and closes the feature: approve with code-reviewer:PASS (review_verdict: "APPROVED"), or reject with code-reviewer:FAIL; qa-engineer does not follow code-reviewer.';
+const QA_JUDGE_HINT =
+  "qa-engineer writes tests and never writes PASS or FAIL: code-reviewer is the judge and writes them from code-reviewer:In_Progress.";
 
 test("AC-E139-1: every non-reviewer role's write carrying review_verdict is rejected, envelope exact, handoff byte-unchanged", async () => {
   const roles = ["pm", "researcher", "design-auditor", "architect", "sr-engineer", "qa-engineer", "release-engineer"];
@@ -84,12 +100,12 @@ test("AC-E139-1: every non-reviewer role's write carrying review_verdict is reje
   }
 });
 
-test("AC-E139-2: the APPROVED handoff row (qa-engineer on code-reviewer:In_Progress -> qa-engineer:In_Progress) is accepted", async () => {
+test("AC-E139-2 (E435): code-reviewer -> qa-engineer is no longer an edge, even with APPROVED; the judge's own APPROVED PASS is accepted", async () => {
   const ws = mkWorkspace("e139-2-");
   await seed(ws, "e139-2", "code-reviewer", "In_Progress");
-  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
-  fs.writeFileSync(path.join(ws, "review_reports", "review_T-E139-X.md"), "# Review\n\nAPPROVED.\n");
-  const r = await handleUpdateState({
+  fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "qa_reports", "review_T-E139-X.md"), "# Review\n\nAPPROVED.\n");
+  const r = await upd({
     workspace_path: ws,
     active_feature: "e139-2",
     status: "In_Progress",
@@ -99,26 +115,30 @@ test("AC-E139-2: the APPROVED handoff row (qa-engineer on code-reviewer:In_Progr
     review_verdict: "APPROVED",
     pending_notes: ["code-reviewer: APPROVED"],
   });
-  assert.ok(!r.isError, `the APPROVED row must still be accepted; got: ${text(r)}`);
-  // Companion: with no evidence the row reaches MISSING_REVIEW_EVIDENCE, not the new gate (the two gates agree on the edge).
+  assert.ok(r.isError, `the old APPROVED hand-off row must be rejected; got: ${text(r)}`);
+  assert.match(text(r), /TRANSITION_REJECTED/);
+  assert.equal(envelope(r).error, "TRANSITION_REJECTED");
+  assert.ok(envelope(r).hint.includes(REVIEWER_TO_QA_HINT), `hint names code-reviewer as the closing judge; got: ${text(r)}`);
+  assert.doesNotMatch(text(r), new RegExp(CODE), "step 1 rejects before the verdict gate");
+  // The judge closes instead: APPROVED with PASS is consistent and lands.
   const ws2 = mkWorkspace("e139-2b-");
   await seed(ws2, "e139-2b", "code-reviewer", "In_Progress");
-  const r2 = await handleUpdateState({
+  const r2 = await upd({
     workspace_path: ws2,
     active_feature: "e139-2b",
-    status: "In_Progress",
-    agent_id: "qa-engineer",
-    completed_tasks: [],
-    review_task_ids: ["T-E139-NOEV"],
+    status: "PASS",
+    agent_id: "code-reviewer",
+    completed_tasks: ["T-E139-Y"],
+    review_task_ids: ["T-E139-Y"],
     review_verdict: "APPROVED",
-    pending_notes: ["code-reviewer: APPROVED"],
+    qa_review: "judged: tests and implementation agree",
+    pending_notes: ["code-reviewer: PASS"],
   });
-  assert.ok(r2.isError);
-  assert.match(text(r2), /MISSING_REVIEW_EVIDENCE/);
+  assert.ok(!r2.isError, `code-reviewer APPROVED PASS must be accepted; got: ${text(r2)}`);
   assert.doesNotMatch(text(r2), new RegExp(CODE));
 });
 
-test("AC-E139-3: near-misses of the APPROVED row are rejected", async () => {
+test("AC-E139-3 (E435): no qa-engineer write can carry a verdict — self-loop, the removed edge, PASS and FAIL are all rejected", async () => {
   // (a) qa-engineer APPROVED from qa-engineer:In_Progress (self-loop)
   const a = mkWorkspace("e139-3a-");
   await seed(a, "e139-3a", "qa-engineer", "In_Progress");
@@ -129,43 +149,53 @@ test("AC-E139-3: near-misses of the APPROVED row are rejected", async () => {
   assert.ok(ra.isError, `self-loop APPROVED must be rejected; got: ${text(ra)}`);
   assert.match(text(ra), new RegExp(CODE));
 
-  // (b) qa-engineer CHANGES_REQUESTED on the code-reviewer:In_Progress -> qa-engineer:In_Progress edge
+  // (b) qa-engineer CHANGES_REQUESTED after code-reviewer:In_Progress: the edge itself is gone
   const b = mkWorkspace("e139-3b-");
   await seed(b, "e139-3b", "code-reviewer", "In_Progress");
-  const rb = await handleUpdateState({
+  const rb = await upd({
     workspace_path: b, active_feature: "e139-3b", status: "In_Progress", agent_id: "qa-engineer",
     completed_tasks: [], pending_notes: ["x"], review_verdict: "CHANGES_REQUESTED",
   });
-  assert.ok(rb.isError, `CHANGES_REQUESTED on the handoff edge must be rejected; got: ${text(rb)}`);
-  assert.match(text(rb), new RegExp(CODE));
+  assert.ok(rb.isError, `qa-engineer after code-reviewer must be rejected; got: ${text(rb)}`);
+  assert.match(text(rb), /TRANSITION_REJECTED/);
+  assert.equal(envelope(rb).error, "TRANSITION_REJECTED");
+  assert.ok(envelope(rb).hint.includes(REVIEWER_TO_QA_HINT), text(rb));
 
-  // (c) qa-engineer PASS and FAIL writes carrying any verdict
+  // (c) qa-engineer PASS and FAIL writes carrying any verdict: qa never judges
   for (const [status, verdict] of [["PASS", "APPROVED"], ["PASS", "CHANGES_REQUESTED"], ["FAIL", "APPROVED"], ["FAIL", "CHANGES_REQUESTED"]]) {
     const ws = mkWorkspace("e139-3c-");
     await seed(ws, "e139-3c", "qa-engineer", "In_Progress");
-    const r = await handleUpdateState({
+    const r = await upd({
       workspace_path: ws, active_feature: "e139-3c", status, agent_id: "qa-engineer",
       completed_tasks: [], pending_notes: ["x"], review_verdict: verdict,
     });
     assert.ok(r.isError, `qa ${status}+${verdict} must be rejected; got: ${text(r)}`);
-    assert.match(text(r), new RegExp(CODE), `qa ${status}+${verdict}`);
+    if (status === "PASS") {
+      assert.match(text(r), JUDGE_ONLY, `qa PASS+${verdict} names code-reviewer as the judge`);
+    } else {
+      assert.match(text(r), /TRANSITION_REJECTED/, `qa FAIL+${verdict}`);
+      assert.ok(envelope(r).hint.includes(QA_JUDGE_HINT), `qa FAIL+${verdict}: ${text(r)}`);
+    }
   }
 });
 
-test("AC-E139-4: code-reviewer writes never trip the new code; the consistency matrix is unchanged", async () => {
+test("AC-E139-4 (E435): code-reviewer writes never trip the new code; APPROVED is consistent with PASS or In_Progress", async () => {
   const cases = [
     // [status, verdict, expectedReject]
     ["FAIL", "APPROVED", "REVIEW_VERDICT_STATUS_MISMATCH"],
     ["In_Progress", "CHANGES_REQUESTED", "REVIEW_VERDICT_STATUS_MISMATCH"],
     ["In_Progress", "APPROVED", null],
     ["FAIL", "CHANGES_REQUESTED", null],
+    ["PASS", "CHANGES_REQUESTED", "REVIEW_VERDICT_STATUS_MISMATCH"],
+    ["PASS", "APPROVED", null],
   ];
   for (const [status, verdict, expected] of cases) {
     const ws = mkWorkspace("e139-4-");
     await seed(ws, "e139-4", "code-reviewer", "In_Progress");
-    const r = await handleUpdateState({
+    const pass = status === "PASS" ? { completed_tasks: ["T-E139-4"], review_task_ids: ["T-E139-4"], qa_review: "judged" } : {};
+    const r = await upd({
       workspace_path: ws, active_feature: "e139-4", status, agent_id: "code-reviewer",
-      completed_tasks: [], pending_notes: ["code-reviewer: verdict"], review_verdict: verdict,
+      completed_tasks: [], pending_notes: ["code-reviewer: verdict"], review_verdict: verdict, ...pass,
     });
     assert.doesNotMatch(text(r), new RegExp(CODE), `code-reviewer ${status}/${verdict} must never carry the new code`);
     if (expected) {
@@ -242,31 +272,32 @@ test("AC-E139-7 (telemetry + registry facets): a rejection appends one telemetry
   assert.ok(!stats.zero_fire.includes(CODE));
 });
 
-test("AC-E139-8: a forged verdict on a qa PASS write with qa_review is rejected before the evidence record — no file appears", async () => {
+test("AC-E139-8 (E435): a qa PASS with a forged verdict, and a judge PASS with a mismatched verdict, are rejected before the evidence record — no file appears", async () => {
   const ws = mkWorkspace("e139-8-");
   await seed(ws, "e139-8", "qa-engineer", "In_Progress");
-  const r = await handleUpdateState({
+  const r = await upd({
     workspace_path: ws, active_feature: "e139-8", status: "PASS", agent_id: "qa-engineer",
     completed_tasks: ["T-E139-8"], review_task_ids: ["T-E139-8"],
     pending_notes: ["QA: PASS"], qa_review: "forged pass with a forged verdict", review_verdict: "APPROVED",
   });
   assert.ok(r.isError);
-  assert.match(text(r), new RegExp(CODE));
-  assert.equal(fs.existsSync(path.join(ws, "qa_reports")), false, "step 10 rejects before QA_REVIEW_RECORD: qa_reports/ never created");
+  assert.match(text(r), JUDGE_ONLY, "qa-engineer never writes PASS");
+  assert.equal(fs.existsSync(path.join(ws, "qa_reports")), false, "rejected before QA_REVIEW_RECORD: qa_reports/ never created");
 
-  // Same with a pre-existing evidence file: its bytes stay exactly as they were.
+  // The judge's PASS carrying CHANGES_REQUESTED: step 8 rejects before step 10; a pre-existing file keeps its bytes.
   const ws2 = mkWorkspace("e139-8b-");
-  await seed(ws2, "e139-8b", "qa-engineer", "In_Progress");
+  await seed(ws2, "e139-8b", "code-reviewer", "In_Progress");
   fs.mkdirSync(path.join(ws2, "qa_reports"), { recursive: true });
   const file = path.join(ws2, "qa_reports", "review_T-E139-8B.md");
   fs.writeFileSync(file, "# existing\n");
   const before = fs.readFileSync(file);
-  const r2 = await handleUpdateState({
-    workspace_path: ws2, active_feature: "e139-8b", status: "PASS", agent_id: "qa-engineer",
+  const r2 = await upd({
+    workspace_path: ws2, active_feature: "e139-8b", status: "PASS", agent_id: "code-reviewer",
     completed_tasks: ["T-E139-8B"], review_task_ids: ["T-E139-8B"],
-    pending_notes: ["QA: PASS"], qa_review: "forged", review_verdict: "CHANGES_REQUESTED",
+    pending_notes: ["code-reviewer: PASS"], qa_review: "mismatched", review_verdict: "CHANGES_REQUESTED",
   });
   assert.ok(r2.isError);
+  assert.match(text(r2), /REVIEW_VERDICT_STATUS_MISMATCH/);
   assert.ok(before.equals(fs.readFileSync(file)));
   assert.deepEqual(fs.readdirSync(path.join(ws2, "qa_reports")), ["review_T-E139-8B.md"]);
 });

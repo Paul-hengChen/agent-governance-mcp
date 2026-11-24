@@ -182,16 +182,16 @@ export class SqliteHandoffStorage {
         this.selectStmt = this.db.prepare("SELECT * FROM handoff_state WHERE workspace_path = ?");
         this.selectLastUpdatedStmt = this.db.prepare("SELECT last_updated FROM handoff_state WHERE workspace_path = ?");
         this.upsertStmt = this.db.prepare(`INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round, hop_count, scope_decision, scope_decision_why)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, hopCount, scopeDecision, scopeDecisionWhy, expectedLastUpdated) => {
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, prd_path, review_round, visual_round, hop_count, scope_decision, scope_decision_why)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, prdPath, reviewRound, visualRound, hopCount, scopeDecision, scopeDecisionWhy, expectedLastUpdated) => {
             const row = this.selectLastUpdatedStmt.get(workspacePath);
             const actual = row?.last_updated ?? null;
             if (actual !== expectedLastUpdated) {
                 throw new Error(`⛔ STATE DRIFT: handoff row changed between freshness check and write ` +
                     `(expected last_updated=${expectedLastUpdated}, actual=${actual}). Retry after tw_get_state.`);
             }
-            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, hopCount, scopeDecision, scopeDecisionWhy);
+            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, prdPath, reviewRound, visualRound, hopCount, scopeDecision, scopeDecisionWhy);
         });
         this.listTasksStmt = this.db.prepare(`SELECT task_id, description, section, completed, note, reverted_reason, sort_order
        FROM tasks WHERE workspace_path = ? ORDER BY sort_order ASC`);
@@ -285,10 +285,6 @@ export class SqliteHandoffStorage {
         const row = this.fetchRow(workspacePath);
         if (!row)
             return null;
-        const qaRoundRaw = row.qa_round;
-        const qa_round = typeof qaRoundRaw === "number" && Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0
-            ? Math.floor(qaRoundRaw)
-            : 0;
         const reviewRoundRaw = row.review_round;
         const review_round = typeof reviewRoundRaw === "number" && Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0
             ? Math.floor(reviewRoundRaw)
@@ -299,7 +295,7 @@ export class SqliteHandoffStorage {
             : 0;
         // v9 — hop_count counter. Null (pre-ALTER row read before the column
         // backfilled) and malformed values default to 0, matching the file-mode
-        // parser and the three round counters above.
+        // parser and the two round counters above.
         const hopCountRaw = row.hop_count;
         const hop_count = typeof hopCountRaw === "number" && Number.isFinite(hopCountRaw) && hopCountRaw >= 0
             ? Math.floor(hopCountRaw)
@@ -315,7 +311,6 @@ export class SqliteHandoffStorage {
             ...(row.scope_decision_why ? { scope_decision_why: row.scope_decision_why } : {}),
             completed_tasks: JSON.parse(row.completed),
             pending_notes: JSON.parse(row.pending),
-            qa_round,
             review_round,
             visual_round,
             hop_count,
@@ -347,7 +342,9 @@ export class SqliteHandoffStorage {
     // else pack the positional args into that same options shape first. No
     // gate/persistence logic lives at this boundary — see writeStateCore.
     // (E36)
-    writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+    writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, 
+    // Ignored since E435; the slot stays so the later positionals do not shift.
+    _qaRound, prdPath, reviewRound, visualRound) {
         if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
             return this.writeStateCore(workspacePathOrOpts);
         }
@@ -359,7 +356,6 @@ export class SqliteHandoffStorage {
             pendingNotes: pendingNotes ?? [],
             blockingReason,
             lastAgent,
-            qaRound,
             prdPath,
             reviewRound,
             visualRound,
@@ -388,7 +384,6 @@ export class SqliteHandoffStorage {
         const hopCount = opts.hopCount;
         const blockingReason = opts.blockingReason;
         const lastAgent = opts.lastAgent;
-        const qaRound = opts.qaRound;
         const prdPath = opts.prdPath;
         const reviewRound = opts.reviewRound;
         const visualRound = opts.visualRound;
@@ -398,14 +393,13 @@ export class SqliteHandoffStorage {
         const _pendingNotes = opts.pendingNotes ?? [];
         const currentLastUpdated = this.fetchLastUpdated(workspacePath);
         verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
-        const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
         const normalisedReviewRound = Number.isFinite(reviewRound) && reviewRound >= 0
             ? Math.floor(reviewRound)
             : 0;
         const normalisedVisualRound = Number.isFinite(visualRound) && visualRound >= 0
             ? Math.floor(visualRound)
             : 0;
-        // v9 — hop_count normalisation, identical to the three round counters:
+        // v9 — hop_count normalisation, identical to the two round counters:
         // falsy/absent input (incl. the positional overload) normalises to 0.
         const normalisedHopCount = Number.isFinite(hopCount) && hopCount >= 0
             ? Math.floor(hopCount)
@@ -428,7 +422,7 @@ export class SqliteHandoffStorage {
                 effectiveScopeDecisionWhy = existing?.scope_decision_why ?? null;
         }
         const now = new Date().toISOString();
-        this.txUpsert(workspacePath, _activeFeature, _status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(_completedTasks), JSON.stringify(_pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, normalisedVisualRound, normalisedHopCount, effectiveScopeDecision, effectiveScopeDecisionWhy, currentLastUpdated);
+        this.txUpsert(workspacePath, _activeFeature, _status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(_completedTasks), JSON.stringify(_pendingNotes), effectivePrdPath, normalisedReviewRound, normalisedVisualRound, normalisedHopCount, effectiveScopeDecision, effectiveScopeDecisionWhy, currentLastUpdated);
         snapshotExtra(workspacePath, SNAPSHOT_KEY, now);
         return Promise.resolve(JSON.stringify({ success: true, storage: "sqlite", updated_at: now }));
     }

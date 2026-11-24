@@ -9,6 +9,10 @@
 // Base-relative checks (AC9, AC12, AC13) read a CLOSED historical range (both ends fixed shas, the lane's
 // own content diff) into memory at capture time through `git archive` / `git diff`, never `git show`, and
 // skip loudly when a sha is unreachable (e.g. after a squash merge); they never re-read a temp dir later.
+// E435 (one chain, old path removed): the `chain_path` marker, `qa_round` and the qa judge leave the served
+// text and the server, so the live checks below pin the marker-free wording (specs/e435-remove-old-path-
+// architecture.md *Copy*) and the live registry of 33; the closed-range parts (AC9, AC12, AC13) still pin E433's
+// own historical range unchanged. Re-pinned titles carry `(E435)`.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -43,6 +47,11 @@ const COPY = {
     "(qa-engineer, PASS)",
     "`qa_round` cap",
     "`(code-reviewer, In_Progress) → (qa-engineer, In_Progress)`",
+    // E435: the marker, the qa round counter and the removed ledger code are gone from every served text.
+    "chain_path",
+    "qa_round",
+    "QA_ROUND_EXCEEDED",
+    "REVIEWER_COMPLETED_TASKS_REJECTED",
   ],
   noTicketTracker: "No ticket file for <tracker id> — start the `spec-workshop` prompt first.",
   scopeLine: "你只負責這張票走到裁判（code-reviewer）PASS；波次層級的核取項屬於整合者。",
@@ -54,7 +63,20 @@ const COPY = {
     "qa_reports/expected-red_<feature>.txt is declared but no ## Expected-Red Diff section was found in any " +
     "qa_reports/review_<id>.md for the PASS'd ids (covers: files count). Run the Expected-Red Diff step " +
     "(skill-code-reviewer) — diff the actual suite reds against the manifest and record the disposition before PASS.",
-  releaseGate: "`(code-reviewer, PASS)` on a feature marked `chain_path: test-first`, `(qa-engineer, PASS)` on an unmarked one",
+  // E433's two-judge release wording; E435 removes it (absence pinned in AC10).
+  oldReleaseGate: "`(code-reviewer, PASS)` on a feature marked `chain_path: test-first`, `(qa-engineer, PASS)` on an unmarked one",
+  // E435 architecture Copy (T-42), verbatim.
+  releaseCd63:
+    "- [ ] One `docs/*` pull request, merged to `main`, carries both the release gate feature's PASS state write from its judge (`.current/_primary/handoff.md`), `(code-reviewer, PASS)`, and the release's CHANGELOG entry under `## [Unreleased]`.",
+  releaseCd69:
+    "After a successful release, `main`'s handoff is no longer the judge's `(code-reviewer, PASS)` and `## [Unreleased]` is empty, so dispatching again by mistake stops at once (`PRECONDITION_NOT_PASS` or `CHANGELOG_ENTRY_MISSING`) instead of releasing twice.",
+  releaseCd95:
+    "`.current/_primary/handoff.md` on `main` is not the judge's `(code-reviewer, PASS)`, has no usable `active_feature`, or cannot be parsed; the detail names the tuple",
+  // E435 architecture Copy (T-36 / T-32), verbatim.
+  const06Line7: "- `status=PASS` and `tw_complete_task` require the chain's judge, `agent_id=\"code-reviewer\"`.",
+  qaLine13Tail: "Because you never write FAIL, no qa round is counted; the loops",
+  qaLine31: "A `TRANSITION_REJECTED` on the claim: stop and report it with the rejection's hint.",
+  archHandoff: "(`architect → sr-engineer` is not an edge)",
   readmeQaRow: "| qa-engineer      | high   | `opus`            | Writes every scenario test first; sr-engineer cannot edit them.      |",
   readmeCrRow: "| code-reviewer    | high   | `opus`            | Detail sensitivity; the chain's judge — reviews tests and code, writes PASS. |",
 };
@@ -142,7 +164,7 @@ function judgeAssignmentSentences(text) {
 }
 
 for (const role of Object.keys(FIVE)) {
-  test(`AC1: composed ${role} prompt carries chain.main, no forbidden old-judge string, and every PASS / tw_complete_task / completed_tasks sentence names code-reviewer`, () => {
+  test(`AC1 (E435): composed ${role} prompt carries chain.main, no forbidden old-judge or marker string, and every PASS / tw_complete_task / completed_tasks sentence names code-reviewer`, () => {
     const text = BUNDLE[role];
     assert.ok(text.includes(COPY.chainMain), `${role}: chain.main line present`);
     for (const f of COPY.forbidden) assert.ok(!text.includes(f), `${role}: forbidden string present: ${f}`);
@@ -169,16 +191,14 @@ for (const role of Object.keys(FIVE)) {
 
 // ------------------------------------------------------------------ AC2
 
-test("AC2: constitution fragments — judge clause (a), test ownership (b), builder ≠ judge unchanged (c), Limits (d), ownership + disclosure (e), build gate (f), state update (g)", () => {
+test("AC2 (E435): constitution fragments — judge clause (a), test ownership (b), builder ≠ judge unchanged (c), Limits (d), ownership + disclosure (e), build gate (f), state update (g)", () => {
   const c06 = content("const-06-chain-31-head.md");
   const c05 = content("const-05-core-standards.md");
   const c01 = content("const-01-core-head.md");
 
-  // (a)
-  assert.ok(
-    c06.includes("- `status=PASS` and `tw_complete_task` require the chain's judge, `agent_id=\"code-reviewer\"`, on a feature whose PM write set `chain_path: \"test-first\"`"),
-    "(a) const-06 names the judge, agent_id code-reviewer, and the marker",
-  );
+  // (a) E435: the judge clause is unconditional — const-06 line 7 is the Copy text, no marker anywhere.
+  assert.equal(c06.split("\n")[6], COPY.const06Line7, "(a) const-06 line 7 names the judge, agent_id code-reviewer, no marker condition");
+  assert.ok(!c06.includes("chain_path"), "(a) const-06 no longer names the chain_path marker");
 
   // (b)
   const ownership = c05.split("\n").find((l) => l.startsWith("- **Test ownership**"));
@@ -239,7 +259,7 @@ test("AC2: constitution fragments — judge clause (a), test ownership (b), buil
 
 // ------------------------------------------------------------------ AC3
 
-test("AC3: skill-qa-engineer.md alone makes qa the test author (scenarios, public interface, open interface details, manifest, no verdict, return loops, bug ticket)", () => {
+test("AC3 (E435): skill-qa-engineer.md alone makes qa the test author (scenarios, public interface, open interface details, manifest, no verdict, return loops, bug ticket)", () => {
   const qa = content("skill-qa-engineer.md");
   const must = [
     "one test per ticket scenario, written against the public interface only",
@@ -266,6 +286,10 @@ test("AC3: skill-qa-engineer.md alone makes qa the test author (scenarios, publi
   assert.ok(!qa.includes("skill-qa-visual"), "no skill-qa-visual");
   assert.ok(!qa.includes("recommended_model: sonnet"), "no recommended_model: sonnet");
   assert.ok(qa.startsWith("---\nrecommended_model: opus\n---\n"), "frontmatter is recommended_model: opus");
+  // E435: no qa round, no marker — line 13 tail and the claim's rejection sentence are the Copy texts.
+  assert.ok(qa.includes(COPY.qaLine13Tail), "line 13 tail: no qa round is counted");
+  assert.ok(qa.includes(COPY.qaLine31), "claim rejection sentence carries no marker diagnosis");
+  for (const s of ["qa_round", "QA_ROUND_EXCEEDED", "chain_path"]) assert.ok(!qa.includes(s), `qa SOP no longer names ${s}`);
 });
 
 // ------------------------------------------------------------------ AC4
@@ -301,7 +325,7 @@ test("AC4: skill-sr-engineer.md builds to pre-written tests, has both return rou
 
 // ------------------------------------------------------------------ AC5
 
-test("AC5: skill-code-reviewer.md is the chain's judge (tests vs scenarios, full suite, Expected-Red Diff, AC Execution, audits, PASS and rejection rows, clean-context carve-outs)", () => {
+test("AC5 (E435): skill-code-reviewer.md is the chain's judge (tests vs scenarios, full suite, Expected-Red Diff, AC Execution, audits, PASS and rejection rows, clean-context carve-outs)", () => {
   const cr = content("skill-code-reviewer.md");
   const must = [
     "A missing scenario, a loose assertion (would pass on a wrong result) or a test of internals is a `required` finding and a rejection reason (test defect)",
@@ -336,14 +360,20 @@ test("AC5: skill-code-reviewer.md is the chain's judge (tests vs scenarios, full
   // No row hands APPROVED to qa-engineer: the PASS row routes to a human, never to qa.
   assert.ok(!/APPROVED[^\n]*\|\s*qa-engineer\s*\|/.test(routes), "no APPROVED → qa-engineer row");
   assert.ok(/\| PASS \| PASS \|[^|]*\| human \|/.test(byCause("| PASS |")), "PASS row ends the chain at the human");
+  // E435: the judge needs no marker, so the "The marker" bullet and its removed code are gone.
+  assert.ok(!cr.includes("**The marker**"), "no 'The marker' bullet");
+  assert.ok(!cr.includes("REVIEWER_COMPLETED_TASKS_REJECTED"), "no REVIEWER_COMPLETED_TASKS_REJECTED");
+  assert.ok(!cr.includes("chain_path"), "code-reviewer SOP no longer names chain_path");
 });
 
 // ------------------------------------------------------------------ AC6
 
-test("AC6: pm routes architect or qa-engineer with the marker, bugfix mode, amend path and counters; architect routes to qa-engineer", () => {
+test("AC6 (E435): pm routes architect or qa-engineer with no marker, bugfix mode, amend path and counters; architect routes to qa-engineer", () => {
   const pm = content("skill-pm.md");
-  assert.ok(pm.includes('next_role="architect" or "qa-engineer", chain_path="test-first"'), "step 8 routes architect or qa-engineer and sets the marker");
-  assert.ok(pm.includes('Set the `chain_path: "test-first"` marker on every feature you route'), "marker on every routed feature");
+  assert.ok(pm.includes('next_role="architect" or "qa-engineer", pending_notes=[...])'), "step 8 routes architect or qa-engineer, no marker argument");
+  assert.ok(!pm.includes("Set the `chain_path"), "no 'Set the chain_path marker' sentence");
+  assert.ok(!pm.includes("(with the `chain_path` marker)"), "bugfix write carries no marker clause");
+  assert.ok(!pm.includes("chain_path"), "pm SOP no longer names chain_path");
   assert.ok(pm.includes("the default bugfix chain is pm → qa-engineer → sr-engineer → code-reviewer"), "bugfix chain (§15.2 ruling 7)");
   assert.ok(pm.includes("step 8 → architect/qa-engineer"), "Gate Summary build-entry wording names architect/qa-engineer");
   assert.ok(pm.includes("an amendment normally hands back to qa-engineer over the normal entry"), "amend path hands back to qa");
@@ -354,16 +384,19 @@ test("AC6: pm routes architect or qa-engineer with the marker, bugfix mode, amen
   const arch = content("skill-architect.md");
   assert.ok(arch.includes('next_role="qa-engineer", pending_notes=["Architecture ready"]'), "architect hand-off routes to qa-engineer");
   assert.ok(!arch.includes('next_role="sr-engineer"'), "architect no longer routes to sr-engineer");
+  assert.ok(arch.includes(COPY.archHandoff), "architect → sr-engineer is not an edge (no marker condition)");
+  assert.ok(!arch.includes("chain_path"), "architect SOP no longer names chain_path");
 
   const coord = BUNDLE.teamwork;
   assert.ok(coord.includes(COPY.chainMain), "coordinator §4 chain is the one routed");
   assert.ok(coord.includes("| test, write tests, test authoring | `qa-engineer` |"), "intent table: test authoring → qa-engineer");
   assert.ok(coord.includes("| review, code review, judge diff, verify, validate, rollback | `code-reviewer` |"), "intent table: verify / validate / rollback → code-reviewer");
   assert.ok(count(coord, "`next_role` is `architect` or `qa-engineer`") >= 2, "build-entry gate rows read architect or qa-engineer");
-  assert.ok(
-    coord.includes('open with a pm-stamped write (`agent_id="pm"`, `status=In_Progress`) carrying `chain_path: "test-first"`, then qa-engineer → sr-engineer → code-reviewer'),
-    "mini-chain: pm-stamped opening write with the marker, then qa → sr → code-reviewer",
-  );
+  const mini = coord.split("\n").find((l) => l.includes("**(ii) mini-chain**"));
+  assert.ok(mini, "mini-chain bullet exists");
+  assert.ok(mini.includes('open with a pm-stamped write (`agent_id="pm"`, `status=In_Progress`)'), "mini-chain: pm-stamped opening write");
+  assert.ok(mini.includes("then qa-engineer → sr-engineer → code-reviewer"), "mini-chain: then qa → sr → code-reviewer");
+  assert.ok(!mini.includes("chain_path"), "mini-chain: no marker clause");
   assert.ok(coord.includes("fresh dispatch of the judge alone (`code-reviewer`)"), "single-role judge dispatch names code-reviewer only");
   assert.ok(!coord.includes("exactly one judge role (`code-reviewer` or `qa-engineer`)"), "no qa-engineer judge dispatch");
   assert.ok(coord.includes(COPY.noTicketTracker), "a tracker number with no ticket file gets msg.no_ticket_tracker");
@@ -426,8 +459,9 @@ test("AC8: templates pin qa-engineer opus (tpl.qa_desc), code-reviewer opus (tpl
 
 // ------------------------------------------------------------------ AC9
 
-test("AC9: hints — MISSING_EVIDENCE unchanged, two rewritten hints name steps that exist in skill-code-reviewer.md, 35 entries, only SR_RETURN_CAP_EXCEEDED documentedInProse flipped", async (t) => {
-  assert.equal(GATE_REGISTRY.length, 35, "the registry still has 35 entries");
+test("AC9 (E435): hints — MISSING_EVIDENCE unchanged, two rewritten hints name steps that exist in skill-code-reviewer.md, 33 live entries (35 in the closed range), only SR_RETURN_CAP_EXCEEDED documentedInProse flipped", async (t) => {
+  // E435: two ledger codes and QA_ROUND_EXCEEDED leave, NON_JUDGE_COMPLETED_TASKS_REJECTED joins → 33.
+  assert.equal(GATE_REGISTRY.length, 33, "the live registry has 33 entries");
   const live = Object.fromEntries(GATE_REGISTRY.map((g) => [g.errorCode, g]));
   const cr = content("skill-code-reviewer.md");
 
@@ -481,7 +515,7 @@ test("AC9: hints — MISSING_EVIDENCE unchanged, two rewritten hints name steps 
 
 // ------------------------------------------------------------------ AC10
 
-test("AC10: README / architecture / release-cd — chain.docs, qa opus row and pin sentence, release gate wording", () => {
+test("AC10 (E435): README / architecture / release-cd — chain.docs, qa opus row and pin sentence, one-judge release gate wording", () => {
   const readme = read("README.md");
   const arch = read("docs/architecture.md");
   const rel = read("docs/release-cd.md");
@@ -500,14 +534,22 @@ test("AC10: README / architecture / release-cd — chain.docs, qa opus row and p
   assert.ok(arch.includes("qa(opus)"), "architecture tier line says qa(opus) (:184)");
   assert.ok(!arch.includes("qa(sonnet)"), "no qa(sonnet)");
 
-  const gateLines = rel.split("\n").filter((l) => l.includes(COPY.releaseGate));
-  assert.ok(gateLines.length >= 3, `release-cd precondition lines name both tuples per doc.release_gate (found ${gateLines.length})`);
+  // E435: the release gate names one judge, (code-reviewer, PASS); the two-tuple marker wording is gone.
+  const relLines = rel.split("\n");
+  assert.ok(relLines.includes(COPY.releaseCd63), "release-cd checklist line (63) is the Copy text");
+  assert.ok(relLines.includes(COPY.releaseCd69), "release-cd re-dispatch line (69) is the Copy text");
+  const row = relLines.find((l) => l.includes("| PRECONDITION_NOT_PASS |"));
+  assert.ok(row, "release-cd PRECONDITION_NOT_PASS row exists");
+  assert.ok(row.split("|").map((c) => c.trim()).includes(COPY.releaseCd95), "PRECONDITION_NOT_PASS meaning cell (95) is the Copy text");
+  assert.ok(!rel.includes(COPY.oldReleaseGate), "no two-judge release wording");
+  assert.ok(!rel.includes("chain_path"), "release-cd no longer names chain_path");
+  assert.ok(!rel.includes("(qa-engineer, PASS)"), "release-cd no longer names (qa-engineer, PASS)");
 });
 
 // ------------------------------------------------------------------ AC12
 
-test("AC12: counts and hygiene — 35 gates, 17 pipeline steps, untouched server files, CLAUDE.md, dist diff, agc check", (t) => {
-  assert.equal(GATE_REGISTRY.length, 35, "GATE_REGISTRY 35 entries");
+test("AC12 (E435): counts and hygiene — 33 gates, 17 pipeline steps, untouched server files, CLAUDE.md, dist diff, agc check", (t) => {
+  assert.equal(GATE_REGISTRY.length, 33, "GATE_REGISTRY 33 entries (E435)");
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17, "UPDATE_STATE_GATE_PIPELINE 17 steps");
   assert.equal(read("CLAUDE.md").split("\n").length - (read("CLAUDE.md").endsWith("\n") ? 1 : 0), 250, "CLAUDE.md is 250 lines");
 

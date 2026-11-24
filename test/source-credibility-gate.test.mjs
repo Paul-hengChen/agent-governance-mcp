@@ -341,7 +341,8 @@ test("T11: AC-7 — the E4 gate block carries NO instanceof FileHandoffStorage g
     !gateBlock.includes("instanceof FileHandoffStorage") && !gateBlock.includes("instanceof storage_js"),
     "the E4 gate block must NOT contain an instanceof FileHandoffStorage guard (storage-mode-agnostic, AC-7)",
   );
-  assert.ok(gateBlock.includes('"pm"'), "sanity: the isolated block must still contain the prev-agent pm-pin");
+  // E435: the build-entry pin moved from a literal "pm" prev-agent check into isBuildEntry(prev, next).
+  assert.ok(gateBlock.includes("isBuildEntry("), "sanity: the isolated block must still be pinned to the build-entry edge");
 });
 
 // ===========================================================================

@@ -135,7 +135,6 @@ async function buildFixture() {
     scopeDecisionWhy: "see step 3. **Foo** above",
     dispatchPins: { "sr-engineer": "fable pin re: 7b. **note**" },
     externalRefs: [{ ref: "see - [ ] T-EXT-1 doc", state: "unresolved" }],
-    qaRound: 2,
     reviewRound: 1,
     hopCount: 3,
     cutApproved: true,
@@ -180,7 +179,7 @@ test("pre-quoted marker (NEW-11, cosmetic, accepted): a marker already wrapped i
   assertAdditiveOnly(state.pending_notes[6], NOTE_PREQUOTED, "pending_notes[6] (pre-quoted)");
 });
 
-test("deep clone / leaf shapes: nested object (dispatch_pins), array-of-objects (external_refs), array (completed_tasks), non-string leaves survive correctly", async () => {
+test("deep clone / leaf shapes (E435): nested object (dispatch_pins), array-of-objects (external_refs), array (completed_tasks), non-string leaves survive correctly", async () => {
   const ws = await buildFixture();
   const state = extractStateBlock(render(ws));
 
@@ -200,8 +199,7 @@ test("deep clone / leaf shapes: nested object (dispatch_pins), array-of-objects 
 
   // Non-string leaves: type AND value preserved exactly (no stringification,
   // no coercion) — numbers stay numbers, booleans stay booleans.
-  assert.equal(state.qa_round, 2);
-  assert.equal(typeof state.qa_round, "number");
+  assert.equal("qa_round" in state, false, "schema 17 renders no qa_round leaf (E435 ruling (a))");
   assert.equal(state.review_round, 1);
   assert.equal(typeof state.review_round, "number");
   assert.equal(state.hop_count, 3);

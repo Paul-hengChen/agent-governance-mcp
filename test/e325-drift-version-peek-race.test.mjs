@@ -22,7 +22,7 @@ const cjsFs = createRequire(import.meta.url)("node:fs");
 const SKEW = /Schema version skew: handoff on-disk v999/;
 
 const body = (v) =>
-  `---\nschema_version: ${v}\nactive_feature: "f"\nstatus: "In_Progress"\nlast_updated: "2026-01-01T00:00:00.000Z"\nlast_agent: "pm"\nqa_round: 0\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`;
+  `---\nschema_version: ${v}\nactive_feature: "f"\nstatus: "In_Progress"\nlast_updated: "2026-01-01T00:00:00.000Z"\nlast_agent: "pm"\nreview_round: 0\nvisual_round: 0\n---\n## Completed\n- (none)\n\n## Pending & Handoff Notes\n- (none)\n`;
 
 function mkFixture(layout, text = body(999)) {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "e325-"));
@@ -81,6 +81,21 @@ for (const [from, layout] of [["flat", "flat"], ["lane", "lane"]]) {
     assert.ok(firedAny, "the injected rename must actually fire for the test to mean anything");
   });
 }
+
+// E435: schema 17 is the server's own version, so a race on a v17 file must never fabricate skew.
+test("AC-E325-1 (E435): a schema 17 handoff renamed between pick and read (either direction) -> no skew advisory", () => {
+  let firedAny = false;
+  for (const from of ["flat", "lane"]) {
+    for (const at of [1, 2, 3]) {
+      const fx = mkFixture(from, body(17));
+      resetSession();
+      const { report, fired } = withRename(fx, from, at, () => detectDrift(fx.ws));
+      firedAny ||= fired;
+      assert.deepEqual(skewLines(report), [], `${from} injection at call ${at} (fired=${fired}) reported v17 as skew`);
+    }
+  }
+  assert.ok(firedAny, "the injected rename must actually fire for the test to mean anything");
+});
 
 test("AC-E325-1: no rename (stable flat and stable lane) -> advisory reported as before", () => {
   for (const layout of ["flat", "lane"]) {

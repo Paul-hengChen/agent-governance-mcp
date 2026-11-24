@@ -137,7 +137,8 @@ test("drift: passthrough details are preserved alongside compressed groups", asy
   // Create a FAIL status with incomplete tasks to trigger the status drift message
   resetSession();
   parseHandoff(ws);
-  await writeHandoffState(ws, "feat", "FAIL", [], [], "test failure", "qa-engineer", 1);
+  // E435: the FAIL fixture is the judge's (code-reviewer); qa-engineer never writes FAIL and no qa round is passed.
+  await writeHandoffState(ws, "feat", "FAIL", [], [], "test failure", "code-reviewer");
   const tasks = [];
   for (let i = 1; i <= 8; i++) {
     tasks.push({ id: `T${String(i).padStart(2, "0")}`, done: true });

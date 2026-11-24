@@ -66,7 +66,8 @@ test("E396 U2: per-id file without the H2 exists for every id, covering file has
   );
 });
 
-test("E396 I: PASS over seven ids, manifest armed, qa_review without the H2, covering file has it -> not EXPECTED_RED_DIFF_MISSING", async () => {
+// E435: the judge is code-reviewer on every feature; the PASS comes from code-reviewer:In_Progress.
+async function passFrom(agent) {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "e396-int";
@@ -79,24 +80,36 @@ test("E396 I: PASS over seven ids, manifest armed, qa_review without the H2, cov
     activeFeature: feature,
     status: "In_Progress",
     completedTasks: [],
-    pendingNotes: ["QA: claiming review"],
-    lastAgent: "qa-engineer",
+    pendingNotes: ["claiming review"],
+    lastAgent: agent,
   });
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
-  const result = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: feature,
-    status: "PASS",
-    agent_id: "qa-engineer",
-    completed_tasks: IDS,
-    pending_notes: ["QA: PASS"],
-    qa_review: "Looks good; the Expected-Red Diff lives in the covers: file.",
-  });
+  try {
+    return await handleUpdateState({
+      workspace_path: ws,
+      active_feature: feature,
+      status: "PASS",
+      agent_id: agent,
+      completed_tasks: IDS,
+      pending_notes: ["PASS"],
+      qa_review: "Looks good; the Expected-Red Diff lives in the covers: file.",
+    });
+  } catch (err) {
+    return { isError: true, content: [{ type: "text", text: `⛔ ${err.message}` }] };
+  }
+}
+
+test("E396 I: PASS over seven ids, manifest armed, qa_review without the H2, covering file has it -> not EXPECTED_RED_DIFF_MISSING (code-reviewer the judge; a qa-engineer PASS is rejected naming code-reviewer, E435)", async () => {
+  const result = await passFrom("code-reviewer");
   const text = result.content[0].text;
   assert.ok(
     !text.includes("EXPECTED_RED_DIFF_MISSING"),
     `covers: file must satisfy the gate after QA_REVIEW_RECORD creates per-id files; got: ${text}`,
   );
+  assert.ok(!result.isError, `code-reviewer PASS accepted; got: ${text}`);
+  const qa = await passFrom("qa-engineer");
+  assert.ok(qa.isError, `qa-engineer PASS must be rejected; got: ${qa.content[0].text}`);
+  assert.match(qa.content[0].text, /reserved for code-reviewer, the chain's judge/);
 });

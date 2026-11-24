@@ -4,6 +4,8 @@
 // Invariant: in SQLite mode the reports table is a record of what the server accepted. QA_REVIEW_RECORD stays
 // before the later PASS gates (same-write evidence must still count), but a write that does not land -- a later
 // gate rejects it, or writeState throws -- has its inserted rows undone, mirroring E236 for file mode.
+// E435 (AC9): SQLite runs the same one chain, so the judge is code-reviewer here too (no marker exists);
+// T-OLD and the AC-E366-4 undo rows are plain data whose signer the server never checks.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -30,7 +32,7 @@ async function mkSqlite(feature) {
   setActiveStorage(storage);
   await storage.writeState({
     workspacePath: dir, activeFeature: feature, status: "In_Progress",
-    completedTasks: [], pendingNotes: ["QA: claiming review"], lastAgent: "qa-engineer",
+    completedTasks: [], pendingNotes: ["QA: claiming review"], lastAgent: "code-reviewer",
   });
   resetSession(dir);
   storage.readState(dir);
@@ -49,13 +51,13 @@ const rows = (storage, dir) =>
 const PASS = (feature, extra = {}) => ({
   active_feature: feature,
   status: "PASS",
-  agent_id: "qa-engineer",
+  agent_id: "code-reviewer",
   pending_notes: ["QA: PASS"],
   qa_review: "Verified.",
   ...extra,
 });
 
-test("AC-E366-1: MISSING_EVIDENCE rejection leaves the reports table exactly as it was", async (t) => {
+test("AC-E366-1 (E435): on a code-reviewer PASS, MISSING_EVIDENCE rejection leaves the reports table exactly as it was", async (t) => {
   if (!SqliteHandoffStorage) return t.skip("no better-sqlite3");
   const feature = "e366-1";
   const { dir, storage } = await mkSqlite(feature);
@@ -77,7 +79,7 @@ test("AC-E366-1: MISSING_EVIDENCE rejection leaves the reports table exactly as 
   }
 });
 
-test("AC-E366-2: a write that passes every gate but whose writeState throws leaves no row, and the same error propagates", async (t) => {
+test("AC-E366-2 (E435): a code-reviewer write that passes every gate but whose writeState throws leaves no row, and the same error propagates", async (t) => {
   if (!SqliteHandoffStorage) return t.skip("no better-sqlite3");
   for (const status of ["PASS", "FAIL"]) {
     const feature = `e366-2-${status.toLowerCase()}`;
@@ -99,7 +101,7 @@ test("AC-E366-2: a write that passes every gate but whose writeState throws leav
   }
 });
 
-test("AC-E366-3: an accepted PASS whose only evidence is its own qa_review is accepted and its rows remain", async (t) => {
+test("AC-E366-3 (E435): an accepted code-reviewer PASS whose only evidence is its own qa_review is accepted and its rows remain", async (t) => {
   if (!SqliteHandoffStorage) return t.skip("no better-sqlite3");
   const feature = "e366-3";
   const { dir, storage } = await mkSqlite(feature);
@@ -111,8 +113,8 @@ test("AC-E366-3: an accepted PASS whose only evidence is its own qa_review is ac
     assert.ok(!r.isError, `same-write evidence must still satisfy MISSING_EVIDENCE; got: ${text(r)}`);
     const got = rows(storage, dir);
     assert.deepEqual(got.map((x) => [x.task_id, x.status, x.reviewer, x.notes]), [
-      ["T1", "PASS", "qa-engineer", "Everything verified."],
-      ["T2", "PASS", "qa-engineer", "Everything verified."],
+      ["T1", "PASS", "code-reviewer", "Everything verified."],
+      ["T2", "PASS", "code-reviewer", "Everything verified."],
     ]);
   } finally {
     cleanup(dir, storage);

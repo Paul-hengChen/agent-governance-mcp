@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+/** zod error for a resume_of value other than "code-reviewer". */
+export declare const RESUME_OF_ENUM_MESSAGE = "resume_of accepts only \"code-reviewer\"; pm:In_Progress \u2192 qa-engineer:In_Progress is an ordinary edge, so omit resume_of there.";
 export type ToolResult = CallToolResult;
 export interface ToolRegistryEntry {
     name: string;
@@ -73,7 +75,6 @@ declare const UpdateStateArgs: z.ZodObject<{
     }>>;
     resume_of: z.ZodOptional<z.ZodEnum<{
         "code-reviewer": "code-reviewer";
-        "qa-engineer": "qa-engineer";
     }>>;
     review_verdict: z.ZodOptional<z.ZodEnum<{
         APPROVED: "APPROVED";
@@ -132,9 +133,6 @@ declare const UpdateStateArgs: z.ZodObject<{
     dispatch_mode: z.ZodOptional<z.ZodEnum<{
         feature: "feature";
         bugfix: "bugfix";
-    }>>;
-    chain_path: z.ZodOptional<z.ZodEnum<{
-        "test-first": "test-first";
     }>>;
     cut_approved_source: z.ZodOptional<z.ZodString>;
     dispatch_mechanism: z.ZodOptional<z.ZodEnum<{

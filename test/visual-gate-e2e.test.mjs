@@ -3,6 +3,11 @@
 // They drive the primitives the tw_update_state handler calls, in its order
 // (validateTransition, visual evidence gate, computeNewRound, writeState,
 // readback), so a reorder of the gates fails here.
+// E435: computeNewRound loses its qa slot (review, visual, next, prev, notes, ...),
+// the handoff drops qa_round, validateTransition takes no prev_qa_round. The
+// visual branches are unchanged (E420 owns them): visual_round still ticks only
+// on a (qa-engineer, FAIL) carrying visual_fail:, a step no tool write reaches
+// any more, so the round-6 / cap tests below drive the counter directly.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -102,16 +107,19 @@ test("AC-5: handler composition — no baselines → gate dormant even with no e
 
 // ---------- the visual round-6 sentinel fires once the cap is crossed (AC-6) ----------
 
-test("AC-6: Round 6 sentinel — fires on cap-cross from prev=5", () => {
+test("AC-6 (E435): Round 6 sentinel — fires on cap-cross from prev=5", () => {
   // Why: the v3.14.1 predicate fix changes `=== 6 && === 5` to
-  // `>= 6 && < 6`. The normal cap-cross MUST still fire.
+  // `>= 6 && < 6`. The normal cap-cross MUST still fire. E435: new signature
+  // (no qa slot); the (qa-engineer, FAIL) input stays because the visual branch
+  // is unchanged (E420) — the result carries no qa_round key.
   const result = computeNewRound(
-    0, 0, 5,
+    0, 5,
     { agent: "qa-engineer", status: "FAIL" },
     undefined,
     ["visual_fail: pixel", "next_role: sr-engineer"],
   );
   assert.equal(result.visual_round, 6, "prev=5 + visual_fail FAIL = 6");
+  assert.equal("qa_round" in result, false, "E435: no qa_round in the result");
   const shouldInjectSentinel = result.visual_round >= 6 && 5 < 6;
   assert.equal(shouldInjectSentinel, true, "sentinel MUST inject on normal cap-cross");
 });
@@ -142,7 +150,7 @@ test("AC-6: Round 6 sentinel — does NOT fire when already past cap", () => {
 
 // ---------- visual_round persists end-to-end across writes (AC-7) ----------
 
-test("AC-7: visual_round persists across writeState → readback", async () => {
+test("AC-7 (E435): visual_round persists across writeState → readback; no qa_round field", async () => {
   // Why: assert that the writeState + parseHandoff round-trip preserves
   // visual_round. The unit tests cover the parse + write separately but
   // the round-trip with v3 schema is what the handler exercises.
@@ -152,15 +160,15 @@ test("AC-7: visual_round persists across writeState → readback", async () => {
 
   await writeHandoffState(
     ws, "feat-vr", "FAIL", [], ["visual_fail: pixel"],
-    "QA failed pixel diff", "qa-engineer",
-    0, undefined, 0, 3,  // qa_round=0, prd_path=undefined, review_round=0, visual_round=3
+    "Reviewer failed pixel diff", "code-reviewer",
+    0, undefined, 0, 3,  // qaRound slot (ignored since E435), prd_path=undefined, review_round=0, visual_round=3
   );
 
   const state = parseHandoff(ws);
   assert.equal(state.visual_round, 3, "visual_round MUST persist through writeState");
-  assert.equal(state.qa_round, 0, "qa_round unaffected");
+  assert.equal(state.qa_round, undefined, "E435: handoff schema 17 has no qa_round");
   assert.equal(state.review_round, 0, "review_round unaffected");
-  assert.equal(state.last_agent, "qa-engineer");
+  assert.equal(state.last_agent, "code-reviewer", "the judge (E435)");
 });
 
 test("AC-7: visual_round survives a subsequent read+write cycle", async () => {
@@ -188,11 +196,13 @@ test("AC-7: visual_round survives a subsequent read+write cycle", async () => {
 test("AC-10: handler composition — VISUAL_ROUND_EXCEEDED rejects everything except (pm, In_Progress)", () => {
   // Why: assert the round-cap branch via validateTransition. This is the
   // contract the handler relies on — if validateTransition stopped applying
-  // the cap, the handler would silently accept post-cap writes.
+  // the cap, the handler would silently accept post-cap writes. E435: no
+  // prev_qa_round; prev (qa-engineer, FAIL) is the kept legacy exit key, the
+  // state an upgraded workspace at visual_round 6 sits in (the cap is
+  // otherwise unreachable since E435, E420's scope).
   const rejection = validateTransition({
     prev: { agent: "qa-engineer", status: "FAIL" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 6,
     next_pending_notes: ["visual_fail: pixel"],
@@ -210,7 +220,6 @@ test("AC-10: handler composition — PM reset transitions through cleanly at cap
   const rejection = validateTransition({
     prev: { agent: "qa-engineer", status: "FAIL" },
     next: { agent: "pm", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 6,
     next_pending_notes: ["pm rebudgeting visual scope"],
@@ -218,9 +227,9 @@ test("AC-10: handler composition — PM reset transitions through cleanly at cap
   assert.equal(rejection, null, "pm reset MUST be accepted");
 });
 
-test("AC-10: handler composition — computeNewRound resets visual_round on PM re-entry post-cap", () => {
+test("AC-10 (E435): handler composition — computeNewRound resets visual_round on PM re-entry post-cap", () => {
   const next = computeNewRound(
-    0, 0, 6,
+    0, 6,
     { agent: "pm", status: "In_Progress" },
   );
   assert.equal(next.visual_round, 0, "PM re-entry resets the counter");

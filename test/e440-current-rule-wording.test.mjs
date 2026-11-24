@@ -98,3 +98,14 @@ test("AC-E440-2: the legacy-inert sentences are byte-identical (they guide the r
     .reduce((n, f) => n + (src(f).match(/legacy[^.\n]*inert/g) || []).length, 0);
   assert.equal(total, 4, "all four `legacy … inert` sentences in content/** remain");
 });
+
+// E435: resume_of accepts only "code-reviewer"; the current-rule sentences that set the field name that one
+// target, and no content/*.md describes qa-engineer as a resume_of value (pm -> qa-engineer is an ordinary edge).
+test("AC-E440-2 (E435): the resume_of rule sentences name code-reviewer as the only resume target", () => {
+  assert.equal(count(src("const-08-chain-31-mid.md"), "setting the first-class `resume_of` handoff field to `code-reviewer`"), 1, "const-08 Amend-Resume Edge");
+  assert.equal(count(src("skill-pm.md"), 'set the first-class `resume_of` field to `"code-reviewer"`'), 1, "skill-pm Amend-Resume declaration");
+  const QA_TARGET = /`resume_of`[^.\n]{0,60}?(?:to|=|:|names)\s*`?"?qa-engineer/;
+  for (const f of fs.readdirSync(CONTENT).filter((x) => x.endsWith(".md"))) {
+    assert.doesNotMatch(src(f), QA_TARGET, `content/${f} names qa-engineer as a resume_of target`);
+  }
+});

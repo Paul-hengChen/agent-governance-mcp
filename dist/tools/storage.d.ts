@@ -13,7 +13,7 @@ export interface HandoffStorage {
      * `writeState({ workspacePath, activeFeature, status, ... })`.
      * Positional signature retained for backwards-compat; planned removal in v4.0.0.
      */
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, _qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
@@ -31,7 +31,7 @@ export declare class FileHandoffStorage implements HandoffStorage {
     readState(workspacePath: string): string;
     writeState(opts: WriteHandoffStateOptions): Promise<string>;
     /** @deprecated v3.15.0: prefer the options-object overload. */
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, _qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;

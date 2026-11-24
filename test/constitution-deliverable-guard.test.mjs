@@ -148,6 +148,16 @@ describe("constitution-deliverable-guard (v3.27.0)", () => {
     assert.ok(!/qa-engineer|qa chain/.test(enforcement), "the enforcement clause gives the report to no qa role");
   });
 
+  // E435 (T-41 Copy): with one chain left, the PASS restriction is unconditional; the enforcement clause
+  // names no chain condition.
+  test("A4 (E435): §3.2 enforcement restricts status=PASS to code-reviewer with no test-first chain condition", () => {
+    const s32 = CONSTITUTION.slice(CONSTITUTION.indexOf("### 3.2"));
+    const at = s32.indexOf("**Enforcement:**");
+    const enforcement = s32.slice(at, s32.indexOf("\n- **", at) > 0 ? s32.indexOf("\n- **", at) : undefined);
+    assert.ok(enforcement.includes("the judge's PASS, and `status=PASS` is server-restricted to"), "Copy text present");
+    assert.ok(!/test-first/.test(enforcement), "no test-first chain condition");
+  });
+
   test("A4 (t-a4-old-wording-absent): stale wording 'authored under the qa chain' is absent", () => {
     assert.ok(
       !CONSTITUTION.includes("authored under the qa chain"),

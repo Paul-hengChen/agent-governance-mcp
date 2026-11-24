@@ -4,6 +4,10 @@
 // on a qa-engineer FAIL with a visual_fail: note, resets on PASS or
 // (pm, In_Progress), caps at 6 (five fails, then pm only), and from round 3
 // allows the sr-engineer -> pm split escalation.
+// E435: computeNewRound loses its leading qa slot (signature now
+// (prev_review_round, prev_visual_round, next, prev?, next_pending_notes?, ...))
+// and no longer returns qa_round / qa_rounds_total. The visual-round counting
+// itself is unchanged here (E420 owns the visual family).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,37 +20,37 @@ import {
 
 // ---------- the visual-round counter increments on a visual failure (AC-8) ----------
 
-test("AC-8: (qa-engineer, FAIL) + visual_fail: token → visual_round increments", () => {
+test("AC-8: (qa-engineer, FAIL) + visual_fail: token → visual_round increments (E435)", () => {
   // Why: visual_round is a *narrow* counter — only ticks when the FAIL is
   // a pixel/widget drift, not a test-logic FAIL. The token in pending_notes
   // is the discriminator. Tests verify both the token-present-bump and
   // the token-absent-hold semantics.
   const result = computeNewRound(
-    0, 0, 0,
+    0, 0,
     { agent: "qa-engineer", status: "FAIL" },
     undefined,
     ["visual_fail: datetime.picker, keyboard.virtual", "next_role: sr-engineer"],
   );
   assert.equal(result.visual_round, 1, "visual_fail: token bumps visual_round");
-  assert.equal(result.qa_round, 1, "qa_round bumps in lockstep for any FAIL");
+  assert.equal("qa_round" in result, false, "E435: no qa_round in the result");
 });
 
-test("AC-8: (qa-engineer, FAIL) without visual_fail: → visual_round held", () => {
+test("AC-8: (qa-engineer, FAIL) without visual_fail: → visual_round held (E435)", () => {
   // Why: a test-logic FAIL must NOT bump visual_round. Without this guard
   // a non-visual workspace would accumulate phantom visual rounds.
   const result = computeNewRound(
-    0, 0, 0,
+    0, 0,
     { agent: "qa-engineer", status: "FAIL" },
     undefined,
     ["QA: T01 failed — unit test reports wrong value", "next_role: sr-engineer"],
   );
   assert.equal(result.visual_round, 0, "no visual_fail: token → visual_round stays");
-  assert.equal(result.qa_round, 1, "qa_round still bumps for test-logic FAIL");
+  assert.equal("qa_round" in result, false, "E435: no qa_round in the result");
 });
 
-test("AC-8: (qa-engineer, FAIL) + visual_fail: increments from prior count", () => {
+test("AC-8: (qa-engineer, FAIL) + visual_fail: increments from prior count (E435)", () => {
   const result = computeNewRound(
-    2, 0, 2,
+    0, 2,
     { agent: "qa-engineer", status: "FAIL" },
     undefined,
     ["visual_fail: pixel", "next_role: sr-engineer"],
@@ -54,32 +58,32 @@ test("AC-8: (qa-engineer, FAIL) + visual_fail: increments from prior count", () 
   assert.equal(result.visual_round, 3, "prior=2 + visual_fail FAIL = 3");
 });
 
-test("AC-8: (qa-engineer, PASS) resets visual_round to 0", () => {
+test("AC-8: (qa-engineer, PASS) resets visual_round to 0 (E435)", () => {
   const result = computeNewRound(
-    0, 0, 4,
+    0, 4,
     { agent: "qa-engineer", status: "PASS" },
   );
-  assert.equal(result.visual_round, 0, "PASS resets — symmetric to qa_round");
+  assert.equal(result.visual_round, 0, "PASS resets visual_round");
 });
 
-test("AC-8: (pm, In_Progress) resets visual_round to 0 (PM re-entry)", () => {
+test("AC-8: (pm, In_Progress) resets visual_round to 0 (PM re-entry) (E435)", () => {
   // Why: the unified escape valve must clear ALL counters; otherwise a
   // post-Round-6 PM rebudget would leave the lock in place.
   const result = computeNewRound(
-    0, 0, 5,
+    0, 5,
     { agent: "pm", status: "In_Progress" },
   );
   assert.equal(result.visual_round, 0, "PM re-entry clears visual_round");
 });
 
-test("AC-8: other writes hold visual_round unchanged", () => {
+test("AC-8: other writes hold visual_round unchanged (E435)", () => {
   for (const next of [
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "code-reviewer", status: "In_Progress" },
     { agent: "code-reviewer", status: "FAIL" },
     { agent: "architect", status: "In_Progress" },
   ]) {
-    const result = computeNewRound(0, 0, 2, next);
+    const result = computeNewRound(0, 2, next);
     assert.equal(result.visual_round, 2, `${next.agent}:${next.status} must not touch visual_round`);
   }
 });
@@ -97,7 +101,6 @@ test("AC-8: visual_round >= cap → only (pm, In_Progress) is accepted", () => {
   const rejection = validateTransition({
     prev: { agent: "qa-engineer", status: "FAIL" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 6,
     next_pending_notes: ["visual_fail: pixel"],
@@ -116,7 +119,6 @@ test("AC-8: visual_round at cap allows (pm, In_Progress)", () => {
   const rejection = validateTransition({
     prev: { agent: "qa-engineer", status: "FAIL" },
     next: { agent: "pm", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 6,
   });
@@ -132,7 +134,6 @@ test("AC-9: at visual_round=3, (sr-engineer → pm, In_Progress) is accepted", (
   const rejection = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "pm", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 3,
     next_pending_notes: ["visual_split_requested: datetime.picker too large to converge", "next_role: pm"],
@@ -145,8 +146,7 @@ test("AC-9: split escalation also allowed at rounds 4 and 5 (Round 3-5 window)",
     const rejection = validateTransition({
       prev: { agent: "sr-engineer", status: "In_Progress" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
-      prev_review_round: 0,
+        prev_review_round: 0,
       prev_visual_round: round,
       next_pending_notes: ["visual_split_requested: <reason>"],
     });
@@ -156,7 +156,7 @@ test("AC-9: split escalation also allowed at rounds 4 and 5 (Round 3-5 window)",
 
 // ---------- handoff schema v3 round-trips through computeNewRound (AC-11) ----------
 
-test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards compat)", () => {
+test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards compat) (E435)", () => {
   // Why: the prev_visual_round parameter is required positionally now,
   // but downstream Storage/handoff parsers default missing fields to 0.
   // Passing 0 explicitly should match historical behaviour.
@@ -165,7 +165,7 @@ test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards 
   // to null agent), so next.agent="sr-engineer" is a role transition and
   // prev_hop_count/feature_changed both default → hop_count = 0 + 1 = 1.
   const result = computeNewRound(
-    2, 1, 0,
+    1, 0,
     { agent: "sr-engineer", status: "In_Progress" },
   );
   // Re-baselined expectation (e8-success-telemetry): computeNewRound's return
@@ -173,16 +173,17 @@ test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards 
   // additive). No prev_*_total args here (all default to 0), and next.agent
   // is neither qa-engineer nor code-reviewer, so none of the three FAIL
   // predicates match — all three totals hold at their 0 base.
-  assert.deepEqual(result, { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 });
+  // E435 (OQ (a) drop): the result has no qa_round / qa_rounds_total keys.
+  assert.deepEqual(result, { review_round: 1, visual_round: 0, hop_count: 1, review_rounds_total: 0, visual_rounds_total: 0 });
 });
 
-test("AC-11: visual_fail token detection is whitespace-robust", () => {
+test("AC-11: visual_fail token detection is whitespace-robust (E435)", () => {
   // Why: pending_notes routinely carry leading/trailing whitespace from
   // operators. The token detector trims before matching, so all of these
   // must bump visual_round.
   for (const note of ["visual_fail: pixel", "  visual_fail: widget", "visual_fail:   "]) {
     const result = computeNewRound(
-      0, 0, 0,
+      0, 0,
       { agent: "qa-engineer", status: "FAIL" },
       undefined,
       [note],
@@ -191,12 +192,12 @@ test("AC-11: visual_fail token detection is whitespace-robust", () => {
   }
 });
 
-test("AC-11: visual_fail token NOT confused with substring matches", () => {
+test("AC-11: visual_fail token NOT confused with substring matches (E435)", () => {
   // Why: a freeform note like "no visual_fail observed" must NOT trigger
   // the bump. Detection uses startsWith() after trim, so the token must
   // appear at the start of a (trimmed) note line.
   const result = computeNewRound(
-    0, 0, 0,
+    0, 0,
     { agent: "qa-engineer", status: "FAIL" },
     undefined,
     ["all visual checks fine, no visual_fail observed", "next_role: sr-engineer"],

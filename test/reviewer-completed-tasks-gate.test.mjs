@@ -1,9 +1,10 @@
 // Coded by @qa-engineer
 // Tests for the role-boundary spec (specs/c16-c10-role-boundary.md, AC-3/AC-4).
-// A code-reviewer write once stamped ids into completed_tasks that qa-engineer
-// never completed; REVIEWER_COMPLETED_TASKS_REJECTED blocks that server-side. It
-// keys only on parsed args, so the tests pin file mode and SQLite mode alike.
-// Later sections widen the gate to every non-qa identity (E40).
+// Bogus ids once reached completed_tasks from a role that never judged the
+// work. Since E435 code-reviewer is the chain's only judge and only ledger
+// writer: NON_JUDGE_COMPLETED_TASKS_REJECTED (pipeline step 9) rejects a
+// non-empty completed_tasks from every other agent_id, qa-engineer included.
+// It keys only on parsed args, so the tests pin file mode and SQLite mode alike.
 // Spec-to-test map: specs/e260h-comment-rationale.md (test/reviewer-completed-tasks-gate.test.mjs).
 
 import { test } from "node:test";
@@ -58,35 +59,43 @@ async function seedFileState(ws, feature, agent, status) {
 }
 
 // ---------------------------------------------------------------------------
-// A code-reviewer write with non-empty completed_tasks is
-// REJECTED with REVIEWER_COMPLETED_TASKS_REJECTED, file mode (FM1, AC-3 bullet 1).
+// FM1 (E435): code-reviewer is the judge, so its ledger write never hits the
+// step-9 gate; an unevidenced id is caught by the evidence gate instead, and
+// with its report on disk the id lands (file mode).
 // ---------------------------------------------------------------------------
 
-test("FM1: code-reviewer CHANGES_REQUESTED-shaped write carrying non-empty completed_tasks is REJECTED (file mode)", async () => {
+const NON_JUDGE_HINT =
+  "completed_tasks on a write not stamped agent_id=code-reviewer is ledger pollution: only code-reviewer, the chain's judge, may grow completed_tasks (or complete tasks through tw_complete_task), backed by the QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or pass []) on this write. See docs/backlog.md E40.";
+const REMOVED_LEDGER_CODES = /REVIEWER_COMPLETED_TASKS_REJECTED|NON_QA_COMPLETED_TASKS_REJECTED/;
+
+test("FM1 (E435): a code-reviewer write carrying completed_tasks is never NON_JUDGE_COMPLETED_TASKS_REJECTED; no report -> QA_COMPLETION_EVIDENCE_MISSING, report present -> the id lands (file mode)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("rctg-fm1-");
-  // prev: code-reviewer:In_Progress -> code-reviewer:FAIL is a valid transition
-  // edge (the real CHANGES_REQUESTED self-stamp), so the write reaches the new
-  // gate rather than being rejected earlier by validateTransition.
   await seedFileState(ws, "rctg-fm1", "code-reviewer", "In_Progress");
   resetSession(ws);
   markStateRead(ws);
-  const result = await handleUpdateState({
+  const args = {
     workspace_path: ws,
     active_feature: "rctg-fm1",
-    status: "FAIL",
+    status: "In_Progress",
     agent_id: "code-reviewer",
-    completed_tasks: ["T-BOGUS-01"], // the bogus-id shape that once polluted the task ledger (C16)
-    pending_notes: ["code-reviewer: found a correctness issue"],
-  });
-  assert.ok(result.isError, "a code-reviewer write with non-empty completed_tasks must be rejected");
-  assert.ok(
-    result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
-    `expected REVIEWER_COMPLETED_TASKS_REJECTED; got: ${result.content[0].text}`,
-  );
-  // E418 hint sufficiency: the rejection must say where the review scope goes instead, and what to omit.
-  assert.match(result.content[0].text, /review_task_ids/, "hint redirects the review scope to review_task_ids");
-  assert.match(result.content[0].text, /Omit\s+completed_tasks/i, "hint tells the writer to omit completed_tasks");
+    completed_tasks: ["T-RCTG-01"],
+    pending_notes: ["code-reviewer: completing T-RCTG-01"],
+  };
+  const result = await handleUpdateState(args);
+  assert.ok(result.isError, "an unevidenced judge ledger write is still refused, by the evidence gate");
+  assert.match(result.content[0].text, /QA_COMPLETION_EVIDENCE_MISSING/);
+  assert.doesNotMatch(result.content[0].text, /NON_JUDGE_COMPLETED_TASKS_REJECTED/, "the judge is the ledger writer");
+  assert.doesNotMatch(result.content[0].text, REMOVED_LEDGER_CODES, "the removed ledger codes are never emitted");
+  assert.deepEqual(parseHandoff(ws).completed_tasks, []);
+
+  fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "qa_reports", "review_T-RCTG-01.md"), "# QA review — T-RCTG-01\n\nPASS.\n", "utf-8");
+  resetSession(ws);
+  markStateRead(ws);
+  const ok = await handleUpdateState(args);
+  assert.ok(!ok.isError, `with the judge report on disk the judge's ledger write lands; got: ${ok.content?.[0]?.text}`);
+  assert.deepEqual(parseHandoff(ws).completed_tasks, ["T-RCTG-01"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -140,13 +149,13 @@ test("FM3: tw_update_state with completed_tasks omitted defaults to [] (zod) and
 });
 
 // ---------------------------------------------------------------------------
-// FM4 / FM5: the APPROVED row (agent_id=qa-engineer) is untouched by the new
-// gate. Review scope travels in review_task_ids and completed_tasks stays empty
-// (a non-empty one would hit QA_COMPLETION_EVIDENCE_MISSING first). FM4: no
-// evidence -> MISSING_REVIEW_EVIDENCE; FM5: evidence present -> accepted.
+// FM4 / FM5 (E435): the APPROVED row moved. code-reviewer -> qa-engineer is no
+// longer an edge (code-reviewer closes the feature), and the judge's own
+// APPROVED write carries the review scope in review_task_ids, never into
+// completed_tasks.
 // ---------------------------------------------------------------------------
 
-test("FM4 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids and NO review evidence is rejected by MISSING_REVIEW_EVIDENCE, not the new gate (file mode)", async () => {
+test("FM4 (E435): a qa-engineer write after code-reviewer:In_Progress is TRANSITION_REJECTED with the judge hint, never a ledger code (file mode)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("rctg-fm4-");
   await seedFileState(ws, "rctg-fm4", "code-reviewer", "In_Progress");
@@ -159,51 +168,45 @@ test("FM4 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids a
     agent_id: "qa-engineer",
     completed_tasks: [],
     review_task_ids: ["T-RCTG-EV"],
-    review_verdict: "APPROVED",
-    pending_notes: ["code-reviewer: APPROVED"],
+    pending_notes: ["qa-engineer: after review"],
   });
-  assert.ok(result.isError, "no review evidence on disk must still be rejected");
+  assert.ok(result.isError, "code-reviewer -> qa-engineer is not an edge");
+  assert.match(result.content[0].text, /TRANSITION_REJECTED/);
   assert.ok(
-    result.content[0].text.includes("MISSING_REVIEW_EVIDENCE"),
-    `expected MISSING_REVIEW_EVIDENCE; got: ${result.content[0].text}`,
+    // "⛔ <CODE>\n<JSON envelope>": read the envelope's top-level `hint` (architecture), not escaped text.
+    JSON.parse(result.content[0].text.slice(result.content[0].text.indexOf("\n") + 1)).hint.includes('code-reviewer is the judge and closes the feature: approve with code-reviewer:PASS (review_verdict: "APPROVED"), or reject with code-reviewer:FAIL; qa-engineer does not follow code-reviewer.'),
+    `hint names code-reviewer as the closing judge; got: ${result.content[0].text}`,
   );
-  assert.ok(
-    !result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
-    "the new gate must NOT fire for an agent_id=qa-engineer write",
-  );
-  assert.ok(
-    !result.content[0].text.includes("QA_COMPLETION_EVIDENCE_MISSING"),
-    "with completed_tasks empty the amended completion-evidence gate must not fire either — the two gates are orthogonal",
-  );
+  assert.doesNotMatch(result.content[0].text, /NON_JUDGE_COMPLETED_TASKS_REJECTED|QA_COMPLETION_EVIDENCE_MISSING/);
 });
 
-test("FM5 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids and review evidence PRESENT is ACCEPTED, completed_tasks stays empty (file mode, positive control)", async () => {
+test("FM5 (E435): the judge's APPROVED write with review_task_ids and its report present is ACCEPTED, completed_tasks stays empty (file mode, positive control)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("rctg-fm5-");
   await seedFileState(ws, "rctg-fm5", "code-reviewer", "In_Progress");
-  const reviewDir = path.join(ws, "review_reports");
+  const reviewDir = path.join(ws, "qa_reports");
   fs.mkdirSync(reviewDir, { recursive: true });
-  fs.writeFileSync(path.join(reviewDir, "review_T-RCTG-EV2.md"), "# Review — T-RCTG-EV2\n\nAPPROVED.\n", "utf-8");
+  fs.writeFileSync(path.join(reviewDir, "review_T-RCTG-EV2.md"), "# QA review — T-RCTG-EV2\n\nAPPROVED.\n", "utf-8");
   resetSession(ws);
   markStateRead(ws);
   const result = await handleUpdateState({
     workspace_path: ws,
     active_feature: "rctg-fm5",
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: [],
     review_task_ids: ["T-RCTG-EV2"],
     review_verdict: "APPROVED",
     pending_notes: ["code-reviewer: APPROVED"],
   });
-  assert.ok(!result.isError, `review evidence present must clear MISSING_REVIEW_EVIDENCE; got: ${result.content?.[0]?.text}`);
-  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "review scope must NOT persist into completed_tasks under the amended contract");
+  assert.ok(!result.isError, `the judge's APPROVED write must be accepted; got: ${result.content?.[0]?.text}`);
+  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "review scope must NOT persist into completed_tasks");
 });
 
 // ---------------------------------------------------------------------------
-// The gate widened to every non-qa identity (E40): FM6-FM11 expect
-// NON_QA_COMPLETED_TASKS_REJECTED per role, and BYPASS-FM / BYPASS-SQL pin the
-// bypass. The gate sits after AGENT_ID_REQUIRED, TRANSITION_REJECTED and
+// The gate covers every non-judge identity (E40, E435): FM6-FM12 expect
+// NON_JUDGE_COMPLETED_TASKS_REJECTED per role, qa-engineer included, and
+// BYPASS-FM / BYPASS-SQL pin the bypass. The gate sits after AGENT_ID_REQUIRED, TRANSITION_REJECTED and
 // CUT_APPROVAL_REQUIRED, so each case seeds a legal same-agent self-loop and
 // asserts the specific code; an illegal prev-tuple would fail on an earlier gate.
 // ---------------------------------------------------------------------------
@@ -215,10 +218,11 @@ const NON_QA_SELF_LOOP_IDENTITIES = [
   ["researcher", "FM9"],
   ["design-auditor", "FM10"],
   ["release-engineer", "FM11"],
+  ["qa-engineer", "FM12"],
 ];
 
 for (const [role, label] of NON_QA_SELF_LOOP_IDENTITIES) {
-  test(`${label}: agent_id="${role}" self-loop carrying non-empty completed_tasks is REJECTED with NON_QA_COMPLETED_TASKS_REJECTED, not an earlier gate (file mode)`, async () => {
+  test(`${label} (E435): agent_id="${role}" self-loop carrying non-empty completed_tasks is REJECTED with NON_JUDGE_COMPLETED_TASKS_REJECTED, not an earlier gate (file mode)`, async () => {
     setActiveStorage(new FileHandoffStorage());
     const ws = mkWorkspace(`rctg-${label.toLowerCase()}-`);
     const feature = `rctg-${label.toLowerCase()}`;
@@ -241,18 +245,12 @@ for (const [role, label] of NON_QA_SELF_LOOP_IDENTITIES) {
       pending_notes: [`${role}: self-loop`],
     });
     assert.ok(result.isError, `agent_id="${role}" carrying non-empty completed_tasks must be rejected`);
+    // Exact emit (architecture step 9 + Copy hintStatic): names the ids, the writer, and the sole permitted writer.
     assert.ok(
-      result.content[0].text.includes("NON_QA_COMPLETED_TASKS_REJECTED"),
-      `expected NON_QA_COMPLETED_TASKS_REJECTED; got: ${result.content[0].text}`,
+      result.content[0].text.includes(`⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=[T-BOGUS-01] on an agent_id=${role} write. ${NON_JUDGE_HINT}`),
+      `expected the exact NON_JUDGE_COMPLETED_TASKS_REJECTED emit; got: ${result.content[0].text}`,
     );
-    assert.ok(
-      !result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
-      "a non-code-reviewer, non-qa-engineer identity must get the NEW code, not the pre-existing c16 code",
-    );
-    // E418 hint sufficiency: const-08 no longer spells the predicate; the hint must name who may write
-    // completed_tasks and what to do.
-    assert.match(result.content[0].text, /only agent_id=qa-engineer may grow completed_tasks/, "hint names the sole permitted writer");
-    assert.match(result.content[0].text, /Omit\s+completed_tasks/i, "hint tells the writer to omit completed_tasks");
+    assert.doesNotMatch(result.content[0].text, REMOVED_LEDGER_CODES, "the removed ledger codes are never emitted");
     assert.deepEqual(
       parseHandoff(ws).completed_tasks,
       [],
@@ -262,14 +260,14 @@ for (const [role, label] of NON_QA_SELF_LOOP_IDENTITIES) {
 }
 
 // ---------------------------------------------------------------------------
-// BYPASS-FM (file mode): a non-qa write prefilled an id, then a qa-engineer
+// BYPASS-FM (file mode): a non-judge write prefilled an id, then the judge's
 // write carried the same id with no evidence and was accepted, because the
 // set-difference gate compared against the already-poisoned ledger. Now the
-// first write fails with NON_QA_COMPLETED_TASKS_REJECTED, the ledger stays
-// clean, and the qa-engineer write is still caught by QA_COMPLETION_EVIDENCE_MISSING.
+// first write fails with NON_JUDGE_COMPLETED_TASKS_REJECTED, the ledger stays
+// clean, and the code-reviewer write is still caught by QA_COMPLETION_EVIDENCE_MISSING.
 // ---------------------------------------------------------------------------
 
-test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the downstream qa-engineer write carrying the same id is still caught by QA_COMPLETION_EVIDENCE_MISSING (file mode)", async () => {
+test("BYPASS-FM (E435): a non-judge prefill write is rejected AT THE FIRST WRITE; the downstream code-reviewer write carrying the same id is still caught by QA_COMPLETION_EVIDENCE_MISSING (file mode)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("rctg-bypass-fm-");
   const feature = "rctg-bypass-fm";
@@ -286,20 +284,17 @@ test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the down
     completed_tasks: ["T-BOGUS-BYPASS"],
     pending_notes: ["sr-engineer: (bypass attempt) prefilling completed_tasks"],
   });
-  assert.ok(write1.isError, "WRITE1 (the non-qa prefill) must be rejected — this is the fix's load-bearing site");
+  assert.ok(write1.isError, "WRITE1 (the non-judge prefill) must be rejected — this is the fix's load-bearing site");
   assert.ok(
-    write1.content[0].text.includes("NON_QA_COMPLETED_TASKS_REJECTED"),
-    `WRITE1 must fail specifically with NON_QA_COMPLETED_TASKS_REJECTED; got: ${write1.content[0].text}`,
+    write1.content[0].text.includes("NON_JUDGE_COMPLETED_TASKS_REJECTED"),
+    `WRITE1 must fail specifically with NON_JUDGE_COMPLETED_TASKS_REJECTED; got: ${write1.content[0].text}`,
   );
   assert.deepEqual(parseHandoff(ws).completed_tasks, [], "the on-disk ledger must NOT be poisoned after the rejected WRITE1");
 
-  // Legitimate advance to code-reviewer (empty completed_tasks — the real
-  // Phase-2 claim shape), then to qa-engineer (empty claim), so the sequence
-  // reaches a real (qa-engineer, In_Progress) prev-tuple honestly rather than
-  // skipping straight to an illegal edge.
-  // WRITE1 was rejected (never landed), so the on-disk stamp is still
-  // the seed's forced-safe value — nothing new to force here. Belt-and-
-  // braces anyway since it's a no-op if already safe (seed-stamp fix E148).
+  // Legitimate advance to code-reviewer (empty completed_tasks — the claim
+  // shape), so the sequence reaches a real (code-reviewer, In_Progress)
+  // prev-tuple honestly. WRITE1 never landed; forcing the stamp is a no-op
+  // belt-and-braces (E148).
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -313,25 +308,10 @@ test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the down
   });
   assert.ok(!advance1.isError, `legitimate sr-engineer->code-reviewer advance must not be rejected; got: ${advance1.content?.[0]?.text}`);
 
-  // advance1 was ACCEPTED and stamped a fresh, wall-clock last_updated
-  // — force it safe before it becomes advance2's prevState (E148).
-  forceSeedStamp(ws);
-  resetSession(ws);
-  markStateRead(ws);
-  const advance2 = await handleUpdateState({
-    workspace_path: ws,
-    active_feature: feature,
-    status: "In_Progress",
-    agent_id: "qa-engineer",
-    completed_tasks: [],
-    pending_notes: ["code-reviewer: APPROVED, handing to qa-engineer"],
-  });
-  assert.ok(!advance2.isError, `legitimate code-reviewer->qa-engineer advance must not be rejected; got: ${advance2.content?.[0]?.text}`);
-
-  // WRITE2: the qa-engineer write with the same id, no evidence and no
-  // qa_review (a qa_review write records its own evidence first and would pass
-  // for the wrong reason). The id was never persisted, so the evidence gate
-  // must catch it. advance2 stamped a wall-clock last_updated; force it safe.
+  // WRITE2: the judge's write with the same id, no evidence and no qa_review
+  // (a qa_review write records its own evidence first and would pass for the
+  // wrong reason). The id was never persisted, so the evidence gate must catch
+  // it. advance1 stamped a wall-clock last_updated; force it safe (E148).
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -339,9 +319,9 @@ test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the down
     workspace_path: ws,
     active_feature: feature,
     status: "In_Progress",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T-BOGUS-BYPASS"],
-    pending_notes: ["qa-engineer: (bypass attempt) claiming completion with no evidence on disk"],
+    pending_notes: ["code-reviewer: (bypass attempt) claiming completion with no evidence on disk"],
   });
   assert.ok(write2.isError, "WRITE2 must also be rejected — the downstream evidence gate closes what the first-write gate doesn't need to");
   assert.ok(
@@ -366,8 +346,8 @@ function mkSqliteWorkspace(prefix = "rctg-sql-") {
   return { dir, dbPath };
 }
 
-sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () => {
-  test("SQ1: code-reviewer write carrying non-empty completed_tasks is REJECTED (SQLite mode)", async () => {
+sqliteDescribe("SQLite mode: NON_JUDGE_COMPLETED_TASKS_REJECTED gate matrix", () => {
+  test("SQ1 (E435): the judge's write carrying non-empty completed_tasks is ACCEPTED and stored as given (SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("rctg-sq1-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -389,16 +369,14 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
       const result = await handleUpdateState({
         workspace_path: dir,
         active_feature: "rctg-sq1",
-        status: "FAIL",
+        status: "In_Progress",
         agent_id: "code-reviewer",
-        completed_tasks: ["T-BOGUS-SQL"],
-        pending_notes: ["code-reviewer: found a correctness issue"],
+        completed_tasks: ["T-RCTG-SQL"],
+        pending_notes: ["code-reviewer: completing T-RCTG-SQL"],
       });
-      assert.ok(result.isError, "SQLite-mode code-reviewer write with non-empty completed_tasks must be rejected too");
-      assert.ok(
-        result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
-        `expected REVIEWER_COMPLETED_TASKS_REJECTED; got: ${result.content[0].text}`,
-      );
+      // The evidence gate is file-mode only, so the judge's ledger write lands as given.
+      assert.ok(!result.isError, `SQLite-mode judge ledger write must be accepted; got: ${result.content?.[0]?.text}`);
+      assert.deepEqual(storage.parse(dir).completed_tasks, ["T-RCTG-SQL"]);
     } finally {
       setActiveStorage(new FileHandoffStorage());
       try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
@@ -435,7 +413,7 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
     }
   });
 
-  test("SQ3: qa-engineer APPROVED-row write with non-empty completed_tasks and no evidence ROW is rejected by MISSING_REVIEW_EVIDENCE, not the new gate (SQLite mode)", async () => {
+  test("SQ3 (E435): qa-engineer self-loop carrying non-empty completed_tasks is REJECTED with NON_JUDGE_COMPLETED_TASKS_REJECTED, ledger unpoisoned (SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("rctg-sq3-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -446,7 +424,7 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
         status: "In_Progress",
         completedTasks: [],
         pendingNotes: ["seed"],
-        lastAgent: "code-reviewer",
+        lastAgent: "qa-engineer",
       });
       resetSession(dir);
       storage.readState(dir);
@@ -456,17 +434,14 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
         status: "In_Progress",
         agent_id: "qa-engineer",
         completed_tasks: ["T-RCTG-SQL-EV"],
-        pending_notes: ["code-reviewer: APPROVED"],
+        pending_notes: ["qa-engineer: tests written"],
       });
-      assert.ok(result.isError, "no code-review evidence row in the SQLite reports table must still be rejected");
+      assert.ok(result.isError, "qa-engineer is not the judge: its ledger write is rejected in SQLite mode too");
       assert.ok(
-        result.content[0].text.includes("MISSING_REVIEW_EVIDENCE"),
-        `expected MISSING_REVIEW_EVIDENCE; got: ${result.content[0].text}`,
+        result.content[0].text.includes(`⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=[T-RCTG-SQL-EV] on an agent_id=qa-engineer write. ${NON_JUDGE_HINT}`),
+        `expected the exact NON_JUDGE_COMPLETED_TASKS_REJECTED emit; got: ${result.content[0].text}`,
       );
-      assert.ok(
-        !result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
-        "the new gate must NOT fire for an agent_id=qa-engineer write in SQLite mode either",
-      );
+      assert.deepEqual(storage.parse(dir).completed_tasks, []);
     } finally {
       setActiveStorage(new FileHandoffStorage());
       try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
@@ -476,12 +451,12 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
   // -------------------------------------------------------------------------
   // SQLite-mode coverage of the widened gate (SQ4 / BYPASS-SQL, E40). The widened gate keys
   // only on parsed.agent_id/parsed.completed_tasks (no FileHandoffStorage
-  // guard — see gates/registry.ts's NON_QA_COMPLETED_TASKS_REJECTED entry's
+  // guard — see gates/registry.ts's NON_JUDGE_COMPLETED_TASKS_REJECTED entry's
   // "Applies in file and SQLite/HTTP mode alike" clause), so it must behave
   // identically under SqliteHandoffStorage.
   // -------------------------------------------------------------------------
 
-  test("SQ4: agent_id=\"sr-engineer\" self-loop carrying non-empty completed_tasks is REJECTED with NON_QA_COMPLETED_TASKS_REJECTED (SQLite mode)", async () => {
+  test("SQ4 (E435): agent_id=\"sr-engineer\" self-loop carrying non-empty completed_tasks is REJECTED with NON_JUDGE_COMPLETED_TASKS_REJECTED (SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("rctg-sq4-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -506,8 +481,8 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
       });
       assert.ok(result.isError, "SQLite-mode sr-engineer write with non-empty completed_tasks must be rejected too");
       assert.ok(
-        result.content[0].text.includes("NON_QA_COMPLETED_TASKS_REJECTED"),
-        `expected NON_QA_COMPLETED_TASKS_REJECTED; got: ${result.content[0].text}`,
+        result.content[0].text.includes("NON_JUDGE_COMPLETED_TASKS_REJECTED"),
+        `expected NON_JUDGE_COMPLETED_TASKS_REJECTED; got: ${result.content[0].text}`,
       );
       const readBack = storage.parse(dir);
       assert.deepEqual(readBack.completed_tasks, [], "the SQLite-backed ledger must NOT be poisoned after the rejected write");
@@ -520,7 +495,7 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
   // BYPASS-SQL replays only BYPASS-FM's first write: QA_COMPLETION_EVIDENCE_MISSING
   // is file-mode only, so asserting the second half here would test behaviour
   // the codebase documents as out of scope.
-  test("BYPASS-SQL: a non-qa prefill write is rejected AT THE FIRST WRITE, ledger stays unpoisoned (SQLite mode)", async () => {
+  test("BYPASS-SQL (E435): a non-judge prefill write is rejected AT THE FIRST WRITE, ledger stays unpoisoned (SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("rctg-bypass-sql-");
     try {
       const storage = new SqliteHandoffStorage(dbPath);
@@ -543,10 +518,10 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
         completed_tasks: ["T-BOGUS-BYPASS-SQL"],
         pending_notes: ["pm: (bypass attempt) prefilling completed_tasks"],
       });
-      assert.ok(write1.isError, "WRITE1 (the non-qa prefill) must be rejected in SQLite mode too");
+      assert.ok(write1.isError, "WRITE1 (the non-judge prefill) must be rejected in SQLite mode too");
       assert.ok(
-        write1.content[0].text.includes("NON_QA_COMPLETED_TASKS_REJECTED"),
-        `WRITE1 must fail specifically with NON_QA_COMPLETED_TASKS_REJECTED; got: ${write1.content[0].text}`,
+        write1.content[0].text.includes("NON_JUDGE_COMPLETED_TASKS_REJECTED"),
+        `WRITE1 must fail specifically with NON_JUDGE_COMPLETED_TASKS_REJECTED; got: ${write1.content[0].text}`,
       );
       const readBack = storage.parse(dir);
       assert.deepEqual(readBack.completed_tasks, [], "the SQLite-backed ledger must NOT be poisoned after the rejected WRITE1");

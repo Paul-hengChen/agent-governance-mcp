@@ -1,5 +1,6 @@
-// Quick end-to-end smoke for v3.2.0 enforcement.
-// Spawns dist/index.js over stdio, probes each new gate, then exits.
+// Quick end-to-end smoke for the chain's enforcement (v5: pm → qa-engineer →
+// sr-engineer → code-reviewer PASS). Spawns dist/index.js over stdio, probes
+// each gate on the way, then exits.
 // NOT a replacement for the unit suite — this just confirms the wiring.
 
 import { spawn } from "node:child_process";
@@ -99,112 +100,129 @@ async function main() {
     t.slice(0, 120),
   );
 
-  // Test 3: zod refine — PASS without qa-engineer
+  // Test 3: PASS by qa-engineer rejected — code-reviewer is the only judge
   r = await callTool("tw_update_state", {
     workspace_path: ws,
     active_feature: "smoke",
     status: "PASS",
-    agent_id: "sr-engineer",
+    agent_id: "qa-engineer",
   });
   t = textOf(r);
   record(
-    "PASS w/o qa-engineer rejected by zod refine",
-    t.includes("Invalid arguments") && t.includes('agent_id="qa-engineer"'),
+    "qa-engineer PASS rejected, judge named",
+    !t.includes('"success":true') && t.includes("code-reviewer"),
     t.slice(0, 160),
   );
 
-  // Test 4: legal pm kickoff
+  // Test 4: legal pm kickoff (cut approved, scope decided: the build-entry gates)
   r = await callTool("tw_update_state", {
     workspace_path: ws,
     active_feature: "smoke",
     status: "In_Progress",
     agent_id: "pm",
+    cut_approved: true,
+    scope_decision: "single-feature",
   });
   t = textOf(r);
   record("pm kickoff accepted", t.includes('"success":true'), t.slice(0, 80));
 
-  // Test 5: pm→architect accepted
+  // Test 5: pm→sr-engineer rejected (the tests come first)
   await callTool("tw_get_state", { workspace_path: ws });
   r = await callTool("tw_update_state", {
-    workspace_path: ws,
-    active_feature: "smoke",
-    status: "In_Progress",
-    agent_id: "architect",
-  });
-  t = textOf(r);
-  record("pm→architect accepted", t.includes('"success":true'), t.slice(0, 80));
-
-  // Test 6: architect→qa-engineer rejected (must go through sr-engineer)
-  await callTool("tw_get_state", { workspace_path: ws });
-  r = await callTool("tw_update_state", {
-    workspace_path: ws,
-    active_feature: "smoke",
-    status: "In_Progress",
-    agent_id: "qa-engineer",
-  });
-  t = textOf(r);
-  record(
-    "architect→qa-engineer rejected (skip sr-engineer)",
-    t.includes("TRANSITION_REJECTED"),
-    t.slice(0, 120),
-  );
-
-  // Test 7: tw_complete_task without agent_id → BLOCKED (handler gate)
-  r = await callTool("tw_complete_task", {
-    workspace_path: ws,
-    task_id: "T01",
-  });
-  t = textOf(r);
-  record(
-    "tw_complete_task w/o agent_id blocked",
-    t.includes("BLOCKED") && t.includes("qa-engineer"),
-    t.slice(0, 140),
-  );
-
-  // Test 8: legal full chain to PASS path with missing evidence
-  await callTool("tw_get_state", { workspace_path: ws });
-  await callTool("tw_update_state", {
     workspace_path: ws,
     active_feature: "smoke",
     status: "In_Progress",
     agent_id: "sr-engineer",
   });
+  t = textOf(r);
+  record("pm→sr-engineer rejected (skip qa-engineer)", t.includes("TRANSITION_REJECTED"), t.slice(0, 120));
+
+  // Test 6: pm→qa-engineer accepted
   await callTool("tw_get_state", { workspace_path: ws });
-  await callTool("tw_update_state", {
+  r = await callTool("tw_update_state", {
     workspace_path: ws,
     active_feature: "smoke",
     status: "In_Progress",
     agent_id: "qa-engineer",
   });
+  t = textOf(r);
+  record("pm→qa-engineer accepted", t.includes('"success":true'), t.slice(0, 80));
+
+  // Test 7: qa-engineer→sr-engineer without a red-test manifest or no-new-test record
+  await callTool("tw_get_state", { workspace_path: ws });
+  r = await callTool("tw_update_state", {
+    workspace_path: ws,
+    active_feature: "smoke",
+    status: "In_Progress",
+    agent_id: "sr-engineer",
+  });
+  t = textOf(r);
+  record("qa→sr hand-off without manifest rejected", t.includes("REPRO_MANIFEST_MISSING"), t.slice(0, 120));
+
+  // Test 8: same hand-off once qa recorded that the ticket needs no new test
+  fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "qa_reports", "no-new-test_smoke.txt"), "smoke: no new test\n");
+  await callTool("tw_get_state", { workspace_path: ws });
+  r = await callTool("tw_update_state", {
+    workspace_path: ws,
+    active_feature: "smoke",
+    status: "In_Progress",
+    agent_id: "sr-engineer",
+  });
+  t = textOf(r);
+  record("qa→sr hand-off with no-new-test record accepted", t.includes('"success":true'), t.slice(0, 80));
+
+  // Test 9: sr-engineer→code-reviewer accepted
+  await callTool("tw_get_state", { workspace_path: ws });
+  r = await callTool("tw_update_state", {
+    workspace_path: ws,
+    active_feature: "smoke",
+    status: "In_Progress",
+    agent_id: "code-reviewer",
+  });
+  t = textOf(r);
+  record("sr→code-reviewer accepted", t.includes('"success":true'), t.slice(0, 80));
+
+  // Test 10: tw_complete_task without agent_id → BLOCKED, judge named
+  r = await callTool("tw_complete_task", { workspace_path: ws, task_id: "T01" });
+  t = textOf(r);
+  record(
+    "tw_complete_task w/o agent_id blocked",
+    t.includes("BLOCKED") && t.includes("code-reviewer"),
+    t.slice(0, 140),
+  );
+
+  // Test 11: code-reviewer PASS with missing evidence
   await callTool("tw_get_state", { workspace_path: ws });
   r = await callTool("tw_update_state", {
     workspace_path: ws,
     active_feature: "smoke",
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["X1"],
   });
   t = textOf(r);
   record(
     "PASS with missing evidence rejected",
-    t.includes("MISSING_EVIDENCE") && t.includes("X1"),
+    !t.includes('"success":true') && t.includes("EVIDENCE") && t.includes("X1"),
     t.slice(0, 160),
   );
 
-  // Test 9: same PASS but supply qa_review → server auto-records evidence and accepts
+  // Test 12: same PASS with qa_review → server auto-records evidence and accepts
   await callTool("tw_get_state", { workspace_path: ws });
   r = await callTool("tw_update_state", {
     workspace_path: ws,
     active_feature: "smoke",
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
+    review_verdict: "APPROVED",
     completed_tasks: ["X1"],
     qa_review: "smoke: synthetic PASS",
   });
   t = textOf(r);
   const evidenceFile = path.join(ws, "qa_reports", "review_X1.md");
   record(
-    "PASS with qa_review accepted + evidence file written",
+    "code-reviewer PASS with qa_review accepted + evidence file written",
     t.includes('"success":true') && fs.existsSync(evidenceFile),
     t.slice(0, 100),
   );

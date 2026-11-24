@@ -64,7 +64,7 @@ async function dispatch(ws, args) {
 // AC1 — v13->v14 migration is stamp-only and seeds nothing
 // ============================================================================
 
-test("AC1: v13->v14 migration is stamp-only — bumps schema_version only, seeds no cut_approved_source", () => {
+test("AC1 (E435): v13->v14 migration is stamp-only — bumps schema_version only, seeds no cut_approved_source; the real chain reaches 17", () => {
   // Re-baselined for the lane-layout migration (e123a): CURRENT_VERSIONS.handoff is now
   // 15, so a v13 payload run through the REAL (un-cleared) registry climbs
   // BOTH the v13->v14 step under test here AND the new v14->v15 step in the
@@ -72,7 +72,7 @@ test("AC1: v13->v14 migration is stamp-only — bumps schema_version only, seeds
   // the public API without clearing the registry (the M1/M3-style tests do
   // that; this test intentionally exercises the real registry end to end).
   // Both steps are stamp-only, so the "no field added" assertion still holds.
-  assert.equal(CURRENT_VERSIONS.handoff, 16, "sanity: this server's CURRENT handoff version is 16 (E431 chain_path/sr_return_count)");
+  assert.equal(CURRENT_VERSIONS.handoff, 17, "sanity: this server's CURRENT handoff version is 17 (E435 drops chain_path/qa_round/qa_rounds_total)");
   const v13Payload = {
     schema_version: 13,
     active_feature: "ac1-migrate-feat",
@@ -81,17 +81,17 @@ test("AC1: v13->v14 migration is stamp-only — bumps schema_version only, seeds
     evidence_schema: 2,
   };
   const result = runMigrations("handoff", v13Payload);
-  assert.deepEqual(result.applied, [14, 15, 16], "the v13->v14 AND v14->v15 steps run on a v13 payload to reach CURRENT");
+  assert.deepEqual(result.applied, [14, 15, 16, 17], "the v13->v14 step and every later step run on a v13 payload to reach CURRENT");
   assert.deepEqual(
     result.payload,
-    { ...v13Payload, schema_version: 16 },
+    { ...v13Payload, schema_version: 17 },
     "the v13->v14 and v14->v15 steps must change schema_version ONLY — no field added, changed, or removed (both stamp-only, no seed)",
   );
   assert.equal(result.payload.cut_approved_source, undefined, "v13->v14 seeds NO cut_approved_source default (absence === non-inherited, the safe direction)");
   assert.equal(result.payload.dispatch_mechanism, undefined, "v14->v15 seeds NO dispatch_mechanism default (e123a-lane-layout-migration — migration invents no attestation)");
 });
 
-test("AC1: a real v13 handoff file migrates to v14 on disk via readHandoffState's fire-and-forget heal (real registry), stamp-only", async () => {
+test("AC1 (E435): a real v13 handoff file migrates to v14 on disk via readHandoffState's fire-and-forget heal (real registry), stamp-only", async () => {
   // parseHandoff runs migrations in-memory only and never writes back
   // (tools/handoff-parse.ts's own doc comment); readHandoffState is the
   // fire-and-forget heal path that persists the migrated payload, mirroring
@@ -122,7 +122,8 @@ visual_rounds_total: 0
   resetSession(ws);
   const json = JSON.parse(readHandoffState(ws));
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.match(readRaw(ws), /schema_version:\s*16/, "on-disk v13 fixture migrates to CURRENT (16)");
+  assert.match(readRaw(ws), /schema_version:\s*17/, "on-disk v13 fixture migrates to CURRENT (17)");
+  assert.doesNotMatch(readRaw(ws), /^qa_round(s_total)?:/m, "v16->v17 drops qa_round / qa_rounds_total from the healed file (E435 ruling (a))");
   assert.equal(json.cut_approved_source, undefined, "the v13->v14 step invents no claim for a historical payload");
   assert.equal(json.active_feature, "ac1-real-v13-feat", "sibling field survives losslessly");
 });
@@ -131,7 +132,7 @@ visual_rounds_total: 0
 // AC2 — absence === non-inherited (its own case, not incidental)
 // ============================================================================
 
-test("AC2: a handoff with no cut_approved_source reads back undefined — absence is the non-inherited default, never a false negative/positive", async () => {
+test("AC2 (E435): a handoff with no cut_approved_source reads back undefined — absence is the non-inherited default, never a false negative/positive", async () => {
   // Case 1: a legacy (v13, written before this field existed) handoff that never had the field at all.
   const legacyWs = mkWs("e114-legacy-");
   writeRaw(
@@ -155,7 +156,7 @@ visual_round: 0
   resetSession(legacyWs);
   const legacyJson = JSON.parse(readHandoffState(legacyWs));
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.match(readRaw(legacyWs), /schema_version:\s*16/, "sanity: the legacy fixture migrated to CURRENT");
+  assert.match(readRaw(legacyWs), /schema_version:\s*17/, "sanity: the legacy fixture migrated to CURRENT (17)");
   assert.equal(legacyJson.cut_approved_source, undefined, "a pre-E114 handoff must read cut_approved_source as undefined, not a false 'not inherited' or false 'inherited'");
 
   // Case 2: a fresh, current-schema write that simply never set the field.

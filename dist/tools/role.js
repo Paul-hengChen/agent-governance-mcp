@@ -28,7 +28,7 @@ const ROLE_SKILL_MAP = {
     // AgentName + ALLOWED_TRANSITIONS: callers set agent_id to the upstream chain role
     // when invoking tw_update_state on its behalf (skill-doc-writer.md "Side-channel
     // constraint" clause). release-engineer is in AgentName and opens on the
-    // qa-engineer:PASS -> release-engineer:In_Progress edge there (v3.49.0, C13).
+    // code-reviewer:PASS -> release-engineer:In_Progress edge there (the chain's judge).
     "doc-writer": "skill-doc-writer.md",
     "release-engineer": "skill-release-engineer.md",
     // Coordinator SOP, composed from the coord-*.md fragments under this logical key; loadable here, not a chain role.

@@ -7,7 +7,7 @@
   The coordinator and every other role MAY pass context (baseline paths, Figma node ids, route,
   canonical-state setup) but MUST NOT define, override, relax, or pre-accept any visual difference.
   **Enforcement:** allowed-diffs are the judge's *by construction* — the visual report is consulted only on
-  the judge's PASS, and on the test-first chain `status=PASS` is server-restricted to
+  the judge's PASS, and `status=PASS` is server-restricted to
   `agent_id="code-reviewer"`, so the report (incl. its `## Allowed Differences`) is accepted and owned by
   code-reviewer at PASS time (server validates report schema, not file authorship), not the coordinator.
   The server validates that the report SCHEMA is complete (`## Allowed Differences` is a required section)

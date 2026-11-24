@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
 // Tests for specs/e247-qa-pass-unticked-gate.md AC1-AC4 and AC7 (PASS_TASKS_INCOMPLETE).
-// Why: a qa PASS is terminal, so an open row of the feature's own lane ledger that is neither in
-// completed_tasks, ticked nor voided must stop the PASS while qa can still fix it. The gate must stay
+// Why: a PASS is terminal, so an open row of the feature's own lane ledger that is neither in
+// completed_tasks, ticked nor voided must stop the PASS while the judge can still fix it. Since
+// E435 the PASS writer is code-reviewer, the chain's only judge (tests seed code-reviewer:In_Progress). The gate must stay
 // dormant everywhere a lane ledger cannot be named (shared, legacy, SQLite, non-PASS writes).
 // AC5/AC6 live in test/error-code-contract.test.mjs and test/e35-pipeline-order.test.mjs.
 
@@ -48,8 +49,8 @@ async function seed(ws, feature = FEATURE, completedTasks = []) {
     activeFeature: feature,
     status: "In_Progress",
     completedTasks,
-    pendingNotes: ["QA: claiming review"],
-    lastAgent: "qa-engineer",
+    pendingNotes: ["code-reviewer: claiming review"],
+    lastAgent: "code-reviewer",
   });
   forceSeedStamp(ws);
   resetSession(ws);
@@ -63,21 +64,22 @@ async function pass(ws, completed, { feature = FEATURE, review = "ok" } = {}) {
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: completed,
-    pending_notes: ["QA: PASS"],
+    pending_notes: ["code-reviewer: PASS"],
   };
   if (review !== null) args.qa_review = review;
   const r = await handleUpdateState(args);
   return { text: r.content[0].text, isError: !!r.isError };
 }
 
-test("AC1: open non-post-PASS rows outside the completed set reject the PASS, listed once in ledger order, evidence undone, handoff unwritten", async () => {
+test("AC1 (E435): a code-reviewer PASS with open non-post-PASS rows outside the completed set reject the PASS, listed once in ledger order, evidence undone, handoff unwritten", async () => {
   const ws = mkWs({ ledger: OPEN3 });
   await seed(ws);
   const r = await pass(ws, ["T-1"]);
   assert.ok(r.isError, r.text);
   assert.ok(r.text.includes("PASS_TASKS_INCOMPLETE: T-2, T-3."), r.text);
+  assert.ok(r.text.includes("A code-reviewer PASS must account for every open task"), "hint names the judge");
   assert.ok(!/PASS_TASKS_INCOMPLETE:[^.]*T-1/.test(r.text), "the completed id must not be listed");
   assert.ok(r.text.includes(path.join(".current", "e900", "tasks.md")), "message names the lane ledger");
   assert.ok(!fs.existsSync(path.join(ws, "qa_reports", "review_T-1.md")), "QA_REVIEW_RECORD evidence must be undone");
@@ -85,7 +87,7 @@ test("AC1: open non-post-PASS rows outside the completed set reject the PASS, li
   assert.notEqual(st.status, "PASS", "handoff must not be written on rejection");
 });
 
-test("AC2: PASS lands when every open id is in this write, in the on-disk set, ticked, or voided", async () => {
+test("AC2 (E435): a code-reviewer PASS lands when every open id is in this write, in the on-disk set, ticked, or voided", async () => {
   // (a) all ids in this write
   let ws = mkWs({ ledger: OPEN3 });
   await seed(ws);
@@ -108,7 +110,7 @@ test("AC2: PASS lands when every open id is in this write, in the on-disk set, t
   assert.ok(!r.isError, `(d) ${r.text}`);
 });
 
-test("AC3: post-PASS role rows never block; mentions later in the text and near-miss prefixes still block", async () => {
+test("AC3 (E435): code-reviewer PASS — post-PASS role rows never block; mentions later in the text and near-miss prefixes still block", async () => {
   let ws = mkWs({
     ledger: [
       "- [ ] T-1 [P0] qa (first)",
@@ -141,7 +143,7 @@ test("AC3: post-PASS role rows never block; mentions later in the text and near-
   assert.deepEqual(listOpenFeatureTasks(rows, new Set()), ["C"], "pure predicate: exempt rows skipped, ids once");
 });
 
-test("AC4: gate is dormant for non-lane ledgers, token mismatch, non-PASS writes and non-file storage", async () => {
+test("AC4 (E435): code-reviewer PASS — gate is dormant for non-lane ledgers, token mismatch, non-PASS writes and non-file storage", async () => {
   // _primary ledger on a main checkout
   let ws = mkWs({ branch: "main", ledgerAt: path.join(".current", "_primary", "tasks.md"), ledger: OPEN3 });
   assert.equal(featureLaneLedger(ws, FEATURE).armed, false, "_primary");
@@ -179,8 +181,8 @@ test("AC4: gate is dormant for non-lane ledgers, token mismatch, non-PASS writes
     workspace_path: ws,
     active_feature: FEATURE,
     status: "In_Progress",
-    agent_id: "qa-engineer",
-    pending_notes: ["QA: still reviewing"],
+    agent_id: "code-reviewer",
+    pending_notes: ["code-reviewer: still reviewing"],
   });
   assert.ok(!w.isError, `non-PASS: ${w.content[0].text}`);
 
@@ -189,7 +191,7 @@ test("AC4: gate is dormant for non-lane ledgers, token mismatch, non-PASS writes
   assert.match(src, /storage instanceof FileHandoffStorage && parsed\.status === "PASS"/, "call site is file-mode and PASS only");
 });
 
-test("AC7: QA_COMPLETION_EVIDENCE_MISSING wins over the new gate; a new-gate rejection writes one telemetry line", async () => {
+test("AC7 (E435): code-reviewer PASS — QA_COMPLETION_EVIDENCE_MISSING wins over the new gate; a new-gate rejection writes one telemetry line", async () => {
   let ws = mkWs({ ledger: OPEN3 });
   await seed(ws);
   // no qa_review: the newly added id has no evidence, and T-2/T-3 are also open

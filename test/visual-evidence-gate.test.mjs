@@ -372,8 +372,11 @@ test("v3.16.0 AC-1: empty active_feature → required:false (defensive)", () => 
 
 // ============================================================================
 // v3.30.0 — Scope Decision Gate (specs/server-scope-decision-gate.md)
-// SCOPE_DECISION_REQUIRED fires on pm -> {architect, sr-engineer} when
+// SCOPE_DECISION_REQUIRED fires on pm -> {architect, qa-engineer} when
 // hasDesignModeRequiringVisual arms it and hasScopeDecision finds no artifact.
+// E435: the build entry is pm -> {architect, qa-engineer} on every feature (no
+// chain_path marker); pm -> sr-engineer is a removed edge, so sr-engineer is
+// no longer a gated target.
 // These test hasScopeDecision directly and replicate the handler's predicate,
 // so a reorder of its conditions fails here (as in visual-gate-e2e.test.mjs).
 // ============================================================================
@@ -386,7 +389,7 @@ test("v3.16.0 AC-1: empty active_feature → required:false (defensive)", () => 
 // visual-evidence decision.
 function gateWouldFire(ws, feature, prevState, nextTuple) {
   const isBuildEntry =
-    (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+    (nextTuple.agent === "architect" || nextTuple.agent === "qa-engineer") &&
     nextTuple.status === "In_Progress" &&
     prevState?.last_agent === "pm" &&
     prevState?.status === "In_Progress";
@@ -456,19 +459,20 @@ test("hasScopeDecision: null / undefined handoffState never throws → false", (
 
 // ---------- Gate FIRES: armed + build-entry + no decision (AC-1) ----------
 
-test("AC-1: gate FIRES — design armed + pm→sr-engineer build entry + no scope decision", () => {
+test("AC-1 (E435): gate FIRES — design armed + pm→qa-engineer build entry + no scope decision", () => {
   // Why: the core enforcement edge from the scope-creep finding (A0). A design-backed
-  // feature entering build via sr-engineer with no recorded decision must be
-  // rejected so an oversized un-split feature cannot slip into build silently.
+  // feature entering build via qa-engineer (the test author, E435) with no recorded
+  // decision must be rejected so an oversized un-split feature cannot slip into
+  // build silently.
   const ws = mkWorkspace();
   seedArmedDesign(ws, "feat-x");
   const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
-  const next = { agent: "sr-engineer", status: "In_Progress" };
+  const next = { agent: "qa-engineer", status: "In_Progress" };
   assert.equal(gateWouldFire(ws, "feat-x", prev, next), true);
 });
 
 test("AC-1: gate FIRES on the architect build-entry edge too (pm→architect)", () => {
-  // Why: AC-1 lists BOTH architect and sr-engineer as gated build-entry targets;
+  // Why: AC-1 lists BOTH architect and qa-engineer (E435) as gated build-entry targets;
   // architect-first routing (this feature's own routing) must also be gated.
   const ws = mkWorkspace();
   seedArmedDesign(ws, "feat-x");
@@ -486,7 +490,7 @@ test("AC-3: gate CLEARED by scope_decision: single-feature in handoff (attestati
   const ws = mkWorkspace();
   seedArmedDesign(ws, "feat-x");
   const prev = { last_agent: "pm", status: "In_Progress", scope_decision: "single-feature" };
-  const next = { agent: "sr-engineer", status: "In_Progress" };
+  const next = { agent: "qa-engineer", status: "In_Progress" };
   assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
 });
 
@@ -497,7 +501,7 @@ test("AC-2: gate CLEARED by .current/feature-split.md existence (multi-feature)"
   seedArmedDesign(ws, "feat-x");
   seedFeatureSplit(ws);
   const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
-  const next = { agent: "sr-engineer", status: "In_Progress" };
+  const next = { agent: "qa-engineer", status: "In_Progress" };
   assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
 });
 
@@ -509,7 +513,7 @@ test("AC-5: gate SILENT when no design file (non-UI workspace) — transition al
   const ws = mkWorkspace();
   // NO design file written.
   const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
-  const next = { agent: "sr-engineer", status: "In_Progress" };
+  const next = { agent: "qa-engineer", status: "In_Progress" };
   assert.equal(gateWouldFire(ws, "no-design-feat", prev, next), false);
 });
 
@@ -519,42 +523,43 @@ test("AC-5: gate SILENT when design mode === no-design — transition allowed", 
   const ws = mkWorkspace();
   writeDesignWithMode(ws, "server-feat", "# design/server-feat\n\nmode: no-design\n\nReason: server-only.\n");
   const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
-  const next = { agent: "sr-engineer", status: "In_Progress" };
+  const next = { agent: "qa-engineer", status: "In_Progress" };
   assert.equal(gateWouldFire(ws, "server-feat", prev, next), false);
 });
 
 // ---------- Gate SILENT for non-build transition targets (AC-6) ----------
 
-test("AC-6: gate SILENT for non-build transition target even when design armed", () => {
+test("AC-6 (E435): gate SILENT for non-build transition target even when design armed", () => {
   // Why: condition 1 of the arm check fails for any next-agent outside
-  // {architect,sr-engineer} — e.g. pm→qa-engineer or pm→pm — so the whole guard
-  // block is skipped regardless of design presence + missing decision.
+  // {architect,qa-engineer} — e.g. pm→sr-engineer (a removed edge since E435,
+  // rejected by the transition table first) or pm→researcher — so the whole
+  // guard block is skipped regardless of design presence + missing decision.
   const ws = mkWorkspace();
   seedArmedDesign(ws, "feat-x");
   const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
-  assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "qa-engineer", status: "In_Progress" }), false);
+  assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "sr-engineer", status: "In_Progress" }), false);
   assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "researcher", status: "In_Progress" }), false);
 });
 
 test("AC-6: gate SILENT when build target status is not In_Progress (e.g. PASS/FAIL)", () => {
-  // Why: condition 1 also requires next.status === In_Progress. A sr-engineer
+  // Why: condition 1 also requires next.status === In_Progress. A qa-engineer
   // write at any non-In_Progress status is not a build-ENTRY and must not gate.
   const ws = mkWorkspace();
   seedArmedDesign(ws, "feat-x");
   const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
-  assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "sr-engineer", status: "Blocked" }), false);
+  assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "qa-engineer", status: "Blocked" }), false);
 });
 
 // ---------- Re-entry / resume safety (arch Edge Case row 1) ----------
 
-test("Edge: re-entry architect→sr-engineer NOT blocked (non-pm predecessor)", () => {
+test("Edge (E435): re-entry architect→qa-engineer NOT blocked (non-pm predecessor)", () => {
   // Why: pinning prev=pm is what makes resume safe. Once build has begun, the
-  // architect→sr-engineer hop has a non-pm predecessor, so condition 2 is false
+  // architect→qa-engineer hop has a non-pm predecessor, so condition 2 is false
   // and the gate is structurally skipped — even with armed design + no decision.
   const ws = mkWorkspace();
   seedArmedDesign(ws, "feat-x");
   const prev = { last_agent: "architect", status: "In_Progress", scope_decision: undefined };
-  const next = { agent: "sr-engineer", status: "In_Progress" };
+  const next = { agent: "qa-engineer", status: "In_Progress" };
   assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
 });
 

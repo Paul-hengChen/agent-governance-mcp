@@ -208,6 +208,20 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   up: (input) => ({ ...input, schema_version: 16 }),
 });
 
+// v16 -> v17 (E435): one chain, so the marker has nothing to mark, and
+// qa-engineer never writes FAIL, so qa_round / qa_rounds_total would stay 0.
+// The first step in this registry that DROPS fields; every earlier step adds
+// or stamps. Pure; the heal write in handoff-parse persists the result.
+registerMigration<Record<string, unknown>, Record<string, unknown>>({
+  kind: "handoff",
+  from: 16,
+  to: 17,
+  up: (input) => {
+    const { chain_path: _c, qa_round: _q, qa_rounds_total: _t, ...rest } = input;
+    return { ...rest, schema_version: 17 };
+  },
+});
+
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

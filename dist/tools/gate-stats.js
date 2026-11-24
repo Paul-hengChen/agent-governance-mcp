@@ -219,7 +219,7 @@ export function computeGateStats(workspacePath) {
             feature,
             released_version: releasedVersion,
             tickets: num(rec.tickets),
-            qa_rounds: num(rec.qa_rounds),
+            // A pre-E435 record's qa_rounds is ignored (the qa round is gone).
             review_rounds: num(rec.review_rounds),
             visual_rounds: num(rec.visual_rounds),
             hops: num(rec.hops),
@@ -276,7 +276,6 @@ export function computeGateStats(workspacePath) {
             features: featureCount,
             one_pass_count: onePassCount,
             one_pass_rate: featureCount === 0 ? null : round2(onePassCount / featureCount),
-            mean_qa_rounds: mean("qa_rounds"),
             mean_review_rounds: mean("review_rounds"),
             mean_visual_rounds: mean("visual_rounds"),
             mean_hops: mean("hops"),

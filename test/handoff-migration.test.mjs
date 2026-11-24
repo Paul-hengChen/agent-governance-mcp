@@ -54,7 +54,7 @@ qa_round: 2
 
   const state = parseHandoff(ws);
   assert.equal(state.active_feature, "legacy-feat");
-  assert.equal(state.qa_round, 2, "qa_round survives migration unchanged");
+  assert.equal(state.qa_round, undefined, "qa_round is carried to v16 and dropped by the v16→v17 step (E435)");
   assert.equal(state.review_round, 0, "review_round defaults to 0 on v1→v2 migration");
 });
 
@@ -82,7 +82,7 @@ last_agent: "pm"
   );
 
   const state = parseHandoff(ws);
-  assert.equal(state.qa_round, 0);
+  assert.equal(state.qa_round, undefined, "the v0→v1 qa_round default is dropped again by v16→v17 (E435)");
   assert.equal(state.review_round, 0);
   assert.equal(state.visual_round, 0, "v3.14.0: visual_round defaults to 0 on v2→v3 migration");
 });
@@ -309,7 +309,7 @@ prd_path: "${legacyPrdPath}"
   // Pre-existing fields preserved.
   assert.equal(state.active_feature, "legacy-v3-feat");
   assert.equal(state.last_agent, "pm");
-  assert.equal(state.qa_round, 1, "qa_round preserved across v3→v4");
+  assert.equal(state.qa_round, undefined, "qa_round preserved across v3→v4, dropped at v16→v17 (E435)");
   assert.equal(state.review_round, 2, "review_round preserved across v3→v4");
   assert.equal(state.prd_path, legacyPrdPath, "prd_path preserved across v3→v4");
 });
@@ -346,9 +346,9 @@ scope_decision_why: "one screen, no sub-flows"
   assert.equal(state.scope_decision_why, "one screen, no sub-flows");
 });
 
-test("AC-7: scope_decision round-trips through writeHandoffState → readback (v10 stamp)", async () => {
+test("AC-7: scope_decision round-trips through writeHandoffState → readback (v17 stamp)", async () => {
   // Why: the modern options-object write must emit scope_decision into YAML and
-  // parse it back identically, stamped at the current schema version (v16).
+  // parse it back identically, stamped at the current schema version (v17).
   // This is the path PM's scope attestation is written through.
   const ws = mkWorkspace();
   resetSession();
@@ -365,7 +365,7 @@ test("AC-7: scope_decision round-trips through writeHandoffState → readback (v
   });
 
   const raw = readRaw(ws);
-  assert.match(raw, /schema_version:\s*16/, "write stamps current handoff schema v16");
+  assert.match(raw, /schema_version:\s*17/, "write stamps current handoff schema v17");
   assert.match(raw, /scope_decision:\s*["']?single-feature["']?/, "scope_decision emitted into YAML");
 
   const state = parseHandoff(ws);
@@ -437,12 +437,12 @@ test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DO
     pendingNotes: ["code-reviewer: approved"],
     lastAgent: "code-reviewer",
     nextRole: "qa-engineer",
-    resumeOf: "qa-engineer",
+    resumeOf: "code-reviewer",
     reviewVerdict: "APPROVED",
   });
   let state = parseHandoff(ws);
   assert.equal(state.next_role, "qa-engineer", "next_role must be present immediately after the write that sets it");
-  assert.equal(state.resume_of, "qa-engineer", "resume_of must be present immediately after the write that sets it");
+  assert.equal(state.resume_of, "code-reviewer", "resume_of (only \"code-reviewer\" since E435) must be present immediately after the write that sets it");
   assert.equal(state.review_verdict, "APPROVED", "review_verdict must be present immediately after the write that sets it");
 
   // Second write: same feature, no active_feature change, omits all three.
@@ -463,9 +463,9 @@ test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DO
   assert.equal(state.last_agent, "qa-engineer", "the new write's own fields still apply");
 });
 
-test("AC-10(g): future v17 handoff refuses-loud against a v16 server (no silent downgrade)", () => {
-  // Why: forward-compat safety. A handoff written by a newer server (v16) must
-  // NOT be silently parsed by this v16 server — runMigrations throws because
+test("AC-10(g): future v18 handoff refuses-loud against a v17 server (no silent downgrade)", () => {
+  // Why: forward-compat safety. A handoff written by a newer server (v18) must
+  // NOT be silently parsed by this v17 server — runMigrations throws because
   // the on-disk version is above the server max, so a newer file is refused
   // loudly instead of being downgraded.
   const ws = mkWorkspace();
@@ -473,7 +473,7 @@ test("AC-10(g): future v17 handoff refuses-loud against a v16 server (no silent 
   writeRaw(
     ws,
     `---
-schema_version: 17
+schema_version: 18
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -490,8 +490,8 @@ qa_round: 0
 
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 17 > server max 16/,
-    "v17 file must refuse-loud against a v16 server",
+    /on-disk version 18 > server max 17/,
+    "v18 file must refuse-loud against a v17 server",
   );
 });
 
@@ -541,17 +541,18 @@ prd_path: "${legacyPrdPath}"
   // must survive untouched (lossless, AC-8).
   assert.equal(state.active_feature, "legacy-v5-feat");
   assert.equal(state.last_agent, "pm");
-  assert.equal(state.qa_round, 1, "qa_round preserved across v5→v6");
+  assert.equal(state.qa_round, undefined, "qa_round preserved across v5→v6, dropped at v16→v17 (E435)");
   assert.equal(state.review_round, 2, "review_round preserved across v5→v6");
   assert.equal(state.cut_approved, true, "cut_approved (a sibling v5 attestation field) preserved across v5→v6");
   assert.equal(state.prd_path, legacyPrdPath, "prd_path preserved across v5→v6");
 });
 
 test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs survives, new protocol fields (incl. dispatch_pins, dispatched_at) stay absent, hop_count seeds 0", async () => {
-  // Why: a v6 payload sits nine steps behind the current v16 and the runner walks stepwise, so one call climbs the
+  // Why: a v6 payload sits eleven steps behind the current v17 and the runner walks stepwise, so one call climbs the
   // whole chain. external_refs survives; migration invents no value for fields only a writer can attest (next_role,
   // resume_of, review_verdict, dispatch_pins, dispatched_at, dispatch_mode, evidence_schema, cut_approved_source,
-  // dispatch_mechanism and its tier), while hop_count and the three round totals seed to 0.
+  // dispatch_mechanism and its tier), while hop_count and the review/visual round totals seed to 0 (qa_rounds_total is
+  // seeded at v12 and dropped again at v17, E435).
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
     schema_version: 6,
@@ -561,8 +562,8 @@ test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs su
     external_refs: [{ ref: "JIRA-1", state: "unresolved" }],
   };
   const result = runMigrations("handoff", v6Payload);
-  assert.deepEqual(result.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "the v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 stamp-only/seed-only chain must run when on-disk version is nine behind CURRENT");
-  assert.equal(result.payload.schema_version, 16, "schema_version bumped to CURRENT (16)");
+  assert.deepEqual(result.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], "the v6→…→v17 chain must run when on-disk version is eleven behind CURRENT");
+  assert.equal(result.payload.schema_version, 17, "schema_version bumped to CURRENT (17)");
   assert.deepEqual(result.payload.external_refs, [{ ref: "JIRA-1", state: "unresolved" }], "external_refs survives the v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 chain verbatim");
   assert.equal(result.payload.next_role, undefined, "v6→v7 seeds no next_role default (DR-1)");
   assert.equal(result.payload.resume_of, undefined, "v6→v7 seeds no resume_of default (DR-1)");
@@ -571,7 +572,7 @@ test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs su
   assert.equal(result.payload.hop_count, 0, "v8→v9 seeds hop_count: 0 (d2-server-brake-accounting DR-3)");
   assert.equal(result.payload.dispatched_at, undefined, "v9→v10 seeds no dispatched_at default (d5-server-side-stale-dispatch-detection DR-7)");
   assert.equal(result.payload.dispatch_mode, undefined, "v10→v11 seeds no dispatch_mode default (e2-bugfix-repro-gate — absence-is-signal)");
-  assert.equal(result.payload.qa_rounds_total, 0, "v11→v12 seeds qa_rounds_total: 0 (e8-success-telemetry — the counter precedent)");
+  assert.equal("qa_rounds_total" in result.payload, false, "v11→v12 seeds qa_rounds_total: 0, v16→v17 drops it (E435)");
   assert.equal(result.payload.review_rounds_total, 0, "v11→v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(result.payload.visual_rounds_total, 0, "v11→v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(result.payload.evidence_schema, undefined, "v12→v13 seeds no evidence_schema default (e23-evidence-schema-versioning D1 — absence-is-signal, migration invents no pin)");
@@ -585,7 +586,7 @@ test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is
   // `current === target` short-circuit). A stale v6 handoff healed once must not
   // be re-migrated on a second pass (e.g. two concurrent reads racing the healing
   // write-back, or a plain re-read of an already-current file). With CURRENT at
-  // 15, the first pass climbs v6→v7→v8→v9→v10→v11→v12→v13→v14→v15.
+  // 17, the first pass climbs v6→v7→…→v17.
   // (T-C9-07 fixture #3)
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
@@ -595,7 +596,7 @@ test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is
     last_agent: "pm",
   };
   const healed = runMigrations("handoff", v6Payload);
-  assert.deepEqual(healed.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "first pass heals v6 to CURRENT (v16)");
+  assert.deepEqual(healed.applied, [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], "first pass heals v6 to CURRENT (v17)");
   const reread = runMigrations("handoff", healed.payload);
   assert.deepEqual(reread.applied, [], "second pass against the now-current payload applies nothing");
   assert.equal(reread.payload, healed.payload, "no-op path returns the same reference");
@@ -647,7 +648,7 @@ external_refs:
   );
   // Pre-existing fields (including the sibling v6 external_refs ledger) preserved.
   assert.equal(state.active_feature, "legacy-v6-feat");
-  assert.equal(state.qa_round, 1, "qa_round preserved across v6→v7");
+  assert.equal(state.qa_round, undefined, "qa_round preserved across v6→v7, dropped at v16→v17 (E435)");
   assert.equal(state.review_round, 2, "review_round preserved across v6→v7");
   assert.deepEqual(
     state.external_refs,
@@ -688,4 +689,68 @@ scope_decision: "single-feature"
   assert.equal(state.scope_decision, "single-feature", "v4-era scope_decision survives the double climb");
   assert.equal(state.cut_approved, undefined, "v4→v5 step still seeds nothing for cut_approved");
   assert.equal(state.external_refs, undefined, "v5→v6 step still seeds nothing for external_refs");
+});
+
+// ============================================================================
+// E435 — handoff schema v16 → v17: the first step that DROPS fields
+// (specs/e435-remove-old-path-architecture.md, "Handoff schema v17").
+// ============================================================================
+
+test("E435 AC4: the v16→v17 step drops chain_path, qa_round and qa_rounds_total and keeps every other field", async () => {
+  // Why: one chain leaves the marker nothing to mark, and qa-engineer never
+  // writes FAIL, so the qa round counters would stay 0 for ever. Every other
+  // v16 field, sr_return_count and the review/visual counters included, must
+  // reach v17 untouched or a mid-flight feature loses its state on upgrade.
+  const { runMigrations } = await import("../dist/schema/versions.js");
+  const kept = {
+    active_feature: "v16-feat",
+    status: "In_Progress",
+    last_agent: "qa-engineer",
+    review_round: 1,
+    visual_round: 2,
+    hop_count: 5,
+    review_rounds_total: 3,
+    visual_rounds_total: 4,
+    sr_return_count: 1,
+    dispatch_pins: { "qa-engineer": "opus" },
+  };
+  const result = runMigrations("handoff", {
+    schema_version: 16,
+    ...kept,
+    chain_path: "test-first",
+    qa_round: 2,
+    qa_rounds_total: 3,
+  });
+  assert.deepEqual(result.applied, [17], "a v16 payload takes exactly one step");
+  assert.deepEqual(result.payload, { ...kept, schema_version: 17 }, "only the three fields go; nothing is seeded");
+});
+
+test("E435 AC4: a v17 handoff carrying a stale resume_of: \"qa-engineer\" parses with resume_of absent", () => {
+  // Why: resume_of narrows to "code-reviewer" with no migration step; the
+  // parser's enum drop is what keeps a hand-edited or pre-upgrade value from
+  // re-opening the removed pm → qa-engineer resume edge.
+  const ws = mkWorkspace();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 17
+active_feature: "stale-resume"
+status: "In_Progress"
+last_updated: "2026-11-01T00:00:00.000Z"
+last_agent: "pm"
+resume_of: "qa-engineer"
+review_round: 0
+visual_round: 0
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- 無
+`,
+  );
+  const state = parseHandoff(ws);
+  assert.equal(state.active_feature, "stale-resume");
+  assert.equal(state.resume_of, undefined, "resume_of accepts only code-reviewer since E435");
 });

@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
 // Pins the order of the checks a state write runs through: the ordered array
 // UPDATE_STATE_GATE_PIPELINE (gates/pipeline.ts + tools/handoff-orchestrator.ts).
-// Pins the step NAME sequence (18 steps) and each step's CODES, so a reorder, rename
+// Pins the step NAME sequence (17 steps) and each step's CODES, so a reorder, rename
 // or dropped/added code fails a test; codes are cross-checked against gates/registry.ts.
 // Imports from dist/ (npm test's prebuild builds it).
 // Rationale: specs/e260g-comment-rationale.md (test/e35-pipeline-order.test.mjs).
@@ -27,13 +27,12 @@ const EXPECTED_PIPELINE = [
   { name: "SOURCE_CREDIBILITY_UNVERIFIED", codes: ["SOURCE_CREDIBILITY_UNVERIFIED"] },
   { name: "REPRO_MANIFEST_MISSING", codes: ["REPRO_MANIFEST_MISSING"] },
   { name: "REVIEW_VERDICT_STATUS_MISMATCH", codes: ["REVIEW_VERDICT_STATUS_MISMATCH", "NON_REVIEWER_VERDICT_REJECTED"] },
-  // This step has two codes. It rejects completed_tasks from any role other
-  // than qa-engineer: code-reviewer keeps its original code and envelope
-  // unchanged, which is why the step keeps its original name, and every other
-  // non-qa agent_id gets NON_QA_COMPLETED_TASKS_REJECTED. It sits directly
-  // after REVIEW_VERDICT_STATUS_MISMATCH and before QA_REVIEW_RECORD.
-  // (E40, e40-nonqa-completed-tasks-write-gate, T-E40-03, c16)
-  { name: "REVIEWER_COMPLETED_TASKS_REJECTED", codes: ["REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"] },
+  // Step 9 (E435, ruling (b)): one code. It rejects a non-empty completed_tasks
+  // from any agent_id other than the judge (code-reviewer), qa-engineer
+  // included. It replaces REVIEWER_COMPLETED_TASKS_REJECTED and
+  // NON_QA_COMPLETED_TASKS_REJECTED and keeps the old step's position: after
+  // REVIEW_VERDICT_STATUS_MISMATCH, before QA_REVIEW_RECORD.
+  { name: "NON_JUDGE_COMPLETED_TASKS_REJECTED", codes: ["NON_JUDGE_COMPLETED_TASKS_REJECTED"] },
   { name: "QA_REVIEW_RECORD", codes: ["QA_REVIEW_TARGET_REQUIRED"] },
   { name: "QA_COMPLETION_EVIDENCE_MISSING", codes: ["QA_COMPLETION_EVIDENCE_MISSING"] },
   { name: "PASS_TASKS_INCOMPLETE", codes: ["PASS_TASKS_INCOMPLETE"] },
@@ -103,6 +102,24 @@ test("t-order-exact: TRANSITION_VALIDATION.codes is the registry-exported TRANSI
       "gates/registry.ts TRANSITION_GATE_CODES — a fork here would let the " +
       "two silently diverge."
   );
+});
+
+// E435: validateTransition emits 6 codes (QA_ROUND_EXCEEDED left with the qa
+// round cap); pinned as a literal so step 1 cannot gain or lose a code unseen.
+test("E435: TRANSITION_GATE_CODES is the 6 transition codes, step 9 is NON_JUDGE_COMPLETED_TASKS_REJECTED, the three removed codes are in no step", () => {
+  assert.deepEqual([...TRANSITION_GATE_CODES], [
+    "AGENT_ID_REQUIRED",
+    "TRANSITION_REJECTED",
+    "REVIEW_ROUND_EXCEEDED",
+    "VISUAL_ROUND_EXCEEDED",
+    "HOP_CAP_EXCEEDED",
+    "SR_RETURN_CAP_EXCEEDED",
+  ]);
+  assert.equal(UPDATE_STATE_GATE_PIPELINE[8].name, "NON_JUDGE_COMPLETED_TASKS_REJECTED");
+  const flattened = UPDATE_STATE_GATE_PIPELINE.flatMap((s) => s.codes);
+  for (const gone of ["QA_ROUND_EXCEEDED", "REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"]) {
+    assert.ok(!flattened.includes(gone), `${gone} is removed (E435) and belongs to no step`);
+  }
 });
 
 test("t-codes-registry-parity: the union of every step's codes[] equals ALL_GATE_CODES minus tool-boundary codes (registry is single source of truth)", async () => {

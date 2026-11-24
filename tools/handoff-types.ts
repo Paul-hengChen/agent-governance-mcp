@@ -44,20 +44,16 @@ export interface ExternalRef {
   state: ExternalRefState;
 }
 
-// Amend-Resume target set (handoff schema v7, c9-protocol-fields). Restricted
-// to the exact two roles the Amend-Resume Edge in tools/transitions.ts allows.
-export type ResumeOfTarget = "code-reviewer" | "qa-engineer";
+// Amend-Resume target set (handoff schema v7, c9-protocol-fields). Since E435
+// (schema v17) only code-reviewer: pm:In_Progress -> qa-engineer:In_Progress
+// is an ordinary edge and needs no resume_of.
+export type ResumeOfTarget = "code-reviewer";
 
 // Code-reviewer verdict values (handoff schema v7, c9-protocol-fields).
 export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
 
 // Dispatch-mode classification. (handoff schema v11, E2)
 export type DispatchMode = "feature" | "bugfix";
-
-// Test-first chain marker (handoff schema v16, E431). One value; absence means
-// the old chain. Defined here, not in transitions.ts, so the types module stays
-// the owner of persisted shapes; transitions.ts takes it with `import type`.
-export type ChainPath = "test-first";
 
 // Per-hop dispatch-mechanism attestation values: which mechanism carried
 // THIS hop — a Task-spawned subagent, an in-context tw_switch_role swap, or
@@ -73,24 +69,20 @@ export interface HandoffState {
   last_agent?: string;
   completed_tasks: string[];
   pending_notes: string[];
-  // QA round counter — incremented on (qa-engineer, FAIL), reset on PASS or
-  // PM re-entry. Round-cap override (>= 4) blocks all transitions except
-  // (pm, In_Progress). Backward-compat: parser defaults missing field to 0.
-  qa_round: number;
   // Code-reviewer round counter — incremented on (code-reviewer, FAIL),
-  // reset on handoff to qa-engineer or PM re-entry. Symmetric to qa_round
-  // with its own REVIEW_ROUND_CAP. Backward-compat: parser defaults to 0.
+  // reset on PASS or PM re-entry, capped by REVIEW_ROUND_CAP.
+  // Backward-compat: parser defaults to 0.
   review_round: number;
   // Visual-fidelity round counter (v3.14.0) — incremented on (qa-engineer,
   // FAIL) when pending_notes contains `visual_fail:`. Independent of
-  // qa_round / review_round; tracks pixel-perfect iteration only.
+  // review_round; tracks pixel-perfect iteration only.
   // Backward-compat: parser defaults missing field to 0 (v2→v3 migration
   // also stamps the field).
   visual_round: number;
   // v9 (d2-server-brake-accounting) — feature-scoped role-transition counter.
   // Computed server-side by computeNewRound; enforced by the HOP_CAP_EXCEEDED
   // override in validateTransition. Always emitted (even 0), parser defaults
-  // missing to 0 — identical treatment to qa_round/review_round/visual_round.
+  // missing to 0 — identical treatment to review_round/visual_round.
   // Feature-scoped: resets ONLY on active_feature change (NOT on PM re-entry,
   // DR-6 — the hop cap is a session-length circuit breaker, harder to clear
   // than the per-task round caps by design).
@@ -99,8 +91,7 @@ export interface HandoffState {
   // counter's FAIL branch (computeNewRound) and resets only when
   // active_feature changes, like hop_count. In file mode the parser always
   // fills them and the serializer always writes them; optional here only
-  // because SQLite never stores them. Read as `state.qa_rounds_total ?? 0`.
-  qa_rounds_total?: number;
+  // because SQLite never stores them. Read as `state.review_rounds_total ?? 0`.
   review_rounds_total?: number;
   visual_rounds_total?: number;
   // Optional absolute path to the workspace's PRD file. Consumed by the RAG
@@ -188,15 +179,10 @@ export interface HandoffState {
   // pin-vs-actual mismatch; nothing compares them automatically. Same
   // one-write lifetime, file mode only.
   dispatch_mechanism_tier?: string;
-  // Which chain the feature entered by. Set by a pm write or by the entry
-  // write pm/architect -> qa-engineer:In_Progress; carried across writes that
-  // omit it; never cleared; dropped when active_feature changes; NOT re-armed
-  // on PM re-entry. File mode only. Read by validateTransition (overlay), the
-  // build-entry checks and every judge-identity check.
-  chain_path?: ChainPath;
-  // sr-engineer -> qa-engineer returns on a test-first feature. Server-computed
-  // each write (computeSrReturnCount); reset on pm:In_Progress and on
-  // active_feature change; not a review round. Present only when > 0, so an
-  // unmarked feature never carries it. File mode only.
+  // sr-engineer -> qa-engineer returns, counted for every file-mode feature.
+  // Server-computed each write (computeSrReturnCount); reset on pm:In_Progress
+  // and on active_feature change; not a review round. Present only when > 0.
+  // File mode only: SQLite never stores it, so the sr_return cap never fires
+  // there.
   sr_return_count?: number;
 }

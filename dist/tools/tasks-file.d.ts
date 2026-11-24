@@ -14,7 +14,7 @@ export declare function rollbackTaskInFile(workspacePath: string, taskId: string
  * same bytes. The caller still decides WHETHER to refuse (row or ledger marks
  * the task done); this only picks the recovery advice for the state found. A
  * ledger-only hit cannot be fixed by rollback (the row is already open), so it
- * names the qa-engineer FAIL write that clears the ledger. (E359)
+ * names the code-reviewer FAIL write that clears the ledger. (E359)
  */
 export declare function voidRefusalMessage(taskId: string, rowCompleted: boolean, ledgerCompleted: boolean): string;
 /**

@@ -8,8 +8,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { enumerateLaneSidecarSources, resolveCurrentLanePaths } from "./lane-paths.js";
 
-// ROUND SEMANTICS: the three *_rounds fields count REWORK ONLY (QA FAIL,
-// CHANGES_REQUESTED, visual FAIL), so a review approved first time records
+// ROUND SEMANTICS: the two *_rounds fields count REWORK ONLY
+// (CHANGES_REQUESTED, visual FAIL), so a review approved first time records
 // `review_rounds: 0`, the same as no review, by design. Read them as "how much
 // rework", never "how many rounds ran". Why the terminal round is not folded
 // in: specs/e260b-rationale.md (tools/metrics.ts). (E52, E85)
@@ -17,11 +17,10 @@ export interface FeatureMetricRecord {
   ts: string; // ISO-8601 emit time == the release-close moment (DR-4)
   feature: string;
   tickets: number;
-  qa_rounds: number; // rework only — cumulative QA FAILs (prevState.qa_rounds_total)
   review_rounds: number; // rework only — cumulative CHANGES_REQUESTED (prevState.review_rounds_total)
   visual_rounds: number; // rework only — cumulative visual FAILs (prevState.visual_rounds_total)
   hops: number; // from prevState.hop_count (AC5 — no new field)
-  one_pass: boolean; // zero rework in all three families (AC3) — NOT "exactly one round ran"
+  one_pass: boolean; // zero rework in both families (AC3) — NOT "exactly one round ran"
   released_version: string | null; // package.json version at emit time, null if unreadable (AC7)
 }
 
@@ -44,7 +43,6 @@ export function deriveTicketCode(feature: string): string {
 export function emitFeatureMetrics(args: {
   workspacePath: string;
   feature: string;
-  qaRoundsTotal: number;
   reviewRoundsTotal: number;
   visualRoundsTotal: number;
   hops: number;
@@ -118,14 +116,12 @@ export function emitFeatureMetrics(args: {
       ts: new Date().toISOString(),
       feature: args.feature,
       tickets,
-      qa_rounds: args.qaRoundsTotal,
       review_rounds: args.reviewRoundsTotal,
       visual_rounds: args.visualRoundsTotal,
       hops: args.hops,
       // Zero rework of any kind (AC3) — see ROUND SEMANTICS above for why a
       // first-pass-APPROVED round is not counted into these totals.
-      one_pass:
-        args.qaRoundsTotal === 0 && args.reviewRoundsTotal === 0 && args.visualRoundsTotal === 0,
+      one_pass: args.reviewRoundsTotal === 0 && args.visualRoundsTotal === 0,
       released_version,
     };
     fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -36,7 +36,7 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     readState(workspacePath: string): string;
     writeState(opts: WriteHandoffStateOptions): Promise<string>;
     /** @deprecated v3.15.0: prefer the options-object overload. */
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, _qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
     /**
      * The real implementation; both writeState overloads reach it with the
      * options-object shape. File-mode-only frontmatter fields (cutApproved,

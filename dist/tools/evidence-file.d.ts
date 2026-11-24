@@ -1,12 +1,10 @@
-import type { ChainPath } from "./handoff-types.js";
-import { judgeFor } from "./transitions.js";
-export type JudgeIdentity = ReturnType<typeof judgeFor>;
+import { type JudgeRole } from "./transitions.js";
 export interface JudgeReport {
-    readonly judge: JudgeIdentity;
+    readonly judge: JudgeRole;
     readonly dir: string;
 }
-export declare function resolveJudgeReport(workspacePath: string, chainPath?: ChainPath): JudgeReport;
-export declare const JUDGE_IDENTITIES: readonly JudgeIdentity[];
+export declare function resolveJudgeReport(workspacePath: string): JudgeReport;
+export declare const REPORT_SIGNERS: readonly string[];
 export declare function encodeEvidenceId(taskId: string): string;
 export declare function decodeEvidenceId(stem: string): string | null;
 export declare const COVERS_LINE_RE: RegExp;

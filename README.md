@@ -17,7 +17,7 @@ Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`,
 | **Lost updates** — two IDEs write `handoff.md` simultaneously, later one silently overwrites | `O_EXCL` file lock + mtime freshness check; concurrent writer gets `⛔ STATE DRIFT` |
 | **Rule drift** — same rules duplicated across `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, … | Constitution (composed from fragments) loaded via MCP role prompts (`/teamwork`, `teamwork-lite`, …); opt-in SessionStart hook for auto-injection |
 | **Format drift** — AI hand-edits `handoff.md` and breaks YAML / checkboxes | Free-text edits revoked; AI MUST go through 12 `tw_*` tools with zod-validated args |
-| **No iteration discipline** — AI declares PASS without testing, or loops forever on the same fail | Server-enforced state machine: `qa_round` / `review_round` / `visual_round` caps; PASS requires evidence files |
+| **No iteration discipline** — AI declares PASS without testing, or loops forever on the same fail | Server-enforced state machine: `review_round` / `visual_round` / `sr_return` caps; only the judge (code-reviewer) writes PASS, and PASS requires evidence files |
 
 Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates + slash commands** — enforcement is advisory. This ships **server-side gates** — AI gets `⛔ BLOCKED` envelopes on rule violations. See [vs. alternatives](#vs-alternatives) below.
 

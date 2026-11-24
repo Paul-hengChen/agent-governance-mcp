@@ -255,7 +255,7 @@ evidence_schema: 1
 // AC2 — v12→v13 migration invents no pin
 // ============================================================================
 
-test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 16 and NO evidence_schema seeded", () => {
+test("AC2-1 (E435): a v12 fixture migrates to v13 with schema_version becoming 17 and NO evidence_schema seeded", () => {
   // The handoff schema's CURRENT version is 16, so the manually-registered chain must
   // extend past v13 (v13→v14 cut_approved_source pin; v14→v15 dispatch_mechanism/tier pin;
   // both stamp-only) or runMigrations throws MISSING_MIGRATION_STEP against the new target
@@ -278,6 +278,8 @@ test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 16 and N
   registerMigration({ kind: "handoff", from: 13, to: 14, up: (i) => ({ ...i, schema_version: 14 }) });
   registerMigration({ kind: "handoff", from: 14, to: 15, up: (i) => ({ ...i, schema_version: 15 }) });
   registerMigration({ kind: "handoff", from: 15, to: 16, up: (i) => ({ ...i, schema_version: 16 }) });
+  // E435: v16 -> v17 drops the test-first marker and the qa round counters (mirrors schema/migrations-handoff.ts).
+  registerMigration({ kind: "handoff", from: 16, to: 17, up: ({ chain_path: _c, qa_round: _q, qa_rounds_total: _t, ...i }) => ({ ...i, schema_version: 17 }) });
 
   const v12Payload = {
     schema_version: 12,
@@ -288,18 +290,18 @@ test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 16 and N
     visual_rounds_total: 0,
   };
   const result = runMigrations("handoff", v12Payload);
-  assert.deepEqual(result.applied, [13, 14, 15, 16], "the v12->v13, v13->v14, AND v14->v15 steps run on a v12 fixture to reach CURRENT");
-  assert.equal(result.payload.schema_version, 16, "on-disk schema_version becomes CURRENT (16)");
+  assert.deepEqual(result.applied, [13, 14, 15, 16, 17], "every step from v12->v13 through v16->v17 runs on a v12 fixture to reach CURRENT");
+  assert.equal(result.payload.schema_version, 17, "on-disk schema_version becomes CURRENT (17)");
   assert.equal(result.payload.evidence_schema, undefined, "the v12->v13 migration MUST NOT seed evidence_schema (D1 — migration invents no pin for historical payloads)");
   assert.equal(result.payload.cut_approved_source, undefined, "the v13->v14 migration MUST NOT seed cut_approved_source (e114-cut-approval-inheritance — migration invents no claim for historical payloads)");
   assert.equal(result.payload.dispatch_mechanism, undefined, "the v14->v15 migration MUST NOT seed dispatch_mechanism (e123a-lane-layout-migration — migration invents no attestation for historical payloads)");
   // Lossless: sibling fields (including the OTHER counter trio) survive untouched.
   assert.equal(result.payload.active_feature, "ac2-v12-feat");
-  assert.equal(result.payload.qa_rounds_total, 4, "sibling counter untouched by the pure stamp-only step");
-  assert.equal(result.payload.review_rounds_total, 1);
+  assert.equal(result.payload.review_rounds_total, 1, "sibling counter untouched by the pure stamp-only step");
+  assert.equal("qa_rounds_total" in result.payload, false, "E435: the v16->v17 step drops qa_rounds_total");
 });
 
-test("AC2-2: a real v12 handoff file (via parseHandoff, real registry) migrates to v13 on disk with the pin absent — an absent field stays absent post-migration", () => {
+test("AC2-2 (E435): a real v12 handoff file (via parseHandoff, real registry) migrates to v13 on disk with the pin absent — an absent field stays absent post-migration", () => {
   const ws = mkWorkspace();
   writeRaw(
     ws,
@@ -324,7 +326,7 @@ visual_rounds_total: 0
 `,
   );
   const state = parseHandoff(ws);
-  assert.equal(state.schema_version ?? 16, 16, "sanity: server CURRENT (16) is what a v12 fixture migrates to");
+  assert.equal(state.schema_version ?? 17, 17, "sanity: server CURRENT (17, E435) is what a v12 fixture migrates to");
   assert.equal(state.evidence_schema, undefined, "an absent field stays absent post-migration (D1) — the v12->v13 step invents no pin");
 });
 
@@ -418,7 +420,7 @@ test("AC4-2: missing sections still reject under pin 2 — the pin only widens H
 // expected string, the file path checked, and the evidence-schema version
 // ============================================================================
 
-async function seedInProgress(ws, feature, lastAgent = "qa-engineer") {
+async function seedInProgress(ws, feature, lastAgent = "code-reviewer") {
   resetSession(ws);
   markStateRead(ws);
   await writeHandoffState({
@@ -441,7 +443,7 @@ async function seedInProgress(ws, feature, lastAgent = "qa-engineer") {
   forceSeedStamp(ws);
 }
 
-test("AC5-1: VISUAL_EVIDENCE_MISSING names the expected file path AND the evidence-schema version", async () => {
+test("AC5-1 (E435): on a code-reviewer PASS, VISUAL_EVIDENCE_MISSING names the expected file path AND the evidence-schema version", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "ac5-visual-missing-feat";
@@ -459,7 +461,7 @@ test("AC5-1: VISUAL_EVIDENCE_MISSING names the expected file path AND the eviden
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
     pending_notes: ["QA: T01 PASS"],
     qa_review: "no visual evidence file exists",
@@ -471,7 +473,7 @@ test("AC5-1: VISUAL_EVIDENCE_MISSING names the expected file path AND the eviden
   assert.match(text, /Evidence schema:\s*v2/, `envelope must name the evidence-schema version; got: ${text}`);
 });
 
-test("AC5-2: VISUAL_REPORT_INCOMPLETE names the missing section heading(s), the report file path, AND the evidence-schema version", async () => {
+test("AC5-2 (E435): on a code-reviewer PASS, VISUAL_REPORT_INCOMPLETE names the missing section heading(s), the report file path, AND the evidence-schema version", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "ac5-visual-incomplete-feat";
@@ -494,7 +496,7 @@ test("AC5-2: VISUAL_REPORT_INCOMPLETE names the missing section heading(s), the 
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
     pending_notes: ["QA: T01 PASS"],
     qa_review: "report is missing a required section",
@@ -507,7 +509,7 @@ test("AC5-2: VISUAL_REPORT_INCOMPLETE names the missing section heading(s), the 
   assert.match(text, /Evidence schema:\s*v2/, `envelope must name the evidence-schema version; got: ${text}`);
 });
 
-test("AC5-3: AC_EXECUTION_LOG_MISSING names the expected heading, the review file path(s) inspected, AND the evidence-schema version", async () => {
+test("AC5-3 (E435): on a code-reviewer PASS, AC_EXECUTION_LOG_MISSING names the expected heading, the review file path(s) inspected, AND the evidence-schema version", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   const feature = "ac5-ac-log-missing-feat";
@@ -533,7 +535,7 @@ test("AC5-3: AC_EXECUTION_LOG_MISSING names the expected heading, the review fil
     workspace_path: ws,
     active_feature: feature,
     status: "PASS",
-    agent_id: "qa-engineer",
+    agent_id: "code-reviewer",
     completed_tasks: ["T01"],
     pending_notes: ["QA: T01 PASS"],
     qa_review: "Looks good, no AC execution log written.",

@@ -75,12 +75,14 @@ test("t-const: HOP_CAP_EXPORTED === 14 (const-01 Limits `hop` cap)", () => {
 
 // ============================================================================
 // AC-1/DR-9: computeNewRound hop_count semantics (pure, isolated)
+// E435: computeNewRound(prev_review_round, prev_visual_round, next, prev, notes,
+// prev_hop_count, feature_changed) — the qa_round slot is gone with the counter.
 // ============================================================================
 
-test("t-compute-role-transition-increments: next.agent !== prev.agent bumps hop_count by 1", () => {
+test("t-compute-role-transition-increments: next.agent !== prev.agent bumps hop_count by 1 (E435)", () => {
   const result = computeNewRound(
-    0, 0, 0,
-    { agent: "sr-engineer", status: "In_Progress" },
+    0, 0,
+    { agent: "qa-engineer", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
     [],
     3, // prev_hop_count
@@ -89,12 +91,12 @@ test("t-compute-role-transition-increments: next.agent !== prev.agent bumps hop_
   assert.equal(result.hop_count, 4, "role transition increments hop_count by 1 from its prior value");
 });
 
-test("t-compute-first-write-counts: null prev.agent -> any next.agent is a counted role transition", () => {
+test("t-compute-first-write-counts: null prev.agent -> any next.agent is a counted role transition (E435)", () => {
   // WHY (DR-9): the very first write of a fresh workspace (prev.agent === null)
   // must count as a role transition too — a coordinator opening a brand-new
   // feature still consumes one hop.
   const result = computeNewRound(
-    0, 0, 0,
+    0, 0,
     { agent: "pm", status: "In_Progress" },
     undefined, // no prev tuple at all — mirrors a fresh workspace
     [],
@@ -104,9 +106,9 @@ test("t-compute-first-write-counts: null prev.agent -> any next.agent is a count
   assert.equal(result.hop_count, 1, "first write (prev.agent=null) counts as a role transition");
 });
 
-test("t-compute-self-loop-holds: same-agent In_Progress->In_Progress self-loop does NOT bump hop_count (DR-9)", () => {
+test("t-compute-self-loop-holds: same-agent In_Progress->In_Progress self-loop does NOT bump hop_count (DR-9, E435)", () => {
   const result = computeNewRound(
-    0, 0, 0,
+    0, 0,
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "sr-engineer", status: "In_Progress" },
     [],
@@ -116,14 +118,14 @@ test("t-compute-self-loop-holds: same-agent In_Progress->In_Progress self-loop d
   assert.equal(result.hop_count, 5, "self-loop is not a role transition — hop_count holds");
 });
 
-test("t-compute-same-agent-status-change-holds: same-agent status change (not a self-loop) also does NOT bump hop_count", () => {
-  // e.g. (qa-engineer, In_Progress) -> (qa-engineer, FAIL) — same agent,
-  // different status. DR-9's counted predicate keys ONLY on next.agent !==
-  // prev.agent, so this must hold too.
+test("t-compute-same-agent-status-change-holds: same-agent status change (not a self-loop) also does NOT bump hop_count (E435)", () => {
+  // e.g. (code-reviewer, In_Progress) -> (code-reviewer, FAIL) — the judge's
+  // own verdict write: same agent, different status. DR-9's counted predicate
+  // keys ONLY on next.agent !== prev.agent, so this must hold too.
   const result = computeNewRound(
-    1, 0, 0,
-    { agent: "qa-engineer", status: "FAIL" },
-    { agent: "qa-engineer", status: "In_Progress" },
+    1, 0,
+    { agent: "code-reviewer", status: "FAIL" },
+    { agent: "code-reviewer", status: "In_Progress" },
     [],
     7,
     false,
@@ -131,11 +133,12 @@ test("t-compute-same-agent-status-change-holds: same-agent status change (not a 
   assert.equal(result.hop_count, 7, "same-agent status change is not counted (DR-9)");
 });
 
-test("t-compute-feature-reset: feature_changed=true resets the base to 0 before the role-transition check (AC-3)", () => {
+test("t-compute-feature-reset: feature_changed=true resets the base to 0 before the role-transition check (AC-3, E435)", () => {
+  // The next feature opens from the judge's PASS (code-reviewer:PASS key).
   const result = computeNewRound(
-    0, 0, 0,
+    0, 0,
     { agent: "pm", status: "In_Progress" },
-    { agent: "qa-engineer", status: "PASS" },
+    { agent: "code-reviewer", status: "PASS" },
     [],
     9, // prior hop_count, must NOT survive the feature change
     true, // feature_changed
@@ -143,31 +146,31 @@ test("t-compute-feature-reset: feature_changed=true resets the base to 0 before 
   assert.equal(result.hop_count, 1, "feature change resets base to 0, then the role transition itself bumps to 1");
 });
 
-test("t-compute-pm-no-reset: (pm, In_Progress) landing does NOT reset hop_count — contrast with the three round caps (DR-6)", () => {
-  // WHY: this is the load-bearing asymmetry vs qa_round/review_round/
-  // visual_round, all of which zero on (pm, In_Progress). hop_count is a
+test("t-compute-pm-no-reset: (pm, In_Progress) landing does NOT reset hop_count — contrast with the two round caps (DR-6, E435)", () => {
+  // WHY: this is the load-bearing asymmetry vs review_round/visual_round,
+  // both of which zero on (pm, In_Progress). hop_count is a
   // session-length breaker: after HOP_CAP_EXCEEDED fires, the (pm,In_Progress)
   // landing records the halt WITHOUT clearing the counter — only an
   // active_feature change does that (AC-3).
   const result = computeNewRound(
-    4, 3, 2, // qa_round, review_round, visual_round — these DO reset on pm landing
+    3, 2, // review_round, visual_round — these DO reset on pm landing
     { agent: "pm", status: "In_Progress" },
-    { agent: "qa-engineer", status: "FAIL" },
+    { agent: "code-reviewer", status: "FAIL" },
     [],
     14, // already at cap
     false, // NOT a feature change
   );
-  assert.equal(result.qa_round, 0, "qa_round resets on pm landing (unchanged sibling behavior)");
+  assert.equal("qa_round" in result, false, "no qa_round counter since E435 (schema 17)");
   assert.equal(result.review_round, 0, "review_round resets on pm landing (unchanged sibling behavior)");
   assert.equal(result.visual_round, 0, "visual_round resets on pm landing (unchanged sibling behavior)");
   assert.equal(result.hop_count, 15, "hop_count does NOT reset on pm landing — it still increments (role transition) from 14 to 15");
 });
 
-test("t-compute-persists-across-many-non-role-writes: hop_count is stable across a long run of self-loops", () => {
+test("t-compute-persists-across-many-non-role-writes: hop_count is stable across a long run of self-loops (E435)", () => {
   let hop = 0;
   let prev = { agent: "sr-engineer", status: "In_Progress" };
   for (let i = 0; i < 50; i++) {
-    const r = computeNewRound(0, 0, 0, prev, prev, [], hop, false);
+    const r = computeNewRound(0, 0, prev, prev, [], hop, false);
     hop = r.hop_count;
   }
   assert.equal(hop, 0, "an unbroken run of self-loops must never advance hop_count");
@@ -181,7 +184,6 @@ test("t-gate-dormant-under-cap: hop_count < HOP_CAP is dormant for any accepted 
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 13,
@@ -194,7 +196,6 @@ test("t-gate-fires-at-cap: hop_count >= HOP_CAP on a role transition rejects wit
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 14,
@@ -215,7 +216,6 @@ test("t-gate-fires-above-cap: hop_count > HOP_CAP (migration/hand-edit case) sti
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 15,
@@ -229,7 +229,6 @@ test("t-gate-landing-escape: (pm, In_Progress) landing is accepted even at/over 
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "pm", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 14,
@@ -238,7 +237,7 @@ test("t-gate-landing-escape: (pm, In_Progress) landing is accepted even at/over 
   assert.equal(r, null, "the (pm, In_Progress) landing must be accepted at/over cap");
 });
 
-test("t-gate-landing-from-reviewer-and-qa (E295 AC2, E41): (pm, In_Progress) landing is accepted at the cap from code-reviewer/qa-engineer In_Progress, with no hop reset", () => {
+test("t-gate-landing-from-reviewer-and-qa (E295 AC2, E41, E435): (pm, In_Progress) landing is accepted at the cap from code-reviewer/qa-engineer In_Progress, with no hop reset", () => {
   // WHY: the cap's own landing edge must be reachable from every state, the same
   // `if (ok) return null` shape the three round caps use; before E295 the table
   // lookup rejected these two origins with TRANSITION_REJECTED at the cap.
@@ -246,7 +245,6 @@ test("t-gate-landing-from-reviewer-and-qa (E295 AC2, E41): (pm, In_Progress) lan
     const r = validateTransition({
       prev: { agent, status: "In_Progress" },
       next: { agent: "pm", status: "In_Progress" },
-      prev_qa_round: 0,
       prev_review_round: 0,
       prev_visual_round: 0,
       prev_hop_count: HOP_CAP_EXPORTED,
@@ -254,7 +252,7 @@ test("t-gate-landing-from-reviewer-and-qa (E295 AC2, E41): (pm, In_Progress) lan
     });
     assert.equal(r, null, `${agent}:In_Progress -> pm:In_Progress must be accepted at the cap`);
     const c = computeNewRound(
-      0, 0, 0,
+      0, 0,
       { agent, status: "In_Progress" },
       { agent: "pm", status: "In_Progress" },
       [],
@@ -263,10 +261,12 @@ test("t-gate-landing-from-reviewer-and-qa (E295 AC2, E41): (pm, In_Progress) lan
     );
     assert.equal(c.hop_count, HOP_CAP_EXPORTED + 1, "landing increments, never resets (DR-6)");
   }
+  // E435: the other role transition is the legal qa-engineer -> sr-engineer
+  // hand-off (code-reviewer -> qa-engineer is no longer an edge).
   const other = validateTransition({
-    prev: { agent: "code-reviewer", status: "In_Progress" },
-    next: { agent: "qa-engineer", status: "In_Progress" },
-    prev_qa_round: 0, prev_review_round: 0, prev_visual_round: 0,
+    prev: { agent: "qa-engineer", status: "In_Progress" },
+    next: { agent: "sr-engineer", status: "In_Progress" },
+    prev_review_round: 0, prev_visual_round: 0,
     prev_hop_count: HOP_CAP_EXPORTED, feature_changed: false,
   });
   assert.equal(other?.error, "HOP_CAP_EXCEEDED", "any other role transition stays rejected at the cap");
@@ -276,7 +276,6 @@ test("t-gate-self-loop-exempt: a same-agent self-loop is accepted even at/over c
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 14,
@@ -289,7 +288,6 @@ test("t-gate-feature-bypass: feature_changed=true bypasses the hop cap even when
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 20,
@@ -302,35 +300,35 @@ test("t-gate-omitted-defaults-dormant: omitting prev_hop_count/feature_changed e
   const r = validateTransition({
     prev: { agent: "sr-engineer", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
   });
   assert.equal(r, null, "callers that omit the hop-cap inputs entirely must not be blocked");
 });
 
 // ============================================================================
-// AC-8: hop-cap override runs AFTER the three round-cap overrides (precedence)
+// AC-8: hop-cap override runs AFTER the round-cap overrides (precedence).
+// E435: two round caps remain (review, visual); the qa round cap is gone.
 // ============================================================================
 
-test("t-precedence-qa-round-wins: prev_qa_round >= 4 AND prev_hop_count >= 14 simultaneously -> QA_ROUND_EXCEEDED fires, not HOP_CAP_EXCEEDED", () => {
-  const r = validateTransition({
-    prev: { agent: "qa-engineer", status: "FAIL" },
+test("t-precedence-review-round-wins (E435): prev_review_round >= 4 AND prev_hop_count >= 14 -> REVIEW_ROUND_EXCEEDED; a stale prev_qa_round=4 no longer outranks the hop cap", () => {
+  const base = {
+    prev: { agent: "code-reviewer", status: "FAIL" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 4,
-    prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 14,
     feature_changed: false,
-  });
-  assert.ok(r);
-  assert.equal(r.error, "QA_ROUND_EXCEEDED", "the qa_round override must win precedence over the hop-cap override");
+  };
+  const review = validateTransition({ ...base, prev_review_round: 4 });
+  assert.equal(review?.error, "REVIEW_ROUND_EXCEEDED", "the review_round override must win precedence over the hop-cap override");
+  // A stale qa counter from a pre-v5 handoff is ignored: the hop cap is the first cap left to fire.
+  const staleQa = validateTransition({ ...base, prev_review_round: 0, prev_qa_round: 4 });
+  assert.equal(staleQa?.error, "HOP_CAP_EXCEEDED", "QA_ROUND_EXCEEDED is gone (E435 OQ (a))");
 });
 
 test("t-precedence-visual-round-wins: prev_visual_round >= 6 AND prev_hop_count >= 14 simultaneously -> VISUAL_ROUND_EXCEEDED fires first", () => {
   const r = validateTransition({
     prev: { agent: "qa-engineer", status: "FAIL" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 6,
     prev_hop_count: 14,
@@ -340,66 +338,64 @@ test("t-precedence-visual-round-wins: prev_visual_round >= 6 AND prev_hop_count 
   assert.equal(r.error, "VISUAL_ROUND_EXCEEDED");
 });
 
-test("t-precedence-existing-round-caps-untouched: round-cap-only scenarios (hop dormant) still behave byte-identically", () => {
+test("t-precedence-existing-round-caps-untouched (E435): round-cap-only scenarios (hop dormant) — the review cap still fires, a stale qa counter caps nothing", () => {
   // Regression guard for AC-8: with hop_count comfortably under cap, the
-  // pre-existing round-cap behavior must be exactly what it was before this
-  // feature shipped.
-  const r = validateTransition({
-    prev: { agent: "qa-engineer", status: "FAIL" },
+  // remaining round-cap behavior is what it was before this feature shipped;
+  // the qa round cap went with E435.
+  const base = {
+    prev: { agent: "code-reviewer", status: "FAIL" },
     next: { agent: "sr-engineer", status: "In_Progress" },
-    prev_qa_round: 4,
-    prev_review_round: 0,
     prev_visual_round: 0,
     prev_hop_count: 0,
-  });
-  assert.ok(r);
-  assert.equal(r.error, "QA_ROUND_EXCEEDED");
+  };
+  assert.equal(validateTransition({ ...base, prev_review_round: 4 })?.error, "REVIEW_ROUND_EXCEEDED");
+  assert.equal(validateTransition({ ...base, prev_review_round: 0, prev_qa_round: 4 }), null);
 });
 
 // ============================================================================
 // AC-1/AC-2/AC-3/DR-6: end-to-end through the real tw_update_state orchestrator
-// The climb bounces pm <-> sr-engineer (both real ALLOWED_TRANSITIONS rows), so every write is a counted role
-// transition and none touches a round counter. Every pm write carries cut_approved: true because the build-entry
+// The climb bounces pm <-> architect (both real ALLOWED_TRANSITIONS rows; E435 removed pm -> sr-engineer), so every
+// write is a counted role transition and none touches a round counter. Every pm write carries cut_approved: true because the build-entry
 // gates key on the previous pm write's attestation, which a bare PM re-entry re-arms.
 // ============================================================================
 
 // Drives hop_count from a fresh workspace up to exactly HOP_CAP_EXPORTED via
-// the pm<->sr-engineer bounce. Returns the final parsed state (last_agent is
-// always "sr-engineer" when HOP_CAP_EXPORTED is even, matching the current
+// the pm<->architect bounce. Returns the final parsed state (last_agent is
+// always "architect" when HOP_CAP_EXPORTED is even, matching the current
 // cap=14 — the seed write is agent=pm=hop 1, then each further bounce write
 // alternates and increments by exactly 1).
 async function climbToHopCap(ws, feature) {
   let res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "pm", cut_approved: true });
   if (res.isError) throw new Error(`seed write failed: ${res.content?.[0]?.text}`);
   let state = parseHandoff(ws);
-  let nextAgent = "sr-engineer";
+  let nextAgent = "architect";
   while (state.hop_count < HOP_CAP_EXPORTED) {
     const args = { active_feature: feature, status: "In_Progress", agent_id: nextAgent };
     if (nextAgent === "pm") args.cut_approved = true;
     res = await dispatch(ws, args);
     if (res.isError) throw new Error(`climb write (agent=${nextAgent}) failed: ${res.content?.[0]?.text}`);
     state = parseHandoff(ws);
-    nextAgent = nextAgent === "pm" ? "sr-engineer" : "pm";
+    nextAgent = nextAgent === "pm" ? "architect" : "pm";
   }
   return state;
 }
 
-test("t-e2e-accumulate-and-cap-fires: successive pm<->sr-engineer role-transition writes climb hop_count 1..HOP_CAP; the next counted transition is rejected", async () => {
+test("t-e2e-accumulate-and-cap-fires: successive pm<->architect role-transition writes climb hop_count 1..HOP_CAP; the next counted transition is rejected", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("hope2e-");
 
   const atCap = await climbToHopCap(ws, "hop-e2e-feat");
   assert.equal(atCap.hop_count, HOP_CAP_EXPORTED, "the climb must land exactly at HOP_CAP_EXPORTED");
-  assert.equal(atCap.last_agent, "sr-engineer", "the climb's final write is the sr-engineer leg of the bounce");
+  assert.equal(atCap.last_agent, "architect", "the climb's final write is the architect leg of the bounce");
 
-  // The next counted role transition (any agent other than sr-engineer or
+  // The next counted role transition (any agent other than architect or
   // the pm landing) must now be rejected.
   const rejected = await dispatch(ws, { active_feature: "hop-e2e-feat", status: "In_Progress", agent_id: "code-reviewer" });
   assert.ok(rejected.isError, "the next role transition past the cap must be rejected");
   assert.match(rejected.content[0].text, /HOP_CAP_EXCEEDED/);
 
   // Only the (pm, In_Progress) landing may proceed (it is also a legal
-  // ALLOWED_TRANSITIONS edge from sr-engineer:In_Progress).
+  // ALLOWED_TRANSITIONS edge from architect:In_Progress).
   const landing = await dispatch(ws, { active_feature: "hop-e2e-feat", status: "In_Progress", agent_id: "pm", cut_approved: true });
   assert.ok(!landing.isError, `the (pm, In_Progress) landing must be accepted: ${landing.content?.[0]?.text}`);
 });
@@ -411,7 +407,7 @@ test("t-e2e-landing-no-reset: the (pm, In_Progress) landing after HOP_CAP_EXCEED
   const atCap = await climbToHopCap(ws, "hop-land-feat");
   assert.equal(atCap.hop_count, HOP_CAP_EXPORTED, "precondition: hop_count is at cap");
 
-  // Land at pm (accepted — legal edge from sr-engineer:In_Progress — but per
+  // Land at pm (accepted — legal edge from architect:In_Progress — but per
   // DR-6 must NOT reset the counter).
   const landing = await dispatch(ws, { active_feature: "hop-land-feat", status: "In_Progress", agent_id: "pm", cut_approved: true });
   assert.ok(!landing.isError, `pm landing must be accepted: ${landing.content?.[0]?.text}`);
@@ -419,7 +415,7 @@ test("t-e2e-landing-no-reset: the (pm, In_Progress) landing after HOP_CAP_EXCEED
   assert.ok(afterLanding.hop_count >= HOP_CAP_EXPORTED, `hop_count must NOT reset on the pm landing (DR-6); got ${afterLanding.hop_count}`);
 
   // The very next non-pm role transition (same feature) must be rejected again.
-  const stillBlocked = await dispatch(ws, { active_feature: "hop-land-feat", status: "In_Progress", agent_id: "sr-engineer" });
+  const stillBlocked = await dispatch(ws, { active_feature: "hop-land-feat", status: "In_Progress", agent_id: "architect" });
   assert.ok(stillBlocked.isError, "autonomous dispatch must stay frozen at pm — the next non-pm transition is rejected again");
   assert.match(stillBlocked.content[0].text, /HOP_CAP_EXCEEDED/);
 });
@@ -438,7 +434,7 @@ test("t-e2e-feature-reset: an active_feature change resets hop_count to a fresh 
   // overwrite (see helper comment above).
   backdateLastUpdated(ws, 31);
 
-  // A NEW active_feature write on a legal edge from sr-engineer:In_Progress
+  // A NEW active_feature write on a legal edge from architect:In_Progress
   // (pm:In_Progress) must reset the counter — feature_changed bypasses the
   // hop-cap block entirely, and computeNewRound resets the base to 0 before
   // this write's own role transition bumps it to 1.
@@ -450,7 +446,7 @@ test("t-e2e-feature-reset: an active_feature change resets hop_count to a fresh 
 
   // Autonomous dispatch is un-frozen: a subsequent role transition on the new
   // feature must be accepted (not HOP_CAP_EXCEEDED).
-  const unfrozen = await dispatch(ws, { active_feature: "hop-reset-feat-b", status: "In_Progress", agent_id: "sr-engineer" });
+  const unfrozen = await dispatch(ws, { active_feature: "hop-reset-feat-b", status: "In_Progress", agent_id: "architect" });
   assert.ok(!unfrozen.isError, `dispatch must be un-frozen on the new feature: ${unfrozen.content?.[0]?.text}`);
   assert.equal(parseHandoff(ws).hop_count, 2, "counting resumes normally on the new feature");
 });
@@ -465,10 +461,11 @@ test("t-crash-file: a fresh parseHandoff/tw_get_state read (new session snapshot
   const ws = mkWs("hopcrash-");
 
   // cut_approved:true on the pm seed clears the file-mode CUT_APPROVAL_REQUIRED
-  // gate for the pm -> architect build-entry edge that follows.
+  // gate for the pm -> architect build-entry edge that follows. E435: the third
+  // write is the architect -> pm return (architect -> sr-engineer is no longer an edge).
   await dispatch(ws, { active_feature: "crash-feat", status: "In_Progress", agent_id: "pm", cut_approved: true });
   await dispatch(ws, { active_feature: "crash-feat", status: "In_Progress", agent_id: "architect" });
-  await dispatch(ws, { active_feature: "crash-feat", status: "In_Progress", agent_id: "sr-engineer" });
+  await dispatch(ws, { active_feature: "crash-feat", status: "In_Progress", agent_id: "pm", cut_approved: true });
   const before = parseHandoff(ws);
   assert.equal(before.hop_count, 3, "precondition: 3 role transitions recorded before the simulated crash");
 
@@ -488,7 +485,7 @@ test("t-crash-file: a fresh parseHandoff/tw_get_state read (new session snapshot
     workspace_path: ws,
     active_feature: "crash-feat",
     status: "In_Progress",
-    agent_id: "code-reviewer",
+    agent_id: "architect",
     completed_tasks: [],
     pending_notes: [],
   });

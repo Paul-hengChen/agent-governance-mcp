@@ -55,7 +55,9 @@ export interface HandoffStorage {
     pendingNotes: string[],
     blockingReason?: string,
     lastAgent?: string,
-    qaRound?: number,
+    // Ignored since handoff schema v17 (E435); the slot stays so the later
+    // positionals do not shift.
+    _qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
     visualRound?: number,
@@ -128,7 +130,9 @@ export class FileHandoffStorage implements HandoffStorage {
     pendingNotes: string[],
     blockingReason?: string,
     lastAgent?: string,
-    qaRound?: number,
+    // Ignored since handoff schema v17 (E435); the slot stays so the later
+    // positionals do not shift.
+    _qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
     visualRound?: number,
@@ -141,7 +145,9 @@ export class FileHandoffStorage implements HandoffStorage {
     pendingNotes?: string[],
     blockingReason?: string,
     lastAgent?: string,
-    qaRound?: number,
+    // Ignored since handoff schema v17 (E435); the slot stays so the later
+    // positionals do not shift.
+    _qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
     visualRound?: number,
@@ -161,7 +167,6 @@ export class FileHandoffStorage implements HandoffStorage {
       pendingNotes: pendingNotes ?? [],
       blockingReason,
       lastAgent,
-      qaRound,
       prdPath,
       reviewRound,
       visualRound,

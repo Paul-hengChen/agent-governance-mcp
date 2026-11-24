@@ -55,9 +55,10 @@ test("AC1: pm:In_Progress amendment on the same feature omitting cut_approved ke
 
 // ---- AC2 (handler-level incident sequence) --------------------------------
 
-test("AC2: incident sequence (pm approve, pm dispatch_pins-only amendment, sr-engineer) is NOT rejected CUT_APPROVAL_REQUIRED", async () => {
+test("AC2: incident sequence (pm approve, pm dispatch_pins-only amendment, qa-engineer build entry) is NOT rejected CUT_APPROVAL_REQUIRED", async () => {
   // WHY: replays the E230 incident through the real pipeline: persisting dispatch_pins on the
-  // approved tuple must not re-arm the gate for the next build-entry hop.
+  // approved tuple must not re-arm the gate for the next build-entry hop. E435: the build entry
+  // is pm -> qa-engineer (the pm -> sr-engineer edge is removed).
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs();
   await write(ws, { lastAgent: "pm", cutApproved: true });
@@ -72,26 +73,26 @@ test("AC2: incident sequence (pm approve, pm dispatch_pins-only amendment, sr-en
     completed_tasks: [],
     pending_notes: ["pm: persisting dispatch pins"],
     scope_decision: "single-feature",
-    dispatch_pins: { "sr-engineer": "opus" },
+    dispatch_pins: { "qa-engineer": "opus" },
   });
   assert.ok(!amend.isError, `pm amendment must succeed: ${amend.content?.[0]?.text}`);
   forceSeedStamp(ws);
   const mid = parseHandoff(ws);
   assert.equal(mid.cut_approved, true, "amendment must keep cut_approved");
-  assert.deepEqual(mid.dispatch_pins, { "sr-engineer": "opus" });
+  assert.deepEqual(mid.dispatch_pins, { "qa-engineer": "opus" });
 
   resetSession(ws);
   markStateRead(ws);
-  const sr = await handleUpdateState({
+  const qa = await handleUpdateState({
     workspace_path: ws,
     active_feature: FEATURE,
     status: "In_Progress",
-    agent_id: "sr-engineer",
+    agent_id: "qa-engineer",
     completed_tasks: [],
-    pending_notes: ["sr-engineer: starting"],
+    pending_notes: ["qa-engineer: writing tests"],
   });
-  const text = sr.content?.[0]?.text ?? "";
-  assert.ok(!sr.isError, `sr-engineer build entry must not be rejected: ${text}`);
+  const text = qa.content?.[0]?.text ?? "";
+  assert.ok(!qa.isError, `qa-engineer build entry must not be rejected: ${text}`);
   assert.ok(!text.includes("CUT_APPROVAL_REQUIRED"));
 });
 

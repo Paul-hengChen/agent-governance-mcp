@@ -128,6 +128,10 @@ const FROZEN_PATHS = ["tools/transitions.ts", "CLAUDE.md", "schema", "prompts"];
 const BASE_DIST_OTHER_BLOBS = "67ebb84f3381e4790c733a272386c66113098837cc56915740251e640aecb242";
 const DIST_ALLOWED = /^dist\/(gates\/registry|gates\/visual|tools\/evidence-file|tools\/handoff-orchestrator)\./;
 const BASE_CURRENT_VERSIONS = { handoff: 16, tasks: 2, sqlite: 2, config: 2 };
+// E435 (specs/e435-remove-old-path.md) later removed two ledger gates (35 -> 33) and bumped handoff 16 -> 17.
+// E434 moved neither; the live pins carry E435's values, and E434's own "unchanged" half is the closed
+// LANE_END_SHA range below, which still reads E434's end commit.
+const E435_CURRENT_VERSIONS = { ...BASE_CURRENT_VERSIONS, handoff: 17 };
 
 // null while the lane builds: the digest checks read the live tree. T-E434-08 sets it to the lane's last
 // content commit, after which they read that fixed commit (closed range) and skip loudly if it is unreachable.
@@ -653,7 +657,7 @@ test("AC9: (a) a visual code-reviewer rejection counts in review_round and visua
 
 // ================================================================== AC10
 
-test("AC10: GATE_REGISTRY — three visual hints renamed, VISUAL_ROUND_EXCEEDED documentedInProse false with mapping.vround, mapping rows name skill-reviewer-visual.md and match the quote sites, field comment, 35 entries, 17 steps, every other field frozen (D21)", async (t) => {
+test("AC10: GATE_REGISTRY — three visual hints renamed, VISUAL_ROUND_EXCEEDED documentedInProse false with mapping.vround, mapping rows name skill-reviewer-visual.md and match the quote sites, field comment, 33 entries (E435), 17 steps, every other field frozen (D21)", async (t) => {
   const live = Object.fromEntries(GATE_REGISTRY.map((g) => [g.errorCode, g]));
   assert.equal(live.VISUAL_EVIDENCE_MISSING.hintStatic, COPY.hintVisualEvidence, "hint.visual_evidence");
   assert.equal(
@@ -680,7 +684,16 @@ test("AC10: GATE_REGISTRY — three visual hints renamed, VISUAL_ROUND_EXCEEDED 
   const mapLines = src.slice(header, endAt).split("\n");
   assert.equal(mapLines.filter((l) => l === COPY.mappingVround).length, 1, "mapping.vround row present once");
   const rows = new Map(mapLines.map((l) => /^\/\/   ([A-Z_]+)\s+(.+)$/.exec(l)).filter(Boolean).map((m) => [m[1], m[2].trim()]));
-  assert.equal(rows.size, 35, "one mapping row per code");
+  assert.equal(rows.size, 33, "one mapping row per code (E435: 33)");
+  assert.equal(rows.get("NON_JUDGE_COMPLETED_TASKS_REJECTED"), "const-08-chain-31-mid.md", "E435: NON_JUDGE row names const-08");
+  assert.deepEqual(
+    [...rows.keys()].slice([...rows.keys()].indexOf("REVIEW_VERDICT_STATUS_MISMATCH"), [...rows.keys()].indexOf("REVIEW_VERDICT_STATUS_MISMATCH") + 2),
+    ["REVIEW_VERDICT_STATUS_MISMATCH", "NON_JUDGE_COMPLETED_TASKS_REJECTED"],
+    "E435: the NON_JUDGE row sits directly after REVIEW_VERDICT_STATUS_MISMATCH",
+  );
+  for (const gone of ["QA_ROUND_EXCEEDED", "REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"]) {
+    assert.ok(!rows.has(gone), `E435: no mapping row for the removed ${gone}`);
+  }
   assert.ok(![...rows.values()].some((v) => v.includes("skill-qa-visual.md")), "no mapping row names skill-qa-visual.md");
   for (const code of BASE_QA_VISUAL_MAPPED) {
     assert.ok(rows.get(code).split(", ").includes("skill-reviewer-visual.md"), `${code} mapping row names skill-reviewer-visual.md`);
@@ -700,11 +713,17 @@ test("AC10: GATE_REGISTRY — three visual hints renamed, VISUAL_ROUND_EXCEEDED 
   const commentLines = [];
   for (let i = fieldLine - 1; i >= 0 && /^\s*\/\//.test(srcLines[i]); i--) commentLines.unshift(srcLines[i].replace(/^\s*\/\/\s?/, ""));
   const comment = commentLines.join(" ").replace(/\s+/g, " ");
-  assert.ok(comment.includes(COPY.registryFieldComment), `field comment states registry.field_comment: ${comment}`);
+  // E435 re-pin: the old-path clause of COPY.registryFieldComment is gone; the architecture
+  // gives the new reason as a quoted fragment, so the claim and the reason are pinned apart.
+  const E435_FIELD_CLAIM = "Every entry is true except VISUAL_ROUND_EXCEEDED";
+  const E435_FIELD_REASON = "nothing emits it since E435: its counter ticks only on a qa-engineer FAIL; E420 owns the visual family";
+  assert.ok(comment.includes(E435_FIELD_CLAIM), `field comment states the claim: ${comment}`);
+  assert.ok(comment.includes(E435_FIELD_REASON), `field comment states the E435 reason: ${comment}`);
+  assert.ok(!comment.includes("only the old path still emits"), "the old-path reason is gone");
   const firstClaim = comment.indexOf("Every entry is true");
-  assert.equal(firstClaim, comment.indexOf(COPY.registryFieldComment), "the first 'Every entry is true' claim is the new one");
+  assert.equal(firstClaim, comment.indexOf(E435_FIELD_CLAIM), "the first 'Every entry is true' claim is the VISUAL_ROUND_EXCEEDED one");
 
-  assert.equal(GATE_REGISTRY.length, 35, "35 entries");
+  assert.equal(GATE_REGISTRY.length, 33, "33 entries (E435)");
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17, "17 pipeline steps");
 
   // D21: every other field of every entry equals base (the compiled registry at LANE_END_SHA once it is set).
@@ -744,10 +763,10 @@ test("AC11: docs/config.md override list + config.migration directly under it; R
 
 // ================================================================== AC13
 
-test("AC13: 35 gates, 17 steps, CURRENT_VERSIONS unchanged; transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged; agc check exits 0", (t) => {
-  assert.equal(GATE_REGISTRY.length, 35);
+test("AC13: 33 gates (E435), 17 steps, CURRENT_VERSIONS = E435's (handoff 17); transitions / schema / prompts / CLAUDE.md byte-identical to base; dist outside the four rebuilt groups unchanged; agc check exits 0", (t) => {
+  assert.equal(GATE_REGISTRY.length, 33, "E435 removed two ledger gates");
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17);
-  assert.deepEqual({ ...CURRENT_VERSIONS }, BASE_CURRENT_VERSIONS, "no schema version moved");
+  assert.deepEqual({ ...CURRENT_VERSIONS }, E435_CURRENT_VERSIONS, "only E435's handoff 16 -> 17 moved since E434's base");
   const agc = spawnSync(process.execPath, [path.join(ROOT, "bin", "agc-init.mjs"), "check"], { cwd: ROOT, encoding: "utf-8" });
   assert.equal(agc.status, 0, `agc check exits 0: ${agc.stdout}${agc.stderr}`);
 

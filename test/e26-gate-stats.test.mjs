@@ -53,34 +53,36 @@ function metricRecord({
   ts = "2026-07-16T00:00:00.000Z",
   feature,
   tickets = 3,
-  qa_rounds = 0,
+  qa_rounds, // E435: new records carry no qa_rounds; pass it only to model a historical record
   review_rounds = 0,
   visual_rounds = 0,
   hops = 4,
   one_pass = true,
   released_version = "3.88.0",
 }) {
-  return { ts, feature, tickets, qa_rounds, review_rounds, visual_rounds, hops, one_pass, released_version };
+  const rec = { ts, feature, tickets, review_rounds, visual_rounds, hops, one_pass, released_version };
+  return qa_rounds === undefined ? rec : { ...rec, qa_rounds };
 }
 
 // ============================================================================
 // R1-R3 — every GATE_REGISTRY code is covered by the report (T-E26-01)
 // ============================================================================
 
-// The hardcoded "35" below is the current size of GATE_REGISTRY. The report
+// The hardcoded "33" below is the current size of GATE_REGISTRY. The report
 // sums to the registry length by construction (tools/gate-stats.ts iterates
 // GATE_REGISTRY, not a fixed list), so when a gate is added this number
 // moves with it; the coverage contract itself does not change. The last
-// addition was SR_RETURN_CAP_EXCEEDED (E431); before it NON_REVIEWER_VERDICT_REJECTED (E139); before it DISPATCH_PIN_TIER_REJECTED (E300, T-E300-04); before it NON_QA_COMPLETED_TASKS_REJECTED. (E40, T-E40-03)
-test("R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 35", () => {
+// change was E435 (35 -> 33): QA_ROUND_EXCEEDED, REVIEWER_COMPLETED_TASKS_REJECTED and
+// NON_QA_COMPLETED_TASKS_REJECTED removed, NON_JUDGE_COMPLETED_TASKS_REJECTED added.
+test("R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 33", () => {
   const ws = mkWorkspace();
   const report = computeGateStats(ws);
-  assert.equal(GATE_REGISTRY.length, 35, "sanity: registry is 35 entries as of this ticket");
+  assert.equal(GATE_REGISTRY.length, 33, "sanity: registry is 33 entries as of this ticket");
   assert.equal(report.fired.length, 0);
-  assert.equal(report.zero_fire.length, 35);
+  assert.equal(report.zero_fire.length, 33);
 });
 
-test("R2: fired.length + zero_fire.length === 35 always, and the two sets are disjoint (no code counted twice)", () => {
+test("R2: fired.length + zero_fire.length === 33 always, and the two sets are disjoint (no code counted twice)", () => {
   const ws = mkWorkspace();
   writeLines(telemetryPath(ws), [
     telemetryEvent({ ts: "2026-07-16T01:00:00.000Z", error_code: "TRANSITION_REJECTED" }),
@@ -88,7 +90,7 @@ test("R2: fired.length + zero_fire.length === 35 always, and the two sets are di
     telemetryEvent({ ts: "2026-07-16T01:00:02.000Z", error_code: "FEATURE_LEASE_HELD" }),
   ]);
   const report = computeGateStats(ws);
-  assert.equal(report.fired.length + report.zero_fire.length, 35, "coverage must sum to the full registry every time");
+  assert.equal(report.fired.length + report.zero_fire.length, 33, "coverage must sum to the full registry every time");
   const firedCodes = new Set(report.fired.map((f) => f.error_code));
   const zeroCodes = new Set(report.zero_fire);
   assert.equal(firedCodes.size, report.fired.length, "no duplicate codes within fired");
@@ -198,7 +200,7 @@ test("F5: by_feature / by_agent / first_ts / last_ts accumulate correctly across
 // U1 — unregistered-code bucket
 // ============================================================================
 
-test("U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 35/35 coverage", () => {
+test("U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 33/33 coverage", () => {
   const ws = mkWorkspace();
   writeLines(telemetryPath(ws), [
     telemetryEvent({ ts: "2026-07-16T01:00:00.000Z", error_code: "SOME_RETIRED_CODE_NO_LONGER_IN_REGISTRY", feature: "old-feat" }),
@@ -211,7 +213,20 @@ test("U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered
   assert.equal(report.unregistered[0].category, "unregistered");
   assert.ok(!report.zero_fire.includes("SOME_RETIRED_CODE_NO_LONGER_IN_REGISTRY"));
   assert.ok(!report.fired.some((f) => f.error_code === "SOME_RETIRED_CODE_NO_LONGER_IN_REGISTRY"));
-  assert.equal(report.fired.length + report.zero_fire.length, 35, "an unregistered code must not perturb full-registry coverage");
+  assert.equal(report.fired.length + report.zero_fire.length, 33, "an unregistered code must not perturb full-registry coverage");
+});
+
+test("U2 (E435): historical telemetry naming the three removed codes lands in `unregistered`; NON_JUDGE_COMPLETED_TASKS_REJECTED is a registered fire", () => {
+  const ws = mkWorkspace();
+  const removed = ["QA_ROUND_EXCEEDED", "REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"];
+  writeLines(telemetryPath(ws), [
+    ...removed.map((c, i) => telemetryEvent({ ts: `2026-07-16T01:00:0${i}.000Z`, error_code: c })),
+    telemetryEvent({ ts: "2026-07-16T01:00:05.000Z", error_code: "NON_JUDGE_COMPLETED_TASKS_REJECTED" }),
+  ]);
+  const report = computeGateStats(ws);
+  assert.deepEqual(report.unregistered.map((u) => u.error_code).sort(), [...removed].sort());
+  assert.deepEqual(report.fired.map((f) => f.error_code), ["NON_JUDGE_COMPLETED_TASKS_REJECTED"]);
+  assert.equal(report.fired.length + report.zero_fire.length, 33);
 });
 
 // ============================================================================
@@ -317,7 +332,7 @@ test("M4: an unreadable (permission-denied) sidecar never throws — degrades to
 // D1-D2 — missing-sidecar degradation
 // ============================================================================
 
-test("D1: both sidecars absent -> never throws, full 35-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths", () => {
+test("D1: both sidecars absent -> never throws, full 33-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths", () => {
   const ws = mkWorkspace();
   let report;
   assert.doesNotThrow(() => {
@@ -326,7 +341,7 @@ test("D1: both sidecars absent -> never throws, full 35-code zero_fire coverage,
   assert.equal(report.telemetry.exists, false);
   assert.equal(report.metrics.exists, false);
   assert.equal(report.fired.length, 0);
-  assert.equal(report.zero_fire.length, 35, "coverage must hold even with zero telemetry data — a young workspace is not an error");
+  assert.equal(report.zero_fire.length, 33, "coverage must hold even with zero telemetry data — a young workspace is not an error");
   assert.equal(report.metrics.features, 0);
   assert.equal(report.metrics.one_pass_rate, null, "no fake 0% when there is no data");
   assert.ok(report.caveats.some((c) => c.includes("No telemetry yet") && c.includes(telemetryPath(ws))));
@@ -340,7 +355,7 @@ test("D2: only metrics.jsonl present (telemetry absent) -> telemetry side degrad
   assert.equal(report.telemetry.exists, false);
   assert.equal(report.metrics.exists, true);
   assert.equal(report.metrics.features, 1);
-  assert.equal(report.zero_fire.length, 35);
+  assert.equal(report.zero_fire.length, 33);
   assert.ok(report.caveats.some((c) => c.includes("No telemetry yet")));
   assert.ok(!report.caveats.some((c) => c.includes("No metrics yet")), "metrics caveat must not fire when the sidecar is present");
 });
@@ -392,25 +407,27 @@ test("DE4: one_pass is strict-boolean-true only — a truthy non-boolean value (
   assert.equal(report.metrics.one_pass_rate, 0);
 });
 
-test("DE5: mean_* and one_pass_rate are null (not 0 or NaN) when zero features exist; populated correctly otherwise", () => {
+test("DE5 (E435): mean_* and one_pass_rate are null (not 0 or NaN) when zero features exist; populated correctly otherwise; mean_qa_rounds is gone and a historical record's qa_rounds is ignored", () => {
   const wsEmpty = mkWorkspace();
   const emptyReport = computeGateStats(wsEmpty);
   assert.equal(emptyReport.metrics.one_pass_rate, null);
-  assert.equal(emptyReport.metrics.mean_qa_rounds, null);
+  assert.ok(!("mean_qa_rounds" in emptyReport.metrics), "mean_qa_rounds dropped (ruling (a))");
   assert.equal(emptyReport.metrics.mean_review_rounds, null);
   assert.equal(emptyReport.metrics.mean_visual_rounds, null);
   assert.equal(emptyReport.metrics.mean_hops, null);
 
   const ws = mkWorkspace();
   writeLines(metricsPath(ws), [
-    metricRecord({ feature: "f1", qa_rounds: 0, review_rounds: 0, visual_rounds: 0, hops: 4, one_pass: true, released_version: "1.0.0" }),
+    metricRecord({ feature: "f1", review_rounds: 0, visual_rounds: 0, hops: 4, one_pass: true, released_version: "1.0.0" }),
+    // a pre-E435 record still carrying qa_rounds: read, but the field is ignored
     metricRecord({ feature: "f2", qa_rounds: 2, review_rounds: 1, visual_rounds: 0, hops: 8, one_pass: false, released_version: "1.0.1" }),
   ]);
   const report = computeGateStats(ws);
   assert.equal(report.metrics.features, 2);
   assert.equal(report.metrics.one_pass_count, 1);
   assert.equal(report.metrics.one_pass_rate, 0.5);
-  assert.equal(report.metrics.mean_qa_rounds, 1);
+  assert.ok(!("mean_qa_rounds" in report.metrics), "mean_qa_rounds dropped (ruling (a))");
+  assert.ok(!JSON.stringify(report.metrics).includes("qa_rounds"), "no qa_rounds key anywhere in the metrics output");
   assert.equal(report.metrics.mean_review_rounds, 0.5);
   assert.equal(report.metrics.mean_visual_rounds, 0);
   assert.equal(report.metrics.mean_hops, 6);
@@ -653,5 +670,5 @@ test("T3b: handleGateStats never throws even against a workspace with no .curren
     result = await handleGateStats({ workspace_path: bareWs });
   });
   const parsed = JSON.parse(result.content[0].text);
-  assert.equal(parsed.zero_fire.length, 35);
+  assert.equal(parsed.zero_fire.length, 33);
 });

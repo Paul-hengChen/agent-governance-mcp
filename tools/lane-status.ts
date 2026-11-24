@@ -15,8 +15,8 @@ import type { LaneInfo, LaneListProvider, LaneListResult } from "./feature-rollu
 import { laneRegistryList } from "./lane-registry.js";
 import { parseHandoff } from "./handoff-parse.js";
 import type { HandoffState } from "./handoff-types.js";
-import { HOP_CAP_EXPORTED, ROUND_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED } from "./transitions.js";
-import { decodeEvidenceId, parseCoversIds, resolveJudgeReport, JUDGE_IDENTITIES } from "./evidence-file.js";
+import { HOP_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED } from "./transitions.js";
+import { decodeEvidenceId, parseCoversIds, resolveJudgeReport, REPORT_SIGNERS } from "./evidence-file.js";
 // Only these tools/lane-paths.ts helpers, never lane-paths' resolver
 // functions: those have pinned caller allow-lists in test/lane-paths.test.mjs.
 import { LEGACY_LANE, PRIMARY_LANE, isSafeLaneName, laneFile, resolveLaneName } from "./lane-paths.js";
@@ -79,7 +79,6 @@ export interface LaneStatusRow {
   lastUpdated: string | null;
   hopCount: number | null;
   reviewRound: number | null;
-  qaRound: number | null;
   /** completed_tasks from the handoff; [] when unreadable. */
   completedTasks: string[];
   commits: LaneCommits;
@@ -142,8 +141,8 @@ export interface ComputeLaneStatusOptions {
 
 /** One cap comparison. `capName` is the REAL exported constant name. */
 export interface CapCheck {
-  metric: "hop" | "review_round" | "qa_round";
-  capName: "HOP_CAP_EXPORTED" | "REVIEW_ROUND_CAP_EXPORTED" | "ROUND_CAP_EXPORTED";
+  metric: "hop" | "review_round";
+  capName: "HOP_CAP_EXPORTED" | "REVIEW_ROUND_CAP_EXPORTED";
   cap: number;
   value: number;
   over: boolean;
@@ -154,7 +153,6 @@ export interface RollupTotals {
   tickets: number;
   hop: number;
   reviewRounds: number;
-  qaRounds: number;
 }
 
 export interface SameFeatureRollup {
@@ -164,7 +162,7 @@ export interface SameFeatureRollup {
   matchingLanes: LaneStatusRow[];
   /** Every lane in the report, for context. */
   allLanes: LaneStatusRow[];
-  /** tickets/hop from computeFeatureRollup; review/qa rounds summed here. */
+  /** tickets/hop from computeFeatureRollup; review rounds summed here. */
   totals: RollupTotals;
   capChecks: CapCheck[];
   evidenceMismatches: LaneStatusRow[];
@@ -209,10 +207,10 @@ export function featureTicketToken(activeFeature: string | null): string | null 
 const FEAT_BRANCH_PREFIX = "feat/";
 const REVIEW_FILE_RE = /^review_(.+)\.md$/;
 // The section header gates/qa-review.ts `recordReviewInFile` writes for a
-// PASS round by the feature's judge: `## <iso-ts> — PASS — by qa-engineer`,
-// or `— by code-reviewer` on a test-first feature (AC5b).
+// PASS round by the judge: `## <iso-ts> — PASS — by code-reviewer`, or
+// `— by qa-engineer` on a report written before v5.0.0 (REPORT_SIGNERS, AC5b).
 const JUDGE_PASS_HEADER_RE = new RegExp(
-  `^##\\s.*\\s—\\sPASS\\s—\\sby (?:${JUDGE_IDENTITIES.join("|")})\\b`,
+  `^##\\s.*\\s—\\sPASS\\s—\\sby (?:${REPORT_SIGNERS.join("|")})\\b`,
   "m",
 );
 // A voided ledger row: `- [-] <id> ... (voided: ...)` (tools/tasks-file.ts
@@ -267,7 +265,7 @@ function isSafeArchiveSegment(s: string): boolean {
 /**
  * Task ids backed by a PASS-bearing evidence file in `dir` (AC5b): each
  * `*.md` whose content carries a `— PASS — by <judge>` section header
- * (qa-engineer or code-reviewer) contributes its own id plus every id its
+ * (code-reviewer, or pre-v5.0.0 qa-engineer) contributes its own id plus every id its
  * `covers:` line names
  * (tools/evidence-file.ts `parseCoversIds`). The own id is the
  * `review_<stem>.md` stem decoded by tools/evidence-file.ts
@@ -569,7 +567,6 @@ export function computeLaneStatus(opts: ComputeLaneStatusOptions = {}): LaneStat
       lastUpdated: info.lastUpdated,
       hopCount: info.hopCount,
       reviewRound: null,
-      qaRound: null,
       completedTasks: Array.isArray(info.completedTasks) ? [...info.completedTasks] : [],
       commits: { list: null, count: null },
       gitStatus: { clean: null, changedFiles: null },
@@ -596,7 +593,6 @@ export function computeLaneStatus(opts: ComputeLaneStatusOptions = {}): LaneStat
           row.completedTasks = [];
         } else {
           row.reviewRound = numOrNull(state.review_round);
-          row.qaRound = numOrNull(state.qa_round);
           if (row.hopCount === null) row.hopCount = numOrNull(state.hop_count);
           if (!Array.isArray(info.completedTasks) && Array.isArray(state.completed_tasks)) {
             row.completedTasks = [...state.completed_tasks];
@@ -681,9 +677,7 @@ function capCheck(metric: CapCheck["metric"], value: number): CapCheck {
   const [capName, cap] =
     metric === "hop"
       ? (["HOP_CAP_EXPORTED", HOP_CAP_EXPORTED] as const)
-      : metric === "review_round"
-        ? (["REVIEW_ROUND_CAP_EXPORTED", REVIEW_ROUND_CAP_EXPORTED] as const)
-        : (["ROUND_CAP_EXPORTED", ROUND_CAP_EXPORTED] as const);
+      : (["REVIEW_ROUND_CAP_EXPORTED", REVIEW_ROUND_CAP_EXPORTED] as const);
   return { metric, capName, cap, value, over: value > cap, atCap: value === cap };
 }
 
@@ -693,7 +687,6 @@ function sumTotals(rows: LaneStatusRow[]): RollupTotals {
     tickets: rows.reduce((s, r) => s + r.completedTasks.length, 0),
     hop: add((r) => r.hopCount),
     reviewRounds: add((r) => r.reviewRound),
-    qaRounds: add((r) => r.qaRound),
   };
 }
 
@@ -736,19 +729,17 @@ export function rollupSameFeature(report: LaneStatusReport, featureId: string): 
   });
   const matchingLanes = report.lanes.filter((r) => r.activeFeature === featureId);
   // One source per total: tickets/hop are computeFeatureRollup's (same
-  // active_feature === featureId attribution); review/qa rounds — which
+  // active_feature === featureId attribution); review rounds — which
   // LaneInfo does not carry — are summed here.
   const rounds = sumTotals(matchingLanes);
   const totals: RollupTotals = {
     tickets: base.totals.ticketCount,
     hop: base.totals.hopCount,
     reviewRounds: rounds.reviewRounds,
-    qaRounds: rounds.qaRounds,
   };
   const capChecks = [
     capCheck("hop", totals.hop),
     capCheck("review_round", totals.reviewRounds),
-    capCheck("qa_round", totals.qaRounds),
   ];
   const evidenceMismatches = matchingLanes.filter((r) => r.evidence?.mismatch === true);
   return {
@@ -804,7 +795,6 @@ export function rollupAcrossLanes(
     checks: [
       capCheck("hop", r.hopCount ?? 0),
       capCheck("review_round", r.reviewRound ?? 0),
-      capCheck("qa_round", r.qaRound ?? 0),
     ],
   }));
   const unreadable = lanes.filter((r) => !r.readable);
@@ -932,8 +922,8 @@ export function renderSameFeatureRollup(r: SameFeatureRollup): string {
   }
   out.push(`Feature roll-up: ${r.featureId} — ${r.matchingLanes.length} of ${r.allLanes.length} lane(s) match`);
   out.push("");
-  out.push("lane | active_feature | status | tickets | hop | review_round | qa_round | evidence | matches");
-  out.push("--- | --- | --- | --- | --- | --- | --- | --- | ---");
+  out.push("lane | active_feature | status | tickets | hop | review_round | evidence | matches");
+  out.push("--- | --- | --- | --- | --- | --- | --- | ---");
   for (const l of r.allLanes) {
     out.push(
       [
@@ -943,7 +933,6 @@ export function renderSameFeatureRollup(r: SameFeatureRollup): string {
         l.completedTasks.length,
         show(l.hopCount),
         show(l.reviewRound),
-        show(l.qaRound),
         l.evidence ? `${l.evidence.evidenceCount}` : "-",
         l.activeFeature === r.featureId,
       ].join(" | "),
@@ -952,7 +941,7 @@ export function renderSameFeatureRollup(r: SameFeatureRollup): string {
   out.push("");
   const t = r.totals;
   out.push(
-    `Totals (matching lanes only) — tickets: ${t.tickets}, hop: ${t.hop} (cap ${HOP_CAP_EXPORTED}), review_round: ${t.reviewRounds} (cap ${REVIEW_ROUND_CAP_EXPORTED}), qa_round: ${t.qaRounds} (cap ${ROUND_CAP_EXPORTED})`,
+    `Totals (matching lanes only) — tickets: ${t.tickets}, hop: ${t.hop} (cap ${HOP_CAP_EXPORTED}), review_round: ${t.reviewRounds} (cap ${REVIEW_ROUND_CAP_EXPORTED})`,
   );
   for (const l of r.matchingLanes) {
     const note = tokenNoteLine(l);
@@ -992,8 +981,8 @@ export function renderCrossLaneRollup(r: CrossLaneRollup): string {
   out.push(...CROSS_FEATURE_BANNER);
   out.push(`Features spanned (${r.distinctFeatures.length}): ${r.distinctFeatures.join(", ")}`);
   out.push("");
-  out.push("lane | active_feature | status | tickets | hop | review_round | qa_round | evidence");
-  out.push("--- | --- | --- | --- | --- | --- | --- | ---");
+  out.push("lane | active_feature | status | tickets | hop | review_round | evidence");
+  out.push("--- | --- | --- | --- | --- | --- | ---");
   for (const l of r.lanes) {
     out.push(
       [
@@ -1003,16 +992,15 @@ export function renderCrossLaneRollup(r: CrossLaneRollup): string {
         l.completedTasks.length,
         show(l.hopCount),
         show(l.reviewRound),
-        show(l.qaRound),
         l.evidence ? `${l.evidence.evidenceCount}` : "-",
       ].join(" | "),
     );
   }
-  for (const name of r.missing) out.push(`${name} | (lane not found) | - | - | - | - | - | -`);
+  for (const name of r.missing) out.push(`${name} | (lane not found) | - | - | - | - | -`);
   out.push("");
   const c = r.combined;
   out.push(
-    `Combined total (informational only, not capped) — tickets: ${c.tickets}, hop: ${c.hop}, review_round: ${c.reviewRounds}, qa_round: ${c.qaRounds}`,
+    `Combined total (informational only, not capped) — tickets: ${c.tickets}, hop: ${c.hop}, review_round: ${c.reviewRounds}`,
   );
   const perLane: string[] = [];
   for (const p of r.perLaneCaps) {
@@ -1229,7 +1217,7 @@ export const WATCH_EXIT_USAGE = 64;
 /** Hex characters of sha256(state line) carried in --baseline (decision (d)). */
 export const WATCH_FINGERPRINT_LENGTH = 12;
 /** Watched keys, in state-line order (decision (c)). */
-export const WATCH_STATE_KEYS = ["feature", "status", "last_agent", "next_role", "hop", "review_round", "qa_round"] as const;
+export const WATCH_STATE_KEYS = ["feature", "status", "last_agent", "next_role", "hop", "review_round"] as const;
 /** Decision (c)'s optional last key, present only under --mailbox-root. */
 export const WATCH_PREREVIEW_KEY = "cut_prereview";
 /** State line of a `--lanes`-named lane that matches no worktree. */
@@ -1342,7 +1330,6 @@ export function readLaneWatchState(
     next_role: state.next_role,
     hop: state.hop_count,
     review_round: state.review_round,
-    qa_round: state.qa_round,
   };
   const fields = WATCH_STATE_KEYS.map((k): [string, string] => [k, watchValue(values[k])]);
   if (mailboxRoot !== undefined) {
