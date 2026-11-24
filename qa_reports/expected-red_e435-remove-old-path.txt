@@ -1,0 +1,16 @@
+# E435 expected-red manifest. Format: <test file> | <exact test name> | <reason>
+# Feature-scoped, append-only per task; each sr task clears the rows its change turns green.
+# T-E435-01 (qa-engineer): new scenario file, red until the E435 implementation lands.
+test/e435-remove-old-path.test.mjs | AC1: pm:In_Progress -> sr-engineer:In_Progress is rejected on every dispatch_mode, even with a no-new-test record; the hint names qa-engineer | pm -> sr still an allowed edge at base (T-E435-30)
+test/e435-remove-old-path.test.mjs | AC2: qa-engineer status=PASS is rejected and the message names code-reviewer as the judge | QA_PASS_REFINE_MESSAGE not exported; qa PASS accepted on an unmarked feature (T-E435-30, T-E435-35)
+test/e435-remove-old-path.test.mjs | AC2: qa-engineer cannot complete tasks: tw_complete_task and a non-empty completed_tasks are both rejected | tw_complete_task reserved for qa-engineer; NON_JUDGE_COMPLETED_TASKS_REJECTED not built (T-E435-30, T-E435-33)
+test/e435-remove-old-path.test.mjs | AC2: code-reviewer completes tasks, grows completed_tasks and writes PASS with no marker on the handoff | code-reviewer judge only on a marked feature (T-E435-30, T-E435-31)
+test/e435-remove-old-path.test.mjs | AC3: on a schema 16 handoff (marker absent or present) the removed old-path steps are rejected with the docs/migration-v5.md hint | MIGRATION_HINT / oldPathStepHint not built (T-E435-30, T-E435-31)
+test/e435-remove-old-path.test.mjs | AC3: a legal new-chain step is accepted and gets no migration hint; the hint keys on the step only | unmarked pm -> qa-engineer needs resume_of at base; oldPathStepHint not exported (T-E435-30)
+test/e435-remove-old-path.test.mjs | AC4: a schema 16 handoff carrying chain_path lazily migrates to 17 with chain_path, qa_round, qa_rounds_total dropped | CURRENT_VERSIONS.handoff is 16, no v16 -> v17 step (T-E435-29)
+test/e435-remove-old-path.test.mjs | AC4: tw_update_state has no chain_path property, resume_of accepts only code-reviewer, an incoming chain_path is stripped | chain_path property and resume_of qa-engineer still in the input schema (T-E435-35)
+test/e435-remove-old-path.test.mjs | AC4: no source under tools/, gates/, schema/ (outside the migration step), scripts/release.mjs or content/ names chain_path | marker still named in tools/, scripts/release.mjs, content/ (T-E435-29..36, T-E435-41)
+test/e435-remove-old-path.test.mjs | AC6: status, completed_tasks and tw_complete_task descriptions name code-reviewer as the only judge, no marker conditional | descriptions still name qa-engineer with the test-first conditional (T-E435-35)
+test/e435-remove-old-path.test.mjs | AC7: no composed prompt, hook output or shipped template describes qa-engineer as the closing role or names chain_path | prompts name chain_path and the three old codes; adapter Execution Profile old sentence (T-E435-32, 33, 36, 37, 41)
+test/e435-remove-old-path.test.mjs | AC8: docs/migration-v5.md covers mid-flight handoffs, agent re-copy, skill-qa-visual override, the in-context wording, re-stamping and SQLite | docs/migration-v5.md does not exist (T-E435-38)
+test/e435-remove-old-path.test.mjs | AC9: SQLite mode rejects pm -> sr, qa PASS, qa completed_tasks and qa tw_complete_task; code-reviewer PASS accepted; no SQLite version added | SQLite runs the old table (pm -> sr accepted) (T-E435-30, T-E435-34)
