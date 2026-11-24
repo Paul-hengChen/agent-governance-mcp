@@ -1174,3 +1174,7 @@ Saving floor decision: it is a measured value, not a fixed guard. Its history is
 ### Manifest
 
 The 8 T-E435-39 snapshot rows in `qa_reports/expected-red_e435-remove-old-path.txt` are cleared (green); one `#` line records it. Remaining rows for open work: T-E435-50 (e359 ×5, e408 AC6).
+
+### Results
+
+Clean tree at the T-E435-40 commit, `node scripts/test-lock.mjs -- npm test`: 4579 tests, 4570 pass, 6 fail, 3 skipped, 0 cancelled. The 6 reds are exactly the T-E435-50 rows (e359 AC-E359-1, -2, -5, -4 SQLite ×2; e408 AC6). No other red.
