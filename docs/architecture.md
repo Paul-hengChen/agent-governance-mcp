@@ -71,9 +71,8 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │      be in ALLOWED_TRANSITIONS, or qualify for the same-agent   │
 │      In_Progress→In_Progress self-loop fast path. Also applies  │
 │      the round-cap overrides:                                   │
-│        qa_round     ≥ 4 (ROUND_CAP)        ┐ matrix collapses   │
-│        review_round ≥ 4 (REVIEW_ROUND_CAP) ├ to {(pm,           │
-│        visual_round ≥ 6 (VISUAL_ROUND_CAP) ┘ In_Progress)}      │
+│        review_round ≥ 4 (REVIEW_ROUND_CAP) ┐ matrix collapses   │
+│        visual_round ≥ 6 (VISUAL_ROUND_CAP) ┘ to (pm,In_Progress)│
 │        sr_return_count ≥ 2 (SR_RETURN_CAP): sr→qa return → pm   │
 │  2 FEATURE_LEASE                  (gates/feature-lease.ts)      │
 │  3 SCOPE_DECISION_REQUIRED        (gates/scope-decision.ts)     │
@@ -82,7 +81,7 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │  6 SOURCE_CREDIBILITY_UNVERIFIED                                │
 │  7 REPRO_MANIFEST_MISSING                                       │
 │  8 REVIEW_VERDICT_STATUS_MISMATCH (gates/code-review.ts)        │
-│  9 REVIEWER_COMPLETED_TASKS_REJECTED                            │
+│  9 NON_JUDGE_COMPLETED_TASKS_REJECTED                           │
 │ 10 QA_REVIEW_RECORD               (gates/qa-review.ts)          │
 │ 11 QA_COMPLETION_EVIDENCE_MISSING (gates/evidence-schema.ts)    │
 │ 12 PASS_TASKS_INCOMPLETE          (gates/open-tasks.ts)         │
@@ -96,9 +95,8 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │ POST-PIPELINE                                                   │
 ├─────────────────────────────────────────────────────────────────┤
 │ P1 Round accounting (computeNewRound)                           │
-│      (qa-engineer, FAIL) → prev + 1                             │
-│      (qa-engineer, PASS) | (pm, In_Progress) → 0                │
-│      (code-reviewer, PASS) → review_round 0 (test-first only)   │
+│      (code-reviewer, FAIL) → review_round + 1                   │
+│      (code-reviewer, PASS) | (pm, In_Progress) → review_round 0 │
 │      sr_return_count: sr→qa return + 1; (pm, In_Progress) → 0   │
 │      else → unchanged;  hop_count incremented per transition    │
 ├─────────────────────────────────────────────────────────────────┤
@@ -239,13 +237,14 @@ Each template carries only `name` + `model` + `description` frontmatter; the SOP
 
 ---
 
-## Three round counters
+## Round counters
 
 | Counter | FAIL cap | Increments on | Resets on | Round-cap collapse target |
 |---|---|---|---|---|
-| `qa_round` | 3 (Round 4 locks) | `(qa-engineer, FAIL)` | `PASS` or `(pm, In_Progress)` | `{(pm, In_Progress)}` |
-| `review_round` | 3 (Round 4 locks) | `(code-reviewer, CHANGES_REQUESTED)` | `PASS` or `(pm, In_Progress)` | `{(pm, In_Progress)}` |
+| `review_round` | 3 (Round 4 locks) | `(code-reviewer, FAIL)` (`CHANGES_REQUESTED`) | `PASS` or `(pm, In_Progress)` | `{(pm, In_Progress)}` |
 | `visual_round` | 5 (Round 6 locks) | `(qa-engineer, FAIL)` w/ `visual_fail:` | `PASS` or `(pm, In_Progress)` | `{(pm, In_Progress)}` |
+
+There is no qa round: qa-engineer writes the tests and never writes PASS or FAIL; code-reviewer is the judge (see [migration-v5.md](migration-v5.md)).
 
 Round 3 of `visual_round` allows an early `(sr-engineer → pm, In_Progress)` split escalation (`visual_split_requested:` in `pending_notes`) instead of grinding to the cap. All counters are persisted in `handoff.md`.
 
