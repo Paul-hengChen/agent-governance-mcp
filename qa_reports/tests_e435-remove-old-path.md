@@ -394,3 +394,36 @@ Left as is: AC4, AC7, AC8, AC13 (no old-path content). CLAUDE.md 250-line pin an
 ### Red Reasons (T-44)
 
 12 red at base, all assertion failures: AC1 ×5 `chain_path` in the composed bundle; AC2 const-06 line 7 marker condition; AC3 qa SOP line 13 / 31; AC5 "The marker" bullet; AC6 pm step 8 marker argument; AC9 / AC12 registry 35; AC10 release-cd two-judge lines. Rows under `# T-E435-44` in the manifest. Run: `node --test test/e433-test-first-rules.test.mjs` → 16 tests, 4 pass, 12 fail = the 12 rows, name for name. T-E435-09 (a + b) is complete.
+
+## T-E435-10 (part 1 of 2) — `test/reviewer-completed-tasks-gate.test.mjs`, `test/e181-pending-notes-roundtrip.test.mjs` (AC2, AC5)
+
+Placement: existing files, edited in place (brief). Re-titled tests carry `(E435)`. Split at a file boundary: these two files are 226 changed lines (100+ / 126−); `e150-completed-tasks-carry-forward`, `e139-non-reviewer-verdict`, `e247-pass-tasks-incomplete` are part 2 (see *Remaining* below).
+
+### Scenario → Test Map (T-10, part 1)
+
+| scenario | exact test name(s) |
+|---|---|
+| Ruling (b): the judge is the ledger writer; its unevidenced id → `QA_COMPLETION_EVIDENCE_MISSING`, with its report the id lands | FM1 (E435): a code-reviewer write carrying completed_tasks is never NON_JUDGE_COMPLETED_TASKS_REJECTED; … |
+| code-reviewer → qa-engineer is not an edge (S3 hint `hint.reviewer_to_qa`) | FM4 (E435): a qa-engineer write after code-reviewer:In_Progress is TRANSITION_REJECTED with the judge hint, … |
+| the judge's APPROVED write keeps review scope out of the ledger | FM5 (E435): the judge's APPROVED write with review_task_ids and its report present is ACCEPTED, … |
+| step 9 exact emit + Copy hintStatic for every non-judge `agent_id`, qa-engineer included (AC2) | FM6–FM12 (E435): agent_id="<role>" self-loop carrying non-empty completed_tasks is REJECTED with NON_JUDGE_COMPLETED_TASKS_REJECTED, … |
+| bypass: non-judge prefill rejected at write 1; the judge's unevidenced write 2 still refused | BYPASS-FM (E435) |
+| AC9 SQLite: judge write stored as given; qa / sr / pm ledger writes rejected | SQ1 (E435) · SQ3 (E435) · SQ4 (E435) · BYPASS-SQL (E435) |
+| zod boundary precedes step 9 (removed codes never named) | AC5 (E435): the rejection is the zod layer, not a gate (pm + ledger id would otherwise hit NON_JUDGE_COMPLETED_TASKS_REJECTED) — green on both |
+
+Left as is (green on both): FM2, FM3, SQ2.
+
+### Open Interface Details (T-10, part 1)
+
+1. Emit asserted verbatim with one id: `` ⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=[<id>] on an agent_id=<role> write. `` + the architecture's hintStatic (one id makes the `${ids}` join separator irrelevant).
+2. FM1 / FM5 judge report at `qa_reports/review_<id>.md` (the `QA_COMPLETION_EVIDENCE_MISSING` Copy hint names that path); old `review_reports/` evidence dropped (it backs nothing, T-09a).
+3. FM4 / FM5 replace the qa-engineer APPROVED row: the edge it rode is gone, so FM4 pins the rejection and FM5 moves the APPROVED write to the judge's own self-loop. FM5 is green at base too (kept as the positive control).
+4. SQ1: the judge's ledger write is accepted and stored as given in SQLite (`QA_COMPLETION_EVIDENCE_MISSING` is file-mode only); SQ3 swaps the qa APPROVED-row case for a qa-engineer ledger self-loop (AC9).
+
+### Red Reasons (T-10, part 1)
+
+14 red at base, all assertion failures (no syntax / link error): FM6–FM11, SQ4, BYPASS-FM, BYPASS-SQL emit `NON_QA_COMPLETED_TASKS_REJECTED` with the qa-engineer hint; FM1, SQ1 `REVIEWER_COMPLETED_TASKS_REJECTED` on the judge; FM12 / SQ3 qa-engineer is still the ledger writer; FM4 code-reviewer → qa-engineer still an edge (`MISSING_REVIEW_EVIDENCE`). Rows under `# T-E435-10` in the manifest. Run: `node --test test/reviewer-completed-tasks-gate.test.mjs test/e181-pending-notes-roundtrip.test.mjs` → 52 tests, 38 pass, 14 fail = the 14 rows, name for name.
+
+### Remaining — part 2 (`e150-completed-tasks-carry-forward`, `e139-non-reviewer-verdict`, `e247-pass-tasks-incomplete`)
+
+Planned re-pins: e150 — every ledger writer / FAIL-shrink / PASS seed and write moves from qa-engineer to code-reviewer (AC13–AC17), AC16 APPROVED-row case becomes the judge's self-loop, AC17 regex → `NON_JUDGE_COMPLETED_TASKS_REJECTED`, AC20 description = Copy `desc.completed_tasks`; e139 — AC-E139-2/3 APPROVED row (code-reviewer → qa-engineer edge gone; APPROVED ↔ PASS consistent), AC-E139-8 qa PASS → code-reviewer PASS (qa PASS now a zod refine); e247 — PASS writer `qa-engineer` → `code-reviewer` (`PASS_TASKS_INCOMPLETE` hint "A code-reviewer PASS").

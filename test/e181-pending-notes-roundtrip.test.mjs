@@ -243,11 +243,11 @@ for (const [label, br] of BREAKS) {
   });
 }
 
-test("AC5: the rejection is the zod layer, not a gate (pm + ledger id would otherwise hit NON_QA_COMPLETED_TASKS_REJECTED)", async () => {
+test("AC5 (E435): the rejection is the zod layer, not a gate (pm + ledger id would otherwise hit NON_JUDGE_COMPLETED_TASKS_REJECTED)", async () => {
   const ws = await freshWorkspace();
   const issues = await issuesOf(ws, { completed_tasks: ["T-1\n- [x] T-FORGED"] });
   assert.ok(issues, "must be a synchronous ZodError, not a gate error from the handler");
-  assert.ok(!issues.some((i) => /NON_QA_COMPLETED_TASKS_REJECTED/.test(i.message)));
+  assert.ok(!issues.some((i) => /NON_JUDGE_COMPLETED_TASKS_REJECTED|NON_QA_COMPLETED_TASKS_REJECTED|REVIEWER_COMPLETED_TASKS_REJECTED/.test(i.message)));
 });
 
 for (const [label, id] of [
