@@ -1,18 +1,10 @@
 // Coded by @sr-engineer
 // Node test-runner adapter for scripts/check-scenario-tests.mjs (E427).
-//
-// Node's built-in JUnit reporter writes classname="test" on every test case,
-// so a ticket's `test <file> — <title>` could not be matched by file. The
-// default export is a test reporter that hands every event to Node's own
-// `junit` reporter unchanged, except that a test:pass / test:fail event that
-// carries data.file gets data.classname = that file relative to the working
-// directory, with `/` separators. The output stays ordinary JUnit XML.
-//
-// readResults(resultsPath) reads that XML back (no third-party dependency)
-// into one { file, title, status } entry per <testcase> and per <testsuite>:
-// title is the full nested title (enclosing suite names joined by " > "),
-// status is "failed" / "skipped" / "passed" per spec D5. It is the one
-// function another project supplies for its own runner (--adapter).
+// Default export: a test reporter emitting Node's JUnit XML with
+//   classname = the test's repo-relative file.
+// readResults(resultsPath) -> [{ file, title, status }] from that XML;
+//   title is the full nested title (" > "), status passed/skipped/failed.
+// Design: specs/e427-ci-scenario-tests.md
 
 import * as fs from "node:fs";
 import * as path from "node:path";

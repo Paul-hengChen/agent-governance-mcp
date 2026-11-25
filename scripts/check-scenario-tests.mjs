@@ -1,17 +1,11 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// CI check that every `done` ticket's named tests exist and passed (E427).
-//
-// Reads every ticket file in the ticket directory whose status is `done`,
-// collects each scenario verified by `Verification: test <file> — <title>`,
-// and looks it up in the test runner's own result file through an adapter's
-// readResults(). A named test that is absent, skipped or failed is a problem,
-// so the result comes from CI, not from any agent's report.
+// CI check that every done ticket's named tests exist and passed (E427).
 // Usage: node scripts/check-scenario-tests.mjs --results <file>
 //          [--tickets <dir>] [--adapter <module>]
-// Exit: 0 = all named tests passed or none to check, 1 = problem(s),
-//       2 = cannot run (stderr). Default adapter: scenario-results-node.mjs
-//       next to this script; --adapter is resolved from the working directory.
+// Exit: 0 = all passed or none to check, 1 = problem(s), 2 = cannot run.
+// --adapter <module> (cwd-relative) exports readResults(); default: the
+// sibling scenario-results-node.mjs. Spec: specs/e427-ci-scenario-tests.md
 
 import * as fs from "node:fs";
 import * as path from "node:path";
