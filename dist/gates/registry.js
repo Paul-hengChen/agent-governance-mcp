@@ -458,6 +458,7 @@ export const GATE_REGISTRY = [
         // an `## AC Execution Log` H2 in any PASS'd id's qa_reports/review_<id>.md (covers:
         // files count). Older specs with no `proof:` lines leave it dormant. Plain-text family,
         // not a transition code. Design: specs/e3-outcome-shaped-acceptance-architecture.md.
+        // When the spec cites a ticket file, the same step checks each test/command scenario id for a passing acceptance-record entry (gates/ac-execution.ts).
         errorCode: "AC_EXECUTION_LOG_MISSING",
         producer: "orchestrator",
         envelope: "plain-text",
