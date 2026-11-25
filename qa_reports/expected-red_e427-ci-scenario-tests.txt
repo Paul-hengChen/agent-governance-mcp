@@ -1,0 +1,29 @@
+# e427-ci-scenario-tests — expected-red manifest (written by qa-engineer, T-E427-01)
+# Format: <relative test file path> | <exact test name>
+
+# test/e427-check-scenario-tests.test.mjs — every test spawns scripts/check-scenario-tests.mjs, which does not
+# exist yet (T-E427-03); AC6 also runs node --test with scripts/scenario-results-node.mjs as reporter (T-E427-02).
+test/e427-check-scenario-tests.test.mjs | AC1 a done ticket whose named test passed exits 0 and prints the ok summary
+test/e427-check-scenario-tests.test.mjs | AC2 a done ticket naming a test absent from the results exits 1 with the notFound line and the problem summary
+test/e427-check-scenario-tests.test.mjs | AC3 a named test recorded as skipped, and one recorded as todo, each fail with the skipped line
+test/e427-check-scenario-tests.test.mjs | AC4 a named test recorded as failed exits 1 with the failed line
+test/e427-check-scenario-tests.test.mjs | AC5 with no done ticket (not started / stopped, or no ticket directory) the checker exits 0 with the none line and never opens the results
+test/e427-check-scenario-tests.test.mjs | AC6 a done ticket still naming a renamed test fails with the notFound line naming the old title and the rename instruction
+test/e427-check-scenario-tests.test.mjs | AC7 the ticket must name the full nested title and the exact file; a leading ./ on the file is accepted
+test/e427-check-scenario-tests.test.mjs | AC8 only `test` verifications are checked; automated test, command and device-or-person scenarios are not
+test/e427-check-scenario-tests.test.mjs | AC9 a missing results file exits 2 with cannotReadResults, a non-JUnit file exits 2 with cannotParseResults (stderr)
+test/e427-check-scenario-tests.test.mjs | AC11 --adapter uses another module's readResults; a module without readResults exits 2 with adapterInvalid
+test/e427-check-scenario-tests.test.mjs | AC12 a done ticket with format problems exits 1 with the ticketProblems line
+test/e427-check-scenario-tests.test.mjs | AC13 a missing --results or an unknown option exits 2 with the usage line on stderr
+
+# test/e427-scenario-results-node.test.mjs — scripts/scenario-results-node.mjs (reporter + readResults) does not
+# exist yet (T-E427-02); node --test cannot load the reporter, so no TAP and no results file.
+test/e427-scenario-results-node.test.mjs | AC10 the adapter reporter writes JUnit with the repo-relative file, and readResults returns full nested titles and D5 statuses
+
+# test/e427-ci-wiring.test.mjs — .github/workflows/ci.yml still runs `npm test` and has no
+# `Check ticket scenario tests` step (T-E427-04).
+test/e427-ci-wiring.test.mjs | AC14 ci.yml keeps job test on [20, 22], runs Test with reporters before the package.json glob, then the Check ticket scenario tests step
+
+# test/e427-ticket-format-doc.test.mjs — docs/ticket-format.md has no `## Named tests checked in CI` section and its
+# tooling section does not name the checker, adapter or CI step yet (T-E427-05).
+test/e427-ticket-format-doc.test.mjs | AC16 the format doc explains the CI check of named tests in the general part and names the tooling in the closing section
