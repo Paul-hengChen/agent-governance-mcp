@@ -12,7 +12,7 @@ Spec: `specs/e424-per-scenario-acceptance.md` (cut human-approved 2026-11-25). L
 ## Affected Files
 
 - `gates/ac-execution.ts` — modify (T-E424-03): new exports per *Interface Contracts*; internal refactor of the review-file traversal into one private locator shared by `hasAcExecutionLogDisposition` (results byte-identical) and the ticket path. New imports: `parseTicketFile` from `../tools/ticket-file.js`, `resolveTicketDir` from `../tools/config.js`, `normalizeHeadingText` added to the existing `../tools/evidence-file.js` import. Keeps importing and calling `resolveJudgeReport` and `encodeEvidenceId`; no `taskId.replace(`; no `path.join(…"qa_reports"…)` literal; no `child_process`.
-- `tools/handoff-orchestrator.ts` — modify (T-E424-04): `PASS_AC_EXECUTION_LOG` step only; import line 42 gains `evaluateTicketAcceptance`, `renderTicketAcceptanceRejection`. The existing no-ticket block moves into an `else` branch with its text unchanged.
+- `tools/handoff-orchestrator.ts` — modify (T-E424-04): `PASS_AC_EXECUTION_LOG` step only; import line 42 gains `evaluateTicketAcceptance`, `renderTicketAcceptanceRejection`. The existing block stays as is; the ticket block is appended after it (additive, DR-1).
 - `gates/registry.ts` — modify (T-E424-04): one comment sentence (Copy `registry.comment`) on the `AC_EXECUTION_LOG_MISSING` entry. `triggerEdge`, `armCondition`, `clearingArtifact`, `hintStatic` and the errorCode → doc-file mapping comment row untouched.
 - `content/skill-code-reviewer.md` — modify (T-E424-05): step 8 per *Copy* `sop.step8`.
 - `dist/**` — rebuilt (`npm run build`) in T-E424-04 and T-E424-05.
@@ -76,6 +76,7 @@ All in `gates/ac-execution.ts`. None throws; fs errors are handled as stated.
 
 5. `export function evaluateTicketAcceptance(workspacePath: string, activeFeature: string, taskIds: string[], evidenceSchema?: number): TicketAcceptanceResult`
    - Reads `specFilePath(workspacePath, activeFeature)`; empty `activeFeature` or unreadable spec → not armed. `ticketPaths = findTicketCitations(...)`; empty → not armed.
+   - Note: this function evaluates the ticket alone; the additive ordering with today's `proof:` check is the orchestrator's (contract 7).
    - Armed: the review-file traversal runs exactly as `hasAcExecutionLogDisposition` (per id: direct `review_<encodeEvidenceId(id)>.md` under `resolveJudgeReport(workspacePath).dir`, then its `covers:` file; first file whose content holds the heading under `evidenceSchema` is the chosen file) and fills `checkedPaths` identically.
    - `ticketPaths.length >= 2` → `problem: {kind: "many"}`. Else read `path.join(workspacePath, ticketPaths[0])`; read error → `{kind: "missing-file"}`; `parseTicketFile(text).problems.length > 0` → `{kind: "parse", count, first: problems[0]}`.
    - Otherwise, over `parseTicketFile(text).scenarios` in order: blocking = verification kind `test`, `command` or `automated-test` (OQ-2); manual = `device-or-person`. With zero blocking ids the result is accepted (no record needed). Otherwise `section = sliceLastAcExecutionLog(chosenFileContent, evidenceSchema)` (no chosen file → no entries), `entries = parseAcceptanceRecord(section ?? "", blockingIds)`, then `missingIds` / `notPassedIds` per *Data Structures*.
@@ -85,35 +86,36 @@ All in `gates/ac-execution.ts`. None throws; fs errors are handled as stated.
    - Returns the text that follows the `⛔ AC_EXECUTION_LOG_MISSING: {completed_tasks}. ` prefix, in the Copy `ac.ticket.order` order: `ac.ticket.lead` (with `{ticketPath}` = `ticketPaths[0]`) + exactly one of [`ac.ticket.many` | `ac.ticket.missing_file` | `ac.ticket.parse`] when `problem` is set, else `ac.ticket.no_entry` (only when `missingIds` non-empty) then `ac.ticket.not_pass` (only when `notPassedIds` non-empty) + `ac.ticket.manual` (only when `manualIds` non-empty) + `Inspected: {paths}. ` + `Evidence schema: {label}. ` + `AC_TICKET_HINT`.
    - `{ids}` and `{paths}` join with `, `. `Inspected:` uses `checkedPaths.join(", ")`, or `(none — no review file resolved for the listed task(s))` when empty (today's fallback, verbatim).
 
-7. Orchestrator `PASS_AC_EXECUTION_LOG` (inside the existing `parsed.status === "PASS" && parsed.completed_tasks.length > 0` and `storage instanceof FileHandoffStorage` guards):
+7. Orchestrator `PASS_AC_EXECUTION_LOG` (inside the existing `parsed.status === "PASS" && parsed.completed_tasks.length > 0` and `storage instanceof FileHandoffStorage` guards). The ticket check is **additive** (DR-1): today's block runs first, unchanged byte-for-byte, and returns today's text when it rejects; the ticket check runs after it, only when today's block did not return.
 
 ```ts
+const arm = hasProofAnnotatedAC(parsed.workspace_path, parsed.active_feature);
+if (arm.armed) {
+  // existing block, unchanged byte-for-byte: hasAcExecutionLogDisposition → today's text on miss
+}
 const ticket = evaluateTicketAcceptance(
   parsed.workspace_path, parsed.active_feature, parsed.completed_tasks, evidenceSchemaPin,
 );
-if (ticket.armed) {
-  if (ticket.rejected) {
-    return {
-      content: [{ type: "text" as const,
-        text:
-          `⛔ AC_EXECUTION_LOG_MISSING: ${parsed.completed_tasks.join(", ")}. ` +
-          renderTicketAcceptanceRejection(ticket, evidenceSchemaLabel),
-      }],
-      isError: true,
-    };
-  }
-} else {
-  // existing block, unchanged byte-for-byte: hasProofAnnotatedAC → hasAcExecutionLogDisposition → today's text
+if (ticket.armed && ticket.rejected) {
+  return {
+    content: [{ type: "text" as const,
+      text:
+        `⛔ AC_EXECUTION_LOG_MISSING: ${parsed.completed_tasks.join(", ")}. ` +
+        renderTicketAcceptanceRejection(ticket, evidenceSchemaLabel),
+    }],
+    isError: true,
+  };
 }
 ```
 
-   The ticket path is exclusive: when armed, the `proof:` existence check is not run (AC6 covers its case — no section means every blocking id is `No entry`). `hasProofAnnotatedAC` stays literally present (registry `armCondition` pin).
+   Outcomes: no citation → only today's check, byte-identical output (AC8). `proof:` + no section → today's text alone, whether or not a ticket is cited (AC6 (b), AC14 (a)). `proof:` + section present → the ticket check decides. No `proof:` + citation → the ticket check alone (AC6 (a); an all-`device-or-person` ticket passes with no section, AC14). The existing block's code is not edited; the ticket block is appended after it.
 
 ### Test seams for qa-engineer
 
 - End to end: `tw_update_state` file mode, `agent_id: "code-reviewer"`, `status: "PASS"`, non-empty `completed_tasks`, fixture workspace with `specs/<feature>.md`, `docs/tickets/<name>.md` (default `ticketDir`), `qa_reports/review_<id>.md`, other PASS gates satisfied.
 - Unit: the six exports above from `dist/gates/ac-execution.js`.
 - AC9 marker: a `command` scenario such as `command touch <marker>`; assert the marker is absent after the write; source pin `gates/ac-execution.ts` contains no `child_process`.
+- AC14: spec with `proof:` + citation of an all-`device-or-person` ticket — no section → result text equals the same write with the `Ticket:` line removed; section present → accepted; same ticket, no `proof:`, no section → accepted.
 - AC8 byte-identity: run the no-ticket writes against `dist/` of this tree and compare with the literal text today's emit site builds (the existing suites already pin it).
 
 ## Copy / Strings
@@ -130,7 +132,7 @@ Unchanged from the spec's Copy table except where this column says so. `{…}` =
 | ac.ticket.parse | `The cited ticket file has {n} format problem(s); first: {problem}. ` | spec, unchanged (OQ-4); `{problem}` = `problems[0]` verbatim |
 | ac.ticket.many | `The spec cites more than one ticket file ({paths}); cite exactly one. ` | spec, unchanged (OQ-5); `{paths}` = all `ticketPaths` |
 | ac.ticket.hint | `Under ## AC Execution Log in a qa_reports/review_<id>.md for one of the PASS'd ids (covers: files count), write one line per ticket scenario: "- <scenario id> — <command or test> — <outcome or exit code> — pass" (or "— fail"). Every scenario verified by a test or a command needs a line ending in "— pass"; device-or-person scenarios are listed for manual verification and never block. The server reads the record and the ticket file only and runs nothing; whether each outcome is true stays with the judge.` | spec, unchanged; held as `AC_TICKET_HINT` |
-| ac.ticket.order | `⛔ AC_EXECUTION_LOG_MISSING: {completed_tasks}. ` + lead + (many \| missing_file \| parse \| no_entry? not_pass?) + manual? + `Inspected: {paths}. ` + `Evidence schema: {label}. ` + hint | spec, unchanged; prefix built at the orchestrator emit site |
+| ac.ticket.order | `⛔ AC_EXECUTION_LOG_MISSING: {completed_tasks}. ` + lead + (many \| missing_file \| parse \| no_entry? not_pass?) + manual? + `Inspected: {paths}. ` + `Evidence schema: {label}. ` + hint | spec, amended 2026-11-25: when today's `proof:` check rejects (spec has `proof:`, no section found), today's no-ticket text is emitted alone, byte-for-byte, and no ticket text is appended; the ticket text above is emitted only when today's check passes or is dormant. Prefix built at the orchestrator emit site |
 | sop.step8 | see full line below | spec text, unchanged |
 | registry.comment | `When the spec cites a ticket file, the same step checks each test/command scenario id for a passing acceptance-record entry (gates/ac-execution.ts).` | spec, unchanged; appended as a new `//` line at the end of the entry's leading comment |
 | hintStatic | unchanged, byte-identical to base | AC8 |
@@ -150,16 +152,22 @@ sequenceDiagram
   participant G as gates/ac-execution.ts
   participant FS as workspace files
   CR->>O: tw_update_state(PASS, completed_tasks)
+  O->>G: hasProofAnnotatedAC(ws, feature)
+  G->>FS: read specs/<feature>.md
+  opt spec has proof: line (unchanged)
+    O->>G: hasAcExecutionLogDisposition(ws, ids, pin)
+    G->>FS: review file (direct, then covers:)
+    alt no AC Execution Log section
+      O-->>CR: today's text, byte-identical (ticket check not run)
+    end
+  end
   O->>G: evaluateTicketAcceptance(ws, feature, ids, pin)
-  G->>FS: read specs/<feature>.md, config (ticket dir)
+  G->>FS: read spec, config (ticket dir)
   alt no citation inside ticket dir
     G-->>O: armed=false
-    O->>G: hasProofAnnotatedAC / hasAcExecutionLogDisposition (unchanged)
-    G-->>O: today's result
-    O-->>CR: today's output, byte-identical
+    O-->>CR: next pipeline step
   else citation(s)
-    G->>FS: locate review file (direct, then covers:)
-    G->>FS: read cited ticket file -> parseTicketFile
+    G->>FS: locate review file; read cited ticket -> parseTicketFile
     G->>G: last AC Execution Log section -> parseAcceptanceRecord
     G-->>O: TicketAcceptanceResult
     alt rejected
@@ -175,7 +183,7 @@ sequenceDiagram
 
 | Context | Decision | Consequences |
 |---|---|---|
-| DR-1 Which path runs when a spec has both a ticket citation and `proof:` lines | Ticket path is exclusive when armed | One rule set per feature; a ticket with only `device-or-person` scenarios passes with no section even if the spec also has `proof:` lines (OQ-8) |
+| DR-1 Which check runs when a spec has both a ticket citation and `proof:` lines | Additive (integrator second pre-review, 2026-11-25): today's `proof:` heading check runs first and is never skipped; the ticket check runs after it; both must hold. When both fail, today's text is emitted alone | No write rejected today can pass after the change; a spec with `proof:` and no section is rejected with today's text even when its ticket is all `device-or-person` (AC14); the judge sees the per-scenario list only once the section exists. Rejected alternative: ticket path exclusive (a relaxation) |
 | DR-2 Where rejection text is built | Gate module renders everything after the `⛔ CODE: ids. ` prefix; prefix stays at the orchestrator emit site | Orchestrator diff stays ~20 lines; errorCode literal stays in the orchestrator (contract test); render text unit-testable |
 | DR-3 Traversal reuse | Private locator returning the chosen file + `checkedPaths`; `hasAcExecutionLogDisposition` becomes a wrapper over it | One traversal for both paths; existing results and `checkedPaths` must stay identical (existing suites pin them) |
 | DR-4 Reading the last `## AC Execution Log` section (OQ-6) | Local `sliceLastAcExecutionLog` in the gate module, reusing the exported `normalizeHeadingText` read-only | `tools/evidence-file.ts` unchanged; the heading rule is restated in one small function and must track `findH2At` if that ever changes |
@@ -189,14 +197,14 @@ _None — the spec's References and external-refs audit shows zero external refe
 
 ## Open Questions
 
-Every item below has a firm decision; none needs a human ruling. Listed for the integrator's second pre-review.
+Every item below has a firm decision; none needs a human ruling. Integrator second pre-review (2026-11-25): all stand except OQ-8, revised below to an additive check; DR-6 (out-of-fence `- <id> — ` lines fail closed) accepted unchanged.
 
 - **OQ-2 — `automated test` (unnamed) blocks.** Decision: yes, it is a blocking scenario. `null` verification is a parse problem (OQ-4). needs human ruling: no.
 - **OQ-4 — missing or unparseable cited ticket.** Decision: fail closed under `AC_EXECUTION_LOG_MISSING` with `ac.ticket.missing_file` / `ac.ticket.parse` (count + first problem). needs human ruling: no.
 - **OQ-5 — more than one citation.** Decision: two or more distinct in-dir citations reject with `ac.ticket.many`; the same path cited twice (after normalisation) counts once; out-of-dir `Ticket:` lines are not citations and do not count. needs human ruling: no.
 - **OQ-6 — which record section.** Decision: today's file traversal picks the file; inside it the last `## AC Execution Log` section counts; implemented in `gates/ac-execution.ts` (DR-4); `tools/evidence-file.ts` needs no change. needs human ruling: no.
 - **OQ-7 — registry doc fields.** Decision: `triggerEdge`, `armCondition`, `clearingArtifact`, `hintStatic` byte-identical; one comment sentence only. needs human ruling: no.
-- **OQ-8 — arming / trigger.** Decision: confirmed unchanged edge (code-reviewer PASS with non-empty `completed_tasks`, file mode); ticket path arms on an in-dir citation alone and is exclusive (DR-1); zero blocking scenarios → accepted with no section; no advisory on accepted PASS. needs human ruling: no.
+- **OQ-8 — arming / trigger.** Decision (revised after the integrator's second pre-review, 2026-11-25): unchanged edge (code-reviewer PASS with non-empty `completed_tasks`, file mode). The ticket check arms on an in-dir citation alone and is **additive**: today's `proof:` heading check still runs first and is never skipped (DR-1). When both fail, today's text is emitted alone. Zero blocking scenarios and no `proof:` line → accepted with no section; with a `proof:` line and no section → rejected with today's text (spec AC14, added). No advisory on accepted PASS. needs human ruling: no.
 - **Citation detail (within OQ-1's ruling).** Decision: lines inside fenced code blocks are not citations (DR-5); the path must immediately follow `Ticket:` (first token or backtick-quoted). needs human ruling: no.
 
 ## Task sizing (`task_size` ≤ 5 files / 300 lines)
