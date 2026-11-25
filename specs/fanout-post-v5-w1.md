@@ -2,7 +2,7 @@
 base: 17dcb8e    integration branch: integ/post-v5-w1
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准，派工中。**
+**狀態：已結案 2026-11-26。** e424、e427 依序 `--no-ff` 合進 `integ/post-v5-w1`（merge `f7a49dc`、`d134a99`，零衝突、無實質解衝突），merge-invariants 每次 PASS；派工 base `d239895`（清單 PR #193）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`GATE_REGISTRY` 33、pipeline 17 步，golden 與 context-budget 測試綠。lane 層 CI：e424 run 45653315807 @ `25caae9`、e427 run 45654701270 @ `7031ef8`；整合層 CI run 45655514072 @ `d134a99`，皆綠（Node 20、22）。Roll-up：e424 7 個 task、hop 11/14、review 退回 0；e427 8 個 task、hop 8/14、review 退回 0；證據 15/15。E424 done-mark；E427 核心已合併、修正條款 (2) 在第 2 波。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out E424 E425 E427」，2026-11-25）。三張票都屬 v5.0.0 里程碑、依排定順序在 v5.0.0 之後以 v5.x 發出。票面以 `docs/backlog.md` 的 E424、E425、E427 列為準，含 2026-11-19 的修正條款；佇列 `docs/v4.0.0-new-tickets.md` 第 249、250、253 號列。人類 2026-11-25 選了切法 A：拆成兩波。本清單只涵蓋第 1 波；E425 與 E427 的 SOP 文字在第 2 波，另開清單。
 
@@ -110,3 +110,24 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-26 | 整合者 | e424 修訂 cut（to-integrator#6，@ `759ef10`，新增 T-E424-07：兩個新測試檔開頭註解縮到 7 行以內，只改註解）`close`（to-lane#6）；cut 核准重新上膛，由人類在 lane 的 session 核准（approval = human） | e424 信箱 to-integrator#6、to-lane#6 |
 | 2026-11-26 | 整合者 | e424 lane 報告（to-integrator#7，取代 #5，HEAD `25caae9`）驗證通過：19 commits、乾淨樹、`check --base main` 33 檔 0 越界、證據 7/7（`review_reports/review_T-E424-01.md` covers 01..06、`review_reports/review_T-E424-07.md`，皆 APPROVED；`qa_reports/review_T-E424-01..07.md` 最後一筆伺服器 PASS）、無新發現、`dist/` 無差異；lane 層 CI run 45653315807 @ `25caae9` 綠（Node 20、22）；review 退回 0、hop 11/14；`close`（to-lane#7） | e424 信箱 to-integrator#7、to-lane#7 |
 | 2026-11-26 | 整合者 | e427 lane 報告（to-integrator#4，取代 #2，HEAD `7031ef8`）驗證通過：19 commits、乾淨樹、`check --base main` 30 檔 0 越界、證據 8/8（`review_reports/review_T-E427-01.md` covers 01..05、`review_reports/review_T-E427-06.md` covers 06..08，皆 APPROVED；`qa_reports/review_T-E427-01..08.md` 最後一筆伺服器 PASS）、無新發現；人類補上 gh 的 `workflow` scope 後推上 branch（GitHub 當時部分停擺），lane 層 CI run 45654701270 @ `7031ef8` 綠（Node 20、22），新步驟在兩個版本都印 `no named test in a done ticket; results not read`；review 退回 0、hop 8/14；`close`（to-lane#4） | e427 信箱 to-integrator#4、to-lane#4 |
+| 2026-11-26 | 整合者 | 整合：`integ/post-v5-w1` 自 `main` @ `d239895` 開出，依序 `--no-ff` 合 e424（merge `f7a49dc`）、e427（merge `d134a99`），零衝突，merge-invariants 每次 PASS；build 無 `dist/` 差異、audit exit 0、`agc check` exit 0、`GATE_REGISTRY` 33、pipeline 17 步；整合層 CI run 45655514072 @ `d134a99` 綠；`check:bookkeeping`、`check:md-tables` exit 0；依序 `finish e424`、`finish e427`，無新發現。波次報告不開票的意見：e424 的 fence 內 `## ` 會截斷紀錄段（fail-safe）、以 `..` 開頭的票檔名不算引用；e427 的 adapter 路徑不存在時錯誤原因帶本機絕對路徑（只印在 stderr）、O1 預設 adapter 壞掉時印絕對路徑、O2 AC6 不單獨保證 file 有記錄（AC10 涵蓋） | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ d239895
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v5-w1 @ 043f7bc）
+- lane-status：primary（main ← integ/post-v5-w1 @ 043f7bc）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
+### 已結案
+- e424（E424）、e427（E427 核心）依序 `--no-ff` 合進 `integ/post-v5-w1`（merge `f7a49dc`、`d134a99`），零衝突、無實質解衝突；整合層 CI run 45655514072 @ `d134a99` 綠（Node 20、22）。
+- lane 紀錄：`.current/history/2026-11/e424/`、`.current/history/2026-11/e427/`。
+- 新發現：無，兩條 lane 都沒有 `pending-tickets.md`，finish 沒有配號。
+- 記帳：E424 done-mark；E427 標「核心已合併、尚未完成」，修正條款 (2) 的兩句 SOP 移到第 2 波，與 E425 一起做。
+### 待人類決定
+- 要不要開第 2 波（E425，加上 E427 修正條款 (2) 的兩句 SOP）；切法已在本清單核准，開波仍要人類下指令。
+- 要不要發 v5.x：E424 與 E427 核心已在 `main`，但 E427 還沒完成。
+- E463、E464（發版腳本）還沒排進佇列，要插在第 2 波前面還是排在里程碑之後。
+### 進行中的背景工作
+無
