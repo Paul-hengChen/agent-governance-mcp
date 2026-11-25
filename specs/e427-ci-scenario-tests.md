@@ -175,6 +175,19 @@ fixture ticket directory and a results file, unless stated otherwise. Test names
   runs, then it exits 0 with 0 failures (baseline at `d239895`: 4704 pass / 4707 tests, 3 skipped, 0 fail), and the
   lane push's CI `test (20)` and `test (22)` are green.
   proof: `node scripts/test-lock.mjs -- npm test; echo "exit=$?"` ends with `# fail 0` and `exit=0`.
+- **AC18 (adapter load error reason, amendment 2026-11-25)** — Given a `done` ticket naming a test, when
+  `--adapter <module>` names a module that cannot be imported (e.g. a path that does not exist), then the checker
+  exits 2 and stderr holds the `adapterInvalid` line immediately followed by the `adapterLoadError` line, whose
+  `<reason>` is non-empty (the first clause of the import error's message, cut as `reason()` cuts it); given a module
+  that imports but has no `readResults` export (the AC11 case), stderr holds the `adapterInvalid` line and no
+  `adapterLoadError` line. The AC9, AC11 and AC13 assertions are unchanged and stay green.
+  proof: the AC18 test in `test/e427-check-scenario-tests.test.mjs` passes.
+- **AC19 (head comments within the comment-length limit, amendment 2026-11-25)** — Given the lane head, when
+  `node bin/agc-init.mjs check` runs, then it prints no `comments:` warning for `scripts/check-scenario-tests.mjs` or
+  `scripts/scenario-results-node.mjs`; each file's head comment is a one-sentence summary (≤80 columns) plus only what
+  a caller needs (usage / exit codes / the `readResults` contract in one line each at most) and a one-line pointer to
+  this spec for the rationale; no executable line changes (behaviour unchanged: AC1–AC18 stay green).
+  proof: `node bin/agc-init.mjs check 2>&1 | grep -E "comments: scripts/(check-scenario-tests|scenario-results-node)\.mjs" ; echo "matches-exit=$?"` prints only `matches-exit=1`.
 
 ## Copy / Strings
 
@@ -196,11 +209,27 @@ when `id` is missing); `<scenario>` = scenario id; `<file>` / `<title>` = the ti
 | cannotParseResults | `check-scenario-tests: cannot parse results <path>: <reason>` | authored-here — D8 |
 | cannotReadTickets | `check-scenario-tests: cannot read tickets <dir>: <reason>` | authored-here — D9 |
 | adapterInvalid | `check-scenario-tests: adapter <module> has no readResults function` | authored-here — D10 |
+| adapterLoadError | `check-scenario-tests: cannot load adapter <module>: <reason>` (stderr, the line directly after `adapterInvalid`, only when importing the module threw) | authored-here — amendment 2026-11-25 (integrator R2); same shape as `cannotReadResults` |
 | ciStepName | `Check ticket scenario tests` | authored-here — D11, CI step name |
 | doc section heading | `## Named tests checked in CI` | authored-here — AC16, general-part heading in `docs/ticket-format.md` |
 
 `<reason>` is the first clause of the error message (as `check-tickets` prints it). The `docs/ticket-format.md` prose
 itself is authored by sr-engineer within AC16's required content.
+
+## Amendment 2026-11-25
+
+Before merging lane e427, the integrator asked for two fixes (mailbox to-lane#2) after code-reviewer's PASS on
+T-E427-01..05; this re-opens the feature through `pm:In_Progress`.
+
+- **R1 — head comments.** `agc check` flags the file-head comments of `scripts/check-scenario-tests.mjs` (13 lines)
+  and `scripts/scenario-results-node.mjs` (15 lines) against the 7-line limit (Constitution §6 Comment discipline).
+  Trim each to a one-sentence summary plus what a caller needs, with a one-line pointer to this spec; the rationale
+  they carried is already here (D3–D10). No behaviour change, no new test: AC19's command is the proof.
+- **R2 — adapter import error reason.** `loadReadResults` swallowed the import error, so a typo in `--adapter` and a
+  module lacking `readResults` printed the same line. Keep the `adapterInvalid` line unchanged (AC11's anchored
+  assertion still matches) and, only when the import itself threw, print one extra stderr line `adapterLoadError`
+  directly after it. Exit code stays 2. Covered by AC18.
+- Not fixed here: the integrator's observations O1 and O2 (listed in its wave report).
 
 ## Visual Tokens
 
@@ -265,3 +294,6 @@ itself is authored by sr-engineer within AC16's required content.
 | T-E427-03 | sr-engineer: checker CLI — args, ticket selection (D7), matching (D4–D6), messages per Copy / Strings, exit codes (D8–D10), `--adapter` (AC1–AC9, AC11–AC13, AC15; ~180 lines) | T-E427-02 | 1 | `scripts/check-scenario-tests.mjs` | — |
 | T-E427-04 | sr-engineer: CI wiring — `Test` step `run:` per D1, new `Check ticket scenario tests` step per D11 (AC14, AC17) | T-E427-03 | 1 | `.github/workflows/ci.yml` | — |
 | T-E427-05 | sr-engineer: format doc — general section `## Named tests checked in CI` (scope limit, done-only, full nested title, `readResults`, rename rule) and tooling-section additions (checker, adapter, CI step, exit codes) (AC16) | T-E427-03 | 1 | `docs/ticket-format.md` | — |
+| T-E427-06 | qa-engineer: AC18 test (missing-path adapter → `adapterInvalid` then `adapterLoadError` with non-empty reason, exit 2; no-readResults adapter → no `adapterLoadError` line); existing AC9/AC11/AC13 assertions unchanged; add the AC18 test name to `qa_reports/expected-red_e427-ci-scenario-tests.txt` | none | 1 | `test/e427-check-scenario-tests.test.mjs` | — |
+| T-E427-07 | sr-engineer: R2 — `loadReadResults` prints `adapterLoadError` after `adapterInvalid` when the import throws (AC18) | T-E427-06 | 1 | `scripts/check-scenario-tests.mjs` | — |
+| T-E427-08 | sr-engineer: R1 — trim both head comments to ≤7 lines with a spec pointer; no executable change (AC19) | T-E427-07 | 2 | `scripts/check-scenario-tests.mjs`, `scripts/scenario-results-node.mjs` | — |
