@@ -7,7 +7,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 範圍由人類指定（integrator prompt「fan-out 這 13 張，開始 Stage 1」，2026-11-25）：pre-v5.0.0 系列 13 張（E448、E451–E462；人類 2026-11-25 裁定全部要在 v5.0.0 tag 之前落地）。票面以 `docs/backlog.md` 第 571、574–585 行為準，含 2026-11-25 嚴格複核（main @ `466bfce`，PR #182）的更正與漏列處，以及人類裁定 E452 (a)、E456 (1) 上限為 4、E462 (4) `none`／`n/a`／`tbd` 不算 no-design。本清單排第 1 波的 11 張；E461、E462 排第 2 波（理由見派工前核對）。
 
 ## 派工前核對（整合者，2026-11-25，規劃時；派工時在派工 base 重做一次）
-- `git worktree list` 只有 primary；`main` = `4d7de5b`（PR #182 merge）、工作樹乾淨；沒有 open 的 pull request；`feat/e448-*`、`feat/e453-*`、`feat/e455-*`、`integ/pre-v5-w1` 都不存在；`../agent-governance-mcp-lanes/` 只剩空的 `_mailbox/`。primary handoff 停在 `release-cd-v5.0.0`（PASS，code-reviewer），drift 無（T-REL4-02、T-E421-01、T-E421-02 是舊 feature 的 evidence-backed 標記，照 drift 訊息不 sync）。`.current/.config.json`：`cutApprovalAutoTier` = `{}`（manifest tier 未開 → 每條 lane 的 cut 都在 lane session 呈人類）、`laneProtocolAddendum` = `docs/lane-protocol-addendum.md`（共用生成物：`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`）。
+- `git worktree list` 只有 primary；`main` = `4d7de5b`（PR #182 merge）、工作樹乾淨；沒有 open 的 pull request；`feat/e448-*`、`feat/e453-*`、`feat/e455-*`、`integ/pre-v5-w1` 都不存在；`../agent-governance-mcp-lanes/` 只剩空的 `_mailbox/`。primary handoff 停在 `release-cd-v5.0.0`（PASS，code-reviewer），drift 無（T-REL4-02、T-E421-01、T-E421-02 是舊 feature 的 evidence-backed 標記，照 drift 訊息不 sync）。`.current/.config.json`：`cutApprovalAutoTier` 規劃時為 `{}`，人類 2026-11-25 裁定開 manifest tier，改為 `{ "manifest": true }`（隨本清單 PR 進 `main`，`agc feature start` 把它複製進 lane；`allowSchemaChange`、`allowDesignArmed` 仍為預設 false）、`laneProtocolAddendum` = `docs/lane-protocol-addendum.md`（共用生成物：`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`）。
 - **實測數字（`dist/`）**：`GATE_REGISTRY.length` 33、`UPDATE_STATE_GATE_PIPELINE.length` 17、`EVIDENCE_SCHEMA_CURRENT` 2（`gates/evidence-schema.ts:9`）、`CLAUDE.md` 250 行、`package.json` 版本 4.23.0（v5.0.0 尚未 tag）。
 - **13 張票的檔案面重疊（決定分組的事實）**：
   - `content/**`：E453、E456、E458（E462 (5) 也改 `content/skill-spec-workshop.md`；E448 若選「拆掉」也要改）。
@@ -49,8 +49,9 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 - **E459 不改 `content/skill-code-reviewer.md` 第 17 行**：修法只讓 lane-status 不再採信手寫的 round 標題；e448 的 cut 若認為 SOP 也要改 → 寄信給整合者，轉給 e453。
 - **`CLAUDE.md` 不動**：沒有 lane 新增 `tools/*.ts`（不加 Layout 列），仍 250 行（`test/e433-test-first-rules.test.mjs` 第 554 行釘點）。cut 若必須新增 `tools/*.ts` → 先寄信給整合者。
 
-### 交給 lane 的 PM（寫進 cut，隨 cut 在 lane session 呈人類核准）
-- **實際走法**：新鏈（pm 寫入設 `chain_path: "test-first"`）；qa-engineer 先寫每個情境的測試與 `qa_reports/expected-red_<feature>.txt`；sr-engineer 照測試實作、不改 qa 寫的測試；code-reviewer 裁判並寫 PASS、`tw_complete_task`。e448 建議走 architect（三種證據讀取規則統一、新 `evidence_schema` 值的啟動條件、E448 的啟動點）——架構師 Open Questions 回信箱做第二次預審；e453、e455 不走 architect。
+### 交給 lane 的 PM（寫進 cut；整合者預審 `close` 後依 manifest tier 自動核准）
+- **實際走法**：新鏈（pm 寫入設 `chain_path: "test-first"`）；qa-engineer 先寫每個情境的測試與 `qa_reports/expected-red_<feature>.txt`；sr-engineer 照測試實作、不改 qa 寫的測試；code-reviewer 裁判並寫 PASS、`tw_complete_task`。e448 建議走 architect（三種證據讀取規則統一、新 `evidence_schema` 值的啟動條件、E448 的啟動點）——架構師 Open Questions 回信箱做第二次預審，整合者 `close` 且沒有 needs human ruling 項目時 sr-engineer 直接開工；e453、e455 不走 architect。
+- **自動核准的前提**：cut 不含待選的選項、不含 needs human ruling 項目；有就照常停下來在 lane session 呈人類。e448 的 E452 要新增 `evidence_schema` 值——若 cut 把它判為 schema 變更（`allowSchemaChange` 為 false），e448 的 cut 停下來在 lane session 呈人類，這是預期結果，不要繞過。
 - **只有實作完才擷取得到的快照**（e453 的 golden 與預算上限）：照第 5、6 波人類裁定 R3 (b)：sr 做完最後一個實作 task 後計畫性退回 qa 一次（用掉 1 次 `sr_return`），qa 重擷取 golden、預算調到實測值並逐 hunk 說明，再經 sr 交給 code-reviewer。
 - PM probe 用完整套件試跑（`node scripts/test-lock.mjs -- npm test`），cut 逐檔列出紅的測試，標明是上表已知的還是新發現的；不在擁有欄的紅檔 → 預審時列給整合者，人類在整合者 session 核准後補進擁有欄。
 - 新訊息與新 hint 文字都寫進 cut 的 Copy / Strings。hint 與 SOP 文字不得引用只在本 repo 存在的路徑或裸票號（`content/**` 隨套件發給每個 adopter）。
@@ -104,4 +105,5 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 |---|---|---|---|
 | 2026-11-25 | 人類 | fan-out pre-v5.0.0 系列 13 張（E448、E451–E462），開始 Stage 1；13 張都要在 v5.0.0 tag 之前落地 | 整合者 session（「fan-out 這 13 張，開始 Stage 1」）；`docs/backlog.md` 第 571、574–585 行 |
 | 2026-11-25 | 整合者 | Stage 1：E462 的檔案面橫跨兩組、E461 的測試要等本波措辭與視覺字串定案，兩張排第 2 波（待人類核准）；第 1 波三條 lane：e453（服務文字與文件：E453、E454、E456、E457、E458 除 (8)）、e448（證據與 judge 檢查：E448、E451、E452、E459、E460、E458 (8)）、e455（ticket 檢查器：E455）；共用生成物歸 e453；`docs/config.md` 按段落分給 e453、e455；E448 以修法 (a) 為前提 | 本檔 |
-| 2026-11-25 | 人類 | 核准本清單：Q1 E448 採修法 (a)（在 code-reviewer PASS 寫入上重新啟動 `MISSING_REVIEW_EVIDENCE`，數量不變、不改 `content/**`）；Q2 E458 (8) 拆給 e448；Q3 `docs/config.md` 按段落分給 e455（第 185–225 行）與 e453（第 240–290 行）；Q4 E461、E462 排第 2 波；Q5 三條 lane 全部角色 pin opus（含 e448 的 architect）。Q6 未另指名：`cutApprovalAutoTier` 為 `{}`，每條 lane 的 cut 都在 lane session 呈人類，Lanes 表不設 `approval` 欄 | 整合者 session（「approve, Q1 a, Q2–Q5 yes」） |
+| 2026-11-25 | 人類 | 核准本清單：Q1 E448 採修法 (a)（在 code-reviewer PASS 寫入上重新啟動 `MISSING_REVIEW_EVIDENCE`，數量不變、不改 `content/**`）；Q2 E458 (8) 拆給 e448；Q3 `docs/config.md` 按段落分給 e455（第 185–225 行）與 e453（第 240–290 行）；Q4 E461、E462 排第 2 波；Q5 三條 lane 全部角色 pin opus（含 e448 的 architect）。Q6 見下一列 | 整合者 session（「approve, Q1 a, Q2–Q5 yes」） |
+| 2026-11-25 | 人類 | Q6：沒有 lane 要在 lane session 看 cut，可以自動核准；開 `cutApprovalAutoTier.manifest`（`.current/.config.json` 改為 `{ "manifest": true }`），Lanes 表不設 `approval` 欄。各 lane 的 cut 在整合者預審 `close` 後依憲法 §3.1 manifest tier 自動核准；條件不成立（例如 cut 含選項或 needs human ruling、schema 變更）時照舊停下來呈人類 | 整合者 session（「Q6, no, I don't, can be auto approve」） |
