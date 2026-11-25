@@ -86,15 +86,33 @@ export function hasDesignModeRequiringVisual(workspacePath, activeFeature) {
 // (`figma-export` -> figma). Any other token (`code`, `freehand`) is an
 // unrecognised declared mode: the next candidate is still tried, and a known mode
 // on any candidate wins. Only when no candidate yields a known mode is the FIRST
-// unrecognised token returned (cut to UNKNOWN_MODE_MAX chars + `…`), so the
-// caller arms the visual checks and names the value instead of silently staying
-// unarmed. It never arms the Figma-only check: that one reads FETCH_BASED_MODES.
+// unrecognised value returned as written (see declaredWord), so the caller arms
+// the visual checks and names the value instead of silently staying unarmed.
+// It never arms the Figma-only check: that one reads FETCH_BASED_MODES.
 // Only a candidate line with no token at all (e.g. `<figma>`) falls back to the
 // known mode that appears EARLIEST on the line (lowest match index): trailing
 // prose such as `image (no Figma)` must not let a later-mentioned mode win
 // (E319). Returns null if no candidate declares or names a mode.
 const KNOWN_MODES = ["figma", "sketch", "xd", "penpot", "pdf", "image", "paper", "prototype", "no-design"];
 const UNKNOWN_MODE_MAX = 40;
+// The declared value as the author wrote it, for an unrecognised mode: the first
+// word after the leading markdown wrappers, case kept, ended by whitespace or a
+// markdown/markup character, trailing punctuation dropped and the length capped,
+// so a value like `N/A` is reported whole and nothing after the word reaches an
+// error message.
+function declaredWord(raw) {
+    const word = /^[^\s`*_"'()[\]<>]*/.exec(raw.replace(/^[\s`*_"'([]+/, ""))?.[0] ?? "";
+    const trimmed = word.replace(/[.,;:]+$/, "");
+    return trimmed.length > UNKNOWN_MODE_MAX ? `${trimmed.slice(0, UNKNOWN_MODE_MAX)}\u2026` : trimmed;
+}
+// The rejection note for a declared mode the server does not know; "" for no
+// mode or a known one. Unknown values still arm the visual checks, so the note
+// names the one-word way out when there is no design source.
+export function unknownDesignModeNote(mode) {
+    if (mode === null || KNOWN_MODES.includes(mode))
+        return "";
+    return `"${mode}" is not a known design mode; write \`no-design\` if there is no design source. `;
+}
 function parseDesignMode(content) {
     // 1. Inline form: `mode: no-design` (no-design fast path, design-auditor L14)
     //    or `**Mode** — figma` (bullet form, L20). Scan the whole doc for the
@@ -125,10 +143,8 @@ function parseDesignMode(content) {
             if (prefixed !== undefined)
                 return prefixed;
             // A declared value outside the known list: remember the first one, keep looking.
-            if (firstUnknown === null) {
-                firstUnknown =
-                    token.length > UNKNOWN_MODE_MAX ? `${token.slice(0, UNKNOWN_MODE_MAX)}\u2026` : token;
-            }
+            if (firstUnknown === null)
+                firstUnknown = declaredWord(raw);
             continue;
         }
         // No declared token. Lowest-index word-boundary match wins. Bare `design`

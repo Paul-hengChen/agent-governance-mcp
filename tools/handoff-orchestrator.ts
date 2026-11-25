@@ -33,6 +33,7 @@ import {
   checkBaselineManifest,
   checkPixelGateAttestation,
   checkSourceCredibility,
+  unknownDesignModeNote,
 } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
@@ -864,6 +865,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                 text:
                   `⛔ VISUAL_BASELINES_REQUIRED: design/<feature>.md declares mode != no-design ` +
                   `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Baselines is absent. ` +
+                  unknownDesignModeNote(armCheck.mode) +
                   gate("VISUAL_BASELINES_REQUIRED").hintStatic,
               }],
               isError: true,
@@ -929,6 +931,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                       `⛔ VISUAL_ASSERTIONS_REQUIRED: design/<feature>.md declares mode != no-design ` +
                       `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Structural ` +
                       `Assertions is absent. ` +
+                      unknownDesignModeNote(armCheck.mode) +
                       gate("VISUAL_ASSERTIONS_REQUIRED").hintStatic,
                   }],
                   isError: true,
