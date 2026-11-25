@@ -29,6 +29,9 @@ workspace after upgrading.
   `REVIEWER_COMPLETED_TASKS_REJECTED` and `NON_QA_COMPLETED_TASKS_REJECTED`
   are replaced by one code, `NON_JUDGE_COMPLETED_TASKS_REJECTED`: only the
   judge (code-reviewer) may record `completed_tasks`.
+- A judge report whose verdict heading an older server appended mid-line (the
+  report had no trailing newline) is no longer read as a verdict: drift and
+  lane-status stop crediting those ids until the heading starts its own line.
 
 ## A feature mid-flight on the old path
 
@@ -94,7 +97,8 @@ Two build-entry checks run in file mode only: `CUT_APPROVAL_REQUIRED` and
 `EXTERNAL_REFS_UNRESOLVED` (`SCOPE_DECISION_REQUIRED` and
 `SOURCE_CREDIBILITY_UNVERIFIED` run in every mode). The expected-red manifest
 check on the qa-engineer → sr-engineer hand-off (`REPRO_MANIFEST_MISSING`) is
-file mode only too.
+file mode only too. So is the PASS-time review-evidence check
+(`MISSING_REVIEW_EVIDENCE`).
 
 ## Telemetry
 
