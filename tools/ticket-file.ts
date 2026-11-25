@@ -69,6 +69,8 @@ const STOPPED_RE = /^stopped\s+—\s+\S/;
 const SOURCE_ENTRY_RE = /^[0-9]+ rev [0-9]+$/;
 const ADDED_RE = /^Added:\s*(\S[^,]*),\s*(\d{4}-\d{2}-\d{2}),\s*(\S.*)$/;
 const KEYWORD_RE = /^(Given|When|Then|And)(\s|$)/;
+const SCENARIO_ID_RE = /^[A-Za-z][A-Za-z0-9-]*$/;
+const FENCE_RE = /^(```|~~~)/;
 const SCENARIO_SECTION = "## Scenarios";
 const ADDED_SECTION = "## Added during build";
 
@@ -136,7 +138,9 @@ interface RawScenario {
 
 /**
  * Collects `###` scenarios under the scenario and added-during-build sections.
- * Headings inside fenced code blocks are ignored; list markers are stripped.
+ * Fence delimiters and every line inside a fenced code block are skipped, so
+ * neither a heading nor a scenario line is read from a fence; list markers
+ * are stripped.
  */
 function collectScenarios(body: string[]): { raw: RawScenario[]; hasSection: boolean } {
   const raw: RawScenario[] = [];
@@ -146,15 +150,17 @@ function collectScenarios(body: string[]): { raw: RawScenario[]; hasSection: boo
   let current: RawScenario | null = null;
   for (const original of body) {
     const line = original.trim();
-    if (/^(```|~~~)/.test(line)) inFence = !inFence;
-    if (!inFence && /^##\s/.test(line)) {
+    const fence = FENCE_RE.test(line);
+    if (fence) inFence = !inFence;
+    if (fence || inFence) continue;
+    if (/^##\s/.test(line)) {
       current = null;
       section = line === SCENARIO_SECTION ? "scenarios" : line === ADDED_SECTION ? "added" : null;
       if (section === "scenarios") hasSection = true;
-    } else if (!inFence && /^###\s/.test(line) && section !== null) {
+    } else if (/^###\s/.test(line) && section !== null) {
       current = { heading: line.replace(/^###\s+/, ""), added: section === "added", lines: [] };
       raw.push(current);
-    } else if (!inFence && /^#{1,3}\s/.test(line)) {
+    } else if (/^#{1,3}\s/.test(line)) {
       current = null;
     } else if (current !== null && line.length > 0) {
       current.lines.push(line.replace(/^[-*]\s+/, ""));
@@ -167,6 +173,11 @@ function checkScenario(raw: RawScenario, problems: string[]): TicketScenario {
   const split = raw.heading.indexOf(" — ");
   const id = (split >= 0 ? raw.heading.slice(0, split) : raw.heading).trim();
   const title = split >= 0 ? raw.heading.slice(split + 3).trim() : "";
+  if (split < 0) {
+    problems.push(`scenario heading "${raw.heading}" has no " — " between the id and the title, so its title is empty`);
+  } else if (!SCENARIO_ID_RE.test(id)) {
+    problems.push(`scenario id "${id}" must start with a letter and hold only letters, digits or -`);
+  }
   const verifications = raw.lines.filter((l) => l.startsWith("Verification:"));
   let verification: TicketVerification | null = null;
   if (verifications.length === 0) problems.push(`scenario ${id} has no verification`);
