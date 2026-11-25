@@ -118,3 +118,20 @@ Placement branch: dispatch brief `Test-file placement` line (existing file `test
   in no compose bundle, as the PM probe predicted).
 - `test/context-budget.test.mjs`: no cap moved — green as-is (100/100 across the four files above).
 - No other probe-listed test turned red. No expected-red manifest change (this is a re-pin to green, not a new red).
+
+## T-E424-07 — header comment trim (amended cut)
+
+Placement branch: dispatch brief `Test-file placement` line (both existing E424 files; no new file).
+
+- `test/e424-ac-execution-exports.test.mjs` header: 8 -> 5 comment lines (plus the `Coded by` line).
+- `test/e424-per-scenario-acceptance.test.mjs` header: 13 -> 5 comment lines (plus the `Coded by` line).
+- Each header is now a one-sentence summary, the facts a reader needs, and a one-line pointer to
+  `specs/e424-per-scenario-acceptance-architecture.md`; every comment line is at most 80 columns.
+- Comments only: no assertion, logic, title or import change (commit 9cf7f1ed, 10+/19-).
+- Comment scan: the `agc check` comment scan (`dist/tools/comment-scan.js`, `analyzeText` + `findingsForFile`
+  with every line treated as added) reported `long-block 8 lines` and `long-block 13 lines` before the trim and
+  no finding for either file after. `node bin/agc-init.mjs check` exits 0 with no comment line (its diff base is
+  the branch upstream, so it would not list these files either way).
+- Suite: `node scripts/test-lock.mjs -- npm test` — 4727 pass / 4730, 0 fail, 3 skipped.
+- No new red test, so no expected-red manifest change; the existing manifest stays the feature's record, so no
+  no-new-test record is written.
