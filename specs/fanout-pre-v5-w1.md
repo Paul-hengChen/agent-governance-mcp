@@ -2,7 +2,7 @@
 base: 4d7de5b    integration branch: integ/pre-v5-w1
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准、派工中（2026-11-25）。** 人類在整合者 session 核准本清單（Q1 (a)、Q2–Q5 是）；派工 base 為本清單 PR 的 merge。
+**狀態：已結案 2026-11-25。** e453、e448、e455 依序 `--no-ff` 合進 `integ/pre-v5-w1`（merge `80f65f8`、`242de49`、`a07b06d`，三次皆零衝突、無實質解衝突），merge-invariants 每次 PASS；派工 base `70d34c6`（清單 PR #183），e453 波中 base-fix merge `934a0d2`（清單擁有欄更新 PR #184 → `e7c8906`）；integ 自 `main` @ `e7c8906` 開出；merge 後 build 無 `dist/` 差異、audit exit 0、`agc check` exit 0、`CLAUDE.md` 250 行、`GATE_REGISTRY` 33、pipeline 17 步。lane 層 CI：e455 run 45565881695 @ `9636895`、e453 run 45574778810 @ `a2b0528`、e448 run 45581118879 @ `d06b148`，整合層 CI run 45581851962 @ `a07b06d`，皆綠（Node 20、22）。Roll-up：e453 11 個 task、hop 6/14、review 退回 0、sr 退回 1/2（R3 (b) 計畫性）；e448 19 個 task、hop 8/14、review 退回 1（R1 結尾換行）；e455 6 個 task、hop 4/14、review 退回 0；證據 36/36。預算（~tok，e453 重擷取）：lean 6003、skill-sr 3308、design-arm 9236、teamwork 19221、non-design 7324；12 個 golden 重擷取。11 張票 done-mark（尚未發版，隨 v5.0.0 發出）；E461、E462 排第 2 波。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out 這 13 張，開始 Stage 1」，2026-11-25）：pre-v5.0.0 系列 13 張（E448、E451–E462；人類 2026-11-25 裁定全部要在 v5.0.0 tag 之前落地）。票面以 `docs/backlog.md` 第 571、574–585 行為準，含 2026-11-25 嚴格複核（main @ `466bfce`，PR #182）的更正與漏列處，以及人類裁定 E452 (a)、E456 (1) 上限為 4、E462 (4) `none`／`n/a`／`tbd` 不算 no-design。本清單排第 1 波的 11 張；E461、E462 排第 2 波（理由見派工前核對）。
 
@@ -119,3 +119,22 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-25 | 整合者 | e455 lane 報告（to-integrator#5）驗證通過：HEAD `9636895`（9 commits）、worktree 乾淨、證據 6/6（`review_reports/review_T-E455-01.md` APPROVED covers T-E455-01..06；`qa_reports/review_T-E455-01..06.md` 最後一筆伺服器 PASS）；`check --base main` 只有 `dist/tools/{config,ticket-file}.*` 6 檔越界——清單擁有欄漏列 tracked 建置產物 `dist/`，機械性且必要，接受；`docs/config.md` 只改第 185、208 行；無新發現、共用生成物未動；lane 層 CI run 45565881695 @ `9636895` 綠；review 退回 0、hop 4/14；`close`（to-lane#2） | e455 信箱 to-integrator#5 |
 | 2026-11-25 | 整合者 | e453 lane 報告（to-integrator#10）驗證通過：HEAD `a2b0528`（23 commits，含 base-fix merge `934a0d2`）、worktree 乾淨、證據 11/11（`review_reports/review_T-E453-01.md` APPROVED covers T-E453-01..11；`qa_reports/review_T-E453-01..11.md` 最後一筆伺服器 PASS）；`check --base origin/main` 只有 `dist/tools/{registry,transitions}.*` 4 檔越界（tracked 建置產物，同 e455，接受）；按行劃分的檔都守住範圍（`docs/config.md` 245、277；`docs/lane-protocol.md` 52、123；`test/e434-reviewer-visual.test.mjs` 只 61；`test/e433-test-first-rules.test.mjs` 的 AC9 未動）；無新發現；共用生成物（12 golden、5 個預算上限）以本 lane 為準；lane 層 CI run 45574778810 @ `a2b0528` 綠；review 退回 0、sr_return 1（R3 (b) 計畫性）、hop 6/14；`close` | e453 信箱 to-integrator#10 |
 | 2026-11-25 | 整合者 | e448 lane 報告（to-integrator#9）驗證通過：HEAD `d06b148`（16 commits）、worktree 乾淨、證據 19/19（`review_reports/review_T-E448-01.md` 第 2 輪 APPROVED covers T-E448-01..19；`qa_reports/review_T-E448-01..19.md`；judge 報告最後一筆伺服器 PASS）；`check --base origin/main` 35 檔越界全是 `dist/`（同 e455、e453，接受），原始碼 0 越界；`test/e434-reviewer-visual.test.mjs` 未碰第 61 行、`test/e433-test-first-rules.test.mjs` 只改 AC9；共用生成物未動；無新發現；lane 層 CI run 45581118879 @ `d06b148` 綠；review 退回 1（R1：報告沒有結尾換行時伺服器追加的 PASS 標題黏在行尾，lane 內修）、hop 8/14。接受 reviewer 在 `qa_reports/review_T-E448-01.md` 伺服器 PASS 標題前手動補一個換行（primary 舊伺服器把標題黏在行尾；只加換行、已在報告與 commit 揭露；合併後新規則需要它才認得這筆 PASS）。併進第 2 波（E462）的遷移指南說明：`MISSING_REVIEW_EVIDENCE` 只在 file mode 檢查；adopter 舊報告若被舊伺服器把判決標題黏在行尾，升級後 drift／lane-status 不再承認那些 id。清單擁有欄漏列 tracked 建置產物 `dist/`（三條 lane 都因此越界，機械性） | e448 信箱 to-integrator#9 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ e7c8906
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/pre-v5-w1 @ 2b3d4a3）
+- lane-status：primary（main ← integ/pre-v5-w1 @ 2b3d4a3）release-cd-v5.0.0／PASS／code-reviewer，hop 4，commits 0，clean
+### 已結案
+- 第 1 波三條 lane（e453、e448、e455）全部合進 `integ/pre-v5-w1`、finish、拆除；11 張票（E448、E451–E460）done-mark，尚未發版。lane 紀錄在 `.current/history/2026-11/{e453,e448,e455}/`。三條 lane 都沒有未配號的新發現；兩項整合者發現已併進 E462（舊註解三處、遷移指南兩句）。
+- e448 改了 server 程式：合併進 `main` 後要重啟 primary 的 MCP server，下一次 `tw_*` 才跑新規則（含 evidence schema 3）。
+### 待人類決定
+- 要不要開第 2 波（E461、E462）；它們在本波合併後才能開，佇列第 272、273 號列。
+- v5.0.0 何時發版：`release-cd-v5.0.0` 的發版驗證（PASS @ `bb28ef6`）只涵蓋九張，13 張 pre-v5 票全部落地後要重做並更新 CHANGELOG。
+- `cutApprovalAutoTier.manifest` 是否保留為 true（本波為了自動核准而開）。
+- 整合者提議（未裁定）：在清單加一條常設規則，只因本 lane 改動而紅、且沒有其他 lane 擁有的測試檔，由整合者核對後直接劃給該 lane並記 Decisions，不問人類；跨 lane 的改劃仍由人類裁定。
+### 進行中的背景工作
+無
