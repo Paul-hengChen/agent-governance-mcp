@@ -80,4 +80,7 @@ None: the manifest `qa_reports/expected-red_e461-mutation-test-gaps.txt` has zer
 
 ## Suite result
 
-Filled after the commit, on a clean tree (`node scripts/test-lock.mjs -- npm test`, `node scripts/smoke-qa-flow.mjs`).
+Run on a clean tree (`git status --porcelain` empty) at commit `c8fb76f`, Node 22.22.3:
+
+- `node scripts/test-lock.mjs -- npm test`: **4676 tests, 4674 pass, 0 fail, 2 skipped, exit 0.** The 2 skips are the base's history-dependent e130 closed-range checks (AC4, AC14), unchanged. 4676 = base probe 4668 + 8 new tests (5 in the new e461 file, the e419 full drift report case, the e422 ReadMe.md and rounding cases).
+- `node scripts/smoke-qa-flow.mjs`: **`12/12 smoke tests passed.`, exit 0**; the `qa-engineer PASS rejected at the tool boundary, judge named` line is `[PASS]` with the boundary message.
