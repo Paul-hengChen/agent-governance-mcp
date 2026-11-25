@@ -1,11 +1,9 @@
 // Coded by @qa-engineer
-// E424 unit contracts for the new gates/ac-execution.ts exports
-// (specs/e424-per-scenario-acceptance-architecture.md, Interface Contracts 1-6).
-// They pin the decided open questions the end-to-end AC tests in
-// test/e424-per-scenario-acceptance.test.mjs do not reach: citation parsing (OQ-1, OQ-5),
-// the last-section rule (OQ-6), the record entry shape (OQ-3, DR-5, DR-6) and the
-// rejection text order (Copy ac.ticket.order). The module is imported as a namespace so
-// each test reports on its own while an export is still missing.
+// E424 unit contracts for the new gates/ac-execution.ts exports.
+// Pins citation parsing, the last-section rule, entry shape, rejection order,
+// which the end-to-end e424-per-scenario-acceptance tests do not reach.
+// Namespace import keeps each test independent while an export is missing.
+// Rationale: specs/e424-per-scenario-acceptance-architecture.md.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

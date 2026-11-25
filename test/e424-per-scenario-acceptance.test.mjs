@@ -1,16 +1,9 @@
 // Coded by @qa-engineer
-// E424 per-scenario acceptance (specs/e424-per-scenario-acceptance.md, AC1-AC12 and AC14).
-// When a spec cites a ticket file (`Ticket: docs/tickets/<name>.md`), the existing
-// AC_EXECUTION_LOG_MISSING step on the judge's PASS must find a "pass" entry in the
-// `## AC Execution Log` record for every scenario verified by a test or a command;
-// device-or-person scenarios are listed as awaiting manual verification and never block.
-// The check is additive: today's proof:-heading check still runs first, unchanged.
-// Every AC test drives the real tw_update_state orchestrator (handleUpdateState) in file
-// mode with a code-reviewer PASS write on a temp workspace whose other PASS gates pass.
-// The record is carried by the write's own qa_review text, which the QA_REVIEW_RECORD step
-// appends to qa_reports/review_<id>.md before this step reads it (same seam as
-// test/ac-execution.test.mjs I1/I2). Only existing exports are imported, so every test
-// reports on its own; the unit contracts live in test/e424-ac-execution-exports.test.mjs.
+// E424 per-scenario acceptance end to end (AC1-AC12, AC14).
+// With a cited ticket file, a judge PASS needs a "pass" AC Execution Log entry
+// per test/command scenario; each test drives handleUpdateState in file mode.
+// Unit contracts: test/e424-ac-execution-exports.test.mjs.
+// Rationale: specs/e424-per-scenario-acceptance-architecture.md.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
