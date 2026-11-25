@@ -14,3 +14,5 @@
 {"ts":"2026-11-25T17:44:24.773Z","feature":"e425-stop-ticket-batch","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T17:46:40.597Z","feature":"e425-stop-ticket-batch","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T17:47:10.846Z","feature":"e425-stop-ticket-batch","agent_id":"sr-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T17:47:33.541Z","feature":"e425-stop-ticket-batch","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T17:48:10.539Z","feature":"e425-stop-ticket-batch","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
