@@ -4,12 +4,13 @@
 // gates/qa-review.ts's hasEvidenceInFile, which is a live gate and scans the
 // qa_reports/ root only. Looks for review_<id>.md in the root and in
 // qa_reports/archive/<feature>/, plus `covers:` lines in both. A file counts
-// when its last verdict section is PASS or it has no verdict section at all.
+// when its last server-recorded verdict section (tools/evidence-file.ts
+// judgeReportStanding) is PASS, or it has none at all.
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/evidence-lookup.ts — verdict rule".
 
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "./evidence-file.js";
+import { buildCoverageIndex, encodeEvidenceId, judgeReportStanding, resolveJudgeReport } from "./evidence-file.js";
 
 // Same filename stem as gates/qa-review.ts evidencePath: both derive it via
 // the shared injective encodeEvidenceId, so this lookup and the live gate
@@ -50,32 +51,11 @@ function archivedFeatureDirs(workspacePath: string): string[] {
     .filter(safeIsDirectory);
 }
 
-// The verdict-heading shape gates/qa-review.ts's recordReviewInFile and
-// gates/code-review.ts's recorder both write:
-// `## <ISO timestamp> — PASS|FAIL — by <reviewer>`. Matched line-anchored so
-// prose elsewhere in a hand-authored report (which may say "PASS" or "FAIL"
-// in running text) is never mistaken for a recorded verdict.
-const VERDICT_HEADING_RE = /^##\s+\S+\s+—\s+(PASS|FAIL)\s+—\s+by\s+.+$/gm;
-
-// Returns the LAST recorded verdict in `content`, or null when the file
-// carries no verdict section at all (see module header, branch 2). Pure, no
-// I/O, never throws — a regex scan over a string.
-function lastVerdict(content: string): "PASS" | "FAIL" | null {
-  let last: "PASS" | "FAIL" | null = null;
-  const re = new RegExp(VERDICT_HEADING_RE.source, "gm"); // fresh lastIndex per call
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    last = m[1] as "PASS" | "FAIL";
-  }
-  return last;
-}
-
-// The content test (module header): no verdict section at all → qualifies
-// (branch 2, hand-authored trust class); a verdict section exists → only
-// qualifies when the LAST one is PASS (branch 1). A FAIL-only file — exactly
-// what recordReviewInFile writes on a rejected round — never qualifies.
+// The content test (module header): no server-recorded verdict section at
+// all -> qualifies (hand-authored trust class); otherwise it qualifies only
+// when the LAST one is PASS. A FAIL-only file never qualifies.
 function evidenceQualifies(content: string): boolean {
-  return lastVerdict(content) !== "FAIL";
+  return judgeReportStanding(content).verdict !== "FAIL";
 }
 
 function fileQualifiesAsEvidence(filePath: string): boolean {

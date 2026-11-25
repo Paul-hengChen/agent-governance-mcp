@@ -1041,7 +1041,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     name: "PASS_EXPECTED_RED_DIFF",
     codes: ["EXPECTED_RED_DIFF_MISSING"],
     run: (ctx) => {
-      const { parsed, storage } = ctx;
+      const { parsed, storage, evidenceSchemaPin } = ctx;
         if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
           // Expected-red diff gate: dormant unless sr-engineer declared
           // qa_reports/expected-red_<feature>.txt. When armed, at least one
@@ -1052,7 +1052,9 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
           if (storage instanceof FileHandoffStorage) {
             const manifest = hasExpectedRedManifest(parsed.workspace_path, parsed.active_feature);
             if (manifest.present) {
-              const disposition = hasExpectedRedDisposition(parsed.workspace_path, parsed.completed_tasks);
+              const disposition = hasExpectedRedDisposition(
+                parsed.workspace_path, parsed.completed_tasks, evidenceSchemaPin,
+              );
               if (!disposition.present) {
                 return {
                   content: [{

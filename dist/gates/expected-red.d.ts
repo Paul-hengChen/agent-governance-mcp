@@ -8,7 +8,7 @@ export declare function hasNoNewTestRecord(workspacePath: string, activeFeature:
     present: boolean;
     recordPath: string;
 };
-export declare function hasExpectedRedDisposition(workspacePath: string, taskIds: string[]): {
+export declare function hasExpectedRedDisposition(workspacePath: string, taskIds: string[], evidenceSchema?: number): {
     present: boolean;
 };
 //# sourceMappingURL=expected-red.d.ts.map

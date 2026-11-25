@@ -7,7 +7,7 @@
 // Spec: specs/c15-expected-red-manifest.md.
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2Section, buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
+import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
 // The H2 heading qa-engineer's Phase 0.5 writes (skill-qa-engineer SOP 2a).
 const DISPOSITION_HEADING = "Expected-Red Diff";
 // Manifest and no-new-test record directory: qa's own artifacts, not the judge
@@ -57,8 +57,10 @@ export function hasNoNewTestRecord(workspacePath, activeFeature) {
 // Disposition: true iff a candidate review file for the PASS'd ids has the H2.
 // Per id: direct review_<id>.md, then its `covers:` file when the direct one is
 // missing or lacks the H2 (index built lazily, once per call). One feature-scoped
-// diff covers every id. Never throws (fs errors skip the file).
-export function hasExpectedRedDisposition(workspacePath, taskIds) {
+// diff covers every id. The heading match follows the evidence-schema pin
+// (pin 1 exact anchor; pin >= 2 or absent normalized-contains). Never throws
+// (fs errors skip the file).
+export function hasExpectedRedDisposition(workspacePath, taskIds, evidenceSchema) {
     const dir = resolveJudgeReport(workspacePath).dir;
     let coverage = null;
     const checked = new Set();
@@ -67,7 +69,7 @@ export function hasExpectedRedDisposition(workspacePath, taskIds) {
             return false;
         checked.add(file);
         try {
-            return sliceH2Section(fs.readFileSync(file, "utf-8"), DISPOSITION_HEADING) !== null;
+            return sliceH2SectionAt(fs.readFileSync(file, "utf-8"), DISPOSITION_HEADING, evidenceSchema) !== null;
         }
         catch {
             return false;
