@@ -71,12 +71,14 @@ function readTickets(cwd, given) {
 
 async function loadReadResults(cwd, given) {
   const url = given === undefined ? DEFAULT_ADAPTER : pathToFileURL(path.resolve(cwd, given));
-  const invalid = new CannotRun(`${P} adapter ${given ?? DEFAULT_ADAPTER.pathname} has no readResults function`);
+  const shown = given ?? DEFAULT_ADAPTER.pathname;
+  const invalid = new CannotRun(`${P} adapter ${shown} has no readResults function`);
   let mod;
   try {
     mod = await import(url.href);
-  } catch {
-    throw invalid;
+  } catch (err) {
+    const why = reason(err).split("\n")[0].trim() || String(err?.name ?? "import failed");
+    throw new CannotRun(`${invalid.message}\n${P} cannot load adapter ${shown}: ${why}`);
   }
   if (typeof mod.readResults !== "function") throw invalid;
   return mod.readResults;
