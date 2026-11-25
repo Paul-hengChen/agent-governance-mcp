@@ -16,6 +16,11 @@ export declare function sliceH2SectionAt(content: string, heading: string, evide
 export declare function findH2LineAt(content: string, heading: string, evidenceSchema?: number): string | null;
 export declare function parseUncheckedLabels(section: string): string[];
 export declare function parseAssertionFailures(section: string): string[];
+export interface RegionDiffRow {
+    readonly id: string;
+    readonly result: string;
+}
+export declare function parseRegionDiffRows(section: string): RegionDiffRow[];
 export declare function parseRegionDiffFailures(section: string): string[];
 export declare function splitTableCells(line: string): string[];
 export declare function normalizeStatus(rawCell: string): string;

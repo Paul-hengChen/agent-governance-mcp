@@ -299,19 +299,27 @@ export function parseAssertionFailures(section: string): string[] {
     const cells = parts.map((c) => c.trim());
     if (cells.length < 2) continue;
     const id = cells[0];
-    if (id === "" || /assertion\s*id/i.test(id)) continue; // header row
+    // Header row: the whole first cell is `assertion` / `assertion id`, so an
+    // id that merely contains the word (assertionIdle) is a data row.
+    if (id === "" || /^assertion(\s*id)?$/i.test(id)) continue;
     const result = cells[cells.length - 1].toLowerCase();
     if (result !== "pass") failures.push(id);
   }
   return failures;
 }
 
-// Region Diff rows `| surface | result |` where result ∈ {pass, accepted}.
-// Anything else (fail, material, unresolved, blank, drift) is a failure.
-// "accepted" is allowed because a difference reviewer-visual deliberately accepts is
-// recorded in `## Allowed Differences`; here it signals "diff exists but cleared".
-export function parseRegionDiffFailures(section: string): string[] {
-  const failures: string[] = [];
+// One Region Diff table row: the first-cell surface id and the last-cell
+// result, lower-cased and trimmed.
+export interface RegionDiffRow {
+  readonly id: string;
+  readonly result: string;
+}
+
+// Region Diff rows `| surface | result |`, header and separator rows skipped.
+// The header skip lives only here: the whole first cell must be `surface` /
+// `surface id`, so ids such as card-surface or Surfaces.list are data rows.
+export function parseRegionDiffRows(section: string): RegionDiffRow[] {
+  const rows: RegionDiffRow[] = [];
   for (const line of section.split("\n")) {
     const t = line.trim();
     if (!t.startsWith("|")) continue;
@@ -322,11 +330,19 @@ export function parseRegionDiffFailures(section: string): string[] {
     const cells = parts.map((c) => c.trim());
     if (cells.length < 2) continue;
     const id = cells[0];
-    if (id === "" || /surface(\s*id)?/i.test(id)) continue; // header row
-    const result = cells[cells.length - 1].toLowerCase();
-    if (result !== "pass" && result !== "accepted") failures.push(id);
+    if (id === "" || /^surface(\s*id)?$/i.test(id)) continue;
+    rows.push({ id, result: cells[cells.length - 1].toLowerCase() });
   }
-  return failures;
+  return rows;
+}
+
+// Region Diff ids whose result is not pass or accepted (fail, material,
+// unresolved, blank, drift). "accepted" means the diff exists but
+// reviewer-visual cleared it and records it in `## Allowed Differences`.
+export function parseRegionDiffFailures(section: string): string[] {
+  return parseRegionDiffRows(section)
+    .filter((r) => r.result !== "pass" && r.result !== "accepted")
+    .map((r) => r.id);
 }
 
 // Split a markdown table line into trimmed cells, dropping the leading/trailing
