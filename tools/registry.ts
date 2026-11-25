@@ -767,7 +767,7 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
         cut_approved: {
           type: "boolean",
           description:
-            "Ticket-cut approval attestation. PM sets cut_approved: true on its pm:In_Progress write AFTER presenting the ticket cut inline in chat and obtaining human approval, to clear the CUT_APPROVAL_REQUIRED gate before routing to architect/sr-engineer. Feature-scoped: re-armed on every PM In_Progress re-entry and on any active_feature change.",
+            "Ticket-cut approval attestation. PM sets cut_approved: true on its pm:In_Progress write AFTER presenting the ticket cut inline in chat and obtaining human approval, to clear the CUT_APPROVAL_REQUIRED gate before routing to architect/qa-engineer. Feature-scoped: re-armed on every PM In_Progress re-entry and on any active_feature change.",
         },
         external_refs: {
           type: "array",
@@ -783,7 +783,7 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
             required: ["ref", "state"],
           },
           description:
-            "External-reference ledger (file-mode only). Array of {ref, state} entries; state ∈ {fetched, indexed, user-confirmed-ignorable, unresolved}. PM populates this during the Resource Audit Gate — one entry per external artifact the spec references. Passing it REPLACES the array wholesale (not merged). Any entry left unresolved blocks the pm:In_Progress → {architect,sr-engineer}:In_Progress build-entry hop (EXTERNAL_REFS_UNRESOLVED). Absence/empty = zero external refs found = non-blocking. Feature-scoped: preserved across same-feature writes, dropped on active_feature change.",
+            "External-reference ledger (file-mode only). Array of {ref, state} entries; state ∈ {fetched, indexed, user-confirmed-ignorable, unresolved}. PM populates this during the Resource Audit Gate — one entry per external artifact the spec references. Passing it REPLACES the array wholesale (not merged). Any entry left unresolved blocks the pm:In_Progress → {architect,qa-engineer}:In_Progress build-entry hop (EXTERNAL_REFS_UNRESOLVED). Absence/empty = zero external refs found = non-blocking. Feature-scoped: preserved across same-feature writes, dropped on active_feature change.",
         },
         next_role: {
           type: "string",
@@ -832,7 +832,7 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
           type: "string",
           enum: ["feature", "bugfix"],
           description:
-            "Ticket dispatch-mode classification (file-mode only). PM sets \"bugfix\" at cut time to mark a repro-first bug-fix ticket: the server then BLOCKS the sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase handoff with REPRO_MANIFEST_MISSING until qa_reports/expected-red_<feature>.txt records the failing reproduction test(s), and QA's Phase 0.5 expected-red disposition becomes load-bearing for PASS. Absence === \"feature\" (the default) — feature-mode chains are unaffected. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry; opt back into the full chain by explicitly setting \"feature\". Never gates a transition edge itself (handoff schema v11).",
+            "Ticket dispatch-mode classification (file-mode only). PM sets \"bugfix\" at cut time to mark a repro-first bug-fix ticket: the server then BLOCKS the sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase handoff with REPRO_MANIFEST_MISSING until qa_reports/expected-red_<feature>.txt records the failing reproduction test(s), and code-reviewer's Expected-Red Diff becomes load-bearing for PASS (every manifest entry green, no red off the manifest). Absence === \"feature\" (the default) — feature-mode chains are unaffected. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry; opt back into the full chain by explicitly setting \"feature\". Never gates a transition edge itself (handoff schema v11).",
         },
         cut_approved_source: {
           type: "string",

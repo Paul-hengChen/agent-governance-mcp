@@ -155,7 +155,7 @@ dispatch prompt is **void**.
 limits, the coordinator absorbed the design-auditor, sr-engineer, and qa roles inline —
 the same actor wrote the code, authored the verdict criteria, and signed the PASS, with no
 independent adversary left. The guard was born here for the visual verdict; it now lives in
-§3, generalized to every code-review verdict, qa verdict and PASS, because the same collapse
+§3, generalized to every code-review verdict and every PASS, because the same collapse
 voids a non-visual verdict just as surely. See Constitution §3.
 
 **Why "no global-frame metric" (false-PASS prevention).** Retrospective B2: the Language
