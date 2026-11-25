@@ -80,3 +80,4 @@
 {"ts":"2026-11-10T08:11:45.259Z","feature":"release-cd-v4.20.0","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.20.0"}
 {"ts":"2026-11-16T10:23:06.482Z","feature":"release-cd-v4.21.0","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.21.0"}
 {"ts":"2026-11-19T10:21:13.155Z","feature":"release-cd-v4.22.0","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.22.0"}
+{"ts":"2026-11-25T14:54:47.301Z","feature":"release-cd-v5.0.0-r2","tickets":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"5.0.0"}
