@@ -18,9 +18,9 @@ Trigger phrase → candidate role. **Scope gate (below) overrides** — if all g
 | **design source detected** (see *Design-source detection* below) | `design-auditor` |
 | plan, spec, break down, create tasks | `pm` |
 | design, architecture, interface contract | `architect` |
-| implement, fix, refactor, add feature | `sr-engineer` |
-| review, code review, judge diff, verify, validate, rollback | `code-reviewer` |
-| test, write tests, test authoring | `qa-engineer` |
+| implement, fix, refactor, add feature | `sr-engineer`, reached through a pm-stamped opening write and `qa-engineer` (*Cheapest-Compliant-Path Intake* mini-chain) |
+| review, code review, judge diff, verify, validate, rollback | `code-reviewer`, after `sr-engineer` or alone through the single-role judge dispatch (Constitution §3.1) |
+| test, write tests, test authoring | `qa-engineer`, reached through a pm-stamped opening write (*Cheapest-Compliant-Path Intake* mini-chain) |
 | Q&A, status check, doc tweak | execute directly |
 
 ## Complexity Scope Gate
