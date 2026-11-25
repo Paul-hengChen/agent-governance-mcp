@@ -224,3 +224,8 @@ with one `#` record in their place, following the e435 precedent (T-E435-40 clea
 34 qa-written rows from T-E453-01..04 are left as they are for sr-engineer's disposition check in T-E453-11.
 
 ### Results
+
+Clean tree (`git status --porcelain` empty) at `d2bf944` (T-E453-10 commit `9332246` plus the lane-state checkpoint),
+`node scripts/test-lock.mjs -- npm test`: **4605 tests, 4603 pass, 0 fail, 2 skipped, 0 cancelled** (exit 0). The 17
+snapshot reds are green; the 2 skips are the same history-dependent closed-range checks as in the sr run (fan-out-base
+`git diff` AC4, `121ddc8` owned-files AC14). `test/e433-test-first-rules.test.mjs` AC9 untouched.
