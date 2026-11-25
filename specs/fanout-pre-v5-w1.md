@@ -1,0 +1,107 @@
+# Fan-out: pre-v5.0.0 修正第 1 波（E448、E451–E460）
+base: 4d7de5b    integration branch: integ/pre-v5-w1
+mailbox: ../agent-governance-mcp-lanes/_mailbox
+
+**狀態：已核准、派工中（2026-11-25）。** 人類在整合者 session 核准本清單（Q1 (a)、Q2–Q5 是）；派工 base 為本清單 PR 的 merge。
+
+範圍由人類指定（integrator prompt「fan-out 這 13 張，開始 Stage 1」，2026-11-25）：pre-v5.0.0 系列 13 張（E448、E451–E462；人類 2026-11-25 裁定全部要在 v5.0.0 tag 之前落地）。票面以 `docs/backlog.md` 第 571、574–585 行為準，含 2026-11-25 嚴格複核（main @ `466bfce`，PR #182）的更正與漏列處，以及人類裁定 E452 (a)、E456 (1) 上限為 4、E462 (4) `none`／`n/a`／`tbd` 不算 no-design。本清單排第 1 波的 11 張；E461、E462 排第 2 波（理由見派工前核對）。
+
+## 派工前核對（整合者，2026-11-25，規劃時；派工時在派工 base 重做一次）
+- `git worktree list` 只有 primary；`main` = `4d7de5b`（PR #182 merge）、工作樹乾淨；沒有 open 的 pull request；`feat/e448-*`、`feat/e453-*`、`feat/e455-*`、`integ/pre-v5-w1` 都不存在；`../agent-governance-mcp-lanes/` 只剩空的 `_mailbox/`。primary handoff 停在 `release-cd-v5.0.0`（PASS，code-reviewer），drift 無（T-REL4-02、T-E421-01、T-E421-02 是舊 feature 的 evidence-backed 標記，照 drift 訊息不 sync）。`.current/.config.json`：`cutApprovalAutoTier` = `{}`（manifest tier 未開 → 每條 lane 的 cut 都在 lane session 呈人類）、`laneProtocolAddendum` = `docs/lane-protocol-addendum.md`（共用生成物：`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`）。
+- **實測數字（`dist/`）**：`GATE_REGISTRY.length` 33、`UPDATE_STATE_GATE_PIPELINE.length` 17、`EVIDENCE_SCHEMA_CURRENT` 2（`gates/evidence-schema.ts:9`）、`CLAUDE.md` 250 行、`package.json` 版本 4.23.0（v5.0.0 尚未 tag）。
+- **13 張票的檔案面重疊（決定分組的事實）**：
+  - `content/**`：E453、E456、E458（E462 (5) 也改 `content/skill-spec-workshop.md`；E448 若選「拆掉」也要改）。
+  - `gates/registry.ts`：E448（`MISSING_REVIEW_EVIDENCE` hint，約第 326–335 行）、E458 (8)（17 段 `hintStatic` 的 `specs/…`／`docs/backlog.md` 引用，第 134–611 行之間）、E462 (1)（第 300–304、594 行註解）。
+  - `tools/handoff-orchestrator.ts`：E448（pipeline 第 17 步，第 1113–1140 行）、E459（file-mode PASS 證據，約第 814–833 行）、E462 (2)(3)。
+  - `tools/evidence-file.ts`：E451、E452；`gates/visual.ts`：E452、E462 (4)；`gates/expected-red.ts`：E459、E462 (1)；`gates/qa-review.ts`：E459（`hasEvidenceInFile`）、E462 (3)（第 135 行報告標題 `# QA review — <id>`）。
+  - `tools/transitions.ts`：E456（第 394 行註解）、E462 (1)；`tools/registry.ts`：E458 (5) 與漏列的 `cut_approved`／`external_refs` 描述、E462。
+  - `docs/migration-v5.md`：E454（第 14、38、69–72 行與 SQLite 段）、E456（第 18 行）。`docs/architecture.md`：E456（約第 244 行）、E457（第 69–76、112 行）。`docs/config.md`：E455（`ticketDir` 段第 190–210 行）、E457（第 245 行）、E458 (6)（第 277 行）。
+  - `test/e433-test-first-rules.test.mjs`：E453（AC5 約第 347 行）、E458（AC2(c)）、E461 (1)(8)。`test/e431-test-first-server-path.test.mjs`：E460（AC14 第 653–680 行）、E448（第 794 行步驟名單，re-arm 不改）。
+- **E462 把整批連成一塊**：它的 10 個檔分屬下面兩條 lane 的擁有面；E461 是純測試，要改的 `test/e433-test-first-rules.test.mjs` 與 e453 重疊，`test/e422-*` 與 e455 重疊，而且它的 (1)(3) 測的是本波會改的措辭與視覺報告字串，應在本波合併後才寫。結論：E461、E462 不進本波，排第 2 波，從本波合併後的 `main` 開（人類 2026-11-25 核准）。
+- **E448 有兩個修法、需要人類裁定**（票面「re-arm … or remove」）：（a）在 code-reviewer PASS 寫入上重新啟動檢查——`GATE_REGISTRY` 仍 33、pipeline 仍 17 步、`content/const-08-chain-31-mid.md` 與 `content/skill-code-reviewer.md` 的宣稱從此成真，不動 `content/**`；（b）拆掉 gate、registry 列與 content 引用——數量變 32／16，牽動 E457 的文件數字與新測試、`CLAUDE.md` 的「17-step」、`test/e35-pipeline-order.test.mjs`，且要改 `content/**`（歸 e453），兩條 lane 互相依賴。**人類 2026-11-25 裁定 (a)**；本清單的檔案劃分以 (a) 為準。
+- **E458 (8) 劃給 e448（拆票，人類 2026-11-25 核准）**：(8) 只改 `gates/registry.ts` 的 `hintStatic` 文字；`gates/registry.ts` 同時是 E448 的檔，且 (8) 點名的 `AC_EXECUTION_LOG_MISSING`、`PASS_TASKS_INCOMPLETE`、`QA_COMPLETION_EVIDENCE_MISSING`、repro gate 都是 e448 這條 lane 的證據檢查。E458 其餘各點與漏列處留在 e453。
+- **讀 lane 原始碼文字的測試（跨 lane 的部分；完整紅燈清單由各 lane 的 PM probe 用完整套件列出，預審時核對）**：
+
+| 被讀的檔 | 讀它的測試 | 檢查什麼 | 歸誰、怎麼保持綠 |
+|---|---|---|---|
+| `tools/handoff-orchestrator.ts`（e448） | `test/context-budget.test.mjs` 第 996–1007 行（e453 擁有） | orchestrator 從 `gates/visual` import `hasDesignModeRequiringVisual` | e448 不動這個 import |
+| `content/*.md`（e453） | `test/e434-reviewer-visual.test.mjs` 第 689–695 行、`test/error-code-contract.test.mjs`（e448 擁有） | `gates/registry.ts` 的 errorCode → doc-file 對照註解（第 75 行起）每列 = 實際以反引號引用該錯誤碼的 content 檔 | e453 不新增、不刪除 content 裡反引號引用的錯誤碼；改到的行（const-08 第 8–11 行、const-12 第 16–19 行、skill-code-reviewer 第 100–106 行、skill-reviewer-visual 第 90–96 行）現有的錯誤碼原樣保留；非動不可 → 寄信給整合者 |
+| `content/const-01-core-head.md` Limits 表（e453） | 12 個 compose golden（e453 擁有）的第 13 行 `review_round` cap 3 | 位元組相同 | e453 重擷取 golden，逐 hunk 說明 |
+| `tools/transitions.ts` 第 158 行的遷移提示字串 | `test/e151-*`、`test/e32-e33-*`、`test/e431-*`、`test/e432-*`、`test/e435-*` | 字串原文 | 本波沒有 lane 改這行（E454 只改 `docs/migration-v5.md` 本文，不改提示字串） |
+| `GATE_REGISTRY.length`、`UPDATE_STATE_GATE_PIPELINE.length` | E457 新增的文件數字測試（e453） | 文件裡的 `<n>-step`、`<n> entries`、`<n> gate definitions`、`<n> gates` 等於實際數量 | e448 依 (a) 不改數量；cut 若必須改 → 寄信給整合者 |
+| `tools/ticket-file.ts`、`docs/ticket-format.md`（e455） | `test/context-budget.test.mjs`（e453 擁有） | 有提到 ticket-file 的那段 | e455 PM probe 若打紅 → 寄信給整合者 |
+
+## Lanes
+| lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |
+|---|---|---|---|---|---|---|---|
+| e453 | E453＋E454＋E456＋E457＋E458（(8) 除外） | feat/e453-served-text-v5 | ../agent-governance-mcp-lanes/e453 | `content/skill-code-reviewer.md`、`content/skill-reviewer-visual.md`、`content/const-01-core-head.md`、`content/const-05-core-standards.md`、`content/const-06-chain-31-head.md`、`content/const-08-chain-31-mid.md`、`content/const-12-chain-r10-s4.md`、`content/const-15-core-tail.md`、`content/coord-01-core-head.md`、`content/coord-03-core-fallback.md`、`content/coord-05-core-visual-drift.md`、`content/skill-sr-engineer.md`、`content/skill-integrator.md`、`content/skill-design-auditor.md`、`content/constitution-rationale.md`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`tools/registry.ts`（只限 tool／prompt 描述文字）、`tools/transitions.ts`（只限第 394 行一帶的註解）、`docs/migration-v5.md`、`docs/architecture.md`、`docs/config.md`（只限第 240–290 行）、`docs/lane-protocol.md`（只限第 52、123 行一帶）、`docs/schema-versions.md`（只在 cut 寫明時）、`CONTRIBUTING.md`、`test/e433-test-first-rules.test.mjs`、`test/e393-builder-judge-core.test.mjs`、`test/e441-tool-description-contracts.test.mjs`（只在 PM probe 紅時）、`test/e457-*.test.mjs`（新，qa 定名）、`test/e453-*.test.mjs`、`test/e456-*.test.mjs`、`test/e458-*.test.mjs`（新，qa 定名）、其他只因本 lane 而紅的測試（PM probe 逐檔列出，整合者預審確認）、`specs/e453-*.md`、`.current/e453/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；e448、e455 擁有的全部；其他所有 `content/**`；`gates/**`、`schema/**`、`prompts/**`、`templates/**`、`bin/**`、`scripts/**`；`tools/**` 除上列兩檔的限定範圍；`CLAUDE.md`、`AGENTS.md`、`.antigravityrules`、`README.md`、`CHANGELOG.md`、`docs/lane-protocol-addendum.md`、`docs/ticket-format.md`、`docs/backlog.md`、`docs/v4.0.0-new-tickets.md` | 做：E453 (1)(2) 與複核更正 (a)(c) 和漏列的 `content/skill-reviewer-visual.md` 第 92–95 行，E433 AC5 重釘；E454 (1)–(3) 依複核更正（只有 `CUT_APPROVAL_REQUIRED`、`EXTERNAL_REFS_UNRESOLVED` 是 file-mode only；新舊 server 混用是 file-mode `handoff.md` 的風險、寫在 SQLite 段外；第 14 行 15 → 17；刪檔重跑會蓋掉 `AGENTS.md`／`.antigravityrules` 本地修改的警告）；E456 (1)–(4) 依人類裁定上限 4 與漏列的 `const-12` 第 18 行、`tools/transitions.ts` 第 394 行註解；E457 數字與第 69–76 行清單、漏列的 `docs/config.md` 第 245 行與 `CONTRIBUTING.md` 第 252 行，加文件數字測試；E458 (1)–(7)、(9) 與漏列處（`skill-design-auditor` 第 56 行、`tools/registry.ts` 約第 770、786 行、`coord-01` 第 22–23 行、`constitution-rationale` 第 158 行、`docs/lane-protocol.md` 第 123 行），E433 AC2(c) 與 `test/e393-*` 第 24 行重釘；golden 重擷取、預算上限調整。不做：E458 (8)（歸 e448）；任何 server 行為；`tools/transitions.ts` 的程式與第 158 行提示字串；`REVIEW_ROUND_CAP`；E461、E462（第 2 波） | 無 |
+| e448 | E448＋E451＋E452＋E459＋E460＋E458 (8) | feat/e448-judge-evidence-checks | ../agent-governance-mcp-lanes/e448 | `tools/handoff-orchestrator.ts`、`gates/registry.ts`、`gates/qa-review.ts`、`gates/expected-red.ts`、`gates/visual.ts`、`gates/evidence-schema.ts`、`gates/code-review.ts`（只在 cut 寫明時）、`tools/evidence-file.ts`、`tools/evidence-lookup.ts`（只在 cut 寫明時）、`tools/drift.ts`（只在 cut 寫明時）、`tools/lane-status.ts`、`tools/tasks.ts`、`tools/tasks-file.ts`、`test/e434-reviewer-visual.test.mjs`、`test/e431-test-first-server-path.test.mjs`、`test/e23-evidence-schema.test.mjs`、`test/error-code-contract.test.mjs`、`test/e432-judge-report-checks.test.mjs`、`test/e177b-lane-status.test.mjs`、`test/e32-e33-gate-hardening.test.mjs`、`test/e154-multi-covers.test.mjs`、`test/qa-flow.test.mjs`、`test/visual-evidence-gate.test.mjs`、`test/gates-expected-red.test.mjs`、`test/e448-*.test.mjs`、`test/e451-*.test.mjs`、`test/e452-*.test.mjs`、`test/e459-*.test.mjs`、`test/e460-*.test.mjs`（新，qa 定名）、`test/fixtures/` 下本 lane 新增的 fixture、其他只因本 lane 而紅的測試（PM probe 逐檔列出，整合者預審確認）、`specs/e448-*.md`、`.current/e448/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；e453、e455 擁有的全部；`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`；`tools/registry.ts`、`tools/transitions.ts`、`tools/handoff-*.ts`（orchestrator 除外）、`schema/**`、`prompts/**`、`templates/**`、`bin/**`、`scripts/**`；`CLAUDE.md`、`AGENTS.md`、`.antigravityrules`、`README.md`、`CHANGELOG.md`、`CONTRIBUTING.md`、`docs/**` | 做：E448 依人類裁定 (a)（在 code-reviewer PASS 寫入上重新啟動 `MISSING_REVIEW_EVIDENCE`，hint 與第 1117–1118 行註解不再提已拆掉的交接；給一個沒有 review 報告的 judge PASS → 被拒）；E451 只錨定 surface 那半，assertion 測試用 `assertionIdle \| fail` 這類 id；E452 依人類裁定 (a)：新的 `evidence_schema` 值、每個 `accepted` surface id 要出現在 `## Allowed Differences` 文字裡（寬鬆比對），封存報告不重判，負向測試，取代 E434 AC7 自讀 fixture 的斷言；E459 (1)–(3) 依複核更正（一條規則：file-mode judge PASS 每個新 id 要有 `qa_review` 或最後一筆 PASS 判決；expected-red 用 `sliceH2SectionAt(..., evidenceSchemaPin)`；lane-status 錨定伺服器寫入的時間戳格式，依 E432 D8、D1(iv)）；E460 `tw_complete_task` 與 `tw_rollback_task` 的拒絕都設 `isError: true`，在 E431 AC14 測試斷言；E458 (8) 依複核：17 段 hint 改成 adopter workspace 裡讀得到的說法。不做：`GATE_REGISTRY` 條數、pipeline 步數與順序（依 (a)）；`content/**`（需要時寄信給整合者，由 e453 改）；`tools/handoff-orchestrator.ts` 的 `hasDesignModeRequiringVisual` import；E462 的註解與三元式（第 2 波） | 無 |
+| e455 | E455 | feat/e455-ticket-checker-strict | ../agent-governance-mcp-lanes/e455 | `tools/ticket-file.ts`、`tools/config.ts`、`docs/ticket-format.md`、`docs/config.md`（只限第 185–225 行的 `ticketDir` 段）、`scripts/check-tickets.mjs`（只在 cut 寫明時）、`test/e422-ticket-file.test.mjs`、`test/e422-ticket-dir-config.test.mjs`、`test/e422-ticket-format-doc.test.mjs`、`test/e455-*.test.mjs`（新，qa 定名）、`test/fixtures/` 下本 lane 新增的 fixture、其他只因本 lane 而紅的測試（PM probe 逐檔列出，整合者預審確認）、`specs/e455-*.md`、`.current/e455/**`、`qa_reports/`、`review_reports/` | 共同禁止全部；e453、e448 擁有的全部；`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`；其他 `tools/**`、`gates/**`、`schema/**`、`prompts/**`、`templates/**`、`bin/**`；`CLAUDE.md`、`AGENTS.md`、`.antigravityrules`、`README.md`、`CHANGELOG.md`、`CONTRIBUTING.md`、其他 `docs/**` | 做：E455 七項依複核更正（(1) scenario id 照文件格式驗證、缺 ` — ` 時標題為空也要報；(2) `needs device or person` 只收 `yes`／`no`；(3) fence 內的行不算 `Verification:` 與 Given/When/Then，兩個方向都測；(4) `"."` 與只有空白的 `ticketDir` 不可用，`isNonEmptyString` 要 trim；(5) 清單含非文字項目的訊息；(6) `Added:` 日期要是真的日期；(7) `## Added during build` 之後還有 `##` 段要報，該段下的 `###` 不得被靜默丟掉）；新訊息由 PM 在 cut 寫進 Copy / Strings；文件同步。不做：E424 的逐 scenario 紀錄；E461 (7) 的 E422 測試補強（第 2 波） | 無 |
+
+## 所有權重劃（相對於 lane-protocol 預設與補充規則）
+- **共用生成物整組歸 e453**：`content/**`（只限上表逐檔列出的 15 檔）、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`。e448、e455 不改 compose bundle；PM probe 若發現它們打紅 → 寄信給整合者，由人類在整合者 session 裁定（記一列 Decisions）。
+- **E458 拆成兩半（人類 2026-11-25 核准）**：(8) 的 hint 文字歸 e448（`gates/registry.ts` 是 E448 的檔），其餘歸 e453。兩半各自在自己的 lane 完成；E458 的 done-mark 在兩條 lane 都合併後由整合者寫。
+- **`docs/config.md` 按段落分給兩條 lane（人類 2026-11-25 核准）**：e455 只限第 185–225 行（`ticketDir` 段），e453 只限第 240–290 行（第 245、277 行）；兩段相隔 15 行以上，merge 時若衝突逐 hunk 解並送 code-reviewer（5b-5）。`fanout.mjs check` 只看檔名，段落限制由整合者 5a 驗證時看 diff 範圍（第 3 波 `README.md` 的前例）。
+- **`tools/registry.ts`、`tools/transitions.ts` 歸 e453，但只限文字**：前者只限 tool／prompt 描述，後者只限第 394 行一帶的註解；兩檔的程式與 `tools/transitions.ts:158` 的遷移提示字串不動。
+- **`test/e431-test-first-server-path.test.mjs` 整檔歸 e448**：E460 的 AC14 斷言與 E448 的第 794 行步驟名單都在 e448。
+- **content 裡反引號引用的錯誤碼不增不減**：對照註解在 e448 擁有的 `gates/registry.ts`，檢查它的兩個測試也在 e448；e453 要增減就先寄信給整合者。
+- **E452 不改 content**：`content/const-11-design-chain-32.md` 與 `content/skill-reviewer-visual.md` 已寫明 accepted 的差異要列進 `## Allowed Differences`，伺服器補上這項檢查後原文仍正確。e448 的 cut 若認為要改措辭 → 寄信給整合者，轉給 e453。
+- **E459 不改 `content/skill-code-reviewer.md` 第 17 行**：修法只讓 lane-status 不再採信手寫的 round 標題；e448 的 cut 若認為 SOP 也要改 → 寄信給整合者，轉給 e453。
+- **`CLAUDE.md` 不動**：沒有 lane 新增 `tools/*.ts`（不加 Layout 列），仍 250 行（`test/e433-test-first-rules.test.mjs` 第 554 行釘點）。cut 若必須新增 `tools/*.ts` → 先寄信給整合者。
+
+### 交給 lane 的 PM（寫進 cut，隨 cut 在 lane session 呈人類核准）
+- **實際走法**：新鏈（pm 寫入設 `chain_path: "test-first"`）；qa-engineer 先寫每個情境的測試與 `qa_reports/expected-red_<feature>.txt`；sr-engineer 照測試實作、不改 qa 寫的測試；code-reviewer 裁判並寫 PASS、`tw_complete_task`。e448 建議走 architect（三種證據讀取規則統一、新 `evidence_schema` 值的啟動條件、E448 的啟動點）——架構師 Open Questions 回信箱做第二次預審；e453、e455 不走 architect。
+- **只有實作完才擷取得到的快照**（e453 的 golden 與預算上限）：照第 5、6 波人類裁定 R3 (b)：sr 做完最後一個實作 task 後計畫性退回 qa 一次（用掉 1 次 `sr_return`），qa 重擷取 golden、預算調到實測值並逐 hunk 說明，再經 sr 交給 code-reviewer。
+- PM probe 用完整套件試跑（`node scripts/test-lock.mjs -- npm test`），cut 逐檔列出紅的測試，標明是上表已知的還是新發現的；不在擁有欄的紅檔 → 預審時列給整合者，人類在整合者 session 核准後補進擁有欄。
+- 新訊息與新 hint 文字都寫進 cut 的 Copy / Strings。hint 與 SOP 文字不得引用只在本 repo 存在的路徑或裸票號（`content/**` 隨套件發給每個 adopter）。
+- qa 寫的測試要讀 base 樹原始碼比對時，擷取當下就讀進記憶體（Node 20 上暫存目錄事後再讀會 ENOENT）；不能用 `git show` 讀 base 樹（T-E77-02 的 meta-test 會擋）。CI 跑 Node 20 與 22。
+- cut 預審的信件 `type: proposal`，`re:` 一定要含 `cut`（例如 `re: cut e448`）。
+- 每個 AC 都要有實作 task，不只 qa task；每個 sr task 在 `task_size` 預算內。
+
+## 完成定義 → 票
+| 完成定義條目 | 由哪張票讓它成立 | 同一波？ |
+|---|---|---|
+| code-reviewer 退件那一列不再要求對未完成的 task 跑 `tw_rollback_task`（`skill-code-reviewer`、`skill-reviewer-visual` 兩處）；步驟 1 允許自己的 `(code-reviewer, In_Progress)` 檢查點、`(code-reviewer, Blocked)` 與 `resume_of` 指向 code-reviewer 的 pm 寫入；E433 AC5 重釘 | e453（E453） | ✓ |
+| 照 `docs/migration-v5.md` 操作後 `agc check` exit 0；sr-engineer 那列拆成 In_Progress／Blocked 兩種；file-mode only 的檢查與新舊 server 混用風險寫對；handoff schema 15 → 17 | e453（E454） | ✓ |
+| Limits 表 `review_round` cap = 4，意義「第 4 次 CHANGES_REQUESTED 之後只有 pm 能接」；`const-08`、`docs/architecture.md`、`tools/transitions.ts` 註解一致；hop 上限寫成每個 feature（`active_feature` 換才歸零）；`sr_return` 上限寫實際範圍（每次 `pm:In_Progress` 歸零、只擋 sr → qa）；服務出去的文字寫明 SQLite／HTTP 模式不計 `sr_return` | e453（E456） | ✓ |
+| 文件的 pipeline 步數、gate 數、`docs/config.md` 的 gate 數與 `CONTRIBUTING.md` 的測試檔數正確，step 1 的 override 清單含 `HOP_CAP_EXCEEDED`；新測試把文件數字綁到實際長度（含 `<n> gate definitions`、`<n> gates` 寫法） | e453（E457） | ✓ |
+| E458 (1)–(7)、(9) 與漏列處改寫；E433 AC2(c) 與 `test/e393-*` 重釘；不改 server 行為 | e453（E458） | ✓ |
+| E458 (8)：17 段 hint 不再引用 adopter workspace 裡不存在的路徑 | e448（E458 (8)） | ✓ |
+| 沒有 review 報告的 judge PASS 被拒（人類裁定 (a)）；hint 與註解不再提已拆掉的交接 | e448（E448） | ✓ |
+| Region Diff 失敗列 id 含 "surface" → PASS 被拒 `VISUAL_REPORT_INCOMPLETE`；assertion id 含 "assertion id" 同樣被拒 | e448（E451） | ✓ |
+| 新 `evidence_schema` 值下，`accepted` 的 surface id 沒列在 `## Allowed Differences` → PASS 被拒；封存報告不重判；E434 AC7 改測伺服器行為 | e448（E452） | ✓ |
+| file-mode PASS、SQLite、drift、lane-status 對 PASS 證據採同一規則；`## Step 7 — Expected-Red Diff` 這類標題照 evidence schema 規則比對；lane-status 不採信手寫 round 標題 | e448（E459） | ✓ |
+| `tw_complete_task` 與 `tw_rollback_task` 的拒絕都帶 `isError: true` | e448（E460） | ✓ |
+| ticket-file 檢查器的七項檢查都會報錯，新訊息有 Copy / Strings，`docs/ticket-format.md`、`docs/config.md` 同步 | e455（E455） | ✓ |
+| 合併後 `npm run build` 的 `dist/` commit、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`CLAUDE.md` 250 行、`GATE_REGISTRY` 33／pipeline 17 | 整合者（5b） | ✓ |
+| 11 張 done-mark（not yet released：隨 v5.0.0 發出）；佇列 `docs/v4.0.0-new-tickets.md` 補 E451–E462 列（E448 已是第 259 號）並排在 v5.0.0 tag 之前；E448 佇列列的優先度 P3 → P1；`npm run check:bookkeeping` exit 0 | 整合者（5c） | ✓ |
+| E461、E462 | 第 2 波（本波合併後，人類 2026-11-25 核准） | ✗ |
+| 本清單結案時寫 `## 接手步驟`，狀態行以「已結案」開頭 | 整合者（5c） | ✓ |
+
+## 整合後（整合者自己的 commit／接線）
+- merge 後 `node scripts/merge-invariants.mjs`；`npm run build` 後 commit `dist/`；golden 與預算以 e453 的擷取為準，合併後重跑確認；`docs/config.md` 若衝突逐 hunk 解並送 code-reviewer。
+- 合併並建置後重啟 primary 的 MCP server（e448 改了 server 程式）。
+- 記帳：見完成定義；`npm run check:bookkeeping` 直接跑、exit 0。
+- 接線票：無。
+- 第 2 波（E461、E462）從本波合併後的 `main` 開，另寫 `specs/fanout-pre-v5-w2.md`。
+- 不發版。`release-cd-v5.0.0` 的發版驗證（PASS @ `bb28ef6`，涵蓋九張）在這 13 張落地後要重做並更新 CHANGELOG——列進待人類決定。
+
+## 合併順序
+1. `integ/pre-v5-w1` 自當時的 `main` 開。
+2. ← `--no-ff` e453（共用生成物 lane 先）→ merge-invariants。
+3. ← `--no-ff` e448 → merge-invariants。
+4. ← `--no-ff` e455 → merge-invariants（`docs/config.md` 若衝突逐 hunk 解並送 code-reviewer）。
+5. `npm run build`、golden、預算、`check:bookkeeping`、audit；記帳 commit。
+6. 依序 `finish e453`、`finish e448`、`finish e455`（`--shipped --base integ/pre-v5-w1`）；`fanout.mjs handoff --closing`；push、CI、`gh pr create`、`gh pr merge --auto --merge`；merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only`、`git branch -d integ/pre-v5-w1`。不發版。
+
+## Dispatch pins
+- e453：`pm=opus`、`qa-engineer=opus`、`sr-engineer=opus`、`code-reviewer=opus`（人類 2026-11-25 核准，沿用第 5–7 波）。
+- e448：`pm=opus`、`architect=opus`、`qa-engineer=opus`、`sr-engineer=opus`、`code-reviewer=opus`（同上；走 architect，architect pin 一併核准）。
+- e455：`pm=opus`、`qa-engineer=opus`、`sr-engineer=opus`、`code-reviewer=opus`（同上）。
+
+## Decisions
+| 日期 | 裁決者 | 內容 | 出處 |
+|---|---|---|---|
+| 2026-11-25 | 人類 | fan-out pre-v5.0.0 系列 13 張（E448、E451–E462），開始 Stage 1；13 張都要在 v5.0.0 tag 之前落地 | 整合者 session（「fan-out 這 13 張，開始 Stage 1」）；`docs/backlog.md` 第 571、574–585 行 |
+| 2026-11-25 | 整合者 | Stage 1：E462 的檔案面橫跨兩組、E461 的測試要等本波措辭與視覺字串定案，兩張排第 2 波（待人類核准）；第 1 波三條 lane：e453（服務文字與文件：E453、E454、E456、E457、E458 除 (8)）、e448（證據與 judge 檢查：E448、E451、E452、E459、E460、E458 (8)）、e455（ticket 檢查器：E455）；共用生成物歸 e453；`docs/config.md` 按段落分給 e453、e455；E448 以修法 (a) 為前提 | 本檔 |
+| 2026-11-25 | 人類 | 核准本清單：Q1 E448 採修法 (a)（在 code-reviewer PASS 寫入上重新啟動 `MISSING_REVIEW_EVIDENCE`，數量不變、不改 `content/**`）；Q2 E458 (8) 拆給 e448；Q3 `docs/config.md` 按段落分給 e455（第 185–225 行）與 e453（第 240–290 行）；Q4 E461、E462 排第 2 波；Q5 三條 lane 全部角色 pin opus（含 e448 的 architect）。Q6 未另指名：`cutApprovalAutoTier` 為 `{}`，每條 lane 的 cut 都在 lane session 呈人類，Lanes 表不設 `approval` 欄 | 整合者 session（「approve, Q1 a, Q2–Q5 yes」） |
