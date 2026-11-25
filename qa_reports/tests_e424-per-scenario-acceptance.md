@@ -102,3 +102,19 @@ Both files run headlessly under `npm test` (temp workspaces under `os.tmpdir()`,
 
 `test/e118-reviewer-ac-completeness.test.mjs` AC7 (size cap 13190) turns red when T-E424-05 lands the step-8 text;
 re-pinned in T-E424-06.
+
+## T-E424-06 — AC13 re-pin (planned sr → qa return)
+
+Placement branch: dispatch brief `Test-file placement` line (existing file `test/e118-reviewer-ac-completeness.test.mjs`).
+
+- `test/e118-reviewer-ac-completeness.test.mjs` — `AC7 - token discipline`: measured
+  `content/skill-code-reviewer.md` = 13663 bytes at the lane HEAD after T-E424-05 (was 13090; +573 from Copy
+  sop.step8). Cap moves 13190 -> 13760 (measured size plus ~100 bytes of slack, per AC13 and the file's existing
+  E433/E434 re-baseline convention); allowed growth over BASE 9525 moves 3665 -> 4235. The test title and assertion
+  message carry the new numbers; a two-line `E424 re-baseline` comment sits with the earlier ones above the test.
+  Was red (13663 > 13190), now green (7/7 in the file).
+- Compose goldens (`test/fixtures/compose-golden/**`): not recaptured — no diff. `test/compose-equivalence.test.mjs`,
+  `test/e90-golden-capture-completeness.test.mjs`, `test/skill-manifest.test.mjs` green as-is (the code-reviewer SOP is
+  in no compose bundle, as the PM probe predicted).
+- `test/context-budget.test.mjs`: no cap moved — green as-is (100/100 across the four files above).
+- No other probe-listed test turned red. No expected-red manifest change (this is a re-pin to green, not a new red).
