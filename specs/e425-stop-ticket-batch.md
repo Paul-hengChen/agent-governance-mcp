@@ -17,8 +17,8 @@ Today any question that needs a human writes `Blocked` and the whole session wai
 
 Test files are qa-engineer's to name; `test/e425-*.test.mjs` below stands for them. Fixtures for the summary script are built in temp directories inside the tests (no new fixture files under `test/fixtures/`).
 
-- **AC1** (lane protocol, the mechanism) — Given `docs/lane-protocol.md`, when it is read, then §3 holds the subsection `C-LP2` verbatim (heading `### 批次 lane` placed after the last §3 bullet, before `## 4. 新發現`), and the §3 first bullet ends with `C-LP1`; the file keeps exactly its eight `## ` headings in their order, no line before line 41 changes, and it contains none of the repo-only strings `test/e290-lane-protocol-generic.test.mjs` forbids.
-  proof: `node --test test/e425-*.test.mjs` (the AC1 test) passes; `node --test test/e290-lane-protocol-generic.test.mjs test/e433-test-first-rules.test.mjs test/e383-lane-ledger-worktree.test.mjs test/e385-worktree-evidence.test.mjs` stays green.
+- **AC1** (lane protocol, the mechanism) — Given `docs/lane-protocol.md`, when it is read, then §3 holds the subsection `C-LP2` verbatim (heading `### 批次 lane` placed after the last §3 bullet, before `## 4. 新發現`), the §3 first bullet ends with `C-LP1`, and the §5 rule 2 *cut 預審* sub-item (the one ending `只在收工送 `type: report`。`) ends with `C-LP3`; the file keeps exactly its eight `## ` headings in their order, no line before line 41 changes, and it contains none of the repo-only strings `test/e290-lane-protocol-generic.test.mjs` forbids.
+  proof: `node --test test/e425-*.test.mjs` (the AC1 test, which asserts `C-LP1`, `C-LP2` and `C-LP3` at their places) passes; `node --test test/e290-lane-protocol-generic.test.mjs test/e433-test-first-rules.test.mjs test/e383-lane-ledger-worktree.test.mjs test/e385-worktree-evidence.test.mjs` stays green.
 - **AC2** (constitution override) — Given the constitution composed for a chain role, when it is built on a design-armed and on a non-design workspace, then `C-C08` appears exactly once, as a sub-bullet directly after the Manifest-tier line, and the existing Cut-Approval Gate and Manifest-tier lines are byte-unchanged; the lite composition does not contain it.
   proof: the AC2 test in `test/e425-*.test.mjs`.
 - **AC3** (coordinator SOP) — Given the `teamwork` coordinator bundle, when it is built, then the Escalation Routes table ends with the row `C-CO3` (exactly one row containing `Batch-lane stop`, with 4 cells), and SOP step 6 ends with `C-CO7`; every other Escalation Routes row is byte-unchanged.
@@ -55,6 +55,7 @@ All new text is `authored-here`: the rulings fix the behaviour, not the wording.
 | string id | exact text (quote verbatim) | source |
 |---|---|---|
 | C-LP1 | block `C-LP1` (appended to the end of `docs/lane-protocol.md` §3 first bullet, after `**不是核准**。`) | authored-here — names the override at the overridden sentence (E425 amendment (5)) |
+| C-LP3 | block `C-LP3` (appended to the end of `docs/lane-protocol.md` §5 rule 2 *cut 預審* sub-item, after `只在收工送 `type: report`。`) | authored-here — that sub-item says a cut failing the manifest tier is presented to the human; a batch lane must not (integrator pre-review, required change) |
 | C-LP2 | block `C-LP2` (new `###` subsection at the end of §3) | authored-here — the single statement of the mechanism (E425 body; amendment (2), (5); 11.4 rulings 1, 2, 4, 5; 15.2 ruling 8) |
 | C-C08 | block `C-C08` (new sub-bullet after the Manifest-tier line of `content/const-08-chain-31-mid.md`) | authored-here — names the two overridden constitution phrases (amendment (5)) |
 | C-CO3 | block `C-CO3` (new last row of `content/coord-03-core-fallback.md` Escalation Routes) | authored-here — the one coordinator Escalation Routes row (E425 body) |
@@ -75,12 +76,18 @@ All new text is `authored-here`: the rulings fix the behaviour, not the wording.
  例外：批次 lane 不等任何打字核准，見本節末的 *批次 lane*。
 ```
 
+`C-LP3`:
+
+```
+ 批次 lane 不把 cut 呈給人類，見 §3 的 *批次 lane*。
+```
+
 `C-LP2`:
 
 ```
 ### 批次 lane
 
-本小節是批次 lane 的唯一規則來源。它指名覆寫三處，只對批次 lane 生效，其餘 lane 照舊：本節第一條的「一律等人類在你這個 session 親手打字」、憲法 §3.1 Cut-Approval Gate 的「人類在對話中核准 cut 之後」，以及 §3.1 Manifest tier 的「HALT exactly as today」。
+本小節是批次 lane 的唯一規則來源。它指名覆寫四處，只對批次 lane 生效，其餘 lane 照舊：本節第一條的「一律等人類在你這個 session 親手打字」、§5 規則 2 *cut 預審* 的「只有條件不成立……才把 cut 呈給人類」、憲法 §3.1 Cut-Approval Gate 的「人類在對話中核准 cut 之後」，以及 §3.1 Manifest tier 的「HALT exactly as today」。
 
 - **什麼是批次 lane**：三項都成立——(a) lane 從已核准的波次表（fan-out 清單）啟動：清單的 Decisions 表有 `人類` 列、Lanes 表有這條 lane；(b) 這條 lane 的每張票都是票檔（格式見 agc 的 `docs/ticket-format.md`）；(c) 這條 lane 在 Lanes 表的 `approval` 欄不是 `human`。
 - **不等打字核准**：批次 lane 從不等人類打字。cut 只能由憲法 §3.1 manifest tier 自動核准；manifest tier 的條件不成立，就停票（見下），不呈給人類、不等，也不寫 `cut_approved`。政策裁決、lease override、hop 或輪數上限用完也一樣：凡是要人類決定的事，一律停票。
@@ -226,7 +233,7 @@ Report and section lines: each non-blank line of the section up to the next `## 
 
 No `design/e425-stop-ticket-batch.md`: mode no-design, so Visual Structural Assertions are omitted. No external reference (the Resource Audit grep found only repo-internal docs). Base `976a7890`; the PM probe on that base: `node scripts/test-lock.mjs -- npm test` → 4743 pass / 0 fail / 3 skipped of 4746, so no red test file exists before this lane's edits.
 
-**Reader tests (literal grep, edits not yet made).** The design keeps every existing pinned line byte-unchanged: new text goes on new lines, except the two appended suffixes `C-LP1` (no test pins that line) and `C-CO7` (no test pins coord-07 step 6). Expected red after the content edits, all fixed by re-capture and none by editing the test file:
+**Reader tests (literal grep, edits not yet made).** The design keeps every existing pinned line byte-unchanged: new text goes on new lines, except the three appended suffixes `C-LP1` and `C-LP3` (literal grep: no test pins either lane-protocol line) and `C-CO7` (no test pins coord-07 step 6). Expected red after the content edits, all fixed by re-capture and none by editing the test file:
 
 | test file | why it turns red | reader in the wave table? | fixed by |
 |---|---|---|---|
@@ -242,7 +249,7 @@ Pins checked and left green by placement: `test/e290-lane-protocol-generic.test.
 
 **Open questions (needs human ruling — answers recorded here).**
 
-1. *What makes a lane a batch lane?* (option choice) — (a) **recommended**: derived, no new marker: the lane comes from a manifest with a `人類` Decisions row, every ticket of the lane is a ticket file, and its `approval` cell is not `human` (as `C-LP2` reads); (b) an explicit marker in the manifest — not possible in this lane, since the `approval` cell accepts only `human`/`—`/empty and `tools/fanout-manifest.ts` is outside the owned set; (c) only lanes the E443 launcher opens — leaves the rule dormant until E443. Under (a) this repository is unaffected today (no ticket directory exists), and every lane with `approval: human` stays attended.
+1. *What makes a lane a batch lane?* (option choice) — (a) **recommended**: derived, no new marker: the lane comes from a manifest with a `人類` Decisions row, every ticket of the lane is a ticket file, and its `approval` cell is not `human` (as `C-LP2` reads); (b) an explicit marker in the manifest — not possible in this lane, since the `approval` cell accepts only `human`/`—`/empty and `tools/fanout-manifest.ts` is outside the owned set; (c) only lanes the E443 launcher opens — leaves the rule dormant until E443. Consequence of (a), for the human to weigh: any adopter lane whose `approval` cell is not `human` and whose tickets are all ticket files will, when its cut fails the manifest tier, stop the ticket and end the session instead of presenting the cut to a human sitting there; to keep a lane attended, write `human` in that lane's `approval` cell. This repository has no ticket directory today, so it is unaffected.
 2. *Where are agent decisions recorded?* — **recommended**: in the ticket file, `## Decisions made during the work` (decisions about the work belong with the work and are readable without agc; the original item (5) said "from the ticket files alone"); alternative: a report file under `qa_reports/`, keeping the ticket file free of anything but scenarios.
 3. *Does the summary print more than the eight items?* — **recommended**: yes, two extra groups, `not started` (a batch ticket nobody reached would otherwise be invisible) and `unreadable tickets` (a malformed file must not vanish silently); alternative: the eight items only.
 
@@ -251,7 +258,7 @@ Pins checked and left green by placement: `test/e290-lane-protocol-generic.test.
 | id | desc | depends_on | est. files | touches | design-link |
 |---|---|---|---|---|---|
 | T-E425-01 | qa-engineer: write the AC1–AC14 scenario tests (summary fixtures in temp dirs) and `qa_reports/expected-red_e425-stop-ticket-batch.txt`; test report with the Scenario → Test Map | none | 2 | `test/e425-*.test.mjs` | — |
-| T-E425-02 | sr-engineer: lane protocol and ticket format text — `C-LP1`, `C-LP2`, `C-TF1`, `C-TF2`, `C-TF3` (AC1, AC5, AC6, AC8 and AC10 text) | T-E425-01 | 2 | `docs/lane-protocol.md`, `docs/ticket-format.md` | — |
+| T-E425-02 | sr-engineer: lane protocol and ticket format text — `C-LP1`, `C-LP2`, `C-LP3`, `C-TF1`, `C-TF2`, `C-TF3` (AC1, AC5, AC6, AC8 and AC10 text) | T-E425-01 | 2 | `docs/lane-protocol.md`, `docs/ticket-format.md` | — |
 | T-E425-03 | sr-engineer: constitution, coordinator and integrator text — `C-C08`, `C-CO3`, `C-CO7`, `C-IN1`..`C-IN3` (AC2, AC3, AC4, AC14) | T-E425-01 | 4 | `content/const-08-chain-31-mid.md`, `content/coord-03-core-fallback.md`, `content/coord-07-core-sop.md`, `content/skill-integrator.md` | — |
 | T-E425-04 | sr-engineer: E427 amendment (2) SOP sentences — `C-QA`, `C-CR` (AC13, AC14) | T-E425-01 | 2 | `content/skill-qa-engineer.md`, `content/skill-code-reviewer.md` | — |
 | T-E425-05 | sr-engineer: `scripts/batch-summary.mjs` per `C-BS` and `C-TF3`, importing `parseTicketFile` / `resolveTicketDir` from `dist/` (AC7–AC12); then the planned return to qa-engineer | T-E425-01 | 1 | `scripts/batch-summary.mjs` | — |
