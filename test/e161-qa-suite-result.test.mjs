@@ -52,6 +52,13 @@ async function seedFile(ws, feature, agent = "code-reviewer") {
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
+  // E448 re-pin: a file-mode judge PASS needs a code-review report for every reviewed id; one covers: report
+  // names every id these scenarios PASS (the suite-result line, not that rule, is under test here).
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  fs.writeFileSync(
+    path.join(ws, "review_reports", "review_e161-scope.md"),
+    "# Code review\n\ncovers: T-E161-X, T1, T2, T-E161-N, T-E161-B, T-E161-H, T-E161-R, T-E161-L\n\nVerdict: APPROVED\n",
+  );
 }
 
 async function mkSqlite(feature) {

@@ -137,6 +137,13 @@ function recordNoNewTest(ws) {
 }
 const w = (agent, status, extra = {}) => ({ active_feature: F, status, agent_id: agent, ...extra });
 
+// E448 re-pin: a file-mode code-reviewer PASS needs review_reports/review_<id>.md for every reviewed id
+// (MISSING_REVIEW_EVIDENCE arms on the judge's PASS write itself). These scenarios test routing, not that rule.
+function recordCodeReview(ws, ...ids) {
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  for (const id of ids) fs.writeFileSync(path.join(ws, "review_reports", `review_${id}.md`), "# Code review\n\nVerdict: APPROVED\n");
+}
+
 // ---------------------------------------------------------------- AC1
 
 test("AC1 (E435): pm -> qa-engineer (no resume_of, no marker) then qa-engineer -> sr-engineer both accepted; a chain_path carried on input is stripped, not stored", async () => {
@@ -198,6 +205,7 @@ test("AC3: ledger completed by code-reviewer via tw_complete_task, completed_tas
   await ADD.run({ workspace_path: ws, task_id: "T-1", description: "one" });
   const c = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "code-reviewer" });
   assert.match(text(c), /"success":true/);
+  recordCodeReview(ws, "T-1");
   const r = await upd(ws, w("code-reviewer", "PASS", { qa_review: "judged", review_task_ids: ["T-1"] }));
   assert.ok(!rejected(r), `code-reviewer PASS accepted: ${text(r)}`);
   const s = state(ws);
@@ -458,6 +466,7 @@ test("AC11 (E435): code-reviewer:PASS exits to pm, researcher, release-engineer 
 test("AC11 (E435): code-reviewer PASS with no marker is accepted (was rejected unmarked); the legacy qa-engineer:PASS / qa-engineer:FAIL keys still exit (DR-3)", async () => {
   const ws = mkWs("e431-ac11b-");
   await seed(ws, F, "code-reviewer", "In_Progress");
+  recordCodeReview(ws, "T-1");
   const r = await upd(ws, w("code-reviewer", "PASS", { qa_review: "x", review_task_ids: ["T-1"] }));
   assert.ok(!rejected(r), `the judge's PASS on any feature: ${text(r)}`);
   assert.equal(state(ws).last_agent, "code-reviewer");
@@ -534,6 +543,7 @@ test("AC12 (E435): the one chain pm -> qa -> sr -> code-reviewer -> code-reviewe
     assert.ok(!rejected(r), `${agent}: ${text(r)}`);
   }
   assert.equal(state(ws).hop_count, 3);
+  recordCodeReview(ws, "T-1");
   const pass = await upd(ws, w("code-reviewer", "PASS", { review_verdict: "APPROVED", completed_tasks: ["T-1"], review_task_ids: ["T-1"], qa_review: "ok" }));
   assert.ok(!rejected(pass), `code-reviewer PASS accepted: ${text(pass)}`);
   const s = state(ws);
@@ -667,8 +677,11 @@ test("AC14 (E435): code-reviewer completes the task; qa-engineer rejected naming
   const ws = await ledgerWs();
   const qa = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "qa-engineer" });
   assert.equal(text(qa), COMPLETE_BLOCKED("qa-engineer") + IN_FLIGHT_HINT);
+  // E460 (AC17): a refusal is flagged for clients keyed on isError; the text is unchanged.
+  assert.equal(qa.isError, true, "the qa-engineer refusal carries isError: true");
   const cr = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "code-reviewer" });
   assert.match(text(cr), /"marked":"completed"/);
+  assert.equal(cr.isError, undefined, "the code-reviewer completion carries no isError");
 });
 
 test("AC14 (E435): another role (sr-engineer) is rejected naming code-reviewer with no migration hint; code-reviewer then completes", async () => {
@@ -676,14 +689,17 @@ test("AC14 (E435): another role (sr-engineer) is rejected naming code-reviewer w
   const ws = await ledgerWs();
   const sr = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "sr-engineer" });
   assert.equal(text(sr), COMPLETE_BLOCKED("sr-engineer"));
+  assert.equal(sr.isError, true, "the sr-engineer refusal carries isError: true (E460, AC17)");
   const cr = await COMPLETE.run({ workspace_path: ws, task_id: "T-1", agent_id: "code-reviewer" });
   assert.match(text(cr), /"marked":"completed"/);
+  assert.equal(cr.isError, undefined, "the code-reviewer completion carries no isError");
 });
 
 // ---------------------------------------------------------------- AC15
 
+// E448 re-pin (E458 item 8): hint.non_judge_completed_tasks_rejected, the repo-only backlog reference dropped.
 const NON_JUDGE_HINT =
-  "completed_tasks on a write not stamped agent_id=code-reviewer is ledger pollution: only code-reviewer, the chain's judge, may grow completed_tasks (or complete tasks through tw_complete_task), backed by the QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or pass []) on this write. See docs/backlog.md E40.";
+  "completed_tasks on a write not stamped agent_id=code-reviewer is ledger pollution: only code-reviewer, the chain's judge, may grow completed_tasks (or complete tasks through tw_complete_task), backed by the QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or pass []) on this write.";
 const nonJudgeRejected = (r) =>
   text(r).includes("⛔ NON_JUDGE_COMPLETED_TASKS_REJECTED: completed_tasks=") && text(r).includes(NON_JUDGE_HINT);
 
@@ -701,6 +717,7 @@ test("AC15 (E435): code-reviewer completed_tasks allowed, qa-engineer's rejected
 
   const ws3 = mkWs("e431-ac15c-");
   await seed(ws3, F, "code-reviewer", "In_Progress");
+  recordCodeReview(ws3, "T-9");
   const pass = await upd(ws3, w("code-reviewer", "PASS", { review_verdict: "APPROVED", qa_review: "ok", review_task_ids: ["T-9"] }));
   assert.ok(!text(pass).includes("REVIEW_VERDICT_STATUS_MISMATCH"), `got: ${text(pass)}`);
 

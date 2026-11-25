@@ -182,7 +182,7 @@ Semantics:
 
 - **Optional.** The value is an array of objects. Each object has `name` (the short name manifests use), `path` (where the sister repo's checkout is), `owns` (what that repo owns, free text) and, optionally, `backlog` (its backlog document) and `contracts` (an array of its contract documents).
 - **Paths.** `path` is relative to this repo's root, so it resolves the same for everyone who clones the two repos side by side; an absolute path (POSIX, Windows or drive form) or a `~` path is dropped, so no local path lands in this tracked file. `backlog` and `contracts` are paths relative to the sister repo's root.
-- **Which entries are dropped.** An entry is dropped when it is not an object; when `name` is not a string matching `^[A-Za-z0-9_.-]+$`, or is `.` or `..`; when `path` is not a non-empty string, or is absolute or starts with `~`; or when `owns` is not a non-empty string. A `backlog` that is not a non-empty string is left out of the entry, and a `contracts` array keeps only its non-empty strings (left out when none remains). A later entry whose `name` was already kept is dropped (the first one wins). Dropping is silent: it is never an error, and the other entries still apply.
+- **Which entries are dropped.** An entry is dropped when it is not an object; when `name` is not a string matching `^[A-Za-z0-9_.-]+$`, or is `.` or `..`; when `path` is not a non-empty string, or is absolute or starts with `~`; or when `owns` is not a non-empty string. A `backlog` that is not a non-empty string is left out of the entry, and a `contracts` array keeps only its non-empty strings (left out when none remains). A string holding only whitespace counts as empty here. A later entry whose `name` was already kept is dropped (the first one wins). Dropping is silent: it is never an error, and the other entries still apply.
 - **Absent when nothing is valid.** `loadConfig` surfaces the kept entries, in list order and byte-verbatim, as `WorkspaceConfig.sisterRepos` only when at least one entry is valid. A missing key, a value that is not an array, or an array with no valid entry all mean "no sister repos".
 - **Who reads it.** The integrator SOP's `status` and take-over (`接手`) modes read each sister repo, read-only, through `node scripts/lane-status.mjs --repo <path>` (its in-flight lanes and their branches) and `git -C <path> rev-parse --short <branch>` (each branch's sha), with `<path>` resolved against primary. `node scripts/fanout.mjs handoff --check <manifest>` resolves each row of the manifest's optional `## 外部依賴` table through this key: the row's `repo` cell is a `name` declared here, and the recorded sha is compared with that branch in the sister repo now. A row naming an undeclared repo stops the check with `SISTER_REPO_UNKNOWN`; a declared `path` that is not a git repository stops it with `SISTER_REPO_NOT_GIT`. Nothing else reads the key.
 - **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists. The parser is `parseSisterRepos` in `tools/config.ts`.
@@ -205,7 +205,7 @@ Ticket files (one Markdown file per ticket, format in `docs/ticket-format.md`) l
 Semantics:
 
 - **Optional.** A path relative to the workspace root. When the directory does not exist, the checker prints that there is no ticket directory and exits 0.
-- **Usable value.** A non-empty string that is relative (not POSIX or Windows absolute, no drive prefix such as `C:`), does not start with `~`, and does not normalize to a path whose first segment is `..` (a name such as `..foo` is accepted). Any other value (absolute, `~`, escaping with `..`, empty, not a string) is dropped silently and the default applies; it is never an error.
+- **Usable value.** A string holding at least one character other than whitespace that is relative (not POSIX or Windows absolute, no drive prefix such as `C:`), does not start with `~`, does not normalize to `.` (the workspace root itself, as `.`, `./` or `a/..` do), and does not normalize to a path whose first segment is `..` (a name such as `..foo` is accepted). Any other value (absolute, `~`, the workspace root, escaping with `..`, empty or whitespace-only, not a string) is dropped silently and the default applies; it is never an error.
 - **Where the default is applied.** `loadConfig` surfaces the value verbatim as `WorkspaceConfig.ticketDir` only when it is usable; `resolveTicketDir(workspacePath)` in `tools/config.ts` returns the configured directory, or `docs/tickets`, joined to the workspace path.
 - **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists.
 
@@ -242,7 +242,7 @@ Use cases:
 - Looser rules for a sandbox / experiment workspace.
 - Custom roles or alternate routing chains (advanced).
 
-**Caveat**: hand-written fragments must keep the server-enforced contracts (`§3.1 server-enforced chain`, `§4 routing chain`). The state machine in `tools/transitions.ts` and the 18 gates in `gates/` are code, not text — drift between your custom constitution and the code yields confusing rejections.
+**Caveat**: hand-written fragments must keep the server-enforced contracts (`§3.1 server-enforced chain`, `§4 routing chain`). The state machine in `tools/transitions.ts` and the 33 gates registered in `gates/registry.ts` are code, not text — drift between your custom constitution and the code yields confusing rejections.
 
 ---
 
@@ -274,7 +274,7 @@ Use cases:
 - Domain-specific QA checklist (e.g. accessibility-mandatory project).
 - Custom researcher heuristics (preferred T1 sources for your domain).
 
-**Caveat (same as constitution override)**: skill files cannot soften server-enforced behaviours. e.g. removing the qa-engineer's evidence-of-PASS requirement from `skill-qa-engineer.md` does NOT lift the gate — the server still rejects PASS without `qa_reports/review_<id>.md`. Text-layer overrides are guidance to the agent; the gates are code.
+**Caveat (same as constitution override)**: skill files cannot soften server-enforced behaviours. e.g. removing the PASS-evidence step from `skill-code-reviewer.md` does NOT lift the gate — the server still rejects a code-reviewer PASS that carries no `qa_review` when no `qa_reports/review_<id>.md` exists. Text-layer overrides are guidance to the agent; the gates are code.
 
 > Since **v3.1.0** (commit `ef65eb2`, 2026-05-12). Same `loadContent()` mechanism as the constitution-fragment override above and `.config.json`.
 >

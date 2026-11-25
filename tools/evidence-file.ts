@@ -32,6 +32,48 @@ export function resolveJudgeReport(workspacePath: string): JudgeReport {
 // qa-engineer for reports written before v5.0.0 (DR-6).
 export const REPORT_SIGNERS: readonly string[] = [JUDGE_ROLE, "qa-engineer"];
 
+// ---------- judge report standing ----------
+// The one PASS-evidence predicate every reader shares (the file-mode PASS
+// gate, lane-status, drift). A report's standing is its LAST server-recorded
+// verdict section in document order, or all-null when it has none.
+export type ReportVerdict = "PASS" | "FAIL";
+
+export interface ReportStanding {
+  readonly verdict: ReportVerdict | null;
+  readonly signer: string | null; // the "by <signer>" token of that last section
+  readonly recordedAt: string | null; // its ISO timestamp, as written
+}
+
+// Exactly the heading the qa_review auto-record writes:
+//   `## ${new Date().toISOString()} — ${status} — by ${reviewer}`
+// Single spaces, em dashes, ISO-8601 UTC with milliseconds and Z. A trailing
+// \r is tolerated (CRLF-edited reports). Any other heading is not a verdict.
+const SERVER_VERDICT_HEADING_RE =
+  /^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) — (PASS|FAIL) — by (\S+)[ \t]*\r?$/gm;
+
+// Pure, no I/O, never throws.
+export function judgeReportStanding(content: string): ReportStanding {
+  let verdict: ReportVerdict | null = null;
+  let signer: string | null = null;
+  let recordedAt: string | null = null;
+  const re = new RegExp(SERVER_VERDICT_HEADING_RE.source, "gm"); // fresh lastIndex per call
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    recordedAt = m[1];
+    verdict = m[2] === "PASS" ? "PASS" : "FAIL";
+    signer = m[3];
+  }
+  return { verdict, signer, recordedAt };
+}
+
+// True when the standing is PASS; with `signers`, the last section's signer
+// must also be one of them.
+export function isPassStanding(standing: ReportStanding, signers?: readonly string[]): boolean {
+  if (standing.verdict !== "PASS") return false;
+  if (signers === undefined) return true;
+  return standing.signer !== null && signers.includes(standing.signer);
+}
+
 // ---------- task-id → evidence filename stem ----------
 // Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its
 // stem from the task id through this one encoder, so two distinct ids can
@@ -299,19 +341,27 @@ export function parseAssertionFailures(section: string): string[] {
     const cells = parts.map((c) => c.trim());
     if (cells.length < 2) continue;
     const id = cells[0];
-    if (id === "" || /assertion\s*id/i.test(id)) continue; // header row
+    // Header row: the whole first cell is `assertion` / `assertion id`, so an
+    // id that merely contains the word (assertionIdle) is a data row.
+    if (id === "" || /^assertion(\s*id)?$/i.test(id)) continue;
     const result = cells[cells.length - 1].toLowerCase();
     if (result !== "pass") failures.push(id);
   }
   return failures;
 }
 
-// Region Diff rows `| surface | result |` where result ∈ {pass, accepted}.
-// Anything else (fail, material, unresolved, blank, drift) is a failure.
-// "accepted" is allowed because a difference reviewer-visual deliberately accepts is
-// recorded in `## Allowed Differences`; here it signals "diff exists but cleared".
-export function parseRegionDiffFailures(section: string): string[] {
-  const failures: string[] = [];
+// One Region Diff table row: the first-cell surface id and the last-cell
+// result, lower-cased and trimmed.
+export interface RegionDiffRow {
+  readonly id: string;
+  readonly result: string;
+}
+
+// Region Diff rows `| surface | result |`, header and separator rows skipped.
+// The header skip lives only here: the whole first cell must be `surface` /
+// `surface id`, so ids such as card-surface or Surfaces.list are data rows.
+export function parseRegionDiffRows(section: string): RegionDiffRow[] {
+  const rows: RegionDiffRow[] = [];
   for (const line of section.split("\n")) {
     const t = line.trim();
     if (!t.startsWith("|")) continue;
@@ -322,11 +372,19 @@ export function parseRegionDiffFailures(section: string): string[] {
     const cells = parts.map((c) => c.trim());
     if (cells.length < 2) continue;
     const id = cells[0];
-    if (id === "" || /surface(\s*id)?/i.test(id)) continue; // header row
-    const result = cells[cells.length - 1].toLowerCase();
-    if (result !== "pass" && result !== "accepted") failures.push(id);
+    if (id === "" || /^surface(\s*id)?$/i.test(id)) continue;
+    rows.push({ id, result: cells[cells.length - 1].toLowerCase() });
   }
-  return failures;
+  return rows;
+}
+
+// Region Diff ids whose result is not pass or accepted (fail, material,
+// unresolved, blank, drift). "accepted" means the diff exists but
+// reviewer-visual cleared it and records it in `## Allowed Differences`.
+export function parseRegionDiffFailures(section: string): string[] {
+  return parseRegionDiffRows(section)
+    .filter((r) => r.result !== "pass" && r.result !== "accepted")
+    .map((r) => r.id);
 }
 
 // Split a markdown table line into trimmed cells, dropping the leading/trailing

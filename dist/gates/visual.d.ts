@@ -29,6 +29,7 @@ export interface VisualReportValidation {
     failedCanonicalStates: string[];
     failedStructuralAssertions: string[];
     failedRegionDiffs: string[];
+    unlistedAcceptedDiffs: string[];
     verdictPass: boolean;
 }
 export declare function validateVisualReport(content: string, evidenceSchema?: number): VisualReportValidation;

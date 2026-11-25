@@ -83,7 +83,7 @@ const COPY = {
 
 // The Builder ≠ judge bullet exactly as at base (frozen in-test fixture; unchanged by E433, AC2 (c)).
 const BUILDER_NE_JUDGE =
-  "- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` (\"awaiting independent QA\") — never a builder-signed verdict.";
+  "- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict (visual verdict included) or its PASS. With no independent judge context available, the work stops at `status=Blocked` (\"awaiting an independent judge\") — never a builder-signed verdict.";
 
 // ------------------------------------------------------------------ composed prompts (non-design, as served)
 
@@ -220,7 +220,7 @@ test("AC2 (E435): constitution fragments — judge clause (a), test ownership (b
   assert.ok(row, "(d) sr_return cap row exists");
   const cells = row.split("|").map((c) => c.trim()).filter(Boolean);
   assert.equal(cells[1], "2", "(d) sr_return value 2");
-  assert.ok(cells[2].includes("sr-engineer returns of one feature to qa-engineer before routing locks to pm"), "(d) sr_return meaning");
+  assert.ok(cells[2].includes("Max sr-engineer returns to qa-engineer between two `(pm, In_Progress)` writes; past it only that return is rejected. File mode only: SQLite/HTTP mode counts no returns."), "(d) sr_return meaning");
 
   // (e)
   const ownerLine = c05.split("\n").find((l) => l.startsWith("- **`tw_complete_task` ownership**"));
@@ -304,7 +304,7 @@ test("AC4: skill-sr-engineer.md builds to pre-written tests, has both return rou
     "with a concrete reason",
     "compare it with the `sr_return` cap",
     "(in hops, not in `review_round`)",
-    "that claim is rejected with `SR_RETURN_CAP_EXCEEDED` and only pm may take the feature",
+    "The server checks the cap on qa-engineer's claim of the return edge, not on your write: past it, that claim is rejected with `SR_RETURN_CAP_EXCEEDED` until a `(pm, In_Progress)` write resets the count.",
     "WHEN a scenario cannot be built → DO stop per *Escalation Routes: scenario cannot be built* — to pm, never to qa-engineer",
     "Run qa-engineer's fixed tests against the implementation",
     "Only when qa-engineer recorded no new test (`qa_reports/no-new-test_<active_feature>.txt`) do you write the reproduction test",
@@ -343,14 +343,15 @@ test("AC5 (E435): skill-code-reviewer.md is the chain's judge (tests vs scenario
     "confirm the fix addresses the cause, not only the scenario",
     '`tw_update_state(status=PASS, agent_id="code-reviewer", review_verdict="APPROVED", completed_tasks=[<ids>], qa_review="<summary>", qa_suite_result={passed, total, command})`',
     'Then `tw_complete_task(<task-id>, agent_id="code-reviewer")` per id',
-    '`tw_update_state(status=FAIL, agent_id="code-reviewer", review_verdict="CHANGES_REQUESTED", review_task_ids=[<ids>]',
-    "`tw_rollback_task(<task-id>, <reason>)`",
+    '- **Rejection rows**: `tw_update_state(status=FAIL, agent_id="code-reviewer", review_verdict="CHANGES_REQUESTED", review_task_ids=[<ids>], qa_review="<findings>", qa_suite_result, blocking_reason="<one line>")` with `next_role` by cause and no `completed_tasks`;',
+    "A task is marked `[x]` only after PASS, so a rejected id normally has nothing to roll back; only for a rejected id the task list already shows `[x]`, run `tw_rollback_task(<task-id>, <reason>)` first.",
     "Each rejection counts once in `review_round`",
     "after the `review_round` cap of FAILs only `(pm, In_Progress)` is accepted",
     "`qa_reports/expected-red_<feature>.txt`, `qa_reports/no-new-test_<feature>.txt`, `qa_reports/tests_<feature>.md`",
     "Do NOT read sr-engineer's `pending_notes` commentary",
   ];
   for (const s of must) assert.ok(cr.includes(s), `code-reviewer SOP must contain: ${s}`);
+  assert.ok(!cr.includes("per rejected id, then"), "the unconditional rollback-then-FAIL wording is gone");
   const routes = cr.slice(cr.indexOf("## Escalation Routes"));
   const rows = routes.split("\n").filter((l) => l.startsWith("|"));
   const byCause = (needle) => rows.find((l) => l.includes(needle));
@@ -389,8 +390,8 @@ test("AC6 (E435): pm routes architect or qa-engineer with no marker, bugfix mode
 
   const coord = BUNDLE.teamwork;
   assert.ok(coord.includes(COPY.chainMain), "coordinator §4 chain is the one routed");
-  assert.ok(coord.includes("| test, write tests, test authoring | `qa-engineer` |"), "intent table: test authoring → qa-engineer");
-  assert.ok(coord.includes("| review, code review, judge diff, verify, validate, rollback | `code-reviewer` |"), "intent table: verify / validate / rollback → code-reviewer");
+  assert.ok(coord.includes("| test, write tests, test authoring | `qa-engineer`, reached through a pm-stamped opening write (*Cheapest-Compliant-Path Intake* mini-chain) |"), "intent table: test authoring → qa-engineer");
+  assert.ok(coord.includes("| review, code review, judge diff, verify, validate, rollback | `code-reviewer`, after `sr-engineer` or alone through the single-role judge dispatch (Constitution §3.1) |"), "intent table: verify / validate / rollback → code-reviewer");
   assert.ok(count(coord, "`next_role` is `architect` or `qa-engineer`") >= 2, "build-entry gate rows read architect or qa-engineer");
   const mini = coord.split("\n").find((l) => l.includes("**(ii) mini-chain**"));
   assert.ok(mini, "mini-chain bullet exists");
@@ -499,7 +500,12 @@ test("AC9 (E435): hints — MISSING_EVIDENCE unchanged, two rewritten hints name
     .replace("Run Phase 3.5 (skill-qa-engineer)", "Run the AC Execution step (skill-code-reviewer)")
     .replace("truthfulness stays with qa-engineer / code-reviewer.", "truthfulness stays with the judge.");
   assert.equal(end.AC_EXECUTION_LOG_MISSING.hintStatic, derivedAcLog, "hint.ac_log is the base text with exactly the two substitutions");
-  assert.equal(live.AC_EXECUTION_LOG_MISSING.hintStatic, derivedAcLog, "the compiled registry serves hint.ac_log");
+  // Re-pinned by lane e448 (E458 item 8, re-allocated by the integrator): the live hint is hint.ac_log minus its
+  // repo-only spec reference — hint.ac_execution_log_missing of specs/e448-judge-evidence-checks.md, verbatim.
+  const HINT_AC_EXECUTION_LOG_MISSING =
+    "Run the AC Execution step (skill-code-reviewer) — execute each proof:-annotated AC in specs/<feature>.md and record command, raw output/exit code, and a per-AC pass/fail verdict under a ## AC Execution Log section in a qa_reports/review_<id>.md for one of the PASS'd ids (covers: files count; the heading may carry a prefix/suffix but must contain the canonical name, evidence schema v2) before PASS. The server checks the section's presence only — the proofs' truthfulness stays with the judge.";
+  assert.equal(derivedAcLog.replace(" See specs/e3-outcome-shaped-acceptance.md AC3/AC4.", ""), HINT_AC_EXECUTION_LOG_MISSING, "hint.ac_execution_log_missing = hint.ac_log minus the spec reference");
+  assert.equal(live.AC_EXECUTION_LOG_MISSING.hintStatic, HINT_AC_EXECUTION_LOG_MISSING, "the compiled registry serves hint.ac_execution_log_missing");
   for (const code of Object.keys(base)) {
     const b = { ...base[code] };
     const e = { ...end[code] };

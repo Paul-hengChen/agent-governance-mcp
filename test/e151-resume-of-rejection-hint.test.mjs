@@ -19,7 +19,9 @@ import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { handleUpdateState } from "../dist/tools/handoff-orchestrator.js";
 import { forceSeedStamp } from "./e148-seed-stamp.mjs";
 
-const HINT_STATIC = " in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md.";
+// E448 re-pin (E458 item 8): hint.transition_rejected — the rejection JSON already carries the allowed list,
+// so the hint points there instead of at a repo-only architecture spec.
+const HINT_STATIC = " in ALLOWED_TRANSITIONS; pick a next state from the allowed list in this rejection.";
 
 function req(prev, next, extra = {}) {
   return { prev, next, prev_review_round: 0, ...extra };
@@ -36,7 +38,7 @@ const QA_JUDGE_HINT =
 
 function s1(role, received) {
   return (
-    `No edge pm:In_Progress → ${role}:In_Progress in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md. ` +
+    `No edge pm:In_Progress → ${role}:In_Progress${HINT_STATIC} ` +
     `Amend-Resume edge: set resume_of: "${role}" on this write itself (the resuming write, not only the PM amendment) ` +
     `to open pm:In_Progress → ${role}:In_Progress; received resume_of: ${received}.`
   );

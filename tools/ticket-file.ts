@@ -69,6 +69,8 @@ const STOPPED_RE = /^stopped\s+—\s+\S/;
 const SOURCE_ENTRY_RE = /^[0-9]+ rev [0-9]+$/;
 const ADDED_RE = /^Added:\s*(\S[^,]*),\s*(\d{4}-\d{2}-\d{2}),\s*(\S.*)$/;
 const KEYWORD_RE = /^(Given|When|Then|And)(\s|$)/;
+const SCENARIO_ID_RE = /^[A-Za-z][A-Za-z0-9-]*$/;
+const FENCE_RE = /^(```|~~~)/;
 const SCENARIO_SECTION = "## Scenarios";
 const ADDED_SECTION = "## Added during build";
 
@@ -84,9 +86,17 @@ function isKnownStatus(text: string): boolean {
   return text === "not started" || text === "done" || STOPPED_RE.test(text);
 }
 
-function asTextList(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  return value.every((v) => typeof v === "string" && v.trim().length > 0) ? (value as string[]) : null;
+/**
+ * Returns a list field's entries when every one is non-blank text; otherwise
+ * reports each non-text or blank entry by its 1-based position and returns null.
+ */
+function checkListEntries(name: string, list: readonly unknown[], problems: string[]): string[] | null {
+  const before = problems.length;
+  list.forEach((entry, i) => {
+    if (typeof entry !== "string") problems.push(`field "${name}" entry ${i + 1} is not text`);
+    else if (entry.trim() === "") problems.push(`field "${name}" entry ${i + 1} is empty`);
+  });
+  return problems.length === before ? (list as string[]) : null;
 }
 
 function checkFields(block: Record<string, unknown>, problems: string[]): Record<string, string | string[]> {
@@ -101,15 +111,20 @@ function checkFields(block: Record<string, unknown>, problems: string[]): Record
     if (blank || (def.kind === "path-list" && Array.isArray(value) && value.length === 0)) {
       if (def.required) problems.push(`missing field "${def.name}"`);
     } else if (def.kind === "id-list" || def.kind === "path-list" || def.kind === "source") {
-      const list = def.kind === "source" && typeof value === "string" ? [value] : asTextList(value);
+      const isList = Array.isArray(value);
+      const list = isList
+        ? checkListEntries(def.name, value, problems)
+        : def.kind === "source" && typeof value === "string" ? [value] : null;
       const bad = def.kind === "source" && list !== null ? list.filter((e) => !SOURCE_ENTRY_RE.test(e.trim())) : [];
       for (const e of bad) problems.push(`source entry "${e}" is not "<number> rev <revision>"`);
-      if (list === null) problems.push(`field "${def.name}" must be a list`);
-      else if (bad.length === 0) fields[def.name] = list;
+      if (list === null && !isList) problems.push(`field "${def.name}" must be a list`);
+      else if (list !== null && bad.length === 0) fields[def.name] = list;
     } else if (typeof value !== "string") {
       problems.push(`field "${def.name}" must be text`);
     } else if (def.kind === "status" && !isKnownStatus(value.trim())) {
       problems.push(`unknown status "${value.trim()}" (expected not started, done, or stopped — <reason>)`);
+    } else if (def.kind === "yes-no" && value.trim() !== "yes" && value.trim() !== "no") {
+      problems.push(`field "${def.name}" must be yes or no, not "${value.trim()}"`);
     } else {
       fields[def.name] = value.trim();
     }
@@ -136,25 +151,38 @@ interface RawScenario {
 
 /**
  * Collects `###` scenarios under the scenario and added-during-build sections.
- * Headings inside fenced code blocks are ignored; list markers are stripped.
+ * Fence delimiters and every line inside a fenced code block are skipped, so
+ * neither a heading nor a scenario line is read from a fence; list markers
+ * are stripped. Every `##` section after the added-during-build section is
+ * reported, and so is each `###` heading under it, which starts no scenario.
  */
-function collectScenarios(body: string[]): { raw: RawScenario[]; hasSection: boolean } {
+function collectScenarios(body: string[], problems: string[]): { raw: RawScenario[]; hasSection: boolean } {
   const raw: RawScenario[] = [];
-  let section: "scenarios" | "added" | null = null;
+  let section: "scenarios" | "added" | "after-added" | null = null;
   let hasSection = false;
   let inFence = false;
   let current: RawScenario | null = null;
   for (const original of body) {
     const line = original.trim();
-    if (/^(```|~~~)/.test(line)) inFence = !inFence;
-    if (!inFence && /^##\s/.test(line)) {
+    const fence = FENCE_RE.test(line);
+    if (fence) inFence = !inFence;
+    if (fence || inFence) continue;
+    if (/^##\s/.test(line)) {
       current = null;
-      section = line === SCENARIO_SECTION ? "scenarios" : line === ADDED_SECTION ? "added" : null;
+      if (section === "added" || section === "after-added") {
+        problems.push(`section "${line}" comes after "${ADDED_SECTION}", which must be the last section`);
+        section = "after-added";
+      } else {
+        section = line === SCENARIO_SECTION ? "scenarios" : line === ADDED_SECTION ? "added" : null;
+      }
       if (section === "scenarios") hasSection = true;
-    } else if (!inFence && /^###\s/.test(line) && section !== null) {
+    } else if (/^###\s/.test(line) && section === "after-added") {
+      current = null;
+      problems.push(`heading "${line}" is not read as a scenario: it is under a section after "${ADDED_SECTION}"`);
+    } else if (/^###\s/.test(line) && section !== null) {
       current = { heading: line.replace(/^###\s+/, ""), added: section === "added", lines: [] };
       raw.push(current);
-    } else if (!inFence && /^#{1,3}\s/.test(line)) {
+    } else if (/^#{1,3}\s/.test(line)) {
       current = null;
     } else if (current !== null && line.length > 0) {
       current.lines.push(line.replace(/^[-*]\s+/, ""));
@@ -163,10 +191,23 @@ function collectScenarios(body: string[]): { raw: RawScenario[]; hasSection: boo
   return { raw, hasSection };
 }
 
+/** True when a `YYYY-MM-DD` text names a real Gregorian calendar day. */
+function isCalendarDate(text: string): boolean {
+  const [year, month, day] = text.split("-").map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return days !== undefined && day >= 1 && day <= days;
+}
+
 function checkScenario(raw: RawScenario, problems: string[]): TicketScenario {
   const split = raw.heading.indexOf(" — ");
   const id = (split >= 0 ? raw.heading.slice(0, split) : raw.heading).trim();
   const title = split >= 0 ? raw.heading.slice(split + 3).trim() : "";
+  if (split < 0) {
+    problems.push(`scenario heading "${raw.heading}" has no " — " between the id and the title, so its title is empty`);
+  } else if (!SCENARIO_ID_RE.test(id)) {
+    problems.push(`scenario id "${id}" must start with a letter and hold only letters, digits or -`);
+  }
   const verifications = raw.lines.filter((l) => l.startsWith("Verification:"));
   let verification: TicketVerification | null = null;
   if (verifications.length === 0) problems.push(`scenario ${id} has no verification`);
@@ -180,8 +221,12 @@ function checkScenario(raw: RawScenario, problems: string[]): TicketScenario {
   for (const keyword of ["Given", "When", "Then"]) {
     if (!keywords.has(keyword)) problems.push(`scenario ${id} has no ${keyword} line`);
   }
-  if (raw.added && !raw.lines.some((l) => ADDED_RE.test(l))) {
+  const addedDates = raw.added ? raw.lines.map((l) => ADDED_RE.exec(l)?.[2]).filter((d) => d !== undefined) : [];
+  if (raw.added && addedDates.length === 0) {
     problems.push(`scenario ${id} added during build has no "Added: <who>, <YYYY-MM-DD>, <reason>" line`);
+  }
+  for (const date of addedDates.filter((d) => !isCalendarDate(d))) {
+    problems.push(`scenario ${id} has an Added date "${date}" that is not a real calendar date`);
   }
   return { id, title, verification, addedDuringBuild: raw.added };
 }
@@ -206,7 +251,7 @@ export function parseTicketFile(text: string): TicketParseResult {
   } else if (block !== undefined) {
     fields = checkFields(block as Record<string, unknown>, problems);
   }
-  const { raw, hasSection } = collectScenarios(lines.slice(close + 1));
+  const { raw, hasSection } = collectScenarios(lines.slice(close + 1), problems);
   const scenarios = raw.map((r) => checkScenario(r, problems));
   if (!hasSection || !raw.some((r) => !r.added)) problems.push("no scenarios");
   const seen = new Set<string>();

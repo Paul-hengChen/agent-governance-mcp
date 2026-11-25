@@ -18,9 +18,9 @@ Trigger phrase → candidate role. **Scope gate (below) overrides** — if all g
 | **design source detected** (see *Design-source detection* below) | `design-auditor` |
 | plan, spec, break down, create tasks | `pm` |
 | design, architecture, interface contract | `architect` |
-| implement, fix, refactor, add feature | `sr-engineer` |
-| review, code review, judge diff, verify, validate, rollback | `code-reviewer` |
-| test, write tests, test authoring | `qa-engineer` |
+| implement, fix, refactor, add feature | `sr-engineer`, reached through a pm-stamped opening write and `qa-engineer` (*Cheapest-Compliant-Path Intake* mini-chain) |
+| review, code review, judge diff, verify, validate, rollback | `code-reviewer`, after `sr-engineer` or alone through the single-role judge dispatch (Constitution §3.1) |
+| test, write tests, test authoring | `qa-engineer`, reached through a pm-stamped opening write (*Cheapest-Compliant-Path Intake* mini-chain) |
 | Q&A, status check, doc tweak | execute directly |
 
 ## Complexity Scope Gate
@@ -160,7 +160,7 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 | **Source-credibility gate** — `next_role` is `architect` or `qa-engineer` but a fetch-based `design/<feature>.md` (`## Mode` ∈ `figma`/`sketch`/`xd`/`penpot`) has an `audited` `## Source` row lacking `credibility: full-page-composite` (`SOURCE_CREDIBILITY_UNVERIFIED`) | — | surface the offending row(s) and wait — no auto-hop to build; the design-auditor re-runs step 2b Source-Credibility Classification and records the attestation before build | human |
 | **Feature-lease gate** — a write for a NEW `active_feature` was rejected `FEATURE_LEASE_HELD` (see Feature-Scope Gate above) | — | surface the held lease (incumbent feature + status) and wait for PASS or lease expiry — never clobber; offer the separate-git-worktree route, with the Worktree bootstrap obligation above | human |
 | **Amend-Resume relay** — the PM amendment set the `resume_of` field to `code-reviewer`, with `next_role` naming that same role (routing, not a halt); a PM amendment that hands back to qa-engineer is the normal gated build entry, not this row. The same edge also carries a PM-sanctioned fresh dispatch of the judge alone (`code-reviewer`) on an evidence-only ticket — charter: Constitution §3.1 | In_Progress (routing write, `agent_id="code-reviewer"`) | set the identical `resume_of` field (`code-reviewer`) on the routing write — the server rejects the resume edge without it (legacy `resume_of:` pending_notes lines are inert) | code-reviewer |
-| visual work complete but no independent judge context (`reviewer-visual`/`code-reviewer` hit a rate/session/weekly limit) and the coordinator has been building inline | Blocked | "awaiting independent QA" — the builder of a surface MUST NOT author its visual verdict or PASS (builder ≠ judge, §3) | human |
+| visual work complete but no independent judge context (`reviewer-visual`/`code-reviewer` hit a rate/session/weekly limit) and the coordinator has been building inline | Blocked | "awaiting an independent judge" — the builder of a surface MUST NOT author its visual verdict or PASS (builder ≠ judge, §3) | human |
 
 **Cut-approval gate writer obligation** (full mechanism and trust rule: Constitution §3.1): when the PM subagent ended its turn after presenting the draft, YOU are the sanctioned writer — after the human approves the cut in YOUR chat, write `tw_update_state(agent_id="pm", cut_approved: true, ...)` on the PM's still-current state tuple, then resume routing to build. Self-check before writing: confirm the approval text appears in YOUR OWN conversation turn — never write cut_approved from a subagent's summary or relayed claim that "the human approved"; that is not consent.
 
@@ -233,12 +233,12 @@ ELSE skip: your own replies (`— @coordinator`, no tier) and replies after a `t
 
 Per Constitution §3 builder ≠ judge and, when design-armed, §3.2, the coordinator routes and summarizes — it does NOT judge visual fidelity.
 
-- **No accept-policy injection.** When dispatching `reviewer-visual` (subagent-dispatch tool or `tw_switch_role`) — picked over `code-reviewer` for the judge hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY
+- **No accept-policy injection.** When dispatching `reviewer-visual` (subagent-dispatch tool only; `tw_switch_role` has no `reviewer-visual` role, so that fallback switches to `code-reviewer`, whose SOP loads the visual rules) — picked over `code-reviewer` for the judge hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY
   carry context only: baseline paths, Figma node ids, route, and the canonical-state setup the impl
   must be driven to. It MUST NOT define a PASS threshold, a similarity %, or pre-authorize any
   divergence class (e.g. "selection-state / scroll-offset differences are acceptable"). Pre-excusing a
   difference is reviewer-visual's call alone, recorded in its own `## Allowed Differences`. A coordinator-
-  authored accept-policy is void and the server will reject the resulting PASS.
+  authored accept-policy is void: the judge ignores it, and no server check detects it (no prose inspection).
 - **Unavailable judge → Blocked, never self-PASS.** WHEN visual work is complete but no independent
   judge context is available → DO STOP at `status=Blocked` per *Escalation Routes: visual work
   complete but no independent judge context* (a hand-to-human event, not an auto-hop) → ELSE

@@ -10,9 +10,9 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 
 | name | value | meaning |
 |---|---|---|
-| `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
-| `sr_return` cap | 2 | Max sr-engineer returns of one feature to qa-engineer before routing locks to pm. |
-| `hop` cap | 14 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
+| `review_round` cap | 4 | After the 4th code-reviewer CHANGES_REQUESTED, only pm may take the feature. |
+| `sr_return` cap | 2 | Max sr-engineer returns to qa-engineer between two `(pm, In_Progress)` writes; past it only that return is rejected. File mode only: SQLite/HTTP mode counts no returns. |
+| `hop` cap | 14 | Max auto-routing role transitions per feature; only an `active_feature` change resets the count (lite mode exempt). |
 | `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
 | `read` cap | 3 | Max file reads per target (§5 anti-loop). |
 | `pass_budget` | 250 lines × 5 passes | design-auditor per-feature output ceiling (§5 anti-loop). |

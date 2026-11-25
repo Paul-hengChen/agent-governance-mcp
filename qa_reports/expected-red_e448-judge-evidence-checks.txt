@@ -1,0 +1,89 @@
+# e448-judge-evidence-checks — expected-red manifest (qa-engineer, T-E448-01 … T-E448-10)
+# Format: <relative test file path> | <exact test name>. Blank and # lines are comments.
+# Every entry is red only because the interface or behaviour it names is not built yet; no compile error anywhere.
+# Recorded from the full suite at qa hand-off: 45 red, every one listed here, nothing else red.
+# sr-engineer appends the reds it leaves itself (feature-scoped: append, never overwrite).
+
+# E458 (8): BASELINE_MANIFEST_MISSING / BASELINE_PROVENANCE_INCOMPLETE hints still end with the repo-only spec reference (T-E448-17)
+test/baseline-manifest-gate.test.mjs | E2: AC-1 — verbatim BASELINE_MANIFEST_MISSING error string in dist/index.js
+test/baseline-manifest-gate.test.mjs | E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (full string verification)
+
+# E458 (8): CUT_APPROVAL_REQUIRED hint still names content/skill-pm.md §SOP step 7a (T-E448-17)
+test/cut-approval-gate.test.mjs | C2: S02 — verbatim hint string in dist/index.js
+
+# E458 (8): TRANSITION_REJECTED hint still names the repo-only architecture spec (T-E448-17)
+test/e151-resume-of-rejection-hint.test.mjs | AC13 (E435): handler path returns ⛔ TRANSITION_REJECTED with the code-reviewer conditional entry and S1
+test/e151-resume-of-rejection-hint.test.mjs | AC10: hint is S1 byte-for-byte with received=absent
+test/e151-resume-of-rejection-hint.test.mjs | AC11 (E435): wrong-role resume_of on the code-reviewer resume keeps the AC9 list and names the received value; on pm -> qa-engineer it is irrelevant
+test/e151-resume-of-rejection-hint.test.mjs | AC12 (E435): every other rejection has no requires entry and the static hint, plus only the in-flight hint on a removed old-path step
+
+# E452: a new feature is still stamped evidence_schema 2 (T-E448-13)
+test/e23-evidence-schema.test.mjs | AC1-1: first write of a new active_feature stamps evidence_schema: 3 on disk (EVIDENCE_SCHEMA_CURRENT)
+test/e23-evidence-schema.test.mjs | AC1-2: a subsequent same-feature write (no client arg exists to set it) preserves the stamped pin
+test/e23-evidence-schema.test.mjs | AC1-3: an active_feature change drops a stale pin and re-stamps EVIDENCE_SCHEMA_CURRENT — never carries the old value forward
+
+# E448: new MISSING_REVIEW_EVIDENCE case — step 17 does not reject the judge PASS yet (T-E448-11)
+test/e236-rejected-write-evidence.test.mjs | AC-E236-4 (E435): every rejecting step after QA_REVIEW_RECORD leaves evidence files byte-identical
+
+# AC14: E460 tw_complete_task judge refusal carries no isError: true (T-E448-16); AC17: E458 (8) NON_JUDGE_COMPLETED_TASKS_REJECTED hint still ends with the backlog reference (T-E448-17)
+test/e431-test-first-server-path.test.mjs | AC14 (E435): code-reviewer completes the task; qa-engineer rejected naming code-reviewer plus the migration hint (Copy verbatim)
+test/e431-test-first-server-path.test.mjs | AC14 (E435): another role (sr-engineer) is rejected naming code-reviewer with no migration hint; code-reviewer then completes
+test/e431-test-first-server-path.test.mjs | AC17 (E435): registry has 33 entries incl. SR_RETURN_CAP_EXCEEDED (shape pinned) and NON_JUDGE_COMPLETED_TASKS_REJECTED, the three removed codes gone; pipeline 17 steps, step 9 renamed; HOP_CAP 14; comment fixed
+
+# E452: EVIDENCE_SCHEMA_CURRENT is still 2 (T-E448-13)
+test/e432-judge-report-checks.test.mjs | AC14 (E435): registry 33, pipeline 17 (base names and order, step 9 renamed), evidence schema 3 (E452), handoff 17, sqlite 2, CLAUDE.md 250 lines
+
+# E458 (8), AC9 re-allocated to this lane: live AC_EXECUTION_LOG_MISSING hint still ends with the repo-only spec reference (T-E448-17)
+test/e433-test-first-rules.test.mjs | AC9 (E435): hints — MISSING_EVIDENCE unchanged, two rewritten hints name steps that exist in skill-code-reviewer.md, 33 live entries (35 in the closed range), only SR_RETURN_CAP_EXCEEDED documentedInProse flipped
+
+# E452: no accepted-surface listing rule under pin 3 (AC7 = AC11) and VISUAL_REPORT_INCOMPLETE hint lacks the v3 sentence (AC10) (T-E448-13)
+test/e434-reviewer-visual.test.mjs | AC7: one surface accepted in Region Diff with an Allowed Differences entry (surface id + reason) → code-reviewer PASS accepted; the same report with the surface id removed from Allowed Differences → VISUAL_REPORT_INCOMPLETE naming it (evidence schema v3)
+test/e434-reviewer-visual.test.mjs | AC10: GATE_REGISTRY — three visual hints renamed, VISUAL_ROUND_EXCEEDED documentedInProse false with mapping.vround, mapping rows name skill-reviewer-visual.md and match the quote sites, field comment, 33 entries (E435), 17 steps, every other field frozen (D21)
+
+# E448 / E458 (8): step 17 MISSING_REVIEW_EVIDENCE does not arm on the file-mode code-reviewer PASS write yet; registry entry and the 18 hints still carry the base text (T-E448-11, T-E448-17)
+test/e448-judge-evidence-checks.test.mjs | AC1: file-mode code-reviewer PASS with no review_reports/ file -> MISSING_REVIEW_EVIDENCE naming T1, hint.missing_review_evidence, no state written, auto-recorded section undone
+test/e448-judge-evidence-checks.test.mjs | AC2: review scope is review_task_ids when non-empty, else completed_tasks
+test/e448-judge-evidence-checks.test.mjs | AC4: MISSING_REVIEW_EVIDENCE registry entry carries hint.missing_review_evidence and a triggerEdge naming the code-reviewer PASS write; the step's comment no longer names a qa-engineer hand-off
+test/e448-judge-evidence-checks.test.mjs | AC19: the 18 E458 (8) hints equal their Copy / Strings text verbatim
+test/e448-judge-evidence-checks.test.mjs | AC20: no hintStatic in GATE_REGISTRY names a workspace-relative repo path or a bare ticket id
+
+# E451: Region Diff / Structural Assertions header patterns are unanchored, so card-surface, Surfaces.list and assertionIdle rows are skipped as headers (T-E448-12)
+test/e451-visual-header-anchor.test.mjs | AC5: a failed Region Diff row whose id contains 'surface' (card-surface, Surfaces.list) is rejected VISUAL_REPORT_INCOMPLETE naming it; real header cells (surface, Surface ID) are still skipped
+test/e451-visual-header-anchor.test.mjs | AC6: a failed Structural Assertions row id assertionIdle is rejected VISUAL_REPORT_INCOMPLETE with structural fail: assertionIdle; header cells assertion id / Assertion ID are still skipped
+
+# E452: EVIDENCE_SCHEMA_CURRENT is still 2 and validateVisualReport has no accepted-surface listing rule under pin >= 3 (T-E448-13)
+test/e452-allowed-differences.test.mjs | AC7: EVIDENCE_SCHEMA_CURRENT is 3; a new feature's first accepted write stamps evidence_schema: 3 and its envelopes cite Evidence schema: v3
+test/e452-allowed-differences.test.mjs | AC8: pin 3, an accepted surface with ## Allowed Differences reading None. (or empty) -> VISUAL_REPORT_INCOMPLETE naming settings.language with msg.allowed_differences_unlisted and hint.visual_report_incomplete
+test/e452-allowed-differences.test.mjs | AC9: pin 3, the accepted surface id anywhere in ## Allowed Differences (list item, table cell, prose) -> PASS accepted; two accepted surfaces, one listed -> rejected naming only the unlisted one
+
+# E459: no shared judgeReportStanding / isPassStanding predicate; file-mode PASS accepts any report file; expected-red ignores the pin; lane-status credits a hand-written PASS heading (T-E448-14, T-E448-15)
+test/e459-pass-evidence-rule.test.mjs | AC12: a judge PASS over an id whose report has standing FAIL (no qa_review) -> MISSING_EVIDENCE naming T1 with msg.missing_evidence_file and hint.missing_evidence
+test/e459-pass-evidence-rule.test.mjs | AC12: standing none (hand-written text only, incl. a hand-written '## Round 1 — PASS — by code-reviewer') is not PASS evidence either; several ids are listed with every checked path
+test/e459-pass-evidence-rule.test.mjs | AC13: a covers: T2 report with standing PASS clears a PASS over [T2] without qa_review; at standing FAIL or none it is rejected MISSING_EVIDENCE
+test/e459-pass-evidence-rule.test.mjs | AC13: the rule covers every id the PASS lists in completed_tasks (carried-forward ids too), under every evidence_schema pin
+test/e459-pass-evidence-rule.test.mjs | AC14: expected-red disposition heading follows the pin — '## Step 7 — Expected-Red Diff' clears under pin 2, 3 and no pin, is rejected under pin 1; '## Expected-Red Diff' clears under every pin
+test/e459-pass-evidence-rule.test.mjs | AC15: lane-status — server FAIL then a hand-written PASS heading is claimedWithoutEvidence; a last server PASS by code-reviewer (or pre-v5 qa-engineer) is credited; server PASS then server FAIL is not
+test/e459-pass-evidence-rule.test.mjs | AC16: judgeReportStanding (tools/evidence-file.ts) reads only server-recorded verdict sections, last one wins
+test/e459-pass-evidence-rule.test.mjs | AC16: on fixtures (a) standing FAIL, (b) server FAIL + hand-written PASS, (c) server PASS + server FAIL, (d) standing PASS, the PASS gate, lane-status and drift agree: only (d) is PASS evidence
+test/e459-pass-evidence-rule.test.mjs | AC16: (kept trust class) a report with no server-recorded verdict at all — even a hand-written PASS heading — is still credited by drift, never by lane-status or the PASS gate
+test/e459-pass-evidence-rule.test.mjs | AC16: lane-status and drift read standing through the shared predicate and restate no verdict-heading regex of their own
+
+# E460: tw_rollback_task refusals carry no isError: true (T-E448-16)
+test/e460-tool-error-flag.test.mjs | AC18: tw_rollback_task on a not-completed task returns its existing JSON error text with isError: true (file mode); a successful rollback carries no isError
+test/e460-tool-error-flag.test.mjs | AC18: tw_rollback_task on a not-completed task returns its existing JSON error text with isError: true (SQLite mode); a successful rollback carries no isError
+
+# E458 (8): PIXEL_GATE_ATTESTATION_MISSING hint still ends with the repo-only spec reference (T-E448-17)
+test/pixel-gate-attestation.test.mjs | E4: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message includes spec reference
+test/pixel-gate-attestation.test.mjs | E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in dist/index.js
+
+# E448: MISSING_REVIEW_EVIDENCE hint still names the hand-off to qa-engineer (T-E448-11)
+test/qa-flow.test.mjs | AC-12: evidence gate verbatim hint string is reachable from compiled handoff-orchestrator.js
+
+# E458 (8): SOURCE_CREDIBILITY_UNVERIFIED hint still names content/ and specs/ paths (T-E448-17)
+test/source-credibility-gate.test.mjs | T13: AC-8 — S02 static suffix verbatim (runtime hintStatic); dynamic prefix + error code in dist/tools/handoff-orchestrator.js
+
+# E458 (8): SCOPE_DECISION_REQUIRED hint still ends with the repo-only spec reference (T-E448-17)
+test/visual-evidence-gate.test.mjs | AC-4: SCOPE_DECISION_REQUIRED hint in tools/handoff-orchestrator.ts matches the spec Copy/Strings verbatim
+
+# Review round 1, R1 (E459, T-E448-19): the qa_review auto-record appends its "## <ts> — PASS — by code-reviewer" heading with no leading newline, so on a judge report without a trailing newline it lands mid-line, is not a server-recorded verdict, and step 13 refuses the PASS with MISSING_EVIDENCE — the newline prefix in the appender is not built yet
+test/e459-pass-evidence-rule.test.mjs | AC13 (review round 1, R1): a judge report with no trailing newline — FAIL-standing or verdict-less — still clears a PASS carrying qa_review + review_task_ids; the recorded PASS heading starts on its own line and lane-status credits the id

@@ -587,15 +587,16 @@ test("AC-4: SCOPE_DECISION_REQUIRED hint in tools/handoff-orchestrator.ts matche
   const indexTs = fs.readFileSync(path.join(root, "gates", "registry.ts"), "utf-8");
   const specMd = fs.readFileSync(path.join(root, "specs", "server-scope-decision-gate.md"), "utf-8");
 
+  // E448 re-pin (E458 item 8): hint.scope_decision_required drops "See specs/server-scope-decision-gate.md."
+  // (a path that does not exist in an adopter workspace); every other byte is unchanged.
   const expected =
     "Scope decision missing. Either: (a) create .current/feature-split.md documenting the " +
     "multi-feature split decision, or (b) set scope_decision: single-feature in this " +
     "tw_update_state call with a why field explaining why this feature is appropriately " +
-    "scoped. Gate only fires when design/<feature>.md declares mode != no-design. " +
-    "See specs/server-scope-decision-gate.md.";
+    "scoped. Gate only fires when design/<feature>.md declares mode != no-design.";
 
-  // (1) The spec's Copy/Strings row carries the exact text (spec is the source
-  // of truth; it lives on one line so a literal substring match is valid).
+  // (1) The original spec's Copy/Strings row still carries this text (followed there by the
+  // dropped reference), so a literal substring match is valid.
   assert.ok(
     specMd.includes(expected),
     "spec Copy/Strings hint must match the expected text verbatim; spec drift detected",
@@ -609,6 +610,10 @@ test("AC-4: SCOPE_DECISION_REQUIRED hint in tools/handoff-orchestrator.ts matche
   assert.ok(
     assembled.includes(expected),
     "index.ts must emit the verbatim hint; impl-vs-spec copy drift detected",
+  );
+  assert.ok(
+    !assembled.includes("See specs/server-scope-decision-gate.md"),
+    "the hint no longer points adopters at a repo-only spec path (E458 item 8)",
   );
 });
 

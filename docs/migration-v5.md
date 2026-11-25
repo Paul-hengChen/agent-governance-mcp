@@ -11,12 +11,20 @@ workspace after upgrading.
   qa-engineer writes the scenario tests first; sr-engineer builds to them;
   code-reviewer judges, writes `status=PASS` and owns `completed_tasks` /
   `tw_complete_task`. qa-engineer no longer writes PASS or FAIL.
-- **Handoff schema 16 → 17**, migrated lazily on first read: `chain_path`,
-  `qa_round` and `qa_rounds_total` are dropped. A `chain_path` sent by an old
-  client is ignored. Nothing else in the handoff changes.
+- **Handoff schema 15 → 17** (v4.23.0 writes 15), migrated lazily on first
+  read: `qa_round` and `qa_rounds_total` (and a pre-release `chain_path`) are
+  dropped, and the new `sr_return_count` counter starts absent (read as 0). A
+  `chain_path` sent by an old client is ignored. Nothing else in the handoff
+  changes.
+- **Upgrade every server that shares a workspace.** Once a v5 server has
+  written a file-mode `handoff.md` at schema 17, an older server (v4.23.0 reads
+  up to 15) refuses it as written by a newer server. Restart every MCP client
+  on v5 before the first write.
 - `resume_of` accepts only `code-reviewer`.
-- The `sr_return` cap (sr-engineer → qa-engineer returns, 2 per feature) applies
-  to every file-mode feature.
+- The `sr_return` cap (2 sr-engineer → qa-engineer returns) applies to every
+  file-mode feature. The count resets on every `pm:In_Progress` write, and the
+  cap closes only that return edge: sr-engineer can still hand to
+  code-reviewer or stop to pm.
 - Error codes: `QA_ROUND_EXCEEDED` is gone (there is no qa round).
   `REVIEWER_COMPLETED_TASKS_REJECTED` and `NON_QA_COMPLETED_TASKS_REJECTED`
   are replaced by one code, `NON_JUDGE_COMPLETED_TASKS_REJECTED`: only the
@@ -35,7 +43,8 @@ can still leave it.
 |---|---|
 | `pm:In_Progress` | Hand to qa-engineer (or architect). The build-entry gates and cut approval apply to `pm → qa-engineer`. |
 | `architect:In_Progress` | Hand to qa-engineer. |
-| `sr-engineer:*` | Continue to code-reviewer. |
+| `sr-engineer:In_Progress` | Continue to code-reviewer. |
+| `sr-engineer:Blocked` | Write `sr-engineer:In_Progress` first, then continue to code-reviewer (`sr-engineer:Blocked → code-reviewer:In_Progress` is rejected). |
 | `code-reviewer:In_Progress` | code-reviewer writes PASS itself, with `review_verdict: "APPROVED"`, `completed_tasks` and `qa_review`. |
 | `qa-engineer:In_Progress` (reviewing a build) | Write `qa-engineer:Blocked` → `pm:In_Progress` → `code-reviewer:In_Progress` with `resume_of: "code-reviewer"`; or hand to sr-engineer, which needs `qa_reports/expected-red_<feature>.txt` or the no-new-test record. |
 | `qa-engineer:FAIL` | sr-engineer fixes, then code-reviewer judges. |
@@ -68,13 +77,24 @@ author must not share the builder's context.
 
 ## Re-stamp `agc-version`
 
-Run `agc init` (or `agc check` to see what is stale). It re-stamps
-`agc-version` in `CLAUDE.md`, `AGENTS.md` and `.antigravityrules`.
+Run `agc init` (or `agc check` to see what is stale). It updates the agc
+block, and its `agc-version` stamp, in `CLAUDE.md` only. An existing
+`AGENTS.md` or `.antigravityrules` is left as it is (`agc init` prints
+`Skipped (already exists)`): bump the `agc-version:` line in each by hand to
+the installed version, or delete the file and re-run `agc init`. Deleting and
+re-running writes a fresh copy from the template, so any local edits in that
+file are lost. Then run `agc check`; it must exit 0.
 
 ## SQLite / HTTP mode
 
 Same transition table and same judge. SQLite does not store `sr_return_count`, so in SQLite the sr_return cap is not enforced.
 No column and no SQLite schema version change.
+
+Two build-entry checks run in file mode only: `CUT_APPROVAL_REQUIRED` and
+`EXTERNAL_REFS_UNRESOLVED` (`SCOPE_DECISION_REQUIRED` and
+`SOURCE_CREDIBILITY_UNVERIFIED` run in every mode). The expected-red manifest
+check on the qa-engineer → sr-engineer hand-off (`REPRO_MANIFEST_MISSING`) is
+file mode only too.
 
 ## Telemetry
 

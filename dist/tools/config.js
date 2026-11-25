@@ -56,8 +56,10 @@ export function parseNodeModulesLinks(value) {
     return { links, rejected };
 }
 const SISTER_REPO_NAME_RE = /^[A-Za-z0-9_.-]+$/;
+// A string holding at least one non-whitespace character; the value itself is
+// kept verbatim by callers.
 function isNonEmptyString(value) {
-    return typeof value === "string" && value.length > 0;
+    return typeof value === "string" && value.trim().length > 0;
 }
 // Absolute in POSIX, Windows (rooted or UNC) or drive form, or "~"-relative.
 function isRejectedSisterPath(p) {
@@ -106,12 +108,14 @@ export function parseSisterRepos(value) {
 }
 /** Ticket-file directory used when `ticketDir` is absent or unusable. */
 export const DEFAULT_TICKET_DIR = "docs/tickets";
-// Usable: a non-empty relative path that does not start with "~" and does not
-// normalize to a path whose first segment is "..".
+// Usable: a relative path with a non-whitespace character that does not start
+// with "~" and normalizes neither to the workspace root (".") nor to a path
+// whose first segment is "..".
 function isUsableTicketDir(value) {
     if (!isNonEmptyString(value) || isRejectedSisterPath(value))
         return false;
-    return path.posix.normalize(value.replace(/\\/g, "/")).split("/")[0] !== "..";
+    const normalized = path.posix.normalize(value.replace(/\\/g, "/")).replace(/\/$/, "");
+    return normalized !== "." && normalized.split("/")[0] !== "..";
 }
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
 // or under .current/. No project-management-tool-specific paths.

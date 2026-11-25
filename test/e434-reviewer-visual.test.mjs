@@ -58,7 +58,7 @@ const COPY = {
   crVisualStep:
     "6a. **Visual verdict**: WHEN `design/<feature>.md` declares `## Visual Baselines` → DO read the workspace's `.current/skill-reviewer-visual.md` when it has one, else `<agc install>/content/skill-reviewer-visual.md`, and follow it on the visual checks' output from step 6; it writes `qa_reports/visual_<task-id>.md` and reads an image only for a surface over its threshold → ELSE do not read it.",
   coord05Dispatch:
-    "When dispatching `reviewer-visual` (subagent-dispatch tool or `tw_switch_role`) — picked over `code-reviewer` for the judge hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY",
+    "When dispatching `reviewer-visual` (subagent-dispatch tool only; `tw_switch_role` has no `reviewer-visual` role, so that fallback switches to `code-reviewer`, whose SOP loads the visual rules) — picked over `code-reviewer` for the judge hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY",
   qaVisualLabel: "**Visual checks**",
   const11Head: "**Visual verdict is reviewer-visual-owned.**",
   const11Measure: "**Measure first, judge over threshold.**",
@@ -327,9 +327,12 @@ const state = (ws) => new FileHandoffStorage().parse(ws);
 const F = "e434-visual-feat";
 const w = (agent, status, extra = {}) => ({ active_feature: F, status, agent_id: agent, ...extra });
 
+// E448 re-pin (E459): the judge report ends with a server-recorded PASS verdict section (the exact shape the
+// qa_review auto-record writes), so its standing is PASS; hand-written sections alone are no longer PASS evidence.
 const JUDGE_REPORT =
   "# QA review — T-1\n\n## Expected-Red Diff\n\nclean (1/1 manifest entries confirmed red, now green — built)\n\n" +
-  "## AC Execution Log\n\nAC1: `node --test x` exit 0 pass\n";
+  "## AC Execution Log\n\nAC1: `node --test x` exit 0 pass\n\n" +
+  "## 2026-11-20T00:00:00.000Z — PASS — by code-reviewer\n\nvisual verdict recorded; every AC green\n";
 
 // One surface's prose block: the three provenance lines the server checks.
 const surfaceBlock = (id, metric) => `### ${id}\n- baseline: sha256:4be91c02a7d3\n- diff-metric: ${metric}\n- pixel_gate_complete: true\n`;
@@ -362,14 +365,16 @@ ${allowed}
 
 // A design-armed, test-first feature at code-reviewer:In_Progress with a ledger, the red-test manifest, a spec
 // with a proof: line, the judge report and (optionally) the visual report.
-async function designJudgeWs(prefix, { visual } = {}) {
+async function designJudgeWs(prefix, { visual, seedOpts = {} } = {}) {
   const ws = mkWs(prefix);
-  await seed(ws, F, "code-reviewer", "In_Progress", { chainPath: "test-first" });
+  await seed(ws, F, "code-reviewer", "In_Progress", { chainPath: "test-first", ...seedOpts });
   await addTask(ws, "T-1");
   put(ws, `design/${F}.md`, designDoc(F));
   put(ws, `qa_reports/expected-red_${F}.txt`, "# scenario test\ntest/x.test.mjs | AC1: red\n");
   put(ws, `specs/${F}.md`, "# spec\n\n## Acceptance Criteria\n\n- **AC1** thing\n  proof: `node --test x`\n");
   put(ws, "qa_reports/review_T-1.md", JUDGE_REPORT);
+  // E448 re-pin: the judge PASS needs the code-review report for every reviewed id.
+  put(ws, "review_reports/review_T-1.md", "# Code review — T-1\n\nVerdict: APPROVED\n");
   if (visual !== undefined) put(ws, "qa_reports/visual_T-1.md", visual);
   return ws;
 }
@@ -583,19 +588,29 @@ test("AC6: design-armed test-first feature, every surface pass with a numeric di
 
 // ================================================================== AC7
 
-test("AC7: one surface accepted in Region Diff with an Allowed Differences entry (surface id + reason) → code-reviewer PASS accepted; the section keeps surface id and reason", async () => {
+test("AC7: one surface accepted in Region Diff with an Allowed Differences entry (surface id + reason) → code-reviewer PASS accepted; the same report with the surface id removed from Allowed Differences → VISUAL_REPORT_INCOMPLETE naming it (evidence schema v3)", async () => {
+  // E452 re-pin (AC11): the server, not a read-back of this test's own fixture, enforces that an accepted
+  // surface is recorded under ## Allowed Differences. The listing rule applies from evidence schema v3, the
+  // pin a new feature gets on its first accepted write, so the fixture is pinned 3.
   const reason = "sub-pixel text anti-aliasing on the row labels; no structural difference";
-  const allowed = `- settings.language — odiff: 0.9% (threshold 0.5%) — ${reason}`;
-  const ws = await designJudgeWs("e434-ac7-", {
-    visual: visualReport({ result: "accepted", metric: "odiff: 0.9% (threshold 0.5%, over; judged by image read)", allowed }),
+  const metric = "odiff: 0.9% (threshold 0.5%, over; judged by image read)";
+  const listed = await designJudgeWs("e434-ac7-", {
+    visual: visualReport({ result: "accepted", metric, allowed: `- settings.language — odiff: 0.9% (threshold 0.5%) — ${reason}` }),
+    seedOpts: { evidenceSchema: 3 },
   });
-  const r = await upd(ws, w("code-reviewer", "PASS", { completed_tasks: ["T-1"], review_verdict: "APPROVED" }));
-  assert.ok(!rejected(r), `judge PASS with an accepted surface must be accepted: ${text(r)}`);
-  assert.equal(state(ws).status, "PASS");
-  const report = fs.readFileSync(path.join(ws, "qa_reports", "visual_T-1.md"), "utf-8");
-  const section = report.slice(report.indexOf("## Allowed Differences"), report.indexOf("## Verdict"));
-  assert.ok(section.includes("settings.language"), "Allowed Differences names the surface id");
-  assert.ok(section.includes(reason), "Allowed Differences carries the reason");
+  const r = await upd(listed, w("code-reviewer", "PASS", { completed_tasks: ["T-1"], review_verdict: "APPROVED" }));
+  assert.ok(!rejected(r), `judge PASS with a listed accepted surface must be accepted: ${text(r)}`);
+  assert.equal(state(listed).status, "PASS");
+
+  const unlisted = await designJudgeWs("e434-ac7b-", {
+    visual: visualReport({ result: "accepted", metric, allowed: `- odiff: 0.9% (threshold 0.5%) — ${reason}` }),
+    seedOpts: { evidenceSchema: 3 },
+  });
+  const r2 = await upd(unlisted, w("code-reviewer", "PASS", { completed_tasks: ["T-1"], review_verdict: "APPROVED" }));
+  assert.ok(rejected(r2), `an accepted surface missing from Allowed Differences must be refused: ${text(r2)}`);
+  assert.match(text(r2), /^⛔ VISUAL_REPORT_INCOMPLETE: /);
+  assert.ok(text(r2).includes("accepted but not in ## Allowed Differences: settings.language"), `names the surface: ${text(r2)}`);
+  assert.equal(state(unlisted).status, "In_Progress", "no state written");
 });
 
 // ================================================================== AC8
@@ -665,12 +680,17 @@ test("AC10: GATE_REGISTRY — three visual hints renamed, VISUAL_ROUND_EXCEEDED 
     BASE_HINT_ASSERTIONS_REQUIRED.replace("qa-visual marks each row pass/fail. ", "reviewer-visual marks each row pass/fail. "),
     "hint.assertions_required = base with exactly the one substitution",
   );
+  // E448 re-pin (E452): hint.visual_report_incomplete = E434's two substitutions plus E452's one added v3 sentence.
   assert.equal(
     live.VISUAL_REPORT_INCOMPLETE.hintStatic,
     BASE_HINT_REPORT_INCOMPLETE
       .replace("(skill-qa-visual §Report schema;", "(skill-reviewer-visual §Report schema;")
-      .replace("(visual verdict is qa-visual-owned, ", "(visual verdict is reviewer-visual-owned, "),
-    "hint.report_incomplete = base with exactly the two substitutions",
+      .replace("(visual verdict is qa-visual-owned, ", "(visual verdict is reviewer-visual-owned, ")
+      .replace(
+        "evidence schema v2). Resolve",
+        "evidence schema v2). From evidence schema v3, every surface whose Region Diff result is accepted must also be named in the Allowed Differences section. Resolve",
+      ),
+    "hint.visual_report_incomplete = base with E434's two substitutions and E452's v3 sentence",
   );
   assert.equal(live.VISUAL_ROUND_EXCEEDED.documentedInProse, false, "VISUAL_ROUND_EXCEEDED documentedInProse: false (D2 (B))");
   for (const g of GATE_REGISTRY) {

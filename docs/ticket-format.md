@@ -16,7 +16,8 @@ The file starts with a line holding only `---`. The field block ends at the next
 The block is YAML front matter: between the two `---` lines, each line is `name: value`. Field names are plain
 lower-case words. Values are not converted to numbers or true/false: `no` stays the word `no`, and `007` stays
 `007`. A list is written in square brackets, entries separated by commas: `[first, second]`; an empty list is
-`[]`.
+`[]`. Every entry of a list must be non-empty text: a nested list, a `name: value` pair or a blank entry such as
+`''` is reported by its position in the list.
 
 Many characters have a meaning of their own in YAML, so write each value, and each entry of a list, like this:
 
@@ -44,7 +45,7 @@ status: 'stopped — vendor''s firmware: late'
 | `priority` | yes | How urgent the ticket is, for example `P0` (most urgent) to `P3`. The format does not fix a scale; use the one your team uses. |
 | `depends on` | yes | A list of ticket ids that must be finished before this one starts. Write `[]` when there are none. |
 | `allowed paths` | yes | A list of the repository paths (or glob patterns such as `src/export/*.ts`) this ticket may change. Paths are relative to the repository root. The list must not be empty. |
-| `needs device or person` | yes | `yes` or `no`. It is `yes` exactly when at least one scenario is verified by `device-or-person` (see below), so a reader can tell at a glance that the ticket cannot be finished by automation alone. |
+| `needs device or person` | yes | `yes` or `no`; any other value, such as `Yes` or `maybe`, is refused. It is `yes` exactly when at least one scenario is verified by `device-or-person` (see below), so a reader can tell at a glance that the ticket cannot be finished by automation alone. |
 | `status` | yes | One of the status values below. |
 | `source` | no | Leave it out or empty, unless the ticket was cut from an issue-tracker item. Then it is a list of `<item number> rev <revision>` entries, for example `[1234 rev 7]`: the tracker's item number and the item's revision when the ticket was written. Write the number only, never a link. Leave it empty in a public repository. |
 
@@ -81,8 +82,10 @@ as an unknown field, so that every field in every ticket is one this document ex
 
 ## Scenarios
 
-Under `## Scenarios`, each scenario starts with a heading `### <scenario id> — <short title>`. The scenario id
-starts with a letter, then letters, digits or `-` (for example `S1`, `csv-header`), and is unique in the file.
+Under `## Scenarios`, each scenario starts with a heading `### <scenario id> — <short title>`. The heading must
+hold ` — ` (a space, an em dash and a space) between the scenario id and the title; a heading without it is
+reported, because its title would be empty. The scenario id starts with a letter, then letters, digits or `-`
+(for example `S1`, `csv-header`), and is unique in the file.
 
 The heading is followed by:
 
@@ -92,6 +95,10 @@ The heading is followed by:
 
 Each of these lines may be written as a list item (`- Given ...`) so that it shows on its own line when the
 Markdown is rendered.
+
+Lines inside a fenced code block (opened and closed by a line starting with three backticks or three tildes)
+are not read as part of a scenario: a heading, a `Given`, `When`, `Then` or `And` line, a verification line or
+an `Added:` line written there is only quoted text, so it neither counts for the scenario nor breaks it.
 
 ### Verification forms
 
@@ -119,6 +126,10 @@ scenario plus one line saying who added it, when and why:
 ```
 Added: <who>, <YYYY-MM-DD>, <reason>
 ```
+
+The date must be a real calendar date: `2026-02-30` or `2026-13-01` is refused. `## Added during build` is the
+last section of the file: any `##` section after it is reported as a problem, and the scenarios under such a
+section are not read.
 
 Existing scenarios are never edited or removed while the work is under way. If one has to change or go, the
 ticket is stopped (`stopped — <reason>`) and re-agreed instead.

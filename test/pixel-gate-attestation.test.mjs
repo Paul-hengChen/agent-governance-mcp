@@ -671,12 +671,19 @@ test("E3: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message mentions carry-forward
   );
 });
 
-test("E4: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message includes spec reference", () => {
-  // Why: AC-9 actionable-error requirement: the spec reference tells the agent where
-  // to find the full requirement. Must appear verbatim.
+test("E4: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message includes spec reference", async () => {
+  // Why: AC-9 actionable-error requirement: the message tells the agent exactly what to fix.
+  // E448 re-pin (E458 item 8): the spec reference is dropped — specs/qa-visual-pixel-gate-attestation.md
+  // does not exist in an adopter workspace — so the hint itself is the full, self-contained requirement.
   assert.ok(
-    DIST_REGISTRY.includes("See specs/qa-visual-pixel-gate-attestation.md"),
-    "error message must include the spec reference (AC-9)",
+    !DIST_REGISTRY.includes("See specs/qa-visual-pixel-gate-attestation.md"),
+    "error message must not point at a repo-only spec path",
+  );
+  const { GATE_REGISTRY } = await import(new URL("../dist/gates/registry.js", import.meta.url).href);
+  assert.equal(
+    GATE_REGISTRY.find((g) => g.errorCode === "PIXEL_GATE_ATTESTATION_MISSING").hintStatic,
+    "Each non-carry-forward surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true' in its ### <surface id> prose sub-section under ## Region Diff. Carry-forward surfaces are exempt.",
+    "hint.pixel_gate_attestation_missing verbatim",
   );
 });
 
@@ -700,9 +707,14 @@ test("E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in d
     DIST_REGISTRY.includes("in its ### <surface id> prose sub-section under ## Region Diff."),
     "clause naming the sub-section location must appear verbatim in dist/gates/registry.js",
   );
+  // E448 re-pin (E458 item 8): the clause ends at the exemption; the repo-only spec reference is gone.
   assert.ok(
-    DIST_REGISTRY.includes("surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md."),
-    "exemption + spec-reference clause must appear verbatim in dist/gates/registry.js",
+    DIST_REGISTRY.includes("surfaces are exempt."),
+    "exemption clause must appear verbatim in dist/gates/registry.js",
+  );
+  assert.ok(
+    !DIST_REGISTRY.includes("surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md."),
+    "no spec-reference clause after the exemption",
   );
 });
 

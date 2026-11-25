@@ -123,6 +123,9 @@ test("AC-E139-2 (E435): code-reviewer -> qa-engineer is no longer an edge, even 
   // The judge closes instead: APPROVED with PASS is consistent and lands.
   const ws2 = mkWorkspace("e139-2b-");
   await seed(ws2, "e139-2b", "code-reviewer", "In_Progress");
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id.
+  fs.mkdirSync(path.join(ws2, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws2, "review_reports", "review_T-E139-Y.md"), "# Code review\n\nVerdict: APPROVED\n");
   const r2 = await upd({
     workspace_path: ws2,
     active_feature: "e139-2b",
@@ -192,6 +195,9 @@ test("AC-E139-4 (E435): code-reviewer writes never trip the new code; APPROVED i
   for (const [status, verdict, expected] of cases) {
     const ws = mkWorkspace("e139-4-");
     await seed(ws, "e139-4", "code-reviewer", "In_Progress");
+    // E448 re-pin: the PASS case needs the code-review report for its reviewed id.
+    fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+    fs.writeFileSync(path.join(ws, "review_reports", "review_T-E139-4.md"), "# Code review\n\nVerdict: APPROVED\n");
     const pass = status === "PASS" ? { completed_tasks: ["T-E139-4"], review_task_ids: ["T-E139-4"], qa_review: "judged" } : {};
     const r = await upd({
       workspace_path: ws, active_feature: "e139-4", status, agent_id: "code-reviewer",

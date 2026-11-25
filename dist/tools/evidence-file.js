@@ -17,6 +17,34 @@ export function resolveJudgeReport(workspacePath) {
 // Signers a multi-feature report reader (lane-status) accepts: the judge, and
 // qa-engineer for reports written before v5.0.0 (DR-6).
 export const REPORT_SIGNERS = [JUDGE_ROLE, "qa-engineer"];
+// Exactly the heading the qa_review auto-record writes:
+//   `## ${new Date().toISOString()} — ${status} — by ${reviewer}`
+// Single spaces, em dashes, ISO-8601 UTC with milliseconds and Z. A trailing
+// \r is tolerated (CRLF-edited reports). Any other heading is not a verdict.
+const SERVER_VERDICT_HEADING_RE = /^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) — (PASS|FAIL) — by (\S+)[ \t]*\r?$/gm;
+// Pure, no I/O, never throws.
+export function judgeReportStanding(content) {
+    let verdict = null;
+    let signer = null;
+    let recordedAt = null;
+    const re = new RegExp(SERVER_VERDICT_HEADING_RE.source, "gm"); // fresh lastIndex per call
+    let m;
+    while ((m = re.exec(content)) !== null) {
+        recordedAt = m[1];
+        verdict = m[2] === "PASS" ? "PASS" : "FAIL";
+        signer = m[3];
+    }
+    return { verdict, signer, recordedAt };
+}
+// True when the standing is PASS; with `signers`, the last section's signer
+// must also be one of them.
+export function isPassStanding(standing, signers) {
+    if (standing.verdict !== "PASS")
+        return false;
+    if (signers === undefined)
+        return true;
+    return standing.signer !== null && signers.includes(standing.signer);
+}
 // ---------- task-id → evidence filename stem ----------
 // Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its
 // stem from the task id through this one encoder, so two distinct ids can
@@ -279,20 +307,21 @@ export function parseAssertionFailures(section) {
         if (cells.length < 2)
             continue;
         const id = cells[0];
-        if (id === "" || /assertion\s*id/i.test(id))
-            continue; // header row
+        // Header row: the whole first cell is `assertion` / `assertion id`, so an
+        // id that merely contains the word (assertionIdle) is a data row.
+        if (id === "" || /^assertion(\s*id)?$/i.test(id))
+            continue;
         const result = cells[cells.length - 1].toLowerCase();
         if (result !== "pass")
             failures.push(id);
     }
     return failures;
 }
-// Region Diff rows `| surface | result |` where result ∈ {pass, accepted}.
-// Anything else (fail, material, unresolved, blank, drift) is a failure.
-// "accepted" is allowed because a difference reviewer-visual deliberately accepts is
-// recorded in `## Allowed Differences`; here it signals "diff exists but cleared".
-export function parseRegionDiffFailures(section) {
-    const failures = [];
+// Region Diff rows `| surface | result |`, header and separator rows skipped.
+// The header skip lives only here: the whole first cell must be `surface` /
+// `surface id`, so ids such as card-surface or Surfaces.list are data rows.
+export function parseRegionDiffRows(section) {
+    const rows = [];
     for (const line of section.split("\n")) {
         const t = line.trim();
         if (!t.startsWith("|"))
@@ -308,13 +337,19 @@ export function parseRegionDiffFailures(section) {
         if (cells.length < 2)
             continue;
         const id = cells[0];
-        if (id === "" || /surface(\s*id)?/i.test(id))
-            continue; // header row
-        const result = cells[cells.length - 1].toLowerCase();
-        if (result !== "pass" && result !== "accepted")
-            failures.push(id);
+        if (id === "" || /^surface(\s*id)?$/i.test(id))
+            continue;
+        rows.push({ id, result: cells[cells.length - 1].toLowerCase() });
     }
-    return failures;
+    return rows;
+}
+// Region Diff ids whose result is not pass or accepted (fail, material,
+// unresolved, blank, drift). "accepted" means the diff exists but
+// reviewer-visual cleared it and records it in `## Allowed Differences`.
+export function parseRegionDiffFailures(section) {
+    return parseRegionDiffRows(section)
+        .filter((r) => r.result !== "pass" && r.result !== "accepted")
+        .map((r) => r.id);
 }
 // Split a markdown table line into trimmed cells, dropping the leading/trailing
 // empty cells produced by the outer pipes. Mirrors the proven cell-splitting in

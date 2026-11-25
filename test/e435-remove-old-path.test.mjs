@@ -135,6 +135,9 @@ test("AC2: code-reviewer completes tasks, grows completed_tasks and writes PASS 
   await call(ADD, ws, { task_id: "T-1", description: "one" });
   const c = await call(COMPLETE, ws, { task_id: "T-1", agent_id: "code-reviewer" });
   assert.match(text(c), /"success":true/, `code-reviewer tw_complete_task accepted: ${text(c)}`);
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "review_reports", "review_T-1.md"), "# Code review\n\nVerdict: APPROVED\n");
   const r = await upd(ws, "code-reviewer", "PASS", {
     review_verdict: "APPROVED", qa_review: "judged", review_task_ids: ["T-1"], completed_tasks: ["T-1"],
   });

@@ -70,10 +70,11 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
 │      (prev_agent, prev_status) → (next_agent, next_status) must │
 │      be in ALLOWED_TRANSITIONS, or qualify for the same-agent   │
 │      In_Progress→In_Progress self-loop fast path. Also applies  │
-│      the round-cap overrides:                                   │
+│      the cap overrides:                                         │
 │        review_round ≥ 4 (REVIEW_ROUND_CAP) ┐ matrix collapses   │
 │        visual_round ≥ 6 (VISUAL_ROUND_CAP) ┘ to (pm,In_Progress)│
 │        sr_return_count ≥ 2 (SR_RETURN_CAP): sr→qa return → pm   │
+│        hop_count ≥ 14 (HOP_CAP_EXCEEDED): role change → pm      │
 │  2 FEATURE_LEASE                  (gates/feature-lease.ts)      │
 │  3 SCOPE_DECISION_REQUIRED        (gates/scope-decision.ts)     │
 │  4 CUT_APPROVAL_REQUIRED          (gates/cut-approval.ts)       │
@@ -109,7 +110,7 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
                                   handoff state updated
 ```
 
-Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 35 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
+Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 33 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
 
 ---
 
@@ -137,7 +138,7 @@ lite mode (/teamwork-lite):
   single-shot direct execution; server-read-only (no agent_id in the chain).
 ```
 
-Auto-routing in full mode: after each role's handoff, the coordinator self-calls `tw_switch_role(<next_role>)` based on `pending_notes.next_role`. Five stop conditions yield to the human (`Blocked`, `PASS`, `next_role: human`, missing `next_role:` line, hop counter ≥ 10). Opt-out via `AGC_AUTO_ROUTE=0`.
+Auto-routing in full mode: after each role's handoff, the coordinator dispatches the role named in the `next_role` field (a subagent, or `tw_switch_role(<next_role>)` as the fallback). It yields to the human on `Blocked`, on `PASS`, when the `next_role` field is absent, and when `hop_count` reaches the `hop` cap (14 per feature). Opt-out via `AGC_AUTO_ROUTE=0`.
 
 ---
 
@@ -241,7 +242,7 @@ Each template carries only `name` + `model` + `description` frontmatter; the SOP
 
 | Counter | FAIL cap | Increments on | Resets on | Round-cap collapse target |
 |---|---|---|---|---|
-| `review_round` | 3 (Round 4 locks) | `(code-reviewer, FAIL)` (`CHANGES_REQUESTED`) | `PASS` or `(pm, In_Progress)` | `{(pm, In_Progress)}` |
+| `review_round` | 4 (after the 4th FAIL only pm) | `(code-reviewer, FAIL)` (`CHANGES_REQUESTED`) | `PASS` or `(pm, In_Progress)` | `{(pm, In_Progress)}` |
 | `visual_round` | 5 (Round 6 locks) | `(qa-engineer, FAIL)` w/ `visual_fail:` | `PASS` or `(pm, In_Progress)` | `{(pm, In_Progress)}` |
 
 There is no qa round: qa-engineer writes the tests and never writes PASS or FAIL; code-reviewer is the judge (see [migration-v5.md](migration-v5.md)).

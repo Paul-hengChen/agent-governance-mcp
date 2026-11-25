@@ -13,7 +13,7 @@ import { computeFeatureRollup } from "./feature-rollup.js";
 import { laneRegistryList } from "./lane-registry.js";
 import { parseHandoff } from "./handoff-parse.js";
 import { HOP_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED } from "./transitions.js";
-import { decodeEvidenceId, parseCoversIds, resolveJudgeReport, REPORT_SIGNERS } from "./evidence-file.js";
+import { decodeEvidenceId, isPassStanding, judgeReportStanding, parseCoversIds, resolveJudgeReport, REPORT_SIGNERS, } from "./evidence-file.js";
 // Only these tools/lane-paths.ts helpers, never lane-paths' resolver
 // functions: those have pinned caller allow-lists in test/lane-paths.test.mjs.
 import { LEGACY_LANE, PRIMARY_LANE, isSafeLaneName, laneFile, resolveLaneName } from "./lane-paths.js";
@@ -34,10 +34,6 @@ export function featureTicketToken(activeFeature) {
 }
 const FEAT_BRANCH_PREFIX = "feat/";
 const REVIEW_FILE_RE = /^review_(.+)\.md$/;
-// The section header gates/qa-review.ts `recordReviewInFile` writes for a
-// PASS round by the judge: `## <iso-ts> — PASS — by code-reviewer`, or
-// `— by qa-engineer` on a report written before v5.0.0 (REPORT_SIGNERS, AC5b).
-const JUDGE_PASS_HEADER_RE = new RegExp(`^##\\s.*\\s—\\sPASS\\s—\\sby (?:${REPORT_SIGNERS.join("|")})\\b`, "m");
 // A voided ledger row: `- [-] <id> ... (voided: ...)` (tools/tasks-file.ts
 // voidTaskInFile's marker; AC5d).
 const VOIDED_ROW_RE = /^- \[-\] (\S+)(?=\s|$)/;
@@ -85,8 +81,9 @@ function isSafeArchiveSegment(s) {
 }
 /**
  * Task ids backed by a PASS-bearing evidence file in `dir` (AC5b): each
- * `*.md` whose content carries a `— PASS — by <judge>` section header
- * (code-reviewer, or pre-v5.0.0 qa-engineer) contributes its own id plus every id its
+ * `*.md` whose last server-recorded verdict section is PASS by a
+ * REPORT_SIGNERS signer (tools/evidence-file.ts `judgeReportStanding`:
+ * code-reviewer, or pre-v5.0.0 qa-engineer) contributes its own id plus every id its
  * `covers:` line names
  * (tools/evidence-file.ts `parseCoversIds`). The own id is the
  * `review_<stem>.md` stem decoded by tools/evidence-file.ts
@@ -116,7 +113,7 @@ function passEvidenceIdsIn(dir) {
         catch {
             continue;
         }
-        if (!JUDGE_PASS_HEADER_RE.test(content))
+        if (!isPassStanding(judgeReportStanding(content), REPORT_SIGNERS))
             continue;
         const m = REVIEW_FILE_RE.exec(name);
         if (m)

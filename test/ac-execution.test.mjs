@@ -234,6 +234,9 @@ async function seedJudgeInProgress(ws, feature) {
   // follow-up handleUpdateState call below never has a ~1/60000 chance of
   // tripping STAMP_PROVENANCE_SUSPECT (E148, docs/backlog.md row E148).
   forceSeedStamp(ws);
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "review_reports", "review_T01.md"), "# Code review\n\nVerdict: APPROVED\n");
 }
 
 test("I1 (E435): code-reviewer PASS rejected with AC_EXECUTION_LOG_MISSING when spec armed + qa_review carries no AC Execution Log section", async () => {

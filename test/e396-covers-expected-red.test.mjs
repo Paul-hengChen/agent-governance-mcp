@@ -73,6 +73,9 @@ async function passFrom(agent) {
   const feature = "e396-int";
   fs.writeFileSync(expectedRedManifestPath(ws, feature), "some/test.mjs | a test name\n", "utf-8");
   writeCoveringFile(ws);
+  // E448 re-pin: a file-mode judge PASS needs a code-review report for every reviewed id (one covers: file).
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "review_reports", "review_e396.md"), `# Code review\n\ncovers: ${IDS.join(", ")}\n`, "utf-8");
   resetSession(ws);
   markStateRead(ws);
   await writeHandoffState({

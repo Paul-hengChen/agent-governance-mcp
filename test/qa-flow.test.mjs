@@ -1000,7 +1000,7 @@ test("AC-12: recordCodeReviewInFile sanitises unsafe task ids", () => {
   assert.equal(fs.existsSync(traversalTarget), false, "must not write outside workspace");
 });
 
-test("AC-12: evidence gate verbatim hint string is reachable from compiled handoff-orchestrator.js", () => {
+test("AC-12: evidence gate verbatim hint string is reachable from compiled handoff-orchestrator.js", async () => {
   // Why: AC-8 mandates the exact hint substring in the rejection envelope.
   // The string is composed inline in the handler; this test guards
   // against future refactors that paraphrase the hint and break the contract.
@@ -1012,19 +1012,19 @@ test("AC-12: evidence gate verbatim hint string is reachable from compiled hando
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "gates", "registry.js"),
     "utf-8",
   );
-  // The hint is composed via two concatenated template literals in the source,
-  // so the substring search splits accordingly. Both halves must be present
-  // and the runtime concat reconstructs the AC-8 verbatim message.
-  assert.match(
-    distIndex,
-    /Code-reviewer evidence missing: write review_reports\/review_<task-id>\.md /,
-    "verbatim AC-8 hint head must be present in compiled handler",
+  // E448 re-pin: the check now arms on the code-reviewer PASS write, so the hint is
+  // hint.missing_review_evidence (it no longer names the removed hand-off to qa-engineer).
+  // The source may split the literal across concatenated lines, so the compiled
+  // module is evaluated and its runtime value compared verbatim.
+  assert.ok(distIndex.includes("MISSING_REVIEW_EVIDENCE"), "the compiled registry carries the code");
+  const { GATE_REGISTRY } = await import(new URL("../dist/gates/registry.js", import.meta.url).href);
+  const g = GATE_REGISTRY.find((x) => x.errorCode === "MISSING_REVIEW_EVIDENCE");
+  assert.equal(
+    g.hintStatic,
+    "Code-reviewer evidence missing: write review_reports/review_<task-id>.md for each reviewed id (or one report whose covers: line names them) before the code-reviewer PASS write.",
+    "verbatim hint.missing_review_evidence in the compiled registry",
   );
-  assert.match(
-    distIndex,
-    /before handing off to qa-engineer\./,
-    "verbatim AC-8 hint tail must be present in compiled handler",
-  );
+  assert.ok(!g.hintStatic.includes("qa-engineer"), "the hint no longer names a hand-off to qa-engineer");
 });
 
 // ---------- AC-12(f) — qa-engineer scope safety net ----------

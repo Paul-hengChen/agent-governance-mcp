@@ -21,7 +21,7 @@ const count = (hay, needle) => hay.split(needle).length - 1;
 const ANCHOR = "**Builder ≠ judge (role-collapse guard)**:";
 // The AC-A1 bullet as shipped (human ruling t3: the "— even a role run inline ... —" aside was trimmed).
 const BULLET =
-  "- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` (\"awaiting independent QA\") — never a builder-signed verdict.";
+  "- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict (visual verdict included) or its PASS. With no independent judge context available, the work stops at `status=Blocked` (\"awaiting an independent judge\") — never a builder-signed verdict.";
 
 const COMBOS = [
   { chain: false, design: false },
@@ -126,7 +126,7 @@ test("AC-C (E435): named sites restate no bare round number", () => {
   assert.ok(!c09.includes("visual_split") && !c09.includes("visual_round"), "C05 split threshold and visual counter retired");
   const c12 = C("const-12-chain-r10-s4.md");
   assert.ok(c12.includes("past the `review_round` cap only pm may take the feature"), "C07 review_round cap named (E433 loop wording)");
-  assert.ok(c12.includes("counts toward the `sr_return` cap, past which only pm may take the feature"), "C08 sr_return cap named");
+  assert.ok(c12.includes("Each sr-engineer return to qa-engineer counts toward the `sr_return` cap, past which that return is rejected until pm re-enters (file mode only); a scenario that cannot be built stops to pm (Blocked), never to qa-engineer."), "C08 sr_return cap named");
   // skill-qa-engineer / skill-qa-visual / skill-sr-engineer.
   const qe = C("skill-qa-engineer.md");
   // E433: qa-engineer writes no FAIL, so its qa_round cap rows are gone (C09-C11); the cap it meets is sr_return.

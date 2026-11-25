@@ -42,7 +42,7 @@ import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-e
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
-import { hasEvidenceInFile, qaEvidencePath, recordReviewInFileUndoable } from "../gates/qa-review.js";
+import { hasEvidenceInFile, hasPassEvidenceInFile, qaEvidencePath, recordReviewInFileUndoable } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { featureLaneLedger, listOpenFeatureTasks } from "../gates/open-tasks.js";
 import { gate, TRANSITION_GATE_CODES } from "../gates/registry.js";
@@ -815,14 +815,23 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["MISSING_EVIDENCE"],
     run: async (ctx) => {
       const { parsed, storage } = ctx;
-        // Evidence gate for PASS path
+        // Evidence gate for PASS path. File mode: every listed id needs a
+        // report (direct or covers:) whose last server-recorded verdict is
+        // PASS; runs after the qa_review auto-record, so this write's own
+        // verdict counts. SQLite: a PASS reports row.
         if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
-          const ev = await storage.hasEvidence(parsed.workspace_path, parsed.completed_tasks);
+          const fileMode = storage instanceof FileHandoffStorage;
+          const ev = fileMode
+            ? hasPassEvidenceInFile(parsed.workspace_path, parsed.completed_tasks)
+            : await storage.hasEvidence(parsed.workspace_path, parsed.completed_tasks);
           if (ev.missing.length > 0) {
+            const detail = fileMode
+              ? `The last server-recorded verdict for each listed id is not PASS (checked: ${ev.missing.map((id) => qaEvidencePath(parsed.workspace_path, id)).join(", ")}, plus any report whose covers: line names the id). `
+              : "";
             return {
               content: [{
                 type: "text" as const,
-                text: `⛔ MISSING_EVIDENCE: ${ev.missing.join(", ")}. ${gate("MISSING_EVIDENCE").hintStatic}`,
+                text: `⛔ MISSING_EVIDENCE: ${ev.missing.join(", ")}. ${detail}${gate("MISSING_EVIDENCE").hintStatic}`,
               }],
               isError: true,
             };
@@ -944,6 +953,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                     if (v.failedCanonicalStates.length) reasons.push(`canonical-state fail: ${v.failedCanonicalStates.join("/")}`);
                     if (v.failedStructuralAssertions.length) reasons.push(`structural fail: ${v.failedStructuralAssertions.join("/")}`);
                     if (v.failedRegionDiffs.length) reasons.push(`region-diff fail: ${v.failedRegionDiffs.join("/")}`);
+                    if (v.unlistedAcceptedDiffs.length) reasons.push(`accepted but not in ## Allowed Differences: ${v.unlistedAcceptedDiffs.join("/")}`);
                     if (!v.verdictPass) reasons.push("verdict != PASS");
                     return `${taskId} (at ${visualEvidencePath(parsed.workspace_path, taskId)}) {${reasons.join("; ")}}`;
                   })
@@ -1031,7 +1041,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     name: "PASS_EXPECTED_RED_DIFF",
     codes: ["EXPECTED_RED_DIFF_MISSING"],
     run: (ctx) => {
-      const { parsed, storage } = ctx;
+      const { parsed, storage, evidenceSchemaPin } = ctx;
         if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
           // Expected-red diff gate: dormant unless sr-engineer declared
           // qa_reports/expected-red_<feature>.txt. When armed, at least one
@@ -1042,7 +1052,9 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
           if (storage instanceof FileHandoffStorage) {
             const manifest = hasExpectedRedManifest(parsed.workspace_path, parsed.active_feature);
             if (manifest.present) {
-              const disposition = hasExpectedRedDisposition(parsed.workspace_path, parsed.completed_tasks);
+              const disposition = hasExpectedRedDisposition(
+                parsed.workspace_path, parsed.completed_tasks, evidenceSchemaPin,
+              );
               if (!disposition.present) {
                 return {
                   content: [{
@@ -1113,21 +1125,19 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     name: "MISSING_REVIEW_EVIDENCE",
     codes: ["MISSING_REVIEW_EVIDENCE"],
     run: async (ctx) => {
-      const { parsed, storage, prevTuple, nextTuple } = ctx;
-        // Code-reviewer evidence gate: on the code-reviewer:In_Progress →
-        // qa-engineer:In_Progress handoff, every id in review scope needs
-        // review evidence. Scope is review_task_ids if non-empty, else
-        // completed_tasks, as for qa_review, so carry-forward ids on an
-        // older-style write are still checked.
+      const { parsed, storage } = ctx;
+        // Code-reviewer evidence gate on the judge's PASS write (file mode
+        // only), whatever the previous state: every id in review scope needs
+        // review_reports/review_<id>.md or a covers: file. Scope is
+        // review_task_ids if non-empty, else completed_tasks, as for qa_review.
         const reviewScopeIds =
           parsed.review_task_ids && parsed.review_task_ids.length > 0
             ? parsed.review_task_ids
             : parsed.completed_tasks;
         if (
-          prevTuple.agent === "code-reviewer" &&
-          prevTuple.status === "In_Progress" &&
-          nextTuple.agent === "qa-engineer" &&
-          nextTuple.status === "In_Progress" &&
+          storage instanceof FileHandoffStorage &&
+          parsed.agent_id === resolveJudgeReport(parsed.workspace_path).judge &&
+          parsed.status === "PASS" &&
           reviewScopeIds.length > 0
         ) {
           const ev = await storage.hasCodeReviewEvidence(parsed.workspace_path, reviewScopeIds);

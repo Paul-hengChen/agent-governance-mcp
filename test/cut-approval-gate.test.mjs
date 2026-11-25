@@ -592,25 +592,19 @@ test("C1: S01 — 'CUT_APPROVAL_REQUIRED' error code present verbatim in dist/in
   );
 });
 
-test("C2: S02 — verbatim hint string in dist/index.js", () => {
+test("C2: S02 — verbatim hint string in dist/index.js", async () => {
   // WHY: S02 is the actionable hint surfaced to the agent when the gate fires.
   // It must be verbatim (not paraphrased) so the SOP reference in the hint is
   // always accurate and the agent knows exactly what to do.
-  const S02_PREFIX = "Cut approval missing. PM must present the ticket cut inline in chat and";
-  const S02_MID = "obtain human approval before routing to build.";
-  const S02_SUFFIX = "See content/skill-pm.md §SOP step 7a.";
-  assert.ok(
-    DIST_REGISTRY.includes(S02_PREFIX),
-    `dist/gates/registry.js must contain verbatim S02 prefix: "${S02_PREFIX}"`,
-  );
-  assert.ok(
-    DIST_REGISTRY.includes(S02_MID),
-    `dist/gates/registry.js must contain verbatim S02 mid: "${S02_MID}"`,
-  );
-  assert.ok(
-    DIST_REGISTRY.includes(S02_SUFFIX),
-    `dist/gates/registry.js must contain verbatim S02 suffix: "${S02_SUFFIX}"`,
-  );
+  // E448 re-pin (E458 item 8): hint.cut_approval_required names the pm SOP section (Cut-Approval Gate)
+  // instead of a repo-only path and step number. The source may split the literal across concatenated
+  // lines, so the compiled registry's runtime value is compared verbatim.
+  const S02 =
+    "Cut approval missing. PM must present the ticket cut inline in chat and obtain human approval before routing to build. Set cut_approved: true on the pm:In_Progress write after approval (pm SOP, Cut-Approval Gate).";
+  const { GATE_REGISTRY } = await import(new URL("../dist/gates/registry.js", import.meta.url).href);
+  const hint = GATE_REGISTRY.find((g) => g.errorCode === "CUT_APPROVAL_REQUIRED").hintStatic;
+  assert.equal(hint, S02, "verbatim S02");
+  assert.ok(!DIST_REGISTRY.includes("See content/skill-pm.md §SOP step 7a."), "the repo-only SOP path is gone");
 });
 
 test("C3: S03 — inline cut draft table header present verbatim in skill-pm.md", () => {
