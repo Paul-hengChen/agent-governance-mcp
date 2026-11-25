@@ -61,3 +61,45 @@ No findings. On a direct miss, the PASS gate reads each listed id's report once 
 
 ## Verdict
 CHANGES_REQUESTED — R1: the standing-PASS rule refuses a legitimate qa_review-bearing judge PASS when the judge report has no trailing newline (breaks AC13). Route to qa-engineer for the red test, then sr-engineer to make the appender start its heading on a new line. Everything else is clean.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Reviewed: `git diff 568be67..HEAD` (qa red test 18f5bfa, sr fix 7ef0284, lane state 154f143), re-checked against `git diff 70d34c6...HEAD`, the spec and architecture, `qa_reports/tests_e448-judge-evidence-checks.md` (R1 section) and the expected-red manifest. Judge report (round-2 Expected-Red Diff and AC Execution Log): `qa_reports/review_T-E448-01.md`.
+
+## Summary
+- R1 is fixed. `recordReviewInFileUndoable` (`gates/qa-review.ts:168-174`) now writes one `\n` before the appended section when the existing report is non-empty and its last byte is not `\n`. The new private helper `lacksTrailingNewline` (`gates/qa-review.ts:70-92`) reads one byte and never throws.
+- New test: `AC13 (review round 1, R1)` in `test/e459-pass-evidence-rule.test.mjs`. It runs FAIL-standing and verdict-less fixtures, each with no trailing newline, through the public `tw_update_state` entry. It asserts that the PASS is accepted, that the original text is a byte prefix of the result, that the PASS heading starts a line, that standing is PASS, and that lane-status credits the id. It fails on 568be67's `gates/qa-review.ts` (negative control: 12 pass, 1 fail, `⛔ MISSING_EVIDENCE: T1`) and passes at HEAD.
+- Since round 1 only `gates/qa-review.ts`, its `dist/` outputs, one test, two qa_reports files and lane state changed. Scope is still the owned set. GATE_REGISTRY 33 / pipeline 17. `dist/` matches a fresh build. `hasEvidenceInFile` is byte-identical to base.
+- Full suite 4606/4608 pass, 0 fail, 2 history-dependent e130 skips. `npm audit --audit-level=high` exit 0.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1–AC12 — implemented — unchanged since round 1 (see Round 1 table above); proofs re-run green in round 2
+AC13 — implemented — gates/qa-review.ts:168-174 (newline prefix) + `lacksTrailingNewline`; test/e459-pass-evidence-rule.test.mjs `AC13 (review round 1, R1)` green, red on 568be67 source
+AC14–AC20 — implemented — unchanged since round 1; proofs re-run green
+AC21 — implemented — suite 4606/4608, 0 fail; audit exit 0; dist matches a fresh build; registry 33 / pipeline 17; no forbidden path touched (judge report AC21 row)
+
+## Correctness
+- R1 is closed. The prefix byte is added to `text` before `record.appended` is updated, so `postSize = preSize + appended.length` still holds. The undo checks the tail and truncates to `preSize`, which removes the prefix too. Verified on the built dist: a report with no trailing newline gets `\n## …`, and undo restores the original 75 bytes exactly. A repeated id in one write appends twice, but only the first append is prefixed, because the second sees a trailing `\n`. A report that already ends in `\n` gets no extra byte. An empty existing file gets no prefix and undoes to size 0. A file absent before the write takes the header path (`existed` false), unchanged.
+- The test is meaningful. It drives the public tool entry, not the helper. It pins the outcome the scenario names: accepted, heading at a line start, standing PASS, lane-status credit. It also checks that the hand-written text survives unchanged. It deliberately leaves the number of newlines before the heading unpinned (documented in tests_*.md), which is acceptable.
+- `lacksTrailingNewline` treats an unreadable file as "no prefix". If that read fails, the append that follows would most likely fail as well, and the existing undo/rethrow path handles that. Not a finding.
+- No regressions in the round-1 diff. `git diff 568be67..HEAD` touches no other source. The full suite has 0 fail.
+- Live-write note, not a finding against this diff. The judge left its round-2 judge report without a trailing newline on purpose. The server that took the PASS write is the installed build, not this lane's dist, so it glued its PASS heading mid-line, exactly the pre-fix R1 behaviour, and accepted the write by file existence (the base rule). The judge inserted the one missing newline byte before that server heading (documented in the judge report's AC13 row). With that byte, this lane's `judgeReportStanding` reads PASS and `checkLaneEvidence` credits all 19 ids (claimedWithoutEvidence: []). This also shows R1 for real: until this lane ships, reports written by the installed server can carry a glued heading, and they read as not-PASS once the new standing rule is live.
+
+## Quality
+- recommended: before or at release, check the existing `qa_reports/*.md` in adopters' and this repo's history for a server verdict heading glued mid-line by a pre-fix server (a line containing `.## <ISO ts> — PASS — by`). The new standing rule reads such a report as not-PASS, so lane-status or drift could stop crediting an id the old server recorded. This repo has none: a grep of qa_reports/ finds only quoted mentions inside table cells of two archived release reports. Report-only.
+
+No required findings. The helper is private, named for what it checks, and commented without ticket ids or repo-only paths. The doc comment on `recordReviewInFileUndoable` was updated to describe the new byte and its undo.
+- optional: the updated doc comment line `// heading starts its own line; the undo truncates that byte away too. If an append throws` runs longer than its neighbours. Cosmetic, no change asked.
+
+## Architecture
+Fits DR-4/DR-5: the fix lives in the appender (`gates/qa-review.ts`), the predicate in `tools/evidence-file.ts` is unchanged, and `hasEvidenceInFile` is byte-identical to base. No new module, gate, pipeline step or storage change. SQLite mode is unaffected: there the record is a row, not a file append.
+
+## Security
+No findings. The single-byte read goes through the same `evidencePath` the append already uses. No new input crosses a trust boundary. The file descriptor is closed in `finally`. Audit exit 0 (1 low and 6 moderate advisories, none from this diff).
+
+## Performance
+No findings. One `stat` plus a one-byte read per existing target file, on the judge PASS/FAIL write path only.
+
+## Verdict
+APPROVED — R1 is fixed at its cause in the appender, covered by a test that fails without the fix, with no regression and clean scope, so every AC (AC1–AC21) now passes.
