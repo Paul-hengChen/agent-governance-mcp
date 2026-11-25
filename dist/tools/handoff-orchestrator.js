@@ -665,7 +665,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["QA_COMPLETION_EVIDENCE_MISSING"],
         run: (ctx) => {
             const { parsed, storage, prevState } = ctx;
-            const judge = resolveJudgeReport(parsed.workspace_path).judge;
+            const { judge, dir: judgeReportDir } = resolveJudgeReport(parsed.workspace_path);
             // QA completion-evidence gate: a write by the judge
             // (code-reviewer, E432/E435) whose
             // completed_tasks adds ids not in the on-disk set needs per-id QA evidence on disk
@@ -693,7 +693,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                     type: "text",
                                     text: `⛔ QA_COMPLETION_EVIDENCE_MISSING: ${ev.missing.join(", ")}. ` +
                                         `Expected evidence file(s): ${expectedPaths} ` +
-                                        `(or an existing qa_reports/ report covering the id via a covers: line). ` +
+                                        `(or an existing report in ${judgeReportDir} covering the id via a covers: line). ` +
                                         gate("QA_COMPLETION_EVIDENCE_MISSING").hintStatic,
                                 }],
                             isError: true,

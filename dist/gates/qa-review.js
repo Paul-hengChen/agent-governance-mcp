@@ -136,7 +136,7 @@ export async function recordReviewInFileUndoable(workspacePath, taskIds, status,
         for (const id of taskIds) {
             const filePath = evidencePath(workspacePath, id);
             const existed = fs.existsSync(filePath);
-            const header = existed ? "" : `# QA review — ${id}\n\n<!-- Auto-appended by tw_update_state(qa_review=...). -->\n\n`;
+            const header = existed ? "" : `# Review — ${id}\n\n<!-- Auto-appended by tw_update_state(qa_review=...). -->\n\n`;
             // A report whose last line has no newline would leave the verdict
             // heading mid-line, where the standing check cannot see it.
             const lead = existed && lacksTrailingNewline(filePath) ? "\n" : "";
