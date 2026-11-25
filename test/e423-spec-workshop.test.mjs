@@ -211,7 +211,8 @@ test("AC9: outputs — rulings table, dated/replacing rulings, ticket format, wa
 });
 
 test("AC10: done condition (one verification, device-or-person flag, conflict rulings) and the no-filing ends", () => {
-  assert.ok(SOP.includes("every scenario has one verification, every device-or-person scenario is marked, and every conflict between sources has a ruling"));
+  // E462 re-pin: the done condition also excludes an open `needs prototype` question (sw.done).
+  assert.ok(SOP.includes("every scenario has one verification, every device-or-person scenario is marked, every conflict between sources has a ruling, and no `needs prototype` question is open."));
   assert.ok(SOP.includes("automated test, command, device-or-person"));
   assert.ok(SOP.includes("`needs device or person: yes`"));
   assert.ok(SOP.includes("Each divergence between a Figma file and a prototype is a conflict."));
