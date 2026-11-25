@@ -72,16 +72,30 @@ export async function handleCompleteTask(parsed: CompleteTaskInput): Promise<Too
   // Only the chain's judge (code-reviewer) completes tasks, in every storage mode. (E435)
   const gate = requireJudge(parsed.agent_id, "tw_complete_task");
   if (!gate.ok) {
-    return { content: [{ type: "text" as const, text: gate.message ?? "blocked" }] };
+    return { content: [{ type: "text" as const, text: gate.message ?? "blocked" }], isError: true };
   }
   const result = await completeTask(parsed.workspace_path, parsed.task_id, parsed.note);
   return { content: [{ type: "text" as const, text: result }] };
 }
 
+// True when a storage result is the JSON error envelope both backends return
+// ({"error": "..."}). Never throws.
+function isErrorEnvelope(text: string): boolean {
+  try {
+    const value: unknown = JSON.parse(text);
+    return typeof value === "object" && value !== null && "error" in value;
+  } catch {
+    return false;
+  }
+}
+
 export async function handleRollbackTask(parsed: RollbackTaskInput): Promise<ToolResult> {
   enforcePreFlight(parsed.workspace_path, "tw_rollback_task");
   const result = await rollbackTask(parsed.workspace_path, parsed.task_id, parsed.reason);
-  return { content: [{ type: "text" as const, text: result }] };
+  return {
+    content: [{ type: "text" as const, text: result }],
+    ...(isErrorEnvelope(result) && { isError: true }),
+  };
 }
 
 // No agent_id gate: void is a PM-driven correction (like tw_add_task /

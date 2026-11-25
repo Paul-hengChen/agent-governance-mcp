@@ -58,6 +58,10 @@ async function seed(ws, feature = FEATURE, completedTasks = []) {
 }
 
 async function pass(ws, completed, { feature = FEATURE, review = "ok" } = {}) {
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id; these
+  // scenarios test the open-task rule, so each PASS'd id has its code-review report.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  for (const id of completed) fs.writeFileSync(path.join(ws, "review_reports", `review_${id}.md`), "# Code review\n\nVerdict: APPROVED\n");
   resetSession(ws);
   markStateRead(ws);
   const args = {

@@ -1,12 +1,14 @@
 // Coded by @sr-engineer
 // QA evidence gate predicates: each QA round appends a timestamped section to
-// qa_reports/review_<task_id>.md. A per-id file's existence is enough; when it is
-// absent, a lazy `covers:` fallback lets one covering report satisfy other ids
-// (parseCoversIds / buildCoverageIndex in tools/evidence-file.ts).
+// qa_reports/review_<task_id>.md. For the completion check a per-id file's
+// existence is enough (hasEvidenceInFile); the file-mode PASS check needs a
+// report whose last server-recorded verdict is PASS (hasPassEvidenceInFile).
+// When the per-id file does not qualify, a lazy `covers:` fallback lets one
+// covering report satisfy other ids (tools/evidence-file.ts).
 // Spec: specs/c3-covering-evidence.md.
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
+import { buildCoverageIndex, encodeEvidenceId, isPassStanding, judgeReportStanding, parseCoversIds, resolveJudgeReport, } from "../tools/evidence-file.js";
 function evidenceDir(workspacePath) {
     return resolveJudgeReport(workspacePath).dir;
 }
@@ -33,6 +35,33 @@ function sizeOrNull(filePath) {
     }
     catch {
         return null;
+    }
+}
+// True when the file is non-empty and its last byte is not "\n". Unreadable
+// or empty files read as false, so no separator is added.
+function lacksTrailingNewline(filePath) {
+    let fd = null;
+    try {
+        const size = fs.statSync(filePath).size;
+        if (size === 0)
+            return false;
+        fd = fs.openSync(filePath, "r");
+        const last = Buffer.alloc(1);
+        fs.readSync(fd, last, 0, 1, size - 1);
+        return last[0] !== 0x0a;
+    }
+    catch {
+        return false;
+    }
+    finally {
+        if (fd !== null) {
+            try {
+                fs.closeSync(fd);
+            }
+            catch {
+                // Best effort: a close failure changes nothing about the answer.
+            }
+        }
     }
 }
 // Reverts the appends in `records` (reverse order) and removes the evidence
@@ -73,8 +102,9 @@ function undoRecordedAppends(records, dir, dirExistedBefore) {
 // The append recordReviewInFile performs, returning an undo that restores
 // every touched evidence file (and the qa_reports/ directory) to its pre-write
 // state. Used by tw_update_state so a write the server then rejects, or whose
-// state write throws, leaves no PASS/FAIL section behind. The appended bytes
-// are exactly those recordReviewInFile has always written. If an append throws
+// state write throws, leaves no PASS/FAIL section behind. When an existing
+// report does not end with a newline, one is written first so the verdict
+// heading starts its own line; the undo truncates that byte away too. If an append throws
 // part-way, what was already appended is undone and the error is rethrown.
 export async function recordReviewInFileUndoable(workspacePath, taskIds, status, reviewer, notes) {
     const dir = evidenceDir(workspacePath);
@@ -107,8 +137,11 @@ export async function recordReviewInFileUndoable(workspacePath, taskIds, status,
             const filePath = evidencePath(workspacePath, id);
             const existed = fs.existsSync(filePath);
             const header = existed ? "" : `# QA review — ${id}\n\n<!-- Auto-appended by tw_update_state(qa_review=...). -->\n\n`;
+            // A report whose last line has no newline would leave the verdict
+            // heading mid-line, where the standing check cannot see it.
+            const lead = existed && lacksTrailingNewline(filePath) ? "\n" : "";
             const section = `## ${ts} — ${status} — by ${reviewer}\n\n${notes.trim()}\n\n`;
-            const text = `${header}${section}`;
+            const text = `${lead}${header}${section}`;
             fs.appendFileSync(filePath, text, "utf-8");
             const record = byPath.get(filePath);
             record.appended = Buffer.concat([record.appended, Buffer.from(text, "utf-8")]);
@@ -120,6 +153,61 @@ export async function recordReviewInFileUndoable(workspacePath, taskIds, status,
         throw err;
     }
     return undo;
+}
+// Read a file as UTF-8, or null when it is absent or unreadable.
+function readOrNull(filePath) {
+    try {
+        return fs.readFileSync(filePath, "utf-8");
+    }
+    catch {
+        return null;
+    }
+}
+// Ids named by the covers: line of any qa_reports/*.md report with standing
+// PASS. A set, not a first-seen map, so a later PASS covering report is never
+// hidden behind an earlier non-PASS one. Unreadable entries are skipped.
+function passCoveredIds(dir) {
+    const covered = new Set();
+    let entries;
+    try {
+        entries = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort();
+    }
+    catch {
+        return covered;
+    }
+    for (const name of entries) {
+        const content = readOrNull(path.join(dir, name));
+        if (content === null || !isPassStanding(judgeReportStanding(content)))
+            continue;
+        for (const id of parseCoversIds(content))
+            covered.add(id);
+    }
+    return covered;
+}
+// File-mode PASS evidence: each id needs a candidate report with standing PASS
+// (direct review_<id>.md, else any qa_reports/*.md whose covers: names it).
+// Never throws: unreadable files read as no evidence.
+export function hasPassEvidenceInFile(workspacePath, taskIds) {
+    const present = [];
+    const missing = [];
+    // Built at most once per call, only on the first direct miss.
+    let covered = null;
+    for (const id of taskIds) {
+        const direct = readOrNull(evidencePath(workspacePath, id));
+        if (direct !== null && isPassStanding(judgeReportStanding(direct))) {
+            present.push(id);
+            continue;
+        }
+        if (covered === null)
+            covered = passCoveredIds(evidenceDir(workspacePath));
+        if (covered.has(id)) {
+            present.push(id);
+        }
+        else {
+            missing.push(id);
+        }
+    }
+    return { present, missing };
 }
 export function hasEvidenceInFile(workspacePath, taskIds) {
     const present = [];

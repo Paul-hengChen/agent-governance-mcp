@@ -64,8 +64,9 @@ async function seedFileState(ws, feature, agent, status) {
 // with its report on disk the id lands (file mode).
 // ---------------------------------------------------------------------------
 
+// E448 re-pin (E458 item 8): hint.non_judge_completed_tasks_rejected, the repo-only backlog reference dropped.
 const NON_JUDGE_HINT =
-  "completed_tasks on a write not stamped agent_id=code-reviewer is ledger pollution: only code-reviewer, the chain's judge, may grow completed_tasks (or complete tasks through tw_complete_task), backed by the QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or pass []) on this write. See docs/backlog.md E40.";
+  "completed_tasks on a write not stamped agent_id=code-reviewer is ledger pollution: only code-reviewer, the chain's judge, may grow completed_tasks (or complete tasks through tw_complete_task), backed by the QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or pass []) on this write.";
 const REMOVED_LEDGER_CODES = /REVIEWER_COMPLETED_TASKS_REJECTED|NON_QA_COMPLETED_TASKS_REJECTED/;
 
 test("FM1 (E435): a code-reviewer write carrying completed_tasks is never NON_JUDGE_COMPLETED_TASKS_REJECTED; no report -> QA_COMPLETION_EVIDENCE_MISSING, report present -> the id lands (file mode)", async () => {

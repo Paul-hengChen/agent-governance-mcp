@@ -7,7 +7,8 @@
 // parsers stay generic in tools/evidence-file.ts.
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2Section, sliceH2SectionAt, findH2LineAt, splitTableCells, parseUncheckedLabels, parseAssertionFailures, parseRegionDiffFailures, normalizeStatus, encodeEvidenceId, } from "../tools/evidence-file.js";
+import { sliceH2Section, sliceH2SectionAt, findH2LineAt, splitTableCells, parseUncheckedLabels, parseAssertionFailures, parseRegionDiffFailures, parseRegionDiffRows, normalizeStatus, encodeEvidenceId, } from "../tools/evidence-file.js";
+import { EVIDENCE_SCHEMA_ACCEPTED_LISTING } from "./evidence-schema.js";
 // ---------- visual evidence (v3.14.0) ----------
 // Constitution §3.1 visual evidence gate: when `design/<active_feature>.md`
 // contains a `## Visual Baselines` H2, PASS additionally requires
@@ -275,6 +276,18 @@ function verdictIsPass(content, evidenceSchema) {
     const firstToken = (text.match(/[A-Za-z]+/)?.[0] ?? "").toUpperCase();
     return firstToken === "PASS";
 }
+// Accepted Region Diff ids whose text does not occur (case-insensitive
+// substring) anywhere in the Allowed Differences section. A missing section is
+// already reported as a missing section, so the rule is skipped for it.
+function findUnlistedAcceptedDiffs(region, allowed) {
+    if (region === null || allowed === null)
+        return [];
+    const allowedLc = allowed.toLowerCase();
+    return parseRegionDiffRows(region)
+        .filter((r) => r.result === "accepted")
+        .map((r) => r.id)
+        .filter((id) => !allowedLc.includes(id.toLowerCase()));
+}
 // Pure validator over a single visual report's content.
 // `evidenceSchema` keys HEADING LOCATION only (E23 D2) — pin 1 replays the
 // legacy exact-anchored sliceH2Section behavior; pin >=2 or absent uses
@@ -294,11 +307,15 @@ export function validateVisualReport(content, evidenceSchema) {
     const failedStructuralAssertions = structural ? parseAssertionFailures(structural) : [];
     const region = sliceH2SectionAt(content, "Region Diff", evidenceSchema);
     const failedRegionDiffs = region ? parseRegionDiffFailures(region) : [];
+    const unlistedAcceptedDiffs = evidenceSchema !== undefined && evidenceSchema >= EVIDENCE_SCHEMA_ACCEPTED_LISTING
+        ? findUnlistedAcceptedDiffs(region, sliceH2SectionAt(content, "Allowed Differences", evidenceSchema))
+        : [];
     const verdictPass = verdictIsPass(content, evidenceSchema);
     const ok = missingSections.length === 0 &&
         failedCanonicalStates.length === 0 &&
         failedStructuralAssertions.length === 0 &&
         failedRegionDiffs.length === 0 &&
+        unlistedAcceptedDiffs.length === 0 &&
         verdictPass;
     return {
         ok,
@@ -306,6 +323,7 @@ export function validateVisualReport(content, evidenceSchema) {
         failedCanonicalStates,
         failedStructuralAssertions,
         failedRegionDiffs,
+        unlistedAcceptedDiffs,
         verdictPass,
     };
 }

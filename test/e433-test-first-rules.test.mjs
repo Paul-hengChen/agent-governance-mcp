@@ -500,7 +500,12 @@ test("AC9 (E435): hints — MISSING_EVIDENCE unchanged, two rewritten hints name
     .replace("Run Phase 3.5 (skill-qa-engineer)", "Run the AC Execution step (skill-code-reviewer)")
     .replace("truthfulness stays with qa-engineer / code-reviewer.", "truthfulness stays with the judge.");
   assert.equal(end.AC_EXECUTION_LOG_MISSING.hintStatic, derivedAcLog, "hint.ac_log is the base text with exactly the two substitutions");
-  assert.equal(live.AC_EXECUTION_LOG_MISSING.hintStatic, derivedAcLog, "the compiled registry serves hint.ac_log");
+  // Re-pinned by lane e448 (E458 item 8, re-allocated by the integrator): the live hint is hint.ac_log minus its
+  // repo-only spec reference — hint.ac_execution_log_missing of specs/e448-judge-evidence-checks.md, verbatim.
+  const HINT_AC_EXECUTION_LOG_MISSING =
+    "Run the AC Execution step (skill-code-reviewer) — execute each proof:-annotated AC in specs/<feature>.md and record command, raw output/exit code, and a per-AC pass/fail verdict under a ## AC Execution Log section in a qa_reports/review_<id>.md for one of the PASS'd ids (covers: files count; the heading may carry a prefix/suffix but must contain the canonical name, evidence schema v2) before PASS. The server checks the section's presence only — the proofs' truthfulness stays with the judge.";
+  assert.equal(derivedAcLog.replace(" See specs/e3-outcome-shaped-acceptance.md AC3/AC4.", ""), HINT_AC_EXECUTION_LOG_MISSING, "hint.ac_execution_log_missing = hint.ac_log minus the spec reference");
+  assert.equal(live.AC_EXECUTION_LOG_MISSING.hintStatic, HINT_AC_EXECUTION_LOG_MISSING, "the compiled registry serves hint.ac_execution_log_missing");
   for (const code of Object.keys(base)) {
     const b = { ...base[code] };
     const e = { ...end[code] };

@@ -148,7 +148,10 @@ const w = W(F);
 const SECTION_ER = "## Expected-Red Diff\n\nPhase 0.5: clean (1/1 manifest entries confirmed red, 0 unexplained reds)\n";
 const SECTION_AC = "## AC Execution Log\n\nAC1: `node --test` exit 0 pass\n";
 const SPEC_WITH_PROOF = "# spec\n\n## Acceptance Criteria\n\n- **AC1** thing\n  proof: `node --test x`\n";
-const judgeReport = (id, ...sections) => `# QA review — ${id}\n\n${sections.join("\n")}`;
+// E448 re-pin (E459): the judge's PASS evidence is a report whose LAST server-recorded verdict section is PASS,
+// so the fixture report ends with one, in the exact shape the qa_review auto-record writes.
+const SERVER_PASS_SECTION = "\n## 2026-11-20T00:00:00.000Z — PASS — by code-reviewer\n\njudged\n";
+const judgeReport = (id, ...sections) => `# QA review — ${id}\n\n${sections.join("\n")}${SERVER_PASS_SECTION}`;
 
 // A feature (no marker, E435) at code-reviewer:In_Progress with a ledger, manifest, a spec with a proof: line and optional judge report.
 async function markedJudgeWs(prefix, { tasks = ["T-1"], completed = [], report, manifest = true, spec = true, feature = F } = {}) {
@@ -158,6 +161,8 @@ async function markedJudgeWs(prefix, { tasks = ["T-1"], completed = [], report, 
   if (manifest) put(ws, `qa_reports/expected-red_${feature}.txt`, "test/x.test.mjs | AC1: red\n");
   if (spec) put(ws, `specs/${feature}.md`, SPEC_WITH_PROOF);
   if (report !== undefined) put(ws, "qa_reports/review_T-1.md", report);
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id.
+  for (const t of tasks) put(ws, `review_reports/review_${t}.md`, "# Code review\n\nVerdict: APPROVED\n");
   return ws;
 }
 
@@ -223,8 +228,9 @@ test("AC3 (E435): the resolver takes the workspace only and always names code-re
 // ---------------------------------------------------------------- AC4
 
 // E435 Copy: QA_COMPLETION_EVIDENCE_MISSING hintStatic, verbatim.
+// E448 re-pin (E458 item 8): hint.qa_completion_evidence_missing, the repo-only backlog reference dropped.
 const QA_COMPLETION_HINT =
-  "code-reviewer is the judge: write its report for each newly added id first (qa_review with review_task_ids on a PASS/FAIL write, or qa_reports/review_<id>.md or a covers: file), or drop the unevidenced ids from completed_tasks. No exemption for any edge, status, or review_verdict. See docs/backlog.md E18 incident (b) + E32.";
+  "code-reviewer is the judge: write its report for each newly added id first (qa_review with review_task_ids on a PASS/FAIL write, or qa_reports/review_<id>.md or a covers: file), or drop the unevidenced ids from completed_tasks. No exemption for any edge, status, or review_verdict.";
 
 test("AC4 (E435): a judge write that adds completed ids needs the judge report (no marker); a qa-engineer ledger write is NON_JUDGE_COMPLETED_TASKS_REJECTED", async () => {
   for (const [status, from, extra] of [
@@ -471,6 +477,7 @@ const SCENARIOS = {
     await h.seed(ws, F, "pm", "In_Progress", { scopeDecision: "single-feature" });
     put(ws, `qa_reports/no-new-test_${F}.txt`, "routing scenario\n");
     for (const a of ["qa-engineer", "sr-engineer", "code-reviewer"]) await rec(w(a, "In_Progress"));
+    put(ws, "review_reports/review_T-1.md", "# Code review\n\nVerdict: APPROVED\n"); // E448 re-pin
     await rec(w("code-reviewer", "PASS", { review_verdict: "APPROVED", completed_tasks: ["T-1"], review_task_ids: ["T-1"], qa_review: "ok" }));
     return t;
   },
@@ -513,7 +520,7 @@ const SCENARIOS = {
   async expectedRedMissing(h, ws) {
     await h.seed(ws, F, "code-reviewer", "In_Progress");
     put(ws, `qa_reports/expected-red_${F}.txt`, "test/x.test.mjs | red\n");
-    put(ws, "qa_reports/review_T-1.md", "# QA review - T-1\n\nno sections\n");
+    put(ws, "qa_reports/review_T-1.md", `# QA review - T-1\n\nno sections\n${SERVER_PASS_SECTION}`); // E448 re-pin (E459)
     const r = await h.upd(ws, w("code-reviewer", "PASS", { completed_tasks: ["T-1"] }));
     return [{ rejected: rejected(r), text: text(r) }];
   },
@@ -661,7 +668,7 @@ test("AC13: the resolver is exported from exactly one module and every consumer 
 
 // ---------------------------------------------------------------- AC14 (counts unchanged)
 
-test("AC14 (E435): registry 33, pipeline 17 (base names and order, step 9 renamed), evidence schema 2, handoff 17, sqlite 2, CLAUDE.md 250 lines", async () => {
+test("AC14 (E435): registry 33, pipeline 17 (base names and order, step 9 renamed), evidence schema 3 (E452), handoff 17, sqlite 2, CLAUDE.md 250 lines", async () => {
   assert.equal(CUR.gates.GATE_REGISTRY.length, 33);
   const pipe = CUR.orchestrator.UPDATE_STATE_GATE_PIPELINE;
   assert.equal(pipe.length, 17);
@@ -674,7 +681,7 @@ test("AC14 (E435): registry 33, pipeline 17 (base names and order, step 9 rename
     console.warn(`[WARN] e432 AC14: step-name comparison against base skipped: ${baseSkipReason}`);
   }
   const ev = await import(pathToFileURL(path.join(ROOT, "dist/gates/evidence-schema.js")).href);
-  assert.equal(ev.EVIDENCE_SCHEMA_CURRENT, 2);
+  assert.equal(ev.EVIDENCE_SCHEMA_CURRENT, 3, "E448 re-pin: E452 adds evidence schema v3");
   assert.equal(CUR.versions.CURRENT_VERSIONS.handoff, 17);
   assert.equal(CUR.versions.CURRENT_VERSIONS.sqlite, 2);
   const lines = fs.readFileSync(path.join(ROOT, "CLAUDE.md"), "utf-8").split("\n");

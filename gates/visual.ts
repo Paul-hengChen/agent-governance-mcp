@@ -16,9 +16,11 @@ import {
   parseUncheckedLabels,
   parseAssertionFailures,
   parseRegionDiffFailures,
+  parseRegionDiffRows,
   normalizeStatus,
   encodeEvidenceId,
 } from "../tools/evidence-file.js";
+import { EVIDENCE_SCHEMA_ACCEPTED_LISTING } from "./evidence-schema.js";
 
 // ---------- visual evidence (v3.14.0) ----------
 // Constitution §3.1 visual evidence gate: when `design/<active_feature>.md`
@@ -330,7 +332,25 @@ export interface VisualReportValidation {
   failedCanonicalStates: string[];
   failedStructuralAssertions: string[];
   failedRegionDiffs: string[];
+  // Accepted Region Diff ids not named in ## Allowed Differences; always
+  // present, non-empty only under pin >= EVIDENCE_SCHEMA_ACCEPTED_LISTING.
+  unlistedAcceptedDiffs: string[];
   verdictPass: boolean;
+}
+
+// Accepted Region Diff ids whose text does not occur (case-insensitive
+// substring) anywhere in the Allowed Differences section. A missing section is
+// already reported as a missing section, so the rule is skipped for it.
+function findUnlistedAcceptedDiffs(
+  region: string | null,
+  allowed: string | null,
+): string[] {
+  if (region === null || allowed === null) return [];
+  const allowedLc = allowed.toLowerCase();
+  return parseRegionDiffRows(region)
+    .filter((r) => r.result === "accepted")
+    .map((r) => r.id)
+    .filter((id) => !allowedLc.includes(id.toLowerCase()));
 }
 
 // Pure validator over a single visual report's content.
@@ -354,12 +374,17 @@ export function validateVisualReport(
   const failedStructuralAssertions = structural ? parseAssertionFailures(structural) : [];
   const region = sliceH2SectionAt(content, "Region Diff", evidenceSchema);
   const failedRegionDiffs = region ? parseRegionDiffFailures(region) : [];
+  const unlistedAcceptedDiffs =
+    evidenceSchema !== undefined && evidenceSchema >= EVIDENCE_SCHEMA_ACCEPTED_LISTING
+      ? findUnlistedAcceptedDiffs(region, sliceH2SectionAt(content, "Allowed Differences", evidenceSchema))
+      : [];
   const verdictPass = verdictIsPass(content, evidenceSchema);
   const ok =
     missingSections.length === 0 &&
     failedCanonicalStates.length === 0 &&
     failedStructuralAssertions.length === 0 &&
     failedRegionDiffs.length === 0 &&
+    unlistedAcceptedDiffs.length === 0 &&
     verdictPass;
   return {
     ok,
@@ -367,6 +392,7 @@ export function validateVisualReport(
     failedCanonicalStates,
     failedStructuralAssertions,
     failedRegionDiffs,
+    unlistedAcceptedDiffs,
     verdictPass,
   };
 }

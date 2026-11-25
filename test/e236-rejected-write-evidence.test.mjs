@@ -74,6 +74,13 @@ const PASS_ARGS = (feature, ids, extra = {}) => ({
   ...extra,
 });
 
+// E448: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id
+// (MISSING_REVIEW_EVIDENCE arms on the code-reviewer PASS write).
+function writeCodeReview(ws, ...ids) {
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  for (const id of ids) fs.writeFileSync(path.join(ws, "review_reports", `review_${id}.md`), "# Code review\n\nVerdict: APPROVED\n");
+}
+
 function writeManifest(ws, feature) {
   fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
   fs.writeFileSync(expectedRedManifestPath(ws, feature), "test/x.test.mjs | a test\n");
@@ -156,6 +163,12 @@ const AC4_CASES = [
       return { args: {} };
     },
   },
+  {
+    // E448: the code-review evidence check is the last step and arms on the judge's PASS write; with no
+    // review_reports/ file it rejects after QA_REVIEW_RECORD, so the same undo must hold.
+    code: "MISSING_REVIEW_EVIDENCE",
+    prepare: () => ({ args: {} }),
+  },
 ];
 
 test("AC-E236-4 (E435): every rejecting step after QA_REVIEW_RECORD leaves evidence files byte-identical", async () => {
@@ -182,6 +195,7 @@ test("AC-E236-5 (E435): a code-reviewer write that passes every gate but whose s
   const existing = path.join(ws, "qa_reports", "review_T-E236-X.md");
   fs.writeFileSync(existing, "# earlier\n");
   await seedQa(ws, feature);
+  writeCodeReview(ws, "T-E236-X", "T-E236-NEW"); // E448 re-pin: reach the state write
   const before = snapshot(path.join(ws, "qa_reports"));
   // The handoff changes after tw_get_state: verifyFreshness throws inside the state write.
   const hp = resolveCurrentLanePaths(ws).handoffPath;
@@ -203,6 +217,7 @@ test("AC-E236-6 (E435): a code-reviewer PASS whose only evidence is its own qa_r
   const ws = mkWorkspace();
   const feature = "e236-6";
   await seedQa(ws, feature);
+  writeCodeReview(ws, "T-E236-X"); // E448 re-pin
   const notes = "Everything verified.";
   const r = await handleUpdateState({ workspace_path: ws, ...PASS_ARGS(feature, ["T-E236-X"], { qa_review: notes }) });
   assert.ok(!r.isError, `same-write evidence must still satisfy PASS_MISSING_EVIDENCE; got: ${text(r)}`);

@@ -59,8 +59,8 @@ test("AC-E154-3: exactly one covers: line keeps today's output, within-line dupl
 });
 
 test("AC-E154-4 (E435): a second covers: line satisfies the code-review evidence lookup and the judge's (code-reviewer's) completion-evidence gate", async () => {
-  // Review side: the review_reports/ lookup reads line 2. Library level since E435: the
-  // MISSING_REVIEW_EVIDENCE gate is dormant (its only edge, code-reviewer -> qa-engineer, is gone).
+  // Review side: the review_reports/ lookup reads line 2 (library level; the MISSING_REVIEW_EVIDENCE gate
+  // itself arms on the judge's PASS write and is exercised by test/e448-judge-evidence-checks.test.mjs).
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("e154-rev-");
   fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
@@ -72,7 +72,14 @@ test("AC-E154-4 (E435): a second covers: line satisfies the code-review evidence
   const ws2 = mkWorkspace("e154-qa-");
   await seedState(ws2, "e154-qa", "code-reviewer", "In_Progress");
   fs.mkdirSync(path.join(ws2, "qa_reports"), { recursive: true });
-  fs.writeFileSync(path.join(ws2, "qa_reports", "review_T-E154-A.md"), "covers: T-E154-A\n\ncovers: T-E154-Y\n");
+  // E448 re-pin (E459): the covering report's last server-recorded verdict section is PASS, which is what makes
+  // it PASS evidence; and the judge PASS needs a code-review report for Y (E448).
+  fs.writeFileSync(
+    path.join(ws2, "qa_reports", "review_T-E154-A.md"),
+    "covers: T-E154-A\n\ncovers: T-E154-Y\n\n## 2026-11-20T00:00:00.000Z — PASS — by code-reviewer\n\njudged\n",
+  );
+  fs.mkdirSync(path.join(ws2, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws2, "review_reports", "review_T-E154-Y.md"), "# Code review\n\nVerdict: APPROVED\n");
   resetSession(ws2);
   markStateRead(ws2);
   const r2 = await handleUpdateState({

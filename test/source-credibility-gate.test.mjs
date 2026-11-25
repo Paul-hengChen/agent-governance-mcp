@@ -385,10 +385,12 @@ test("T13: AC-8 — S02 static suffix verbatim (runtime hintStatic); dynamic pre
   // the registry's `+` concatenation unfolded, so the test reads the runtime
   // value from gate(...) rather than searching dist text.
   const entry = gate("SOURCE_CREDIBILITY_UNVERIFIED");
+  // E448 re-pin (E458 item 8): hint.source_credibility_unverified names the design-auditor SOP step instead of
+  // repo-only paths (content/..., specs/...) that do not exist in an adopter workspace.
   const STATIC_SUFFIX =
     " Every audited row in a fetch-based design (figma/sketch/xd/penpot) must carry " +
-    "credibility: full-page-composite in the ## Source manifest before routing to build. " +
-    "See content/skill-design-auditor.md step 2b and specs/e4-design-source-credibility-gate.md.";
+    "credibility: full-page-composite in the ## Source manifest before routing to build " +
+    "(design-auditor SOP, step 2b).";
   assert.equal(
     entry.hintStatic,
     STATIC_SUFFIX,
@@ -408,7 +410,7 @@ test("T13: AC-8 — S02 static suffix verbatim (runtime hintStatic); dynamic pre
   const dynamicPrefix = "Source-credibility attestation missing or unverified for: figma/12:345.";
   const reconstructed = dynamicPrefix + entry.hintStatic;
   const SPEC_S02 =
-    "Source-credibility attestation missing or unverified for: figma/12:345. Every audited row in a fetch-based design (figma/sketch/xd/penpot) must carry credibility: full-page-composite in the ## Source manifest before routing to build. See content/skill-design-auditor.md step 2b and specs/e4-design-source-credibility-gate.md.";
+    "Source-credibility attestation missing or unverified for: figma/12:345. Every audited row in a fetch-based design (figma/sketch/xd/penpot) must carry credibility: full-page-composite in the ## Source manifest before routing to build (design-auditor SOP, step 2b).";
   assert.equal(reconstructed, SPEC_S02, "dynamic prefix + hintStatic must reproduce spec S02 byte-for-byte");
 });
 
