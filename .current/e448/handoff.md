@@ -2,8 +2,8 @@
 schema_version: 17
 active_feature: "e448-judge-evidence-checks"
 status: "In_Progress"
-last_updated: "2026-11-25T07:49:08.067Z"
-last_agent: "qa-engineer"
+last_updated: "2026-11-25T08:05:47.476Z"
+last_agent: "sr-engineer"
 prd_path: "specs/e448-judge-evidence-checks.md"
 scope_decision: "single-feature"
 scope_decision_why: "One lane, one manifest row: six judge-evidence fixes in the same gate/orchestrator files; split by ticket inside the cut, not by feature."
@@ -15,13 +15,13 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "opus"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-11-25T07:49:08.067Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-11-25T08:05:47.476Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 review_round: 0
 visual_round: 0
-hop_count: 3
+hop_count: 4
 review_rounds_total: 0
 visual_rounds_total: 0
 ---
@@ -31,11 +31,16 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- qa-engineer: e448-judge-evidence-checks tests ready (T-E448-01..10) — 45 red; report qa_reports/tests_e448-judge-evidence-checks.md; manifest qa_reports/expected-red_e448-judge-evidence-checks.txt
-- qa-engineer: new files test/e448-judge-evidence-checks, e451-visual-header-anchor, e452-allowed-differences, e459-pass-evidence-rule, e460-tool-error-flag (.test.mjs; AC1-AC20 except AC11/AC17 which live in e434 AC7 / e431 AC14); 25 owned files re-pinned incl. e433 AC9 only (re-allocated) and a new MISSING_REVIEW_EVIDENCE case in e236 AC-E236-4.
-- qa-engineer: suite (node scripts/test-lock.mjs -- npm test, Node 22): 4607 tests, 4560 pass, 45 fail, 2 skipped; the 45 reds == the manifest exactly, nothing else red; build zero compile errors; no dist/content/compose-golden/context-budget change.
-- qa-engineer: tests follow the architecture's interface contracts exactly (judgeReportStanding/isPassStanding exports, hasPassEvidenceInFile placement, msg.missing_evidence_file full text, unlisted reason inside the task's {...}, MRE triggerEdge/armCondition/clearingArtifact exact strings, isError undefined on success). OQ 2 (covering PASS outvotes own FAIL) pinned as deliberate; AC16(b) fixture checked for PASS gate, lane-status and drift; drift verdict-less class kept.
-- qa-engineer: no out-of-set test needs changing (discovery probe in a scratch copy: all 65 post-change reds were in the owned set, now re-pinned; 677/677 green against it).
+- sr-engineer: T-E448-11..18 ready for code review (e448-judge-evidence-checks); HEAD 535ea08, one commit per task (11 3c?->see git log 37394af..HEAD), dist/ committed with each source change, tree clean except .current/e448 state files.
+- T-11 (AC1-AC4): step 17 MISSING_REVIEW_EVIDENCE arms on FileHandoffStorage && agent_id === resolveJudgeReport().judge && status PASS && review scope non-empty, whatever the previous state; prevTuple/nextTuple arm dropped; comment no longer names a qa-engineer hand-off; registry triggerEdge/armCondition/clearingArtifact/hintStatic = architecture strings + hint.missing_review_evidence.
+- T-12 (AC5, AC6): tools/evidence-file.ts exports RegionDiffRow + parseRegionDiffRows (header skip /^surface(\s*id)?$/i); parseRegionDiffFailures re-expressed over it; parseAssertionFailures header skip /^assertion(\s*id)?$/i.
+- T-13 (AC7-AC11): EVIDENCE_SCHEMA_CURRENT 3 + EVIDENCE_SCHEMA_ACCEPTED_LISTING 3 + v3 header comment; VisualReportValidation.unlistedAcceptedDiffs (always present); listing rule only under pin >= 3, skipped when ## Allowed Differences is absent (DR-6), case-insensitive substring (DR-7); orchestrator step-14 reason 'accepted but not in ## Allowed Differences: <ids>' after region-diff fail; hint.visual_report_incomplete.
+- T-14 (AC12, AC13, AC16): judgeReportStanding / isPassStanding / ReportStanding / ReportVerdict + non-exported SERVER_VERDICT_HEADING_RE in tools/evidence-file.ts; gates/qa-review.ts hasPassEvidenceInFile placed above hasEvidenceInFile (byte-unchanged), covers: fallback via a PASS-standing set (not buildCoverageIndex); orchestrator step 13 file-mode branch with msg.missing_evidence_file, SQLite text shape unchanged; MISSING_EVIDENCE armCondition/clearingArtifact/hint.missing_evidence.
+- T-15 (AC14-AC16): hasExpectedRedDisposition(ws, ids, evidenceSchema?) via sliceH2SectionAt, step 15 passes evidenceSchemaPin (guard + manifest call lines unchanged); lane-status JUDGE_PASS_HEADER_RE deleted, passEvidenceIdsIn uses isPassStanding(judgeReportStanding(content), REPORT_SIGNERS); evidence-lookup VERDICT_HEADING_RE/lastVerdict deleted, evidenceQualifies = standing verdict !== FAIL (verdict-less trust class kept).
+- T-16 (AC17, AC18): tools/tasks.ts judge refusal of tw_complete_task carries isError: true; handleRollbackTask adds isError via local isErrorEnvelope (JSON with an error key) — both storage modes, success results unflagged; tasks-file.ts / storage-sqlite.ts untouched.
+- T-17 (AC19, AC20): 18 hintStatic values per Copy / Strings (only the dropped repo-path / ticket-id sentences changed; line splits otherwise kept).
+- T-18 (AC21): npm run build zero errors, npx tsc --noEmit clean; dist/ diff 37394af..HEAD covers only the 10 owned sources; CLAUDE.md 250 lines; no content/**, schema/**, tools/registry.ts, tools/transitions.ts, prompts/templates/bin/scripts/docs change; hasDesignModeRequiringVisual import untouched; GATE_REGISTRY 33 entries, UPDATE_STATE_GATE_PIPELINE 17 steps same order (e35/e448 AC3 green).
+- Suite (clean tree, node scripts/test-lock.mjs -- npm test, Node 22): 4607 tests, 4605 pass, 0 fail, 2 skipped, exit 0 — all 45 qa expected-red entries now green; sr left no intentional red, so nothing appended to qa_reports/expected-red_e448-judge-evidence-checks.txt. npm audit --audit-level=high: exit 0 (7 vulns: 1 low, 6 moderate; no HIGH/CRITICAL). No test file edited.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
