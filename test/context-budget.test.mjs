@@ -187,7 +187,7 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
 
 // --- reduction (AC2) -------------------------------------------------------
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5969 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 6003 ~tok)", () => {
   // Cap rule: each raise is a re-measure (qa-owned unless noted sr-owned), and the cap is the
   // exact measured size (zero headroom).
   // Bump history: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
@@ -201,7 +201,8 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // E437-E440 re-baseline (ruling 2 = a, 2026-11-18): the lean measure composes the lite constitution RAW (no origin strip), so the new origin-fence markers in const-02 / const-15 and the E437 site 11 inline <agc install> definition outweigh the deletions, +30 ~tok (measured 5761); was 5731, zero headroom.
     // E433 re-baseline: test-first chain wording in const-01/05/06/08/12, +268 ~tok (measured 6029); was 5761, zero headroom.
   // E434 re-baseline: visual_round / visual_split Limits rows and the visual_fail: token leave const-01/05, -60 ~tok (measured 5969); was 6029, zero headroom.
-  assert.ok(lean <= 5969, `lean always-on (${lean} ~tok) must meet the <= 5969 target (E434 re-baseline, zero headroom)`);
+  // E453 re-baseline: the review_round, sr_return and hop Limits rows in const-01 state the cap value and scope the server enforces, the const-05 builder ≠ judge bullet names only the code-review verdict and an independent judge, and the const-15 hop-cap bullet counts per feature, +34 ~tok (measured 6003); was 5969, zero headroom.
+  assert.ok(lean <= 6003, `lean always-on (${lean} ~tok) must meet the <= 6003 target (E453 re-baseline, zero headroom)`);
 });
 
 // --- enforcement preserved (AC3) ------------------------------------------
@@ -514,7 +515,7 @@ test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1
   assert.ok(toks <= 1415, `skill-spec-workshop stripped body (${toks} ~tok) must be ≤ 1415 (AC21, E445 re-baseline, zero headroom)`);
 });
 
-test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3285 cap", () => {
+test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3308 cap", () => {
   // WHY: the same budget for the sr-engineer dispatch, with the same composition and zero-headroom
   // cap rule as the pm cap test above. History: specs/e260i-comment-rationale.md
   // (test/context-budget.test.mjs).
@@ -528,7 +529,8 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3285 cap", () =>
   // E419 re-baseline: crash-checkpoint line is an ordinary write, -11 ~tok (measured 2805); was 2816, zero headroom.
   // E433 re-baseline: skill-sr-engineer builds to qa tests, return routes + Escalation rows replace the QA Round Reply, +530 ~tok (measured 3335); was 2805, zero headroom.
   // E434 re-baseline: the visual split request leaves skill-sr-engineer and the whole-surface loop runs qa-engineer's checks, -50 ~tok (measured 3285); was 3335, zero headroom.
-  assert.ok(toks <= 3285, `skill-sr stripped body (${toks} ~tok) must be ≤ 3285 (AC2, E434 re-baseline, zero headroom)`);
+  // E453 re-baseline: step 4c says SQLite/HTTP mode counts no returns and that a pm In_Progress write resets the sr_return count, and step 3b routes an infeasible repro to the scenario-cannot-be-built row, +23 ~tok (measured 3308); was 3285, zero headroom.
+  assert.ok(toks <= 3308, `skill-sr stripped body (${toks} ~tok) must be ≤ 3308 (AC2, E453 re-baseline, zero headroom)`);
 });
 
 // --- Constitution rationale fencing (second-round strip) ---
@@ -582,7 +584,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9187 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9236 ~tok)", () => {
   // WHY: the design arm keeps design-only fenced text, so this floor sits above the non-design one.
   // Each cap is the exact re-measured value (chars/4 estimator), zero headroom; bumps are
   // qa-owned unless noted sr-owned.
@@ -598,14 +600,15 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // E433 re-baseline: test-first chain wording in const-01/05/06/08/12 (+ the T-E433-13 const-05 sentences), +425 ~tok (measured 9265); was 8840, zero headroom.
   // E434 re-baseline: visual counter rows / bullets leave const-01/05/09/13, const-11 gains const11.measure and names reviewer-visual, -46 ~tok (measured 9219); was 9265, zero headroom.
   // E435 re-baseline (T-E435-40): const-06 judge sentence loses the marker conditional (T-E435-36), const-08 Non-Judge gate rename (T-E435-33), const-11 "on the test-first chain" dropped (T-E435-41), -32 ~tok (measured 9187); was 9219, zero headroom.
-  assert.ok(stripped <= 9187, `stripped constitution (${stripped} ~tok) must be ≤ 9187 (AC8 design-arm floor, E435 re-baseline, zero headroom)`);
+  // E453 re-baseline: the const-01 Limits rows (review_round cap 4, sr_return and hop scope), the const-05 builder ≠ judge bullet, and the sr_return sentences in const-06 / const-12 and the per-feature hop bullet in const-15, +49 ~tok (measured 9236); was 9187, zero headroom.
+  assert.ok(stripped <= 9236, `stripped constitution (${stripped} ~tok) must be ≤ 9236 (AC8 design-arm floor, E453 re-baseline, zero headroom)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19063 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19221 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -630,7 +633,8 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // E433 re-baseline: constitution test-first wording plus coord-01/03/07 chain edits, +541 ~tok (measured 19155); was 18614, zero headroom.
   // E434 re-baseline: the design-arm constitution change above plus the coordinator's reviewer-visual dispatch wording, -47 ~tok (measured 19108); was 19155, zero headroom.
   // E435 re-baseline (T-E435-40): the design-arm constitution change above (-32) plus coord-03 qa_round / "review/qa" wording (T-E435-32, T-E435-41) and the coord-07 mini-chain marker clause (T-E435-36), -45 ~tok (measured 19063); was 19108, zero headroom.
-  assert.ok(bundle <= 19063, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19063 (AC8 design-arm floor, E435 re-baseline, zero headroom)`);
+  // E453 re-baseline: the design-arm constitution change above (+49) plus the coord-01 routing rows naming how sr-engineer, code-reviewer and qa-engineer are reached, the coord-03 "awaiting an independent judge" note and the coord-05 reviewer-visual dispatch and void-policy sentences (+109), +158 ~tok (measured 19221); was 19063, zero headroom.
+  assert.ok(bundle <= 19221, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19221 (AC8 design-arm floor, E453 re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -940,14 +944,14 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- rebaseline + pin the new non-design figure (AC8) ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7275 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7324 ~tok)", () => {
   // WHY: the budget win that justified the feature, regression-guarded. Both sides are measured
   // like production (origin tags, then rationale, stripped); the non-design side composes without
   // the design fragments. The cap is the exact measured size (zero headroom) and the design-only
   // saving must stay at least 1912 ~tok (measured, re-baselined like the cap), since core and chain edits land on both arms.
   // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 9187 (E435 re-baseline, zero headroom)
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7275 (E435 re-baseline, zero headroom)
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 9236 (E453 re-baseline, zero headroom)
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7324 (E453 re-baseline, zero headroom)
   // Floor bumps from e43 (test-file ask at dispatch) through E258 (comment-discipline bullet)
   // continue the same cap history, pointed to above.
   // E336 re-baseline: portable pull command form (const-15 site), +6 ~tok; was 8420, zero headroom.
@@ -959,7 +963,8 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // E433 re-baseline: test-first chain wording on the core and chain fragments, +426 ~tok (measured 7363); was 6937, zero headroom.
   // E434 re-baseline: the Limits rows and the visual_fail: token leave core const-01/05 on both arms, -62 ~tok (measured 7301); was 7363, zero headroom.
   // E435 re-baseline (T-E435-40): const-06 (T-E435-36) and const-08 (T-E435-33) land on both arms; const-11 is design-only, -26 ~tok (measured 7275); was 7301, zero headroom.
-  assert.ok(nonDesign <= 7275, `non-design constitution (${nonDesign} ~tok) must be ≤ 7275 (AC8 non-design floor, E435 re-baseline, zero headroom)`);
+  // E453 re-baseline: every constitution edit of this change (const-01 Limits rows, const-05, const-06, const-12, const-15) lands on both arms, so the design-only saving stays 1912, +49 ~tok (measured 7324); was 7275, zero headroom.
+  assert.ok(nonDesign <= 7324, `non-design constitution (${nonDesign} ~tok) must be ≤ 7324 (AC8 non-design floor, E453 re-baseline, zero headroom)`);
   assert.ok(
     ratStripped - nonDesign >= 1912,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 1912 (E435 re-baseline: the design-only const-11 loses "on the test-first chain" (T-E435-41), -6 ~tok, measured 1912, was 1918; E434 re-baseline: core loses 62 ~tok, the design arm 46, measured 1918, was 1902; E433 re-baseline: the test-first wording adds +425 ~tok design arm vs +426 non-design (rounding), measured 1902, was 1903; E393 re-baseline: builder ≠ judge moved from the design-only §3.2 fragment into core §3; E437-E440 re-baseline, ruling R2 = a, 2026-11-18: const-11 §3.2 preamble and const-02/13 labels shrink the design-only fragments, floor was 1999, measured 1903)`,

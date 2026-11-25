@@ -48,20 +48,7 @@ test/e434-reviewer-visual.test.mjs | AC2: code-reviewer step 6a (cr.visual_step)
 # sr-engineer T-E453-09: snapshot reds left after T-E453-05..09 (full suite on a clean tree at 70b8ea6:
 # 4605 tests, 4586 pass, 17 fail, 2 skipped). Every qa-written test above is green; these 17 are snapshots
 # of the served text, re-captured / re-measured by qa in T-E453-10 (AC28). Measured values given per cap.
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt | compose golden; served content changed (T-E453-10 re-captures)
-test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant) | constitution monolith golden; const-01/05/06/12/15 changed (T-E453-10 re-captures)
-test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte | coordinator monolith golden; coord-01/03/05 changed (T-E453-10 re-captures, no test edit)
-test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 5969 ~tok) | zero-headroom cap moved by the text: measured 6003 ~tok (T-E453-10 sets the cap)
-test/context-budget.test.mjs | AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3285 cap | zero-headroom cap moved by the text: measured 3308 ~tok (T-E453-10 sets the cap)
-test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9187 ~tok) | zero-headroom cap moved by the text: measured 9236 ~tok (T-E453-10 sets the cap)
-test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19063 ~tok) | zero-headroom cap moved by the text: measured 19221 ~tok (T-E453-10 sets the cap)
-test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7275 ~tok) | zero-headroom cap moved by the text: measured 7324 ~tok (T-E453-10 sets the cap)
+# T-E453-10 (qa-engineer): the 17 snapshot rows that stood here are removed (green) — the 12 compose goldens were re-captured with
+# scripts/capture-constitution-golden.mjs (all 12 changed; every hunk is a Copy / Strings edit) and the 5 moved
+# context-budget caps set to the measured values (lean 6003, skill-sr 3308, design-arm 9236, teamwork 19221,
+# non-design 7324 ~tok); all 17 green. See ## T-E453-10 in qa_reports/tests_e453-served-text-v5.md.

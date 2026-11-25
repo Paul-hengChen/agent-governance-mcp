@@ -142,3 +142,85 @@ Run on a clean tree (`git status --porcelain` empty) at commit `94b3111`:
 - The 34 failing test names equal the 34 manifest entries exactly (sorted set diff empty): no red off the manifest,
   and every pre-existing test that is not a re-pin stayed as it was.
 - `test/e433-test-first-rules.test.mjs` AC9 (moved to another lane by a human ruling) is green and untouched.
+
+## T-E453-10 — golden and budget re-capture (qa-engineer, AC28, after sr's planned R3 (b) return)
+
+Placement: existing files only (brief) — `test/fixtures/compose-golden/**` re-captured in place, `test/context-budget.test.mjs`
+edited in place; no new test file. Mechanism: `npm run build` (`dist/` unchanged, `git status --porcelain` showed only the
+lane state files) then `node scripts/capture-constitution-golden.mjs`; no golden hand-edited. 12 captured, 12 changed.
+
+### Content sites that reach a golden
+
+From `git diff 94b3111 HEAD -- content/` (the T-E453-05..09 content edits), the sites the goldens compose:
+
+| site | file, line | Copy / Strings id | chars | ~tok |
+|---|---|---|---|---|
+| L1 | `const-01-core-head.md` l.13 | limits.review_round.value + limits.review_round.meaning | +6 | +1.50 |
+| L2 | `const-01-core-head.md` l.14 | limits.sr_return.meaning | +87 | +21.75 |
+| L3 | `const-01-core-head.md` l.15 | limits.hop.meaning | +38 | +9.50 |
+| B | `const-05-core-standards.md` l.21 | c05.builder_judge | -11 | -2.75 |
+| S6 | `const-06-chain-31-head.md` l.8 | c06.sr_return | +25 | +6.25 |
+| S12 | `const-12-chain-r10-s4.md` l.18 | c12.sr_return | +31 | +7.75 |
+| H | `const-15-core-tail.md` l.6 | c15.hop | +17 | +4.25 |
+| R1 | `coord-01-core-head.md` l.21 | coord01.row_impl | +108 | +27.00 |
+| R2 | `coord-01-core-head.md` l.22 | coord01.row_review | +89 | +22.25 |
+| R3 | `coord-01-core-head.md` l.23 | coord01.row_test | +90 | +22.50 |
+| N | `coord-03-core-fallback.md` l.39 | coord03.row39_note | +6 | +1.50 |
+| V1 | `coord-05-core-visual-drift.md` l.5 | coord05.dispatch | +113 | +28.25 |
+| V2 | `coord-05-core-visual-drift.md` l.10 | coord05.void | +30 | +7.50 |
+| SR1 | `skill-sr-engineer.md` l.29 | sr.repro_escape | +2 | +0.50 |
+| SR2 | `skill-sr-engineer.md` l.33 | sr.read_count + sr.cap_tail | +91 | +22.75 |
+
+chars = new line length minus old, origin tags removed (the measured text strips them; none of these lines carries one except
+SR1, whose tags are unchanged); ~tok = chars / 4, the `approxTokens` estimator. `constitution-rationale.md` (rat.builder_judge),
+`skill-code-reviewer.md`, `skill-reviewer-visual.md`, `skill-integrator.md` and `skill-design-auditor.md` reach no golden and
+no moved cap (the goldens compose only the constitution, the coordinator and the sr-engineer skill).
+
+### Per-golden hunks
+
+| golden | hunks (new-file line) | Copy / Strings id per hunk |
+|---|---|---|
+| build-full-design.txt | 13–15, 64, 73, 138, 165 | L1–L3, B, S6, S12, H |
+| build-full-design-fd.txt | 13–15, 64, 73, 138, 165 | L1–L3, B, S6, S12, H |
+| build-full-nondesign.txt | 13–15, 56, 65, 98, 109 | L1–L3, B, S6, S12, H |
+| build-full-nondesign-fd.txt | 13–15, 56, 65, 98, 109 | L1–L3, B, S6, S12, H |
+| build-lite-design.txt | 13–15, 64, 71 | L1–L3, B, H (the lite compose excludes chain const-06 / const-12) |
+| build-lite-design-fd.txt | 13–15, 64, 71 | L1–L3, B, H |
+| build-lite-nondesign.txt | 13–15, 56, 63 | L1–L3, B, H |
+| build-lite-nondesign-fd.txt | 13–15, 56, 63 | L1–L3, B, H |
+| constitution-monolith.txt | 13–15, 64, 73, 138, 165 | L1–L3, B, S6, S12, H |
+| hook-full.txt | 13–15, 64, 73, 138, 165 | L1–L3, B, S6, S12, H (byte-identical to the monolith, as before) |
+| hook-lite.txt | 13–15, 64, 71 | L1–L3, B, H |
+| skill-coordinator-monolith.txt | 21–23, 163, 236, 241 | R1–R3, N, V1, V2 |
+
+Check: every `+` line of the 12-file diff was matched against the spec's Copy / Strings text by script (non-table lines as
+substrings, table rows cell by cell; the unchanged trigger-phrase cells of the coord-01 / coord-03 rows and the unchanged
+`- **No accept-policy injection.** ` lead of the coord-05 line are the only non-matching spans, and the spec marks them
+"role cell" / "rest of the line unchanged"). 73 lines changed, 73 explained: no unexplained hunk (no defect).
+`test/skill-manifest.test.mjs` is not edited: `t-golden-byte-identity` goes green on the re-captured fixture alone.
+
+### context-budget caps (measured, zero headroom; chars/4)
+
+| test | old → new | delta | sites (~tok) |
+|---|---|---|---|
+| AC2 lean always-on (lite constitution raw + lite skill) | 5969 → 6003 | +34 | L1 +1.50, L2 +21.75, L3 +9.50, B -2.75, H +4.25 = +34.25 (137 chars) |
+| AC1/AC2 skill-sr-engineer stripped body | 3285 → 3308 | +23 | SR1 +0.50, SR2 +22.75 = +23.25 (93 chars) |
+| AC8 design-arm constitution | 9187 → 9236 | +49 | L1–L3 +32.75, B -2.75, S6 +6.25, S12 +7.75, H +4.25 = +48.25 (193 chars) |
+| AC8 teamwork coordinator bundle | 19063 → 19221 | +158 | design-arm +48.25 plus R1 +27.00, R2 +22.25, R3 +22.50, N +1.50, V1 +28.25, V2 +7.50 (+109.00) = +157.25 (629 chars) |
+| AC8 non-design constitution | 7275 → 7324 | +49 | same seven const sites as the design arm (all on both arms) = +48.25 |
+
+Each per-cap sum rounds to the measured delta through `Math.ceil` on the whole text (the bundle has two composed parts, hence
++157.25 → +158). Unchanged by this text, so not edited: the design-only strip saving floor (≥ 1912; measured 9236 − 7324 = 1912,
+since every constitution edit lands on both arms), the rationale saving floor (≥ 240), skill-pm (4942), skill-spec-workshop
+(1415) and the ≥ 1830 bundle-difference guard. No sentinel in the file names any changed text (grepped for every old phrase).
+In `test/context-budget.test.mjs` each moved cap got: the test title's cap value, one `E453 re-baseline:` note naming the
+reason in plain language with `+N ~tok (measured M); was O, zero headroom`, and the assertion value and message; the two
+inline path figures of the non-design test (`design-arm path`, `non-design path`) now read 9236 / 7324. Nothing else changed.
+
+### Manifest
+
+The 17 snapshot rows sr appended in T-E453-09 are removed from `qa_reports/expected-red_e453-served-text-v5.txt` (all green),
+with one `#` record in their place, following the e435 precedent (T-E435-40 cleared its snapshot rows the same way). The
+34 qa-written rows from T-E453-01..04 are left as they are for sr-engineer's disposition check in T-E453-11.
+
+### Results

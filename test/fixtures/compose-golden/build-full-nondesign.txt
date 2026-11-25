@@ -10,9 +10,9 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 
 | name | value | meaning |
 |---|---|---|
-| `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
-| `sr_return` cap | 2 | Max sr-engineer returns of one feature to qa-engineer before routing locks to pm. |
-| `hop` cap | 14 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
+| `review_round` cap | 4 | After the 4th code-reviewer CHANGES_REQUESTED, only pm may take the feature. |
+| `sr_return` cap | 2 | Max sr-engineer returns to qa-engineer between two `(pm, In_Progress)` writes; past it only that return is rejected. File mode only: SQLite/HTTP mode counts no returns. |
+| `hop` cap | 14 | Max auto-routing role transitions per feature; only an `active_feature` change resets the count (lite mode exempt). |
 | `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
 | `read` cap | 3 | Max file reads per target (§5 anti-loop). |
 | `pass_budget` | 250 lines × 5 passes | design-auditor per-feature output ceiling (§5 anti-loop). |
@@ -53,7 +53,7 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 - **`tw_complete_task` ownership**: ONLY the chain's judge, code-reviewer, flips the final `[x]` (after its PASS). qa-engineer and sr-engineer signal their hand-offs via `pending_notes` in `tw_update_state`. This prevents double-completion races.
 - **Escalation call format**: every escalation state write uses one canonical shape — `tw_update_state(status=<Blocked|FAIL>, agent_id=<role>, next_role=<role>, pending_notes=["<Role>: <situation> — <detail>"])`. `next_role`, `resume_of`, and `review_verdict` are first-class handoff fields (schema v7, c9-protocol-fields), enum-validated by the server at the tool boundary — NOT `pending_notes` tokens; `pending_notes` is free text for humans (situation description, rationale) and carries no routing. A code-reviewer verdict is recorded via the `review_verdict` field (`APPROVED` / `CHANGES_REQUESTED`); the server rejects a verdict that disagrees with `status` with `REVIEW_VERDICT_STATUS_MISMATCH` (`APPROVED` requires `status=PASS` on the judge's PASS write, or `status=In_Progress`; `CHANGES_REQUESTED` requires `status=FAIL`; an absent verdict never fires the gate). Skill SOPs list their escalation sites as rows of an `## Escalation Routes` table (columns `situation | status | pending note | next_role` — the `next_role` column names the value for the `next_role` field; `human` in that column means OMIT the field — the enum has no `human` value, and the escalation `status` plus the field's absence is what halts auto-routing to the human) and reference rows by situation name instead of restating the call. Note tokens that remain keep their existing owning-site definitions and are NOT redefined here: `scope_decision_why` (PM scope attestation), `covers:` (batched evidence manifests).
 - **Rule grammar (WHEN/DO/ELSE)**: a normative gate rule reads WHEN `<trigger>` → DO `<action>` → ELSE `<escape>` — either as literal prose in that shape, or as one Escalation Routes table row (a row is the same triple collapsed to columns).
-- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed verdict.
+- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict (visual verdict included) or its PASS. With no independent judge context available, the work stops at `status=Blocked` ("awaiting an independent judge") — never a builder-signed verdict.
 
 <!-- chain-only:start -->
 ### 3.1 Server-enforced chain
@@ -62,7 +62,7 @@ The routing chain is **server-enforced**, not advisory. Invalid
 `tw_update_state` writes are rejected before reaching storage. Key rules:
 
 - `status=PASS` and `tw_complete_task` require the chain's judge, `agent_id="code-reviewer"`.
-- Each code-reviewer rejection counts once in `review_round`, whichever role it routes to; each `(sr-engineer, In_Progress) → (qa-engineer, In_Progress)` return counts toward the `sr_return` cap, past which that return is rejected and only `(pm, In_Progress)` may take the feature.
+- Each code-reviewer rejection counts once in `review_round`, whichever role it routes to; each `(sr-engineer, In_Progress) → (qa-engineer, In_Progress)` return counts toward the `sr_return` cap, past which that return is rejected until the next `(pm, In_Progress)` write resets the count (file mode only).
 - PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
 - **Scope decision gate**: WHEN a build-entry write — `(pm, In_Progress) → (architect, In_Progress)` or `(pm, In_Progress) → (qa-engineer, In_Progress)` — lands while `design/<active_feature>.md` is armed (`## Mode` ≠ `no-design`) → DO record a scope decision first: `.current/feature-split.md` (multi-feature split) OR handoff `scope_decision: single-feature` → ELSE rejected `SCOPE_DECISION_REQUIRED`. Predecessor pinned to `pm:In_Progress`, so re-entry/resume (architect→qa-engineer, the qa-engineer ⇄ sr-engineer hand-offs) is never re-blocked; non-design workspaces pass silently; in-context / lite-mode work that emits no transition is not covered. Why these §3.1 gates exist: `content/constitution-rationale.md`.
 - **Cut-Approval Gate**: WHEN a write crosses the same build-entry edge (any feature, visual or not) → DO set `cut_approved: true` on the `pm:In_Progress` state write, ONLY after the human approved the inline cut in chat → ELSE rejected `CUT_APPROVAL_REQUIRED`. File-mode only (skipped in SQLite/HTTP mode); predecessor pinned to `pm:In_Progress`, so resume/re-entry is never re-blocked. Re-armed by a fresh PM `In_Progress` entry (a code-reviewer rejection routed back to PM included), or any `active_feature` change — re-present and re-approve the cut. Sanctioned writer: ONLY the context that directly witnessed the human's chat-turn approval in its OWN conversation, never another agent's summary or relayed claim — the PM itself in same-context dispatch (lite, full non-subagent, `tw_switch_role` fallback); under subagent dispatch — where the PM subagent ends its turn after presenting the draft — it is the coordinator, via `tw_update_state(agent_id="pm", cut_approved: true, ...)` on the PM's still-current state tuple. Attestation-based trust boundary: the server cannot verify the witnessing. Role actions live in `skill-pm` Gate Summary and `skill-coordinator` *Cut-approval gate writer obligation*, which MUST NOT restate this mechanism.
@@ -95,7 +95,7 @@ researcher (optional) → design-auditor (optional) → pm → architect (if com
 ```
 
 qa-engineer writes one test per ticket scenario, sr-engineer builds to those tests, and code-reviewer, the chain's judge, reviews both and writes PASS. Each code-reviewer rejection (`(code-reviewer, FAIL)`) counts once in `review_round`, whichever role it routes to; past the `review_round` cap only pm may take the feature.
-Each sr-engineer return to qa-engineer counts toward the `sr_return` cap, past which only pm may take the feature; a scenario that cannot be built stops to pm (Blocked), never to qa-engineer.
+Each sr-engineer return to qa-engineer counts toward the `sr_return` cap, past which that return is rejected until pm re-enters (file mode only); a scenario that cannot be built stops to pm (Blocked), never to qa-engineer.
 
 Each role finishes with `tw_update_state` whose first-class `next_role` field names the successor role so the coordinator (or human) knows where to route (`pending_notes` stays free-text prose for the next reader — it carries no routing token).
 
@@ -106,7 +106,7 @@ Each role finishes with `tw_update_state` whose first-class `next_role` field na
 - **Fix attempts**: Max consecutive auto-fix tries on the same failure is the `fix_try` cap. Then STOP.
 - **File reads per target**: Max is the `read` cap. Then STOP.
 - **Escalation**: On limit, stop tool use immediately. Report what's missing and wait for human instruction.
-- **Auto-routing hop cap**: per `/teamwork` session, role transitions are capped at the `hop` cap. Stop conditions: `skill-coordinator` §Escalation Routes. Lite mode is exempt (no auto-routing).
+- **Auto-routing hop cap**: per feature, across `/teamwork` sessions, role transitions are capped at the `hop` cap. Stop conditions: `skill-coordinator` §Escalation Routes. Lite mode is exempt (no auto-routing).
 
 ## 6. Security & Privacy
 
