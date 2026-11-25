@@ -60,6 +60,15 @@ Test file (qa-engineer creates it): `test/e462-stale-comments-wording.test.mjs`.
   - Given the change is built (`npm run build`, `dist/` committed with every `.ts` change), when the full suite runs, then every test is green except the known base skips, the re-pinned tests listed under Dependencies are green, `GATE_REGISTRY` has 33 entries and `UPDATE_STATE_GATE_PIPELINE` 17 steps, and no compose golden changed (PM probe: none moves).
   proof: `node scripts/test-lock.mjs -- npm test` prints `# fail 0`.
 
+**Amendment (2026-11-25, after code-reviewer PASS @ `4620ebc`).** Human ruling made in the integrator session on 2026-11-25 and relayed by the integrator (to be recorded in the manifest Decisions at close): the two stale comments the reviewer listed as optional are fixed in this lane, and in a second ruling the same day ("expected-red 那項也一起修") the `gates/expected-red.ts` header re-wrap the reviewer recommended joins them. Scope is exactly AC9; nothing else reopens. Base for AC9 is `4620ebc`.
+
+- **AC9** — three more comment-only fixes (amendment).
+  - (a) Given `tools/handoff-orchestrator.ts`, the comment at the top of the `QA_COMPLETION_EVIDENCE_MISSING` pipeline step (~lines 737–745), then it no longer contains `QA completion-evidence gate` or `per-id QA evidence`, and names the judge's evidence instead (e.g. "Completion-evidence gate" and "per-id evidence in the judge report"). No code or message string changes: the step name and error code `QA_COMPLETION_EVIDENCE_MISSING` stay.
+  - (b) Given `gates/visual.ts`, the `Source-credibility gate` comment (~line 862), then it no longer contains `pm to architect or sr-engineer hop` and names the current build-entry edge pm → {architect, qa-engineer} (e.g. "Build-entry gate on the pm to architect or qa-engineer hop").
+  - (c) Given `gates/expected-red.ts`, the file-header comment block, then it is re-wrapped so the block is at most 7 lines (the comment-length scan limit), e.g. by joining `File mode only.` back onto one line; wording otherwise unchanged.
+  - For all three: comment-only (no code, string or behaviour change), no `chain_path`, no bare ticket id in new comment text.
+  proof: `node --test --test-name-pattern "^AC9 " test/e462-stale-comments-wording.test.mjs` exits 0 (resident: the old phrases in (a) and (b) are absent, (b) names `qa-engineer`); the judge-run `transpileModule` script (`removeComments: true`, target/module ESNext, as AC1) over `tools/handoff-orchestrator.ts`, `gates/visual.ts` and `gates/expected-red.ts` against `4620ebc` prints no DIFF; and the comment-length scan against base `83ca8c0` prints no `gates/expected-red.ts` line and no line that the same scan at `4620ebc` did not print. Judge-run scan, from the worktree after `npm run build`: `node --input-type=module -e "const m=await import('./dist/tools/comment-scan.js');const {langForPath}=await import('./dist/tools/comment-langs.js');const f=[];for(const [r,a] of m.collectAdded(process.cwd(),'83ca8c0')){const l=langForPath(r);const t=l&&m.readScannable(process.cwd(),r);if(t)f.push(...m.findingsForFile(r,m.analyzeText(t,l),a));}m.formatFindings(f).forEach((x)=>console.log(x));"`. A plain `node bin/agc-init.mjs check` cannot show this, because it diffs against `@{upstream}` (currently `4620ebc`); PM run of the scan at `4620ebc` against `83ca8c0` prints `gates/expected-red.ts:1 long-block 8 lines (limit 7)`.
+
 ## Copy / Strings
 
 `<…>` marks an interpolated value. No string cites a repo-only path or a ticket id.
@@ -143,9 +152,9 @@ Test file (qa-engineer creates it): `test/e462-stale-comments-wording.test.mjs`.
 | Parallel-Lane Cut | not triggered: already one lane of `specs/fanout-pre-v5-w2.md`; the cut stays serial inside the lane |
 | Scope Decision | `scope_decision: single-feature` recorded (dormant for a non-design feature) |
 | Resource Audit | zero external references in the backlog rows and the manifest; `external_refs` omitted |
-| Question Batch | zero open questions; the `none` / `n/a` / `tbd` question was already ruled by the human (2026-11-25); the H1 retitle judged not an evidence-schema change (see Dependencies) |
-| Expected-red | qa-engineer writes `qa_reports/expected-red_e462-stale-comments-wording.txt` (new AC tests red at base plus the five re-pinned files) before the qa → sr hand-off |
-| Cut-Approval | cut presented inline; `cut_approved` left to the coordinator after the integrator pre-review; `fanout.mjs check --cut` exit 0 |
+| Question Batch | zero open questions; the `none` / `n/a` / `tbd` question was already ruled by the human (2026-11-25); the H1 retitle judged not an evidence-schema change (see Dependencies); the AC9 amendment scope was ruled by the human (2026-11-25, relayed by the integrator), nothing left open |
+| Expected-red | qa-engineer writes `qa_reports/expected-red_e462-stale-comments-wording.txt` (new AC tests red at base plus the five re-pinned files) before the qa → sr hand-off; AC9: T-E462-10 appends the new AC9 tests, red at `4620ebc` |
+| Cut-Approval | cut presented inline; `cut_approved` left to the coordinator after the integrator pre-review (original cut and the AC9 amendment alike); `fanout.mjs check --cut` exit 0 |
 
 manifest-tier: no option choice, no needs-human-ruling item
 
@@ -175,6 +184,10 @@ Task Budget Map:
 | T-E462-06 | sr-engineer | AC4, AC5 | 2 files, ~20 lines |
 | T-E462-07 | sr-engineer | AC6, AC7 | 2 text files, ~8 lines |
 | T-E462-08 | sr-engineer | AC8 | build + full suite |
+| T-E462-10 | qa-engineer | AC9 resident assertions, manifest + tests report | 1 test file + 2 qa_reports files |
+| T-E462-11 | sr-engineer | AC9 (a)(b)(c), build, full suite | 3 source files, comments only, + `dist/` |
+
+Amendment order (AC9, after the PASS @ `4620ebc`): qa T-E462-10 → sr T-E462-11 → code-reviewer judges T-E462-10 and T-E462-11 and writes PASS again.
 
 - [ ] T-E462-01 [P0] qa-engineer: new `test/e462-stale-comments-wording.test.mjs`, tests for AC1–AC7 (titles start `AC<n> `; Copy / Strings pinned verbatim; AC5 mutations run in a scratch copy only and logged; base text frozen as literals, never read from history); `qa_reports/expected-red_e462-stale-comments-wording.txt` and `qa_reports/tests_e462-stale-comments-wording.md` | depends_on: none
 - [ ] T-E462-02 [P0] qa-engineer: re-pin the tests this lane turns red to the new strings, intent kept: `test/e161-qa-suite-result.test.mjs` AC-E161-2, `test/e236-rejected-write-evidence.test.mjs` AC-E236-6, `test/qa-flow.test.mjs` recordReviewInFile heading (all to `e462.report-heading`), `test/e423-spec-workshop.test.mjs` AC10 (`sw.done`), `test/e445-spec-workshop-questioning.test.mjs` `S.reopen` / `B.done` (AC5, AC6, AC9); add each to the expected-red manifest; old-heading fixtures untouched | depends_on: T-E462-01
@@ -185,3 +198,5 @@ Task Budget Map:
 - [ ] T-E462-06 [P0] sr-engineer: `gates/visual.ts` unknown mode reported as written plus an exported note helper, wired into the two visual messages in `tools/handoff-orchestrator.ts` (AC4, AC5) | depends_on: T-E462-05
 - [ ] T-E462-07 [P0] sr-engineer: `content/skill-spec-workshop.md` step 4 / step 5 (AC6) and `docs/migration-v5.md` two sentences (AC7), exactly the Copy / Strings rows | depends_on: T-E462-06
 - [ ] T-E462-08 [P0] sr-engineer, last implementation task: `npm run build`, `dist/**` committed; full suite `node scripts/test-lock.mjs -- npm test` with every manifest entry green and no red beyond the base skips; gate count 33 / pipeline 17; goldens and the AC21 cap unmoved (else the R3 (b) return) (AC8) | depends_on: T-E462-07
+- [ ] T-E462-10 [P0] qa-engineer: AC9 tests in `test/e462-stale-comments-wording.test.mjs` (titles start `AC9 `; old phrases `QA completion-evidence gate`, `per-id QA evidence` absent from `tools/handoff-orchestrator.ts`; `pm to architect or sr-engineer hop` absent from `gates/visual.ts` and its build-entry comment names `qa-engineer`); append them to `qa_reports/expected-red_e462-stale-comments-wording.txt` and update `qa_reports/tests_e462-stale-comments-wording.md` | depends_on: none
+- [ ] T-E462-11 [P0] sr-engineer: AC9 comment-only fixes in `tools/handoff-orchestrator.ts` (completion-evidence gate comment), `gates/visual.ts` (source-credibility build-entry edge) and `gates/expected-red.ts` (header re-wrapped to ≤ 7 lines); `npm run build`, `dist/**` committed; full suite `node scripts/test-lock.mjs -- npm test` green beyond the base skips | depends_on: T-E462-10
