@@ -33,3 +33,5 @@ test/e425-stop-ticket-batch.test.mjs | AC13: qa-engineer step 6 ends with C-QA; 
 
 # the added strings are not in content/** yet (presence is checked before the scan) (T-E425-03, T-E425-04)
 test/e425-stop-ticket-batch.test.mjs | AC14: every string this lane adds under content/** names no repo-only path and no bare ticket id
+
+# T-E425-06 (qa-engineer): golden re-capture and the e118 / e410 / e349 / context-budget re-pins are green on arrival; no red added.

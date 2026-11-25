@@ -39,13 +39,44 @@ All tests are in `test/e425-stop-ticket-batch.test.mjs`.
 | AC12 | `AC12: a malformed ticket is listed under unreadable tickets with its problem count; the valid ones are summarised` |
 | AC13 | `AC13: qa-engineer step 6 ends with C-QA; code-reviewer carries step C-CR directly after step 4` |
 | AC14 | `AC14: every string this lane adds under content/** names no repo-only path and no bare ticket id` |
-| AC15 | not in this pass: T-E425-06 (golden re-capture and cap re-baseline after sr-engineer's planned return) |
+| AC15 | T-E425-06 (no new test; existing pins re-baselined): `test/compose-equivalence.test.mjs` (the six build/hook/monolith golden tests), `test/skill-manifest.test.mjs` t-golden-byte-identity, `test/context-budget.test.mjs` `AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9336 ~tok)`, `AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19449 ~tok)`, `AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7424 ~tok)` |
 
 Not automated by these tests, for the judge: AC1's proof also names `node --test test/e290-lane-protocol-generic.test.mjs
 test/e433-test-first-rules.test.mjs test/e383-lane-ledger-worktree.test.mjs test/e385-worktree-evidence.test.mjs`
 (existing tests, run as-is). AC1's "no line before line 41 changes" is pinned here as an index check (line 39 is the §3
 heading, line 41 the §3 first bullet), which catches any inserted or removed line before it; a same-length content
 change on lines 1–40 is visible only in `git diff <base>...HEAD -- docs/lane-protocol.md`, which the judge reads.
+
+## T-E425-06 — AC15 re-capture and re-pins (planned return)
+
+Goldens re-captured by tool: `npm run build && node scripts/capture-constitution-golden.mjs`. `git diff --stat` over
+`test/fixtures/compose-golden` lists exactly the seven chain/coordinator goldens (build-full-design, build-full-design-fd,
+build-full-nondesign, build-full-nondesign-fd, constitution-monolith, hook-full, skill-coordinator-monolith; 8+, 1-);
+the five lite goldens are byte-unchanged. No golden hand-edited.
+
+Context-budget caps (measured, zero headroom, one per-hunk comment each in `test/context-budget.test.mjs`):
+
+| cap | was | measured | delta | E418 saving | share given back | net vs pre-E418 |
+|---|---|---|---|---|---|---|
+| design-arm constitution (C-C08) | 9236 | 9336 | +100 | −1065 | 9.4% | −965 |
+| non-design constitution (C-C08) | 7324 | 7424 | +100 | −985 | 10.2% | −885 |
+| teamwork bundle (C-C08 +100, C-CO3 + C-CO7 +128) | 19221 | 19449 | +228 | −2490 | 9.2% | −2262 |
+
+Design-only strip saving stays 1912 (C-C08 lands on both arms). Matches the spec estimate (+100 / +100 / ≈ +229).
+
+Re-pinned tests (integrator-assigned; only the assigned values changed):
+
+- `test/e118-reviewer-ac-completeness.test.mjs` `AC7 - token discipline: file grows by at most 4466 bytes over BASE (9525 bytes)`
+  — size cap 13760 → 13991 (measured `content/skill-code-reviewer.md`), title growth 4235 → 4466; reason: the
+  code-reviewer named-test confirmation step (C-CR). `growth >= 0` assertion unchanged.
+- `test/e410-task-alias-content-tail.test.mjs` both AC2 tests — line numbers / counts only, verified against the files:
+  const-08 row 5 → 6, count 11 → 12; skill-integrator rows 177 → 179, 181 → 183, 248 → 251, count 249 → 252. The brief's
+  178 / 182 were off by one: the two spans actually sit on lines 179 and 183 (C-IN1 and C-IN2 both land above them).
+- `test/e349-integrator-repo-facts.test.mjs` AC-E349-2 — `TOOLS` literal gains `、`node scripts/batch-summary.mjs`` to match
+  the addendum §5 line; `batch-summary` added to the enumerated SOP-calls list (the integrator SOP calls it through
+  `<agc install>`).
+
+Expected-red manifest: unchanged in substance — the re-pins are green on arrival, so T-E425-06 adds no red.
 
 ## Open Interface Details
 
