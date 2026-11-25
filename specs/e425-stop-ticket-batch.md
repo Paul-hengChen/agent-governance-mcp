@@ -263,3 +263,23 @@ Pins checked and left green by placement: `test/e290-lane-protocol-generic.test.
 | T-E425-04 | sr-engineer: E427 amendment (2) SOP sentences — `C-QA`, `C-CR` (AC13, AC14) | T-E425-01 | 2 | `content/skill-qa-engineer.md`, `content/skill-code-reviewer.md` | — |
 | T-E425-05 | sr-engineer: `scripts/batch-summary.mjs` per `C-BS` and `C-TF3`, importing `parseTicketFile` / `resolveTicketDir` from `dist/` (AC7–AC12); then the planned return to qa-engineer | T-E425-01 | 1 | `scripts/batch-summary.mjs` | — |
 | T-E425-06 | qa-engineer (planned return): re-capture the seven goldens, re-set the three caps to measured values with a per-hunk comment and the E418 delta (AC15) | T-E425-02, T-E425-03, T-E425-04, T-E425-05 | 8 | `test/fixtures/compose-golden/**`, `test/context-budget.test.mjs` | — |
+| T-E425-07 | qa-engineer (rework): AC16 test in `test/e425-stop-ticket-batch.test.mjs`; trim the comment blocks R2 lists to ≤ 7 lines each, comments only, no assertion change; update the expected-red manifest | none | 3 | `test/e425-*.test.mjs`, `test/context-budget.test.mjs`, `test/e118-reviewer-ac-completeness.test.mjs` | — |
+| T-E425-08 | sr-engineer (rework): R1, replace the Status values example reason in `docs/ticket-format.md` (example text only) (AC16) | T-E425-07 | 1 | `docs/ticket-format.md` | — |
+
+## Rework after lane report
+
+Integrator lane report returned after the code-reviewer PASS (mailbox `to-lane#7`), two required items. Existing ACs AC1–AC15 stand unchanged; tasks T-E425-01..06 stay done.
+
+- **R1 (defect this ticket introduced).** The *Status values* row for `stopped — <reason>` in `docs/ticket-format.md` gives the example `stopped — waiting on vendor firmware`, which now reads as the fixed form `stopped — waiting on <id>` (`C-TF1`) with `vendor firmware` as an id; `scripts/batch-summary.mjs` would list such a ticket under `waiting`. Replace only the example reason with `stopped — vendor firmware not available yet` (string `C-TF4`). Literal grep: `test/e422-ticket-file.test.mjs:231` and `test/e427-check-scenario-tests.test.mjs:136` use the old string only as parser fixture data (still a valid stopped status); no test pins the doc example, so no other test turns red.
+- **R2 (comment discipline, Constitution §6).** `agc check` reports comment advisories this lane added (none on `main`): `test/e425-stop-ticket-batch.test.mjs:1` (13 lines), `test/context-budget.test.mjs:594`, `:624`, `:957` (11, 15, 13 lines; file comment ratio 41.5%) and `test/e118-reviewer-ac-completeness.test.mjs:223` (8 lines). Each block is cut to ≤ 7 lines; comments only, no assertion or cap change. The detail removed from the cap comments is kept here: each re-baselined cap moved by this lane's added text only (`C-C08` on both constitution arms; `C-C08` + `C-CO3` + `C-CO7` on the coordinator bundle), measured at T-E425-06, against the E418 saving recorded in the Dependencies section above; further rationale goes in qa-engineer's commit message.
+
+- **AC16** — Given `docs/ticket-format.md`, when the *Status values* row for `stopped — <reason>` is read, then its example reason does not begin with `waiting on` (it reads `C-TF4`), so the only `waiting on` status the doc shows is the fixed form `stopped — waiting on <id>`; and `node bin/agc-init.mjs check` reports no comment advisory in a file this lane changed that `main` does not already have.
+  proof: the AC16 test in `test/e425-stop-ticket-batch.test.mjs` passes; `node bin/agc-init.mjs check` lists no `comments` warning for `test/e425-stop-ticket-batch.test.mjs`, `test/context-budget.test.mjs` or `test/e118-reviewer-ac-completeness.test.mjs` beyond those on `main`.
+
+| string id | exact text (quote verbatim) | source |
+|---|---|---|
+| C-TF4 | `stopped — vendor firmware not available yet` | authored-here — an example reason that cannot be read as `stopped — waiting on <id>` (integrator R1) |
+
+Bounds: `fanout.mjs check --cut` reports `test/e118-reviewer-ac-completeness.test.mjs` (T-E425-07) as out of bounds, because the `擁有` cell names it only in prose ("other tests red only because of this lane"). This lane already re-pinned it at T-E425-06 (commit `8c91cc0f`) under the standing unowned-red-file rule, and R2 touches only the comment block that re-pin added. The integrator confirms this at pre-review (a Decisions row, decided by `整合者`).
+
+Order: qa-engineer (T-E425-07: AC16 red, R2 trims, expected-red manifest) → sr-engineer (T-E425-08) → code-reviewer re-judges T-E425-07 and T-E425-08, including that `agc check` shows no advisory this lane added. Out of scope: the optional double-count finding (the integrator lists it in the wave report).
