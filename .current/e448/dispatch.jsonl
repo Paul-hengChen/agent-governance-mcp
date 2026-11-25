@@ -6,3 +6,6 @@
 {"ts":"2026-11-25T07:49:08.071Z","feature":"e448-judge-evidence-checks","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T07:56:21.619Z","feature":"e448-judge-evidence-checks","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T08:05:47.479Z","feature":"e448-judge-evidence-checks","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T08:06:46.416Z","feature":"e448-judge-evidence-checks","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T08:09:29.622Z","feature":"e448-judge-evidence-checks","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T08:21:05.078Z","feature":"e448-judge-evidence-checks","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
