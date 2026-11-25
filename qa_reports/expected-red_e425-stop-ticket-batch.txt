@@ -1,0 +1,35 @@
+# Expected-red manifest for e425-stop-ticket-batch (T-E425-01, qa-engineer). Format: <test file> | <exact test name>.
+# Expected red after the content edits (spec Dependencies: compose-equivalence, skill-manifest, context-budget) are
+# T-E425-06's re-capture and are not listed here; sr-engineer appends any red it leaves itself.
+
+# docs/lane-protocol.md has no C-LP1 / C-LP2 / C-LP3 yet (T-E425-02)
+test/e425-stop-ticket-batch.test.mjs | AC1: lane protocol holds C-LP1, C-LP2 and C-LP3 at their places; skeleton and line 41 index kept
+
+# content/const-08-chain-31-mid.md has no C-C08 sub-bullet yet (T-E425-03)
+test/e425-stop-ticket-batch.test.mjs | AC2: C-C08 is served once, directly after the Manifest-tier line, on both arms; lite does not carry it
+
+# content/coord-03 has no C-CO3 row and coord-07 step 6 no C-CO7 suffix yet (T-E425-03)
+test/e425-stop-ticket-batch.test.mjs | AC3: coordinator Escalation Routes ends with the C-CO3 row, other rows unchanged; step 6 ends with C-CO7
+
+# content/skill-integrator.md has no C-IN1 / C-IN2 / C-IN3 yet (T-E425-03)
+test/e425-stop-ticket-batch.test.mjs | AC4: integrator stage text carries C-IN1, C-IN2, C-IN3 as sub-bullets; once-approval sentence kept; no Escalation Routes
+
+# docs/ticket-format.md has no C-TF1 paragraph yet (T-E425-02); the check-tickets half already passes
+test/e425-stop-ticket-batch.test.mjs | AC5: ticket format holds C-TF1 after 'No other value is valid'; the fixed stop wordings pass check-tickets
+
+# docs/ticket-format.md has no ## Batch summary (C-TF2) and no C-TF3 paragraph yet (T-E425-02)
+test/e425-stop-ticket-batch.test.mjs | AC6: ticket format has ## Batch summary (C-TF2) between Named tests and Example ticket; tooling ends with C-TF3
+
+# scripts/batch-summary.mjs does not exist yet (module not found, exit 1) (T-E425-05); AC8 and AC10 also need C-LP2 (T-E425-02)
+test/e425-stop-ticket-batch.test.mjs | AC7: a stop spreads to dependents only — A stopped, B and D waiting on A, C done
+test/e425-stop-ticket-batch.test.mjs | AC8: a stop outside the allowed paths shows its reason with the path; C-LP2 requires naming it
+test/e425-stop-ticket-batch.test.mjs | AC9: added scenarios, agent decisions, qa interface decisions and allowed visual differences reach the summary
+test/e425-stop-ticket-batch.test.mjs | AC10: a device-or-person ticket is listed under awaiting manual verification with its check; C-LP2 states PASS-then-stop
+test/e425-stop-ticket-batch.test.mjs | AC11: the summary only reads — no file changes; no ticket directory and unknown option messages
+test/e425-stop-ticket-batch.test.mjs | AC12: a malformed ticket is listed under unreadable tickets with its problem count; the valid ones are summarised
+
+# content/skill-qa-engineer.md has no C-QA and content/skill-code-reviewer.md no C-CR yet (T-E425-04)
+test/e425-stop-ticket-batch.test.mjs | AC13: qa-engineer step 6 ends with C-QA; code-reviewer carries step C-CR directly after step 4
+
+# the added strings are not in content/** yet (presence is checked before the scan) (T-E425-03, T-E425-04)
+test/e425-stop-ticket-batch.test.mjs | AC14: every string this lane adds under content/** names no repo-only path and no bare ticket id
