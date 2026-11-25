@@ -135,4 +135,10 @@ under `npm test` (temp dirs under `os.tmpdir()`, removed in `after`).
 
 ## Suite result
 
-(filled after the clean-tree run below)
+Run on a clean tree (`git status --porcelain` empty) at commit `94b3111`:
+`node scripts/test-lock.mjs -- npm test` → **4605 tests, 4569 pass, 34 fail, 2 skipped, 0 cancelled** (exit 1).
+
+- 4605 = the 4579-test baseline + 26 new tests (23 in `test/e453-served-text-v5.test.mjs`, 3 in `test/e457-doc-numbers.test.mjs`).
+- The 34 failing test names equal the 34 manifest entries exactly (sorted set diff empty): no red off the manifest,
+  and every pre-existing test that is not a re-pin stayed as it was.
+- `test/e433-test-first-rules.test.mjs` AC9 (moved to another lane by a human ruling) is green and untouched.
