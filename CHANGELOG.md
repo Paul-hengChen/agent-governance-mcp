@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-25
+
 MAJOR release. It ships 23 backlog tickets of the v5.0.0 milestone, landed on `main` since v4.22.0:
 E419 and E422 (wave 1), E423 and E431 (wave 2), E432 (wave 3), E433 (wave 4), E434 (wave 5), E445
 (wave 6) and E435 (wave 7); then E450 (the release-window test fix); then E448 and E451 to E460
