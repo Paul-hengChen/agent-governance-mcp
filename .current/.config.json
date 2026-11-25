@@ -2,7 +2,9 @@
   "artifacts": "repo",
   "host": "claude-code",
   "schema_version": 2,
-  "cutApprovalAutoTier": {},
+  "cutApprovalAutoTier": {
+    "manifest": true
+  },
   "laneProtocolAddendum": "docs/lane-protocol-addendum.md",
   "driftBaselineIds": [
     "A10-01",
