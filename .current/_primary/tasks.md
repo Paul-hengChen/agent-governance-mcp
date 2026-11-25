@@ -161,6 +161,9 @@ _(No active tasks — ready for the next feature.)_
 - [-] T-RELCD8-10 [P0] doc-writer (coordinator Task-dispatch, before code-reviewer): write the human-approved v5.0.0 CHANGELOG draft verbatim under ## [Unreleased]; no state write | depends_on: T-RELCD8-09 (voided: human ruling 2026-11-24: v5 cut reduced to three tasks)
 - [-] T-RELCD8-11 [P0] code-reviewer: verify AC10 of specs/release-cd-v5.0.0.md (CHANGELOG entry: approved text, citations [], upgrade notes vs docs/migration-v5.md and AC5) | depends_on: T-RELCD8-10 (voided: human ruling 2026-11-24: v5 cut reduced to three tasks)
 - [-] T-RELCD8-12 [P0] code-reviewer: re-run every proof (AC Execution Log), PASS write over T-RELCD8-01..12, AC11 read-back + post-PASS worktree dry run | depends_on: T-RELCD8-11 (voided: human ruling 2026-11-24: v5 cut reduced to three tasks)
+- [x] T-RELCD9-01 [P0] qa-engineer: test report qa_reports/tests_release-cd-v5.0.0-r2.md listing AC1–AC11 as command scenarios with their proofs verbatim (no test, judge runs them) + qa_reports/no-new-test_release-cd-v5.0.0-r2.txt, hand off to sr-engineer | depends_on: none
+- [x] T-RELCD9-02 [P0] sr-engineer: confirm nothing to build (no code, test, content or doc change), hand off to code-reviewer | depends_on: T-RELCD9-01
+- [x] T-RELCD9-03 [P0] code-reviewer: execute every AC proof AC1–AC10 (AC Execution Log in qa_reports/review_T-RELCD9-01.md, covers T-RELCD9-01..03), verify the coordinator-written CHANGELOG entry (AC10), review_reports/review_T-RELCD9-01.md, PASS write, AC11 read-back + post-PASS dry run | depends_on: T-RELCD9-02
 
 ## Compacted History
 <!-- compacted: E125c 2026-09-26 — 67 sections, 891 [x] rows, 26 [-] rows summarized below; full rows: git log -i --grep <ticket-id>, or git log -p -- .current/_primary/tasks.md (pre-compaction commit 165b72d is auxiliary and invalidated by a history rewrite, E104) -->
