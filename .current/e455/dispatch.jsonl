@@ -5,3 +5,6 @@
 {"ts":"2026-11-25T06:36:21.495Z","feature":"e455-ticket-checker-strict","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T06:44:07.460Z","feature":"e455-ticket-checker-strict","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T06:54:48.332Z","feature":"e455-ticket-checker-strict","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T06:55:39.295Z","feature":"e455-ticket-checker-strict","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T06:57:22.605Z","feature":"e455-ticket-checker-strict","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T07:07:43.285Z","feature":"e455-ticket-checker-strict","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
