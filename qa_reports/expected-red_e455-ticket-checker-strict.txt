@@ -1,0 +1,50 @@
+# e455-ticket-checker-strict — expected-red manifest (qa-engineer, T-E455-01, test-first chain)
+# Format: <relative test file path> | <exact test name>; '#' lines are reasons/comments.
+# Every entry below was run red against the lane base build (npm run build, then
+# node --test test/e455-ticket-checker-strict.test.mjs: 34 tests, 8 pass, 26 fail).
+# The 8 green tests are guards that already hold at base and are not listed.
+
+# AC1: no heading-separator or id-shape check yet; a heading without " — " or with a malformed id passes silently
+test/e455-ticket-checker-strict.test.mjs | AC1 a scenario heading with no em-dash separator reports heading-no-separator once, keeps id = whole heading and an empty title, adds no id-shape problem, and exits 1
+test/e455-ticket-checker-strict.test.mjs | AC1 a scenario id that is not a letter followed by letters, digits or - reports id-shape quoting the id, and exits 1
+
+# AC2: needs device or person accepts any text; a non-yes/no value only surfaces as the count-mismatch line and stays in fields
+test/e455-ticket-checker-strict.test.mjs | AC2 a needs device or person value other than yes or no reports yes-no, not the count-mismatch line, drops the field, and exits 1
+
+# AC3: fenced lines are pushed into the scenario's lines, so a fenced Verification/Given/When/Then/Added line counts
+test/e455-ticket-checker-strict.test.mjs | AC3 a fenced Verification line inside a valid scenario is not a second verification, for ``` and ~~~ fences
+test/e455-ticket-checker-strict.test.mjs | AC3 a Given, When or Then line found only inside a fence does not satisfy the missing-keyword check
+test/e455-ticket-checker-strict.test.mjs | AC3 a Verification line found only inside a fence leaves the scenario with no verification
+test/e455-ticket-checker-strict.test.mjs | AC3 an Added line found only inside a fence leaves the added-during-build scenario without its Added line
+test/e455-ticket-checker-strict.test.mjs | AC3 a heading inside a fence stays ignored and the fenced lines under it are not scenario lines either
+
+# AC4: the non-empty-string rule does not trim and a ticketDir normalizing to "." is usable: "." sweeps root .md files,
+# whitespace-only points at a missing directory, whitespace-only sisterRepos values are kept
+test/e455-ticket-checker-strict.test.mjs | AC4 a ticketDir that normalizes to the workspace root or is whitespace-only is dropped silently and the default applies
+test/e455-ticket-checker-strict.test.mjs | AC4 with a whitespace-only ticketDir and docs/tickets holding one valid ticket, the no-argument checker checks docs/tickets
+test/e455-ticket-checker-strict.test.mjs | AC4 with ticketDir . the no-argument checker never checks the workspace root's .md files
+test/e455-ticket-checker-strict.test.mjs | AC4 sisterRepos entries whose path or owns is whitespace-only are dropped; whitespace-only backlog and contracts strings are left out; non-blank values stay verbatim
+
+# AC5: a list holding a non-text or blank entry reports "must be a list" instead of a per-entry message
+test/e455-ticket-checker-strict.test.mjs | AC5 a list entry that is not text reports entry-not-text with its 1-based position, not must be a list, and drops the field
+test/e455-ticket-checker-strict.test.mjs | AC5 a blank-text list entry reports entry-empty with its 1-based position, not must be a list, and drops the field
+test/e455-ticket-checker-strict.test.mjs | AC5 a list mixing not-text and blank entries reports one problem per bad entry
+test/e455-ticket-checker-strict.test.mjs | AC5 a source list with a bad entry reports only the entry problems, never a source-entry shape line for that field
+
+# AC6: the Added line is checked for the YYYY-MM-DD shape only; an impossible date passes with no problem
+test/e455-ticket-checker-strict.test.mjs | AC6 an Added line with the documented shape but an impossible date reports added-date quoting the date, not the missing-Added line, and exits 1
+
+# AC7: a ## heading after Added during build is not reported; a second ## Scenarios re-opens scenario parsing and a ### under another section is dropped silently
+test/e455-ticket-checker-strict.test.mjs | AC7 a ## section after Added during build is reported once per heading, quoting the heading line, and exits 1
+test/e455-ticket-checker-strict.test.mjs | AC7 a ### scenario under a second Scenarios or a second Added during build section is reported as not read and is not a scenario
+
+# AC8: docs/ticket-format.md does not yet state the separator, fenced-line, list-entry, yes/no-refusal, calendar-date and section-after-added rules
+test/e455-ticket-checker-strict.test.mjs | AC8 the Scenarios section states the heading holds an em dash between the scenario id and the title
+test/e455-ticket-checker-strict.test.mjs | AC8 the doc states that lines inside a fenced code block are not read as headings, Given/When/Then/And, verification or Added lines
+test/e455-ticket-checker-strict.test.mjs | AC8 the field-block section states that every list entry is non-empty text
+test/e455-ticket-checker-strict.test.mjs | AC8 the needs device or person row still says yes or no and adds that any other value is refused
+test/e455-ticket-checker-strict.test.mjs | AC8 the added-during-build section states the date must be a real calendar date and that a ## section after it is reported and its scenarios are not read
+
+# AC9: docs/config.md ticketDir "Usable value" and sisterRepos "Which entries are dropped" bullets do not yet mention whitespace-only values or values normalizing to the workspace root
+test/e455-ticket-checker-strict.test.mjs | AC9 the ticketDir Usable value bullet names whitespace-only values and values normalizing to . (the workspace root) as unusable
+test/e455-ticket-checker-strict.test.mjs | AC9 the sisterRepos Which entries are dropped bullet states that a string of only whitespace counts as empty
