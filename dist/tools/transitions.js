@@ -218,7 +218,7 @@ export function allowedSuccessors(key) {
 }
 const REVIEW_ROUND_CAP = 4;
 // v3.14.0 — visual_round caps at 6 (5 failed pixel iterations then lock to
-// pm) — symmetric to REVIEW_ROUND_CAP=4 (3 fails then Round 4 lock). Constitution
+// pm) — symmetric to REVIEW_ROUND_CAP=4 (4 fails, then only pm). Constitution
 // §3.1 documents the user-visible "5 rounds" framing; cap=6 reflects the
 // off-by-one between "rounds completed" and "next write index".
 const VISUAL_ROUND_CAP = 6;

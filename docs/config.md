@@ -242,7 +242,7 @@ Use cases:
 - Looser rules for a sandbox / experiment workspace.
 - Custom roles or alternate routing chains (advanced).
 
-**Caveat**: hand-written fragments must keep the server-enforced contracts (`§3.1 server-enforced chain`, `§4 routing chain`). The state machine in `tools/transitions.ts` and the 18 gates in `gates/` are code, not text — drift between your custom constitution and the code yields confusing rejections.
+**Caveat**: hand-written fragments must keep the server-enforced contracts (`§3.1 server-enforced chain`, `§4 routing chain`). The state machine in `tools/transitions.ts` and the 33 gates registered in `gates/registry.ts` are code, not text — drift between your custom constitution and the code yields confusing rejections.
 
 ---
 
@@ -274,7 +274,7 @@ Use cases:
 - Domain-specific QA checklist (e.g. accessibility-mandatory project).
 - Custom researcher heuristics (preferred T1 sources for your domain).
 
-**Caveat (same as constitution override)**: skill files cannot soften server-enforced behaviours. e.g. removing the qa-engineer's evidence-of-PASS requirement from `skill-qa-engineer.md` does NOT lift the gate — the server still rejects PASS without `qa_reports/review_<id>.md`. Text-layer overrides are guidance to the agent; the gates are code.
+**Caveat (same as constitution override)**: skill files cannot soften server-enforced behaviours. e.g. removing the PASS-evidence step from `skill-code-reviewer.md` does NOT lift the gate — the server still rejects a code-reviewer PASS that carries no `qa_review` when no `qa_reports/review_<id>.md` exists. Text-layer overrides are guidance to the agent; the gates are code.
 
 > Since **v3.1.0** (commit `ef65eb2`, 2026-05-12). Same `loadContent()` mechanism as the constitution-fragment override above and `.config.json`.
 >

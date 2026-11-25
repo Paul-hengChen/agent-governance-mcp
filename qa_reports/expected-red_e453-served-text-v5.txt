@@ -1,0 +1,23 @@
+# e453-served-text-v5 — expected-red manifest (qa-engineer phase 1, T-E453-01..04, test-first).
+# Format: <test file> | <exact test name> | <reason>. Every entry is red because the served text, docs or
+# tool descriptions it pins are not built yet; sr-engineer tasks T-E453-05..09 turn them green.
+# sr-engineer appends the snapshot reds it leaves (compose goldens, moved context-budget caps) below.
+
+# new test file (T-E453-01)
+
+# new test file (T-E453-02)
+
+# re-pin, owned tests (T-E453-03)
+
+# re-pin, coord-05 parenthetical (T-E453-04)
+
+# sr-engineer T-E453-09: snapshot reds left after T-E453-05..09 (full suite on a clean tree at 70b8ea6:
+# 4605 tests, 4586 pass, 17 fail, 2 skipped). Every qa-written test above is green; these 17 are snapshots
+# of the served text, re-captured / re-measured by qa in T-E453-10 (AC28). Measured values given per cap.
+# T-E453-10 (qa-engineer): the 17 snapshot rows that stood here are removed (green) — the 12 compose goldens were re-captured with
+# scripts/capture-constitution-golden.mjs (all 12 changed; every hunk is a Copy / Strings edit) and the 5 moved
+# context-budget caps set to the measured values (lean 6003, skill-sr 3308, design-arm 9236, teamwork 19221,
+# non-design 7324 ~tok); all 17 green. See ## T-E453-10 in qa_reports/tests_e453-served-text-v5.md.
+# T-E453-11 (sr-engineer, AC28 disposition check): the 34 qa rows from T-E453-01..04 that stood above are removed (green).
+# Full suite on a clean tree (node scripts/test-lock.mjs -- npm test): 4605 tests, 4603 pass, 0 fail, 2 skipped
+# (history-dependent closed-range checks, not manifest rows). No entry remains red; the manifest lists none.

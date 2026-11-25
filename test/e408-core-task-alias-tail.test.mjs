@@ -32,7 +32,7 @@ const SITES = [
   ["coord-03-core-fallback.md", "the dispatched subagent call fail this session", ["the `Task(...)` fail this session"]],
   ["coord-03-core-fallback.md", "the subagent-dispatch tool or the `tw_switch_role` fallback)", ["`Task(subagent_type=<role>, …)` or the `tw_switch_role` fallback)"]],
   ["coord-03-core-fallback.md", "on the resume call to the subagent-dispatch tool —", ["on the resume `Task(...)` call —"]],
-  ["coord-05-core-visual-drift.md", "(subagent-dispatch tool or `tw_switch_role`)", ["(Task or `tw_switch_role`)"]],
+  ["coord-05-core-visual-drift.md", "(subagent-dispatch tool only; `tw_switch_role` has no `reviewer-visual` role, so that fallback switches to `code-reviewer`, whose SOP loads the visual rules)", ["(Task or `tw_switch_role`)"]],
   ["coord-07-core-sop.md", "(subagent-dispatch tool if available,", ["(Task-tool subagent if available,"]],
 ];
 
