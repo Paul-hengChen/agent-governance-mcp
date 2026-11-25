@@ -159,6 +159,36 @@ test("AC13: the same FAIL-standing report clears when the PASS write carries qa_
   assert.equal(state(ws).status, "PASS");
 });
 
+test("AC13 (review round 1, R1): a judge report with no trailing newline — FAIL-standing or verdict-less — still clears a PASS carrying qa_review + review_task_ids; the recorded PASS heading starts on its own line and lane-status credits the id", async () => {
+  // Why: the judge hand-writes qa_reports/review_<id>.md (Expected-Red Diff, AC Execution Log) before the PASS,
+  // and an editor may save it without a final newline. The auto-record must still open its verdict section on a
+  // new line: a verdict heading glued to the previous line is not a server-recorded verdict, so the standing
+  // would stay FAIL/none and step 13 would refuse the judge's own legitimate PASS (and blame the server's
+  // verdict). The original report text must survive byte-for-byte ahead of the new section.
+  const bodies = {
+    "FAIL-standing": FIX.a("T1").replace(/\n+$/, ""),
+    "verdict-less": HEAD("T1").replace(/\n+$/, ""),
+  };
+  for (const [label, body] of Object.entries(bodies)) {
+    assert.ok(!body.endsWith("\n"), `${label}: fixture has no trailing newline`);
+    const ws = await judgeWs("e459-ac13nl-", { reports: { "qa_reports/review_T1.md": body } });
+    const r = await upd(ws, w("code-reviewer", "PASS", {
+      completed_tasks: ["T1"], review_task_ids: ["T1"], review_verdict: "APPROVED", qa_review: "re-judged after the fix: green",
+    }));
+    assert.ok(!rejected(r), `${label}: qa_review on the PASS write is PASS evidence even without a trailing newline: ${text(r)}`);
+    assert.equal(state(ws).status, "PASS", `${label}: PASS state written`);
+
+    const got = fs.readFileSync(reportPath(ws, "T1"), "utf-8");
+    assert.ok(got.startsWith(body), `${label}: the hand-written report is kept unchanged ahead of the new section`);
+    const m = /## \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z — PASS — by code-reviewer/.exec(got.slice(body.length));
+    assert.ok(m, `${label}: a server PASS section was appended: ${JSON.stringify(got.slice(body.length))}`);
+    const at = body.length + m.index;
+    assert.equal(got[at - 1], "\n", `${label}: the recorded PASS heading starts on its own line: ${JSON.stringify(got.slice(Math.max(0, at - 30), at + 40))}`);
+    assert.equal(EF.judgeReportStanding(got).verdict, "PASS", `${label}: standing is PASS after the auto-record`);
+    assert.deepEqual(checkLaneEvidence(ws, F, ["T1"]).evidenceIds, ["T1"], `${label}: lane-status credits T1`);
+  }
+});
+
 test("AC13: a covers: T2 report with standing PASS clears a PASS over [T2] without qa_review; at standing FAIL or none it is rejected MISSING_EVIDENCE", async () => {
   const ok = await judgeWs("e459-ac13b-", { ids: ["T2"], reports: { "qa_reports/review_batch-1.md": `covers: T2\n${FIX.d("batch")}` } });
   const r = await upd(ok, w("code-reviewer", "PASS", { completed_tasks: ["T2"] }));

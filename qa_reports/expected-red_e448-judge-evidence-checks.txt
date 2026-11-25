@@ -84,3 +84,6 @@ test/source-credibility-gate.test.mjs | T13: AC-8 — S02 static suffix verbatim
 
 # E458 (8): SCOPE_DECISION_REQUIRED hint still ends with the repo-only spec reference (T-E448-17)
 test/visual-evidence-gate.test.mjs | AC-4: SCOPE_DECISION_REQUIRED hint in tools/handoff-orchestrator.ts matches the spec Copy/Strings verbatim
+
+# Review round 1, R1 (E459, T-E448-19): the qa_review auto-record appends its "## <ts> — PASS — by code-reviewer" heading with no leading newline, so on a judge report without a trailing newline it lands mid-line, is not a server-recorded verdict, and step 13 refuses the PASS with MISSING_EVIDENCE — the newline prefix in the appender is not built yet
+test/e459-pass-evidence-rule.test.mjs | AC13 (review round 1, R1): a judge report with no trailing newline — FAIL-standing or verdict-less — still clears a PASS carrying qa_review + review_task_ids; the recorded PASS heading starts on its own line and lane-status credits the id

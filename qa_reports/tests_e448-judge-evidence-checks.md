@@ -21,7 +21,7 @@ Placement branch acted on: the dispatch brief's `Test-file placement` line (new 
 | AC10 | same | `AC10: the AC8 report on a feature pinned 2, or with no pin, is accepted …` |
 | AC11 | `test/e434-reviewer-visual.test.mjs` | `AC7: one surface accepted in Region Diff … (evidence schema v3)` (rewritten) |
 | AC12 | `test/e459-pass-evidence-rule.test.mjs` | `AC12: a judge PASS over an id whose report has standing FAIL …` ; `AC12: standing none …` |
-| AC13 | same | `AC13: the same FAIL-standing report clears when the PASS write carries qa_review …` ; `AC13: a covers: T2 report …` ; `AC13: the rule covers every id … under every evidence_schema pin` ; `AC13: (deliberate, architecture OQ 2) …` |
+| AC13 | same | `AC13: the same FAIL-standing report clears when the PASS write carries qa_review …` ; `AC13: a covers: T2 report …` ; `AC13: the rule covers every id … under every evidence_schema pin` ; `AC13: (deliberate, architecture OQ 2) …` ; `AC13 (review round 1, R1): a judge report with no trailing newline …` |
 | AC14 | same | `AC14: expected-red disposition heading follows the pin …` |
 | AC15 | same | `AC15: lane-status — server FAIL then a hand-written PASS heading is claimedWithoutEvidence; …` |
 | AC16 | same | `AC16: judgeReportStanding …` ; `AC16: on fixtures (a) … (d) …` ; `AC16: (kept trust class) …` ; `AC16: lane-status and drift read standing through the shared predicate …` |
@@ -124,3 +124,20 @@ AC13 first test and OQ 2 test — they pin behaviour the change must keep.
 
 `npm test` is headless; SQLite cases skip loudly when better-sqlite3 is absent. Temp workspaces only under
 `os.tmpdir()`; no base-tree reads, no `git show`, no historic SHA pinned.
+
+## Review round 1 (R1) — test-defect fix
+
+Finding R1 in `review_reports/review_T-E448-01.md`: AC13's auto-record case was tested only with a judge report that
+ends in a newline. Added to `test/e459-pass-evidence-rule.test.mjs` (the brief's placement line; existing owned file):
+
+- `AC13 (review round 1, R1): a judge report with no trailing newline — FAIL-standing or verdict-less — still clears a PASS carrying qa_review + review_task_ids; the recorded PASS heading starts on its own line and lane-status credits the id`
+  — two fixtures (FIX.a and HEAD with the final newline stripped); per fixture: the PASS write is accepted and the
+  state is PASS, the original report text is kept unchanged ahead of the new section, the character before the
+  recorded `## <ISO ts> — PASS — by code-reviewer` heading is `\n`, `judgeReportStanding` reads PASS, and
+  `checkLaneEvidence` credits T1.
+- Open interface detail: the test does not pin how many newlines precede the heading (one or a blank line both
+  satisfy "starts on its own line"); it pins only that the heading begins a line and the old text is a byte prefix.
+- Red reason: the appender (qa_review auto-record) writes the heading with no leading newline, so it lands mid-line
+  and step 13 refuses with `⛔ MISSING_EVIDENCE: T1. …` — the newline prefix is not built yet. Listed in
+  `qa_reports/expected-red_e448-judge-evidence-checks.txt` under the R1 group.
+- Suite after this hop: see the hand-off note (the only red is this test).
