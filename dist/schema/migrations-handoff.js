@@ -182,8 +182,8 @@ registerMigration({
 // v15 -> v16: add optional chain_path marker and sr_return_count counter
 // (E431). Additive STAMP-ONLY, seeds nothing: absence of chain_path === the old
 // chain (every pre-v16 feature entered by it), absence of sr_return_count === 0
-// (a historical feature has never made a test-first return). Seeding either
-// would fabricate state. Same template as v14 -> v15.
+// (a historical feature has never made an sr-engineer -> qa-engineer return).
+// Seeding either would fabricate state. Same template as v14 -> v15.
 registerMigration({
     kind: "handoff",
     from: 15,

@@ -1,0 +1,8 @@
+{"ts":"2026-11-25T09:59:09.943Z","feature":"e461-mutation-test-gaps","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:02:34.031Z","feature":"e461-mutation-test-gaps","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:03:01.842Z","feature":"e461-mutation-test-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:12:26.674Z","feature":"e461-mutation-test-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:20:13.264Z","feature":"e461-mutation-test-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:28:50.116Z","feature":"e461-mutation-test-gaps","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:29:35.735Z","feature":"e461-mutation-test-gaps","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:43:35.891Z","feature":"e461-mutation-test-gaps","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

@@ -355,7 +355,7 @@ const UpdateStateArgs = z
     // v5 — cut-approval attestation (pm-cut-approval-gate). PM sets
     // cut_approved: true on its pm:In_Progress write AFTER inline cut draft +
     // human approval, to clear the CUT_APPROVAL_REQUIRED gate on the
-    // pm:In_Progress → {architect,sr-engineer}:In_Progress build-entry edge.
+    // pm:In_Progress → {architect,qa-engineer}:In_Progress build-entry edge.
     cut_approved: z.boolean().optional(),
     // v6 — external-reference ledger (b8-external-ref-ledger). PM records one
     // entry per external artifact its spec references during the Resource Audit

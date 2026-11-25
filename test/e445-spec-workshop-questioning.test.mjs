@@ -99,8 +99,8 @@ const S = {
     "Write each question as `Q<n> — <title>: <question>`, then your recommendation on its own line, then a worked example on its own line (a named case, step by step, what breaks under each option).",
   yes: 'Word each question so that "yes" accepts your recommendation; when it cannot be worded so, say so in the question.',
   by_number: "The human may answer by number.",
-  reopen:
-    "When an answer shows an earlier ruling should change, reopen that question in the next batch; its new ruling names the one it replaces.",
+  // E462 re-pin (sw.reopen): the supersede clause is already in the ruling sentence, so the reopen sentence drops it.
+  reopen: "When an answer shows an earlier ruling should change, reopen that question in the next batch.",
   prototype:
     "A question about how something looks or feels is marked `needs prototype` in the record, and its ruling waits until the human has seen one; this role does not build the prototype.",
   prototype_end: "A `needs prototype` question still open when the run ends makes the run end `not ready to cut`.",
@@ -116,7 +116,8 @@ const B = {
   example: "(a named case, step by step, what breaks under each option)",
   operator: "Address every question to the operator in this session; a tracker item's author is not here.",
   ruling: "Write each ruling to the record the moment it is made, with its date; a ruling that replaces an earlier one names the one it replaces.",
-  done: "the work is ready to cut when every scenario has one verification, every device-or-person scenario is marked, and every conflict between sources has a ruling.",
+  // E462 re-pin (sw.done): the done condition also excludes an open `needs prototype` question.
+  done: "the work is ready to cut when every scenario has one verification, every device-or-person scenario is marked, every conflict between sources has a ruling, and no `needs prototype` question is open.",
   verification:
     "Verification is one of: automated test, command, device-or-person; a ticket with any device-or-person scenario sets `needs device or person: yes`.",
   figma: "Each divergence between a Figma file and a prototype is a conflict.",

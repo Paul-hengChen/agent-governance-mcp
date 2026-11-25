@@ -642,7 +642,8 @@ test("recordReviewInFile creates qa_reports/review_<id>.md per task", async () =
   assert.ok(fs.existsSync(p1));
   assert.ok(fs.existsSync(p2));
   const body = fs.readFileSync(p1, "utf-8");
-  assert.match(body, /^# QA review — T01/);
+  // E462 re-pin: a newly created judge report is titled `# Review — <id>` (e462.report-heading).
+  assert.match(body, /^# Review — T01/);
   assert.match(body, /PASS — by qa-engineer/);
   assert.match(body, /all checks green/);
 });

@@ -90,7 +90,7 @@ export interface TransitionRejection {
                                     // omits ## Visual Structural Assertions. Hard error, not a
                                     // silent fallback (Codex review #3). Handler-side only.
     | "SCOPE_DECISION_REQUIRED"     // v3.30.0 — emitted by the index.ts tw_update_state guard at the
-                                    // pm → {architect,sr-engineer}:In_Progress edge when the design is
+                                    // pm → {architect,qa-engineer}:In_Progress edge when the design is
                                     // armed (mode != no-design) but neither .current/feature-split.md
                                     // nor handoff scope_decision === "single-feature" is present. NOT
                                     // produced by validateTransition (it reads fs + handoff state);
@@ -103,14 +103,14 @@ export interface TransitionRejection {
                                     // validateTransition; union extension is for handler-side
                                     // narrowing + envelope consistency (mirrors VISUAL_BASELINES_REQUIRED).
     | "CUT_APPROVAL_REQUIRED"       // v5 — emitted by the index.ts tw_update_state guard at the
-                                    // pm → {architect,sr-engineer}:In_Progress edge when the prev
+                                    // pm → {architect,qa-engineer}:In_Progress edge when the prev
                                     // handoff state lacks cut_approved === true. Unconditional (not
                                     // arm-gated); file-storage mode only. NOT produced by
                                     // validateTransition (it reads handoff state + storage kind);
                                     // union extension is for handler-side narrowing + envelope
                                     // consistency (mirrors SCOPE_DECISION_REQUIRED).
     | "EXTERNAL_REFS_UNRESOLVED"    // v6 — emitted by the handoff-orchestrator gate at the
-                                    // pm → {architect,sr-engineer}:In_Progress edge when the prev
+                                    // pm → {architect,qa-engineer}:In_Progress edge when the prev
                                     // handoff state carries >=1 external_refs entry with
                                     // state === "unresolved". Unconditional (not arm-gated);
                                     // file-storage mode only. NOT produced by validateTransition
@@ -398,7 +398,7 @@ const VISUAL_ROUND_CAP = 6;
 // v9 (d2-server-brake-accounting) — const-01 Limits: `hop` cap — max
 // auto-routing role transitions per feature (14 since E295, was 10). An
 // independent brake, not a backstop behind the round caps: it counts every
-// role hand-off on either chain path (sr-engineer -> qa-engineer returns
+// role hand-off in the chain (sr-engineer -> qa-engineer returns
 // included), so depending on the mix of rejections it can trip before or
 // after any round cap or the sr-return cap. Unlike the round caps, hop_count
 // is feature-scoped: it resets ONLY on active_feature change, never on PM
