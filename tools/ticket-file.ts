@@ -153,11 +153,12 @@ interface RawScenario {
  * Collects `###` scenarios under the scenario and added-during-build sections.
  * Fence delimiters and every line inside a fenced code block are skipped, so
  * neither a heading nor a scenario line is read from a fence; list markers
- * are stripped.
+ * are stripped. Every `##` section after the added-during-build section is
+ * reported, and so is each `###` heading under it, which starts no scenario.
  */
-function collectScenarios(body: string[]): { raw: RawScenario[]; hasSection: boolean } {
+function collectScenarios(body: string[], problems: string[]): { raw: RawScenario[]; hasSection: boolean } {
   const raw: RawScenario[] = [];
-  let section: "scenarios" | "added" | null = null;
+  let section: "scenarios" | "added" | "after-added" | null = null;
   let hasSection = false;
   let inFence = false;
   let current: RawScenario | null = null;
@@ -168,8 +169,16 @@ function collectScenarios(body: string[]): { raw: RawScenario[]; hasSection: boo
     if (fence || inFence) continue;
     if (/^##\s/.test(line)) {
       current = null;
-      section = line === SCENARIO_SECTION ? "scenarios" : line === ADDED_SECTION ? "added" : null;
+      if (section === "added" || section === "after-added") {
+        problems.push(`section "${line}" comes after "${ADDED_SECTION}", which must be the last section`);
+        section = "after-added";
+      } else {
+        section = line === SCENARIO_SECTION ? "scenarios" : line === ADDED_SECTION ? "added" : null;
+      }
       if (section === "scenarios") hasSection = true;
+    } else if (/^###\s/.test(line) && section === "after-added") {
+      current = null;
+      problems.push(`heading "${line}" is not read as a scenario: it is under a section after "${ADDED_SECTION}"`);
     } else if (/^###\s/.test(line) && section !== null) {
       current = { heading: line.replace(/^###\s+/, ""), added: section === "added", lines: [] };
       raw.push(current);
@@ -180,6 +189,14 @@ function collectScenarios(body: string[]): { raw: RawScenario[]; hasSection: boo
     }
   }
   return { raw, hasSection };
+}
+
+/** True when a `YYYY-MM-DD` text names a real Gregorian calendar day. */
+function isCalendarDate(text: string): boolean {
+  const [year, month, day] = text.split("-").map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return days !== undefined && day >= 1 && day <= days;
 }
 
 function checkScenario(raw: RawScenario, problems: string[]): TicketScenario {
@@ -204,8 +221,12 @@ function checkScenario(raw: RawScenario, problems: string[]): TicketScenario {
   for (const keyword of ["Given", "When", "Then"]) {
     if (!keywords.has(keyword)) problems.push(`scenario ${id} has no ${keyword} line`);
   }
-  if (raw.added && !raw.lines.some((l) => ADDED_RE.test(l))) {
+  const addedDates = raw.added ? raw.lines.map((l) => ADDED_RE.exec(l)?.[2]).filter((d) => d !== undefined) : [];
+  if (raw.added && addedDates.length === 0) {
     problems.push(`scenario ${id} added during build has no "Added: <who>, <YYYY-MM-DD>, <reason>" line`);
+  }
+  for (const date of addedDates.filter((d) => !isCalendarDate(d))) {
+    problems.push(`scenario ${id} has an Added date "${date}" that is not a real calendar date`);
   }
   return { id, title, verification, addedDuringBuild: raw.added };
 }
@@ -230,7 +251,7 @@ export function parseTicketFile(text: string): TicketParseResult {
   } else if (block !== undefined) {
     fields = checkFields(block as Record<string, unknown>, problems);
   }
-  const { raw, hasSection } = collectScenarios(lines.slice(close + 1));
+  const { raw, hasSection } = collectScenarios(lines.slice(close + 1), problems);
   const scenarios = raw.map((r) => checkScenario(r, problems));
   if (!hasSection || !raw.some((r) => !r.added)) problems.push("no scenarios");
   const seen = new Set<string>();
