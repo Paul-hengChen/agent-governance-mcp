@@ -327,12 +327,14 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     producer: "orchestrator",
     envelope: "plain-text",
     triggerEdge:
-      "code-reviewer:In_Progress -> qa-engineer:In_Progress with review scope (review_task_ids if non-empty, else completed_tasks — c16 amendment, E32)",
-    armCondition: "hasCodeReviewEvidence(reviewScopeIds).missing non-empty",
-    clearingArtifact: "review_reports/review_<id>.md",
+      "status=PASS write by code-reviewer (the judge), whatever the previous state, with review scope (review_task_ids if non-empty, else completed_tasks); file-mode only",
+    armCondition:
+      "agent_id === resolveJudgeReport().judge && status === PASS && hasCodeReviewEvidence(reviewScopeIds).missing non-empty; FileHandoffStorage only",
+    clearingArtifact: "review_reports/review_<id>.md (or a covers: file) for every id in review scope",
     hintStatic:
       "Code-reviewer evidence missing: write review_reports/review_<task-id>.md " +
-      "before handing off to qa-engineer.",
+      "for each reviewed id (or one report whose covers: line names them) " +
+      "before the code-reviewer PASS write.",
     documentedInProse: true,
   },
   {

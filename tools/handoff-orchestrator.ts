@@ -1113,21 +1113,19 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     name: "MISSING_REVIEW_EVIDENCE",
     codes: ["MISSING_REVIEW_EVIDENCE"],
     run: async (ctx) => {
-      const { parsed, storage, prevTuple, nextTuple } = ctx;
-        // Code-reviewer evidence gate: on the code-reviewer:In_Progress →
-        // qa-engineer:In_Progress handoff, every id in review scope needs
-        // review evidence. Scope is review_task_ids if non-empty, else
-        // completed_tasks, as for qa_review, so carry-forward ids on an
-        // older-style write are still checked.
+      const { parsed, storage } = ctx;
+        // Code-reviewer evidence gate on the judge's PASS write (file mode
+        // only), whatever the previous state: every id in review scope needs
+        // review_reports/review_<id>.md or a covers: file. Scope is
+        // review_task_ids if non-empty, else completed_tasks, as for qa_review.
         const reviewScopeIds =
           parsed.review_task_ids && parsed.review_task_ids.length > 0
             ? parsed.review_task_ids
             : parsed.completed_tasks;
         if (
-          prevTuple.agent === "code-reviewer" &&
-          prevTuple.status === "In_Progress" &&
-          nextTuple.agent === "qa-engineer" &&
-          nextTuple.status === "In_Progress" &&
+          storage instanceof FileHandoffStorage &&
+          parsed.agent_id === resolveJudgeReport(parsed.workspace_path).judge &&
+          parsed.status === "PASS" &&
           reviewScopeIds.length > 0
         ) {
           const ev = await storage.hasCodeReviewEvidence(parsed.workspace_path, reviewScopeIds);
