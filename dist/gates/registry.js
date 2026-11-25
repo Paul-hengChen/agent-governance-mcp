@@ -63,7 +63,7 @@ export const GATE_REGISTRY = [
         triggerEdge: "no edge prev->next in ALLOWED_TRANSITIONS; unknown status",
         armCondition: "always (validateTransition step 4)",
         clearingArtifact: "a legal edge in ALLOWED_TRANSITIONS",
-        hintStatic: " in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md.",
+        hintStatic: " in ALLOWED_TRANSITIONS; pick a next state from the allowed list in this rejection.",
         documentedInProse: true,
     },
     {
@@ -126,8 +126,7 @@ export const GATE_REGISTRY = [
         hintStatic: "Scope decision missing. Either: (a) create .current/feature-split.md documenting the " +
             "multi-feature split decision, or (b) set scope_decision: single-feature in this " +
             "tw_update_state call with a why field explaining why this feature is appropriately " +
-            "scoped. Gate only fires when design/<feature>.md declares mode != no-design. " +
-            "See specs/server-scope-decision-gate.md.",
+            "scoped. Gate only fires when design/<feature>.md declares mode != no-design.",
         documentedInProse: true,
     },
     {
@@ -139,7 +138,7 @@ export const GATE_REGISTRY = [
         clearingArtifact: "cut_approved: true on prev state",
         hintStatic: "Cut approval missing. PM must present the ticket cut inline in chat and " +
             "obtain human approval before routing to build. Set cut_approved: true on " +
-            "the pm:In_Progress write after approval. See content/skill-pm.md §SOP step 7a.",
+            "the pm:In_Progress write after approval (pm SOP, Cut-Approval Gate).",
         documentedInProse: true,
     },
     {
@@ -150,8 +149,7 @@ export const GATE_REGISTRY = [
         armCondition: "unconditional; FileHandoffStorage only; fires iff >=1 external_refs entry state==unresolved",
         clearingArtifact: "every external_refs entry fetched/indexed/user-confirmed-ignorable, or field absent/empty",
         hintStatic: " Each entry in external_refs must be fetched, indexed, or user-confirmed-ignorable " +
-            "before routing to build. See content/skill-pm.md §Resource Audit Gate and " +
-            "specs/b8-external-ref-ledger.md.",
+            "before routing to build (pm SOP, Resource Audit Gate).",
         documentedInProse: true,
     },
     {
@@ -167,8 +165,8 @@ export const GATE_REGISTRY = [
         armCondition: "checkSourceCredibility (fetch-based modes figma/sketch/xd/penpot only)",
         clearingArtifact: "every audited ## Source row carries credibility: full-page-composite, or design is non-fetch-mode / has no ## Source section / no design file",
         hintStatic: " Every audited row in a fetch-based design (figma/sketch/xd/penpot) must carry " +
-            "credibility: full-page-composite in the ## Source manifest before routing to build. " +
-            "See content/skill-design-auditor.md step 2b and specs/e4-design-source-credibility-gate.md.",
+            "credibility: full-page-composite in the ## Source manifest before routing to build " +
+            "(design-auditor SOP, step 2b).",
         documentedInProse: true,
     },
     {
@@ -181,8 +179,7 @@ export const GATE_REGISTRY = [
         hintStatic: "A second feature cannot take the workspace slot while the incumbent feature's lease is live " +
             "(per-workspace mutual exclusion: at most one non-terminal feature per workspace_path). " +
             "Wait for the incumbent to reach PASS or for its lease to expire, or run the new feature " +
-            "in a separate git worktree (distinct workspace_path). " +
-            "See specs/e1-feature-scoped-state-design.md.",
+            "in a separate git worktree (distinct workspace_path).",
         documentedInProse: true,
     },
     {
@@ -197,8 +194,7 @@ export const GATE_REGISTRY = [
         armCondition: "classifyLeaseOverride === unaudited; FileHandoffStorage only",
         clearingArtifact: "pending_notes[0] matching /^lease-override:/",
         hintStatic: "A lease_override write must carry its human-attested audit line: prepend " +
-            "a \"lease-override: <reason>\" note as pending_notes[0] (gates/lease-override.ts). " +
-            "See specs/e10-lease-override.md AC2.",
+            "a \"lease-override: <reason>\" note as pending_notes[0].",
         documentedInProse: true,
     },
     // ---- plain-text (codes 13-32) — producer: orchestrator ----
@@ -234,7 +230,7 @@ export const GATE_REGISTRY = [
             "first (qa_review with review_task_ids on a PASS/FAIL write, or " +
             "qa_reports/review_<id>.md or a covers: file), or drop the unevidenced " +
             "ids from completed_tasks. No exemption for any edge, status, or " +
-            "review_verdict. See docs/backlog.md E18 incident (b) + E32.",
+            "review_verdict.",
         documentedInProse: true,
     },
     {
@@ -281,8 +277,7 @@ export const GATE_REGISTRY = [
         hintStatic: "Bugfix-mode fix cannot hand off to code-reviewer until " +
             "qa_reports/expected-red_<feature>.txt records the failing reproduction " +
             "test(s) proven red before the fix (skill-sr-engineer). If repro is " +
-            "infeasible, escalate status=Blocked to pm instead. " +
-            "See specs/e2-bugfix-repro-gate.md AC2/AC6.",
+            "infeasible, escalate status=Blocked to pm instead.",
         documentedInProse: true,
     },
     {
@@ -359,8 +354,7 @@ export const GATE_REGISTRY = [
             "diff-metric: value in its prose sub-section under ## Region Diff. " +
             "Carry-forward surfaces (annotated \"pass (carried forward — git diff " +
             "confirms source untouched)\") are exempt; \"B1 tool unavailable — LLM " +
-            "fallback\" satisfies the diff-metric requirement. " +
-            "See specs/qa-visual-baseline-provenance.md.",
+            "fallback\" satisfies the diff-metric requirement.",
         documentedInProse: true,
     },
     {
@@ -372,7 +366,7 @@ export const GATE_REGISTRY = [
         clearingArtifact: "freeze >=1 audited node-id",
         // Fully static (no interpolation): hintStatic holds the whole emitted string
         // including the ⛔ prefix; the emit site is `gate(code).hintStatic`.
-        hintStatic: "⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections). See specs/figma-baseline-manifest-gate.md.",
+        hintStatic: "⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections).",
         documentedInProse: true,
     },
     {
@@ -382,7 +376,7 @@ export const GATE_REGISTRY = [
         triggerEdge: "PASS, armed, >=2 audited rows, provenance section absent/incomplete",
         armCondition: "checkBaselineManifest.code",
         clearingArtifact: "add ## Baseline Selection Provenance",
-        hintStatic: "⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c. See specs/figma-baseline-manifest-gate.md.",
+        hintStatic: "⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c.",
         documentedInProse: true,
     },
     {
@@ -395,7 +389,7 @@ export const GATE_REGISTRY = [
         hintStatic: "Each non-carry-forward " +
             "surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true' " +
             "in its ### <surface id> prose sub-section under ## Region Diff. Carry-forward " +
-            "surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md.",
+            "surfaces are exempt.",
         documentedInProse: true,
     },
     {
@@ -407,7 +401,7 @@ export const GATE_REGISTRY = [
         clearingArtifact: "APPROVED↔{PASS, In_Progress} or CHANGES_REQUESTED↔FAIL",
         hintStatic: "A code-reviewer APPROVED verdict requires status=PASS or In_Progress; " +
             "CHANGES_REQUESTED requires status=FAIL. Align review_verdict with status, " +
-            "or omit review_verdict. See specs/c9-protocol-fields.md AC-5.",
+            "or omit review_verdict.",
         documentedInProse: true,
     },
     {
@@ -425,7 +419,7 @@ export const GATE_REGISTRY = [
             "pollution: only code-reviewer, the chain's judge, may grow completed_tasks " +
             "(or complete tasks through tw_complete_task), backed by the " +
             "QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks (or " +
-            "pass []) on this write. See docs/backlog.md E40.",
+            "pass []) on this write.",
         documentedInProse: true,
     },
     {
@@ -442,7 +436,7 @@ export const GATE_REGISTRY = [
         clearingArtifact: "omit review_verdict on any write not stamped agent_id=code-reviewer",
         hintStatic: "review_verdict is the code-reviewer's verdict field: only an " +
             "agent_id=code-reviewer write may carry it. Omit review_verdict on this " +
-            "write. See docs/backlog.md E139.",
+            "write.",
         documentedInProse: true,
     },
     {
@@ -478,8 +472,7 @@ export const GATE_REGISTRY = [
             "the heading may carry a prefix/suffix but must contain the canonical " +
             "name, evidence schema v2) " +
             "before PASS. The server checks the section's presence only — the proofs' " +
-            "truthfulness stays with the judge. " +
-            "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",
+            "truthfulness stays with the judge.",
         documentedInProse: true,
     },
     {
@@ -497,7 +490,7 @@ export const GATE_REGISTRY = [
             "ledger: add each listed id to completed_tasks with its QA evidence (a covers: " +
             "line counts), or void a dropped task with tw_void_task, then retry the PASS. " +
             "Rows whose description starts with release-engineer or doc-writer (post-PASS " +
-            "work) are exempt. See docs/backlog.md E247.",
+            "work) are exempt.",
         documentedInProse: true,
     },
     // ---- tool-boundary (code 33) — producer: zod at tools/registry.ts ----
