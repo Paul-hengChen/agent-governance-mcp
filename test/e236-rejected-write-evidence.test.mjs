@@ -229,7 +229,8 @@ test("AC-E236-6 (E435): a code-reviewer PASS whose only evidence is its own qa_r
   const want = fs.readFileSync(path.join(ref, "qa_reports", "review_T-E236-X.md"), "utf-8");
   const norm = (s) => s.replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, "<ISO>");
   assert.equal(norm(got), norm(want));
-  assert.match(got, /^# QA review — T-E236-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by code-reviewer\n\nEverything verified\.\n\n$/m);
+  // E462 re-pin: a newly created judge report is titled `# Review — <id>` (e462.report-heading).
+  assert.match(got, /^# Review — T-E236-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by code-reviewer\n\nEverything verified\.\n\n$/m);
 });
 
 test("AC-E236-7: the undo leaves a file alone when it changed after the append, and never throws", async () => {

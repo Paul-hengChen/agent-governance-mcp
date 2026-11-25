@@ -8,7 +8,7 @@
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
 import { requireJudge, JUDGE_ROLE, validateTransition, computeNewRound, computeSrReturnCount, allowedSuccessors, HOP_CAP_EXPORTED, } from "./transitions.js";
-import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, visualEvidencePath, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, checkSourceCredibility, } from "../gates/visual.js";
+import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, visualEvidencePath, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, checkSourceCredibility, unknownDesignModeNote, } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition, hasNoNewTestRecord } from "../gates/expected-red.js";
@@ -195,8 +195,8 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                 // v7 (c9-protocol-fields AC-4) — structured Amend-Resume field.
                 // Replaces the former next_pending_notes token grep; legacy
                 // `resume_of: <role>` pending_notes lines are inert (DR-2).
-                // Only code-reviewer resumes (E435).
-                next_resume_of: parsed.resume_of === "code-reviewer" ? "code-reviewer" : undefined,
+                // Only code-reviewer resumes: normalised at handler entry.
+                next_resume_of: parsed.resume_of,
                 // v9 — hop-cap inputs (d2-server-brake-accounting). Arms the
                 // HOP_CAP_EXCEEDED override: fires when the feature's persisted
                 // hop_count is at/over cap on a counted role transition that is not
@@ -665,14 +665,13 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["QA_COMPLETION_EVIDENCE_MISSING"],
         run: (ctx) => {
             const { parsed, storage, prevState } = ctx;
-            const judge = resolveJudgeReport(parsed.workspace_path).judge;
-            // QA completion-evidence gate: a write by the judge
-            // (code-reviewer, E432/E435) whose
-            // completed_tasks adds ids not in the on-disk set needs per-id QA evidence on disk
-            // (hasEvidenceInFile: a per-id file or a covers: line), whatever the
-            // status. Ids already on disk need none. Runs after the qa_review record,
-            // so a write's own review counts. No exemptions and no prevState guard;
-            // other identities belong to the gate above. File mode only.
+            const { judge, dir: judgeReportDir } = resolveJudgeReport(parsed.workspace_path);
+            // Completion-evidence gate: a write by the judge (code-reviewer) whose completed_tasks
+            // adds ids not in the on-disk set needs per-id evidence in the judge report on disk
+            // (hasEvidenceInFile: a per-id file or a covers: line), whatever the status. Ids
+            // already on disk need none. Runs after the qa_review record, so a write's own review
+            // counts. No exemptions and no prevState guard; other identities belong to the gate
+            // above. File mode only.
             // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — QA_COMPLETION_EVIDENCE_MISSING".
             if (storage instanceof FileHandoffStorage &&
                 parsed.agent_id === judge &&
@@ -693,7 +692,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                     type: "text",
                                     text: `⛔ QA_COMPLETION_EVIDENCE_MISSING: ${ev.missing.join(", ")}. ` +
                                         `Expected evidence file(s): ${expectedPaths} ` +
-                                        `(or an existing qa_reports/ report covering the id via a covers: line). ` +
+                                        `(or an existing report in ${judgeReportDir} covering the id via a covers: line). ` +
                                         gate("QA_COMPLETION_EVIDENCE_MISSING").hintStatic,
                                 }],
                             isError: true,
@@ -792,6 +791,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                 type: "text",
                                 text: `⛔ VISUAL_BASELINES_REQUIRED: design/<feature>.md declares mode != no-design ` +
                                     `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Baselines is absent. ` +
+                                    unknownDesignModeNote(armCheck.mode) +
                                     gate("VISUAL_BASELINES_REQUIRED").hintStatic,
                             }],
                         isError: true,
@@ -853,6 +853,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                         text: `⛔ VISUAL_ASSERTIONS_REQUIRED: design/<feature>.md declares mode != no-design ` +
                                             `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Structural ` +
                                             `Assertions is absent. ` +
+                                            unknownDesignModeNote(armCheck.mode) +
                                             gate("VISUAL_ASSERTIONS_REQUIRED").hintStatic,
                                     }],
                                 isError: true,
@@ -961,10 +962,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         run: (ctx) => {
             const { parsed, storage, evidenceSchemaPin } = ctx;
             if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
-                // Expected-red diff gate: dormant unless sr-engineer declared
-                // qa_reports/expected-red_<feature>.txt. When armed, at least one
-                // review file for the PASS'd ids (or a covers: file) must have an
-                // `## Expected-Red Diff` section with QA's suite-vs-manifest
+                // Expected-red diff gate: dormant unless the manifest
+                // qa_reports/expected-red_<feature>.txt exists (qa-engineer writes
+                // it with the scenario tests). When armed, at least one judge
+                // report for the PASS'd ids (or a covers: file) must have an
+                // `## Expected-Red Diff` section with the judge's suite-vs-manifest
                 // disposition. Section existence only; the server runs no tests.
                 // File mode only: the manifest is a qa_reports/ file.
                 if (storage instanceof FileHandoffStorage) {
@@ -1118,6 +1120,12 @@ async function handleUpdateStateCore(parsed) {
     // skips zod may omit it. Normalise once so every gate reads a list
     // and omission and [] stay one input class. (E150)
     parsed = { ...parsed, completed_tasks: parsed.completed_tasks ?? [] };
+    // Only code-reviewer resumes; zod rejects any other resume_of, but a
+    // direct caller may pass one. Normalise once so every consumer reads
+    // a stale or empty value exactly as an absent one.
+    if (parsed.resume_of !== "code-reviewer") {
+        parsed = { ...parsed, resume_of: undefined };
+    }
     // Defense-in-depth: zod refine already enforces this on PASS, but a
     // client that bypasses zod still hits this guard. (E431, E435)
     if (parsed.status === "PASS") {
@@ -1295,7 +1303,7 @@ async function handleUpdateStateCore(parsed) {
         // (AC-3): persisted only when set on this write. File-mode only
         // (DR-5): SqliteHandoffStorage.writeState ignores all three.
         nextRole: parsed.next_role,
-        resumeOf: parsed.resume_of === "code-reviewer" ? "code-reviewer" : undefined,
+        resumeOf: parsed.resume_of,
         reviewVerdict: parsed.review_verdict,
         // v8 — dispatch_pins (c14-dispatch-pins). Pass-through only:
         // advisory bookkeeping like next_role (AC-5) — NOT cross-checked

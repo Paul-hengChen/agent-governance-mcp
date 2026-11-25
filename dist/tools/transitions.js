@@ -225,7 +225,7 @@ const VISUAL_ROUND_CAP = 6;
 // v9 (d2-server-brake-accounting) — const-01 Limits: `hop` cap — max
 // auto-routing role transitions per feature (14 since E295, was 10). An
 // independent brake, not a backstop behind the round caps: it counts every
-// role hand-off on either chain path (sr-engineer -> qa-engineer returns
+// role hand-off in the chain (sr-engineer -> qa-engineer returns
 // included), so depending on the mix of rejections it can trip before or
 // after any round cap or the sr-return cap. Unlike the round caps, hop_count
 // is feature-scoped: it resets ONLY on active_feature change, never on PM

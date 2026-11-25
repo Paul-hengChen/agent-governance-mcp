@@ -8,6 +8,7 @@ export declare function hasDesignModeRequiringVisual(workspacePath: string, acti
     mode: string | null;
     designPath: string;
 };
+export declare function unknownDesignModeNote(mode: string | null): string;
 export declare function hasVisualEvidenceInFile(workspacePath: string, taskIds: string[]): {
     present: string[];
     missing: string[];

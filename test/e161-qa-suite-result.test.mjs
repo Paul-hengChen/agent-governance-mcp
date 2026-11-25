@@ -133,7 +133,8 @@ test("AC-E161-2 (E435): code-reviewer PASS/FAIL, file mode records the suite lin
   await recordReviewInFile(ref, ["T-E161-X"], "PASS", "code-reviewer", `${line}\n\n${review.trim()}`);
   const want = fs.readFileSync(evidenceFile(ref, "T-E161-X"), "utf-8");
   assert.equal(got.replace(ISO, "<ISO>"), want.replace(ISO, "<ISO>"));
-  assert.match(got, /^# QA review — T-E161-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by code-reviewer\n\nsuite-result: /);
+  // E462 re-pin: a newly created judge report is titled `# Review — <id>` (e462.report-heading).
+  assert.match(got, /^# Review — T-E161-X\n\n<!-- Auto-appended by tw_update_state\(qa_review=\.\.\.\)\. -->\n\n## \d{4}-\d\d-\d\dT[\d:.]+Z — PASS — by code-reviewer\n\nsuite-result: /);
 
   // FAIL records it too (the record step fires on PASS and FAIL alike).
   const ws2 = mkWorkspace("e161-2f-");

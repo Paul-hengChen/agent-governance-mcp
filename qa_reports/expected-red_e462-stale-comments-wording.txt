@@ -1,0 +1,53 @@
+# e462-stale-comments-wording — expected-red manifest (qa-engineer, T-E462-01 / T-E462-02)
+# Format: <relative test file path> | <exact test name>
+# Every entry is red at the cut base (83ca8c0 source) because the implementation tasks T-E462-03..09 are not
+# built yet; each must be green once sr-engineer finishes T-E462-08. Nothing else may be red.
+
+# AC1 (T-E462-03 / T-E462-09 not built): the stale old-chain phrases are still in the source comments.
+test/e462-stale-comments-wording.test.mjs | AC1 no stale old-chain phrase remains in the named source files
+# AC1: no comment in tools/transitions.ts names {architect,qa-engineer} yet (lines 93/106/113 still say {architect,sr-engineer}).
+test/e462-stale-comments-wording.test.mjs | AC1 tools/transitions.ts and tools/registry.ts comments name the build-entry edge {architect,qa-engineer}
+
+# AC2 (T-E462-04 not built): both `parsed.resume_of === "code-reviewer" ? ...` ternaries are still in tools/handoff-orchestrator.ts.
+test/e462-stale-comments-wording.test.mjs | AC2 the two resume_of ternaries are gone and both consumers read parsed.resume_of
+
+# AC3 (T-E462-05 not built): the message still says `(or an existing qa_reports/ report covering ...)`.
+test/e462-stale-comments-wording.test.mjs | AC3 QA_COMPLETION_EVIDENCE_MISSING names the judge report directory from resolveJudgeReport
+# AC3 (T-E462-05 not built): new judge reports still start `# QA review — <id>`.
+test/e462-stale-comments-wording.test.mjs | AC3 a new judge report starts with `# Review — <id>`, then the unchanged auto-append marker and verdict section
+
+# AC4 (T-E462-06 not built): parseDesignMode still reports the lowercased leading token (`mode: N/A` -> `n`), and the
+# two visual messages carry no unknown-mode note.
+test/e462-stale-comments-wording.test.mjs | AC4 an unknown declared mode is reported as written (case kept, not cut at `/`) and arms
+test/e462-stale-comments-wording.test.mjs | AC4 the reported value is the first word only and a very long word is cut to 40 characters plus `…`
+test/e462-stale-comments-wording.test.mjs | AC4 VISUAL_BASELINES_REQUIRED reports mode=N/A and the no-design note before the static hint
+test/e462-stale-comments-wording.test.mjs | AC4 VISUAL_ASSERTIONS_REQUIRED carries the same note after `Assertions is absent. `
+
+# AC5 (T-E462-06 not built): written against the AC4 format; at base the inline `N/A` is reported as `n`.
+test/e462-stale-comments-wording.test.mjs | AC5 the first unknown token wins: inline N/A over an H2 mockup
+
+# AC6 (T-E462-07 not built): step 4 still carries the old reopen sentence, step 5 the old done sentence.
+test/e462-stale-comments-wording.test.mjs | AC6 step 4 keeps the ruling sentence and states the reopen rule once, as sw.reopen
+test/e462-stale-comments-wording.test.mjs | AC6 step 5's first sentence is sw.done (no open `needs prototype` question)
+test/e462-stale-comments-wording.test.mjs | AC6 no other line of the SOP changes and no backtick-quoted error code is gained or lost
+
+# AC7 (T-E462-07 not built): docs/migration-v5.md has neither added sentence yet.
+test/e462-stale-comments-wording.test.mjs | AC7 `## What changed` has mig.midline as its own bullet
+test/e462-stale-comments-wording.test.mjs | AC7 `## SQLite / HTTP mode` has mig.sqlite_checks immediately followed by mig.review_evidence, no server mix
+
+# T-E462-02 re-pins to e462.report-heading (T-E462-05 not built): new reports still start `# QA review — <id>`.
+test/e161-qa-suite-result.test.mjs | AC-E161-2 (E435): code-reviewer PASS/FAIL, file mode records the suite line, a blank line, then the trimmed qa_review; heading and file header unchanged
+test/e236-rejected-write-evidence.test.mjs | AC-E236-6 (E435): a code-reviewer PASS whose only evidence is its own qa_review is accepted and records the same header and section as before
+test/qa-flow.test.mjs | recordReviewInFile creates qa_reports/review_<id>.md per task
+
+# T-E462-02 re-pins to sw.done / sw.reopen (T-E462-07 not built): the SOP still has the old step 4 / step 5 sentences.
+test/e423-spec-workshop.test.mjs | AC10: done condition (one verification, device-or-person flag, conflict rulings) and the no-filing ends
+test/e445-spec-workshop-questioning.test.mjs | AC5: step 4 keeps the dated/replacing ruling sentence and follows it with a separate reopen sentence
+test/e445-spec-workshop-questioning.test.mjs | AC6: step 4 marks look-and-feel questions `needs prototype`, defers them, builds none, and ends `not ready to cut` if open
+test/e445-spec-workshop-questioning.test.mjs | AC9: step 5 keeps its three base sentences in order, then the one-time accept-all reminder
+
+# AC9 amendment (qa-engineer, T-E462-10; red at 4620ebc because T-E462-11 is not built yet).
+# AC9 (a): tools/handoff-orchestrator.ts still says `QA completion-evidence gate` and `per-id QA evidence` (~lines 737/739).
+test/e462-stale-comments-wording.test.mjs | AC9 tools/handoff-orchestrator.ts no longer calls the completion-evidence gate a QA gate
+# AC9 (b): gates/visual.ts ~line 862 still says `pm to architect or sr-engineer hop`; the block names no qa-engineer.
+test/e462-stale-comments-wording.test.mjs | AC9 gates/visual.ts source-credibility comment names the pm to architect or qa-engineer build entry

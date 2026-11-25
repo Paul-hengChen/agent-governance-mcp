@@ -298,13 +298,12 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // QA completion-evidence gate: closes the identity-swap gap (another role writing
-    // agent_id="qa-engineer" with pre-filled completed_tasks) (E432: the feature's
-    // judge — code-reviewer on a test-first feature — is armed the same way). A
-    // qa-engineer write that adds ids to the on-disk completed set needs per-id
-    // QA evidence on disk (hasEvidenceInFile from gates/qa-review.ts, covers:
-    // honored); ids already there are exempt, and no edge or verdict is. Runs after the qa_review auto-record, so a PASS
-    // or FAIL write's own evidence counts. File mode only.
+    // Completion-evidence gate: closes the identity-swap gap (another role writing
+    // as the judge with pre-filled completed_tasks). A judge (code-reviewer) write
+    // that adds ids to the on-disk completed set needs per-id evidence on disk
+    // (hasEvidenceInFile from gates/qa-review.ts, covers: honored); ids already
+    // there are exempt, and no edge or verdict is. Runs after the qa_review
+    // auto-record, so a PASS or FAIL write's own evidence counts. File mode only.
     // Spec: specs/c16-c10-role-boundary.md (the E32 amendment).
     errorCode: "QA_COMPLETION_EVIDENCE_MISSING",
     producer: "orchestrator",
@@ -570,7 +569,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // AC-execution-log gate: QA must log each spec `proof:` run. Arms when
+    // AC-execution-log gate: the judge must log each spec `proof:` run. Arms when
     // specs/<feature>.md has a line-leading `proof:` (gates/ac-execution.ts); clears on
     // an `## AC Execution Log` H2 in any PASS'd id's qa_reports/review_<id>.md (covers:
     // files count). Older specs with no `proof:` lines leave it dormant. Plain-text family,
@@ -593,7 +592,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // PASS-time open-task gate: a qa PASS must account for every open row of the
+    // PASS-time open-task gate: a judge PASS must account for every open row of the
     // feature's own lane ledger (gates/open-tasks.ts); post-PASS role rows are exempt.
     // Shared, legacy and configured ledgers leave it dormant. File mode only.
     // Spec: specs/e247-qa-pass-unticked-gate.md.
