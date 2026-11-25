@@ -1,14 +1,15 @@
 // Coded by @sr-engineer
-// Expected-Red Diff gate predicates: sr-engineer lists tests left red on purpose
+// Expected-Red Diff gate predicates: qa-engineer lists the tests it leaves red
 // in qa_reports/expected-red_<feature>.txt (`<test file> | <test name>` per
-// line); QA records its diff against the suite run under a `## Expected-Red
-// Diff` H2 in qa_reports/review_<id>.md. Existence only: the manifest arms, the
-// H2 clears; rows are never parsed and tests never run. File mode only.
+// line); the judge records its diff against the suite run under a
+// `## Expected-Red Diff` H2 in the judge report. Existence only: the manifest
+// arms, the H2 clears; rows are never parsed and tests never run. File mode
+// only.
 // Spec: specs/c15-expected-red-manifest.md.
 import * as fs from "fs";
 import * as path from "path";
 import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
-// The H2 heading qa-engineer's Phase 0.5 writes (skill-qa-engineer SOP 2a).
+// The H2 heading the judge writes (skill-code-reviewer step 7).
 const DISPOSITION_HEADING = "Expected-Red Diff";
 // Manifest and no-new-test record directory: qa's own artifacts, not the judge
 // report, so they keep their own location.
@@ -26,7 +27,7 @@ function safeFeatureName(activeFeature) {
 export function expectedRedManifestPath(workspacePath, activeFeature) {
     return path.join(qaReportsDir(workspacePath), `expected-red_${safeFeatureName(activeFeature)}.txt`);
 }
-// Where qa-engineer records that a test-first ticket needs no new test.
+// Where qa-engineer records that a feature needs no new test.
 export function noNewTestRecordPath(workspacePath, activeFeature) {
     return path.join(qaReportsDir(workspacePath), `no-new-test_${safeFeatureName(activeFeature)}.txt`);
 }
