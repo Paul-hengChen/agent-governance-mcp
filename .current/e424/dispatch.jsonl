@@ -12,3 +12,4 @@
 {"ts":"2026-11-25T15:53:48.448Z","feature":"e424-per-scenario-acceptance","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T15:54:21.827Z","feature":"e424-per-scenario-acceptance","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T15:56:27.370Z","feature":"e424-per-scenario-acceptance","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T15:56:55.519Z","feature":"e424-per-scenario-acceptance","agent_id":"sr-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
