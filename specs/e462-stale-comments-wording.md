@@ -135,6 +135,20 @@ Test file (qa-engineer creates it): `test/e462-stale-comments-wording.test.mjs`.
 - **Golden / budget (R3 (b))**: the probe moves neither, so no planned sr → qa return is cut. If sr's final text does move a compose golden or the AC21 cap after all, the R3 (b) route applies: after the last implementation task sr returns once to qa (uses 1 `sr_return`), qa re-captures the golden / sets the cap to the measured value with a per-hunk note, then sr hands to code-reviewer.
 - `CLAUDE.md` unchanged: no `tools/*.ts` file is added.
 
+## Gate Summary
+
+| gate | outcome |
+|---|---|
+| Visual state-count / geometric-density split | not triggered: non-design, no `design/e462-stale-comments-wording.md` |
+| Parallel-Lane Cut | not triggered: already one lane of `specs/fanout-pre-v5-w2.md`; the cut stays serial inside the lane |
+| Scope Decision | `scope_decision: single-feature` recorded (dormant for a non-design feature) |
+| Resource Audit | zero external references in the backlog rows and the manifest; `external_refs` omitted |
+| Question Batch | zero open questions; the `none` / `n/a` / `tbd` question was already ruled by the human (2026-11-25); the H1 retitle judged not an evidence-schema change (see Dependencies) |
+| Expected-red | qa-engineer writes `qa_reports/expected-red_e462-stale-comments-wording.txt` (new AC tests red at base plus the five re-pinned files) before the qa → sr hand-off |
+| Cut-Approval | cut presented inline; `cut_approved` left to the coordinator after the integrator pre-review; `fanout.mjs check --cut` exit 0 |
+
+manifest-tier: no option choice, no needs-human-ruling item
+
 ## Cut
 
 | id | desc | depends_on | est. files | touches | design-link |
@@ -146,7 +160,7 @@ Test file (qa-engineer creates it): `test/e462-stale-comments-wording.test.mjs`.
 
 Cut notes: `dist/**` is the tracked build product of every `.ts` change (addendum §3), committed with the source. Comment-only files: `tools/transitions.ts`, `tools/registry.ts`, `tools/handoff-types.ts`, `schema/migrations-handoff.ts`, `gates/expected-red.ts`, `gates/registry.ts`. No compose golden or `test/context-budget.test.mjs` change is expected (probe); they stay owned in case. No `tools/*.ts` file is added. Release bookkeeping (CHANGELOG, backlog done-marks for E461 / E462) belongs to the integrator / release-engineer and is not cut here.
 
-Order (v5 chain): qa T-E462-01 → qa T-E462-02 → sr T-E462-03 … T-E462-08 (in id order; each one sr session, within the `task_size` budget) → code-reviewer judges every task and writes PASS. sr never edits a qa-written test; any red sr leaves is appended to the expected-red manifest with its reason. No planned sr → qa return (see Dependencies, R3 (b) fallback).
+Order (v5 chain): qa T-E462-01 → qa T-E462-02 → sr T-E462-03 → T-E462-09 → T-E462-04 → T-E462-05 → T-E462-06 → T-E462-07 → T-E462-08 (each one sr session, within the `task_size` budget of ≤ 5 files; T-E462-09 was appended at the integrator pre-review to split the original seven-file T-E462-03, ids never renumbered) → code-reviewer judges every task and writes PASS. sr never edits a qa-written test; any red sr leaves is appended to the expected-red manifest with its reason. No planned sr → qa return (see Dependencies, R3 (b) fallback).
 
 Task Budget Map:
 
@@ -154,7 +168,8 @@ Task Budget Map:
 |---|---|---|---|
 | T-E462-01 | qa-engineer | AC1–AC7 new tests, expected-red manifest, test map | 1 new file |
 | T-E462-02 | qa-engineer | re-pin of the five red files | 5 files, ~10 lines |
-| T-E462-03 | sr-engineer | AC1 | 7 files, comments only |
+| T-E462-03 | sr-engineer | AC1 (part 1) | 4 files, comments only |
+| T-E462-09 | sr-engineer | AC1 (part 2) | 3 files, comments only |
 | T-E462-04 | sr-engineer | AC2 | 1 file, ~8 lines |
 | T-E462-05 | sr-engineer | AC3 | 2 files, ~2 lines |
 | T-E462-06 | sr-engineer | AC4, AC5 | 2 files, ~20 lines |
@@ -163,8 +178,9 @@ Task Budget Map:
 
 - [ ] T-E462-01 [P0] qa-engineer: new `test/e462-stale-comments-wording.test.mjs`, tests for AC1–AC7 (titles start `AC<n> `; Copy / Strings pinned verbatim; AC5 mutations run in a scratch copy only and logged; base text frozen as literals, never read from history); `qa_reports/expected-red_e462-stale-comments-wording.txt` and `qa_reports/tests_e462-stale-comments-wording.md` | depends_on: none
 - [ ] T-E462-02 [P0] qa-engineer: re-pin the tests this lane turns red to the new strings, intent kept: `test/e161-qa-suite-result.test.mjs` AC-E161-2, `test/e236-rejected-write-evidence.test.mjs` AC-E236-6, `test/qa-flow.test.mjs` recordReviewInFile heading (all to `e462.report-heading`), `test/e423-spec-workshop.test.mjs` AC10 (`sw.done`), `test/e445-spec-workshop-questioning.test.mjs` `S.reopen` / `B.done` (AC5, AC6, AC9); add each to the expected-red manifest; old-heading fixtures untouched | depends_on: T-E462-01
-- [ ] T-E462-03 [P0] sr-engineer: stale old-chain and build-entry comments in `tools/transitions.ts`, `tools/registry.ts`, `tools/handoff-types.ts`, `schema/migrations-handoff.ts`, `gates/expected-red.ts`, `gates/registry.ts` and the expected-red comment in `tools/handoff-orchestrator.ts` (AC1; comment-only; HOP_CAP phrases, lines 158 / 393, the mapping comment and `chain_path` untouched) | depends_on: T-E462-02
-- [ ] T-E462-04 [P0] sr-engineer: `tools/handoff-orchestrator.ts` `resume_of` normalised once at handler entry, both ternaries removed (AC2) | depends_on: T-E462-03
+- [ ] T-E462-03 [P0] sr-engineer: stale old-chain and build-entry comments in `tools/transitions.ts`, `tools/registry.ts`, `tools/handoff-types.ts` and the expected-red comment in `tools/handoff-orchestrator.ts` (AC1, part 1 of 2; comment-only; HOP_CAP phrases, lines 158 / 393 and `chain_path` untouched) | depends_on: T-E462-02
+- [ ] T-E462-09 [P0] sr-engineer: stale old-chain comments in `schema/migrations-handoff.ts`, `gates/expected-red.ts`, `gates/registry.ts` (AC1, part 2 of 2; comment-only; the errorCode → doc-file mapping comment, hint strings and `chain_path` untouched) | depends_on: T-E462-03
+- [ ] T-E462-04 [P0] sr-engineer: `tools/handoff-orchestrator.ts` `resume_of` normalised once at handler entry, both ternaries removed (AC2) | depends_on: T-E462-09
 - [ ] T-E462-05 [P0] sr-engineer: completion-evidence message via `resolveJudgeReport().dir` in `tools/handoff-orchestrator.ts`; new-report heading `# Review — <id>` in `gates/qa-review.ts` (AC3) | depends_on: T-E462-04
 - [ ] T-E462-06 [P0] sr-engineer: `gates/visual.ts` unknown mode reported as written plus an exported note helper, wired into the two visual messages in `tools/handoff-orchestrator.ts` (AC4, AC5) | depends_on: T-E462-05
 - [ ] T-E462-07 [P0] sr-engineer: `content/skill-spec-workshop.md` step 4 / step 5 (AC6) and `docs/migration-v5.md` two sentences (AC7), exactly the Copy / Strings rows | depends_on: T-E462-06
