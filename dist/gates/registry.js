@@ -337,7 +337,9 @@ export const GATE_REGISTRY = [
             "Differences, and a Verdict that normalizes to exactly PASS — every row " +
             "cleared (skill-reviewer-visual §Report schema; headings may carry " +
             "prefixes/suffixes but must contain the canonical names, evidence " +
-            "schema v2). Resolve the failed/unverified " +
+            "schema v2). From evidence schema v3, every surface whose Region Diff " +
+            "result is accepted must also be named in the Allowed Differences " +
+            "section. Resolve the failed/unverified " +
             "rows — do NOT pre-accept them (visual verdict is reviewer-visual-owned, " +
             "Constitution §3.2).",
         documentedInProse: true,

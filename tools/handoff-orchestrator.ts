@@ -944,6 +944,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                     if (v.failedCanonicalStates.length) reasons.push(`canonical-state fail: ${v.failedCanonicalStates.join("/")}`);
                     if (v.failedStructuralAssertions.length) reasons.push(`structural fail: ${v.failedStructuralAssertions.join("/")}`);
                     if (v.failedRegionDiffs.length) reasons.push(`region-diff fail: ${v.failedRegionDiffs.join("/")}`);
+                    if (v.unlistedAcceptedDiffs.length) reasons.push(`accepted but not in ## Allowed Differences: ${v.unlistedAcceptedDiffs.join("/")}`);
                     if (!v.verdictPass) reasons.push("verdict != PASS");
                     return `${taskId} (at ${visualEvidencePath(parsed.workspace_path, taskId)}) {${reasons.join("; ")}}`;
                   })
