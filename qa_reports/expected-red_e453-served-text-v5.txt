@@ -4,46 +4,12 @@
 # sr-engineer appends the snapshot reds it leaves (compose goldens, moved context-budget caps) below.
 
 # new test file (T-E453-01)
-test/e453-served-text-v5.test.mjs | AC1: code-reviewer Rejection rows bullet starts with the FAIL write and rolls back only an id the task list already shows [x] | cr.reject_head / cr.reject_rollback not yet in content/skill-code-reviewer.md (T-E453-05)
-test/e453-served-text-v5.test.mjs | AC2: code-reviewer step 1 accepts sr-engineer In_Progress, the pm resume_of write, its own Blocked, claim and checkpoint, and STOPs otherwise | cr.step1 not yet in content/skill-code-reviewer.md step 1 (T-E453-05)
-test/e453-served-text-v5.test.mjs | AC3: reviewer-visual rejection rows carry no tw_rollback_task; widget, drift and check-defect rows are the FAIL write alone | content/skill-reviewer-visual.md rows still carry tw_rollback_task (rv.row_* not built, T-E453-05)
-test/e453-served-text-v5.test.mjs | AC5: migration guide re-stamp section is mig.restamp, and following it on a 4.0.0-stamped workspace ends with agc check exit 0 | docs/migration-v5.md Re-stamp section is not mig.restamp yet (T-E453-09); the agc init / check run part already passes
-test/e453-served-text-v5.test.mjs | AC6: migration guide splits the sr-engineer row into In_Progress and Blocked, and validateTransition agrees | docs/migration-v5.md still has the sr-engineer:* row (mig.row_sr_* not built, T-E453-09); the validateTransition part already holds
-test/e453-served-text-v5.test.mjs | AC7: migration guide SQLite / HTTP section names the file-mode-only checks (mig.sqlite_checks) and not the old/new server mix | mig.sqlite_checks not yet in the SQLite / HTTP section (T-E453-09)
-test/e453-served-text-v5.test.mjs | AC8: migration guide What changed has the schema 15 → 17 bullet and the mixed-servers bullet, outside the SQLite section | mig.schema / mig.mixed_servers not yet in What changed (T-E453-09)
-test/e453-served-text-v5.test.mjs | AC9: review_round cap row says 4 (equal to the server cap) with limits.review_round.meaning; architecture row and transitions comment agree; check-only sites unchanged | const-01 review_round row still 3 with the old meaning; architecture row and transitions.ts comment not rewritten (T-E453-06, T-E453-09)
-test/e453-served-text-v5.test.mjs | AC10: hop cap is stated per feature (reset only by an active_feature change) in Limits, const-15 and the architecture auto-routing paragraph | const-01 hop row and const-15 still say per `/teamwork` session; arch.autoroute not built (T-E453-06, T-E453-09)
-test/e453-served-text-v5.test.mjs | AC11: sr_return cap is stated as closing only the sr-engineer → qa-engineer return until the next pm In_Progress write, at every site | sr_return sites still say routing locks to pm / only pm may take the feature (T-E453-06, T-E453-09)
-test/e453-served-text-v5.test.mjs | AC12: the sr_return Limits row and sr-engineer step 4c say SQLite/HTTP mode counts no returns | limits.sr_return.meaning / sr.read_count not built (T-E453-06)
-test/e453-served-text-v5.test.mjs | AC16: coordinator routing-table rows for implement / review / test name the pm-stamped entry and the judge dispatch | coord-01 routing rows are still bare role cells (coord01.row_* not built, T-E453-07)
-test/e453-served-text-v5.test.mjs | AC17: integrator 'a builder' item is integ.builder (both §2 carve-outs by reference) | skill-integrator 'a builder' item not rewritten (integ.builder, T-E453-07)
-test/e453-served-text-v5.test.mjs | AC18: coord-05 dispatch parenthetical is coord05.dispatch and the void sentence is coord05.void | coord-05 parenthetical and void sentence not rewritten (coord05.*, T-E453-07)
-test/e453-served-text-v5.test.mjs | AC19: sr-engineer step 3b infeasible-repro escape routes per Escalation Routes: scenario cannot be built | skill-sr-engineer step 3b still routes to awaiting clarification (sr.repro_escape, T-E453-06)
-test/e453-served-text-v5.test.mjs | AC20: tw_update_state descriptions of cut_approved, external_refs and dispatch_mode name the v5 build entry and the judge; no tw_* description names the old entry or Phase 0.5 | tools/registry.ts descriptions still name architect/sr-engineer and Phase 0.5 (reg.*, T-E453-08)
-test/e453-served-text-v5.test.mjs | AC21: docs/config.md skill-override caveat names the code-reviewer PASS evidence (config.caveat_skill) | docs/config.md caveat still says evidence-of-PASS (config.caveat_skill, T-E453-08)
-test/e453-served-text-v5.test.mjs | AC22: lane-protocol hop-continuation (b) and the report's tasks line name the code-reviewer verdict only | docs/lane-protocol.md lines 52 / 123 still name the qa verdict (lp.*, T-E453-08)
-test/e453-served-text-v5.test.mjs | AC23: served content names no qa verdict and no awaiting independent QA; Builder ≠ judge bullet, coord-03 row 39 note and rationale line are rewritten | const-05 / coord-03 / rationale still say qa verdict / awaiting independent QA (T-E453-07, T-E453-08)
-test/e453-served-text-v5.test.mjs | AC24: design-auditor build-entry edge reads pm:In_Progress → {architect,qa-engineer}:In_Progress; no served file names {architect,sr-engineer} | skill-design-auditor still names {architect,sr-engineer} (da.edge, T-E453-08)
-test/e453-served-text-v5.test.mjs | AC26: the content lines this feature changes cite no repo-only path and no bare ticket id | the changed content lines are located by their Copy text, which is not built yet (T-E453-05..08)
 
 # new test file (T-E453-02)
-test/e457-doc-numbers.test.mjs | AC13: CONTRIBUTING, architecture and config state 17 steps and 33 gates, and CONTRIBUTING carries no test-file count | CONTRIBUTING / architecture / config still say 18-step, 35 gates and 87 test files (T-E453-08, T-E453-09)
-test/e457-doc-numbers.test.mjs | AC14: architecture step 1 box lists four cap overrides, HOP_CAP_EXCEEDED after the SR_RETURN_CAP line, every box line 67 characters wide | architecture step 1 box not yet 'the cap overrides:' plus the HOP_CAP_EXCEEDED line (T-E453-09)
-test/e457-doc-numbers.test.mjs | AC15: every pipeline-length and gate-count statement in the five docs equals the live counts; the checker reports mutated numbers | checker reports CONTRIBUTING 18-step x2 / 35 gate definitions, architecture 35 entries, config 18 gates (T-E453-08, T-E453-09); the mutation cases already pass
 
 # re-pin, owned tests (T-E453-03)
-test/e393-builder-judge-core.test.mjs | AC-A1: builder ≠ judge rule is in const-05 §3 and in all four compositions | re-pinned BULLET = c05.builder_judge; const-05 still has the old bullet (T-E453-07)
-test/e393-builder-judge-core.test.mjs | AC-C (E435): named sites restate no bare round number | re-pinned C08 = c12.sr_return; const-12 line 18 not rewritten (T-E453-06)
-test/e433-test-first-rules.test.mjs | AC2 (E435): constitution fragments — judge clause (a), test ownership (b), builder ≠ judge unchanged (c), Limits (d), ownership + disclosure (e), build gate (f), state update (g) | re-pinned (c) BUILDER_NE_JUDGE = c05.builder_judge and (d) = limits.sr_return.meaning; content not rewritten (T-E453-06, T-E453-07)
-test/e433-test-first-rules.test.mjs | AC4: skill-sr-engineer.md builds to pre-written tests, has both return routes with Escalation Routes rows, and no QA Round Reply | re-pinned sr SOP must-list entry = sr.cap_tail; skill-sr-engineer not rewritten (T-E453-06)
-test/e433-test-first-rules.test.mjs | AC5 (E435): skill-code-reviewer.md is the chain's judge (tests vs scenarios, full suite, Expected-Red Diff, AC Execution, audits, PASS and rejection rows, clean-context carve-outs) | re-pinned must list = cr.reject_head + cr.reject_rollback, plus no 'per rejected id, then'; skill-code-reviewer not rewritten (T-E453-05)
-test/e433-test-first-rules.test.mjs | AC6 (E435): pm routes architect or qa-engineer with no marker, bugfix mode, amend path and counters; architect routes to qa-engineer | re-pinned coordinator intent rows = coord01.row_test / coord01.row_review; coord-01 not rewritten (T-E453-07)
 
 # re-pin, coord-05 parenthetical (T-E453-04)
-test/e408-core-task-alias-tail.test.mjs | AC2: each of the six sites carries its replacement once, on one line, and the old span is gone | re-pinned coord-05 SITES row = coord05.dispatch parenthetical; coord-05 not rewritten (T-E453-07)
-test/e408-core-task-alias-tail.test.mjs | AC3: claude-code composition defines the alias once, before every E408 site | same coord-05 SITES row: the replacement text is absent from the composed coordinator (T-E453-07)
-test/e412-qa-visual-template.test.mjs | AC3: coord-05 dispatch line carries the when-to-pick clause and the pinned parenthetical | re-pinned coord-05 parenthetical = coord05.dispatch; coord-05 not rewritten (T-E453-07)
-test/e434-reviewer-visual.test.mjs | AC2: code-reviewer step 6a (cr.visual_step) between steps 6 and 7; qa SOP loads no visual sub-skill and gives no visual verdict; coord-05 picks reviewer-visual; non-design code-reviewer prompt changes only by step 6a | re-pinned COPY.coord05Dispatch (line 61) = coord05.dispatch; coord-05 not rewritten (T-E453-07)
 
 # sr-engineer T-E453-09: snapshot reds left after T-E453-05..09 (full suite on a clean tree at 70b8ea6:
 # 4605 tests, 4586 pass, 17 fail, 2 skipped). Every qa-written test above is green; these 17 are snapshots
@@ -52,3 +18,6 @@ test/e434-reviewer-visual.test.mjs | AC2: code-reviewer step 6a (cr.visual_step)
 # scripts/capture-constitution-golden.mjs (all 12 changed; every hunk is a Copy / Strings edit) and the 5 moved
 # context-budget caps set to the measured values (lean 6003, skill-sr 3308, design-arm 9236, teamwork 19221,
 # non-design 7324 ~tok); all 17 green. See ## T-E453-10 in qa_reports/tests_e453-served-text-v5.md.
+# T-E453-11 (sr-engineer, AC28 disposition check): the 34 qa rows from T-E453-01..04 that stood above are removed (green).
+# Full suite on a clean tree (node scripts/test-lock.mjs -- npm test): 4605 tests, 4603 pass, 0 fail, 2 skipped
+# (history-dependent closed-range checks, not manifest rows). No entry remains red; the manifest lists none.
