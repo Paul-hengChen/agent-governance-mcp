@@ -67,6 +67,30 @@ function sizeOrNull(filePath: string): number | null {
   }
 }
 
+// True when the file is non-empty and its last byte is not "\n". Unreadable
+// or empty files read as false, so no separator is added.
+function lacksTrailingNewline(filePath: string): boolean {
+  let fd: number | null = null;
+  try {
+    const size = fs.statSync(filePath).size;
+    if (size === 0) return false;
+    fd = fs.openSync(filePath, "r");
+    const last = Buffer.alloc(1);
+    fs.readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // Best effort: a close failure changes nothing about the answer.
+      }
+    }
+  }
+}
+
 // Reverts the appends in `records` (reverse order) and removes the evidence
 // directory when this write created it and left it empty. Never throws. A file
 // is touched only when it still matches this write's post-append shape, so a
@@ -104,8 +128,9 @@ function undoRecordedAppends(
 // The append recordReviewInFile performs, returning an undo that restores
 // every touched evidence file (and the qa_reports/ directory) to its pre-write
 // state. Used by tw_update_state so a write the server then rejects, or whose
-// state write throws, leaves no PASS/FAIL section behind. The appended bytes
-// are exactly those recordReviewInFile has always written. If an append throws
+// state write throws, leaves no PASS/FAIL section behind. When an existing
+// report does not end with a newline, one is written first so the verdict
+// heading starts its own line; the undo truncates that byte away too. If an append throws
 // part-way, what was already appended is undone and the error is rethrown.
 export async function recordReviewInFileUndoable(
   workspacePath: string,
@@ -142,8 +167,11 @@ export async function recordReviewInFileUndoable(
       const filePath = evidencePath(workspacePath, id);
       const existed = fs.existsSync(filePath);
       const header = existed ? "" : `# QA review — ${id}\n\n<!-- Auto-appended by tw_update_state(qa_review=...). -->\n\n`;
+      // A report whose last line has no newline would leave the verdict
+      // heading mid-line, where the standing check cannot see it.
+      const lead = existed && lacksTrailingNewline(filePath) ? "\n" : "";
       const section = `## ${ts} — ${status} — by ${reviewer}\n\n${notes.trim()}\n\n`;
-      const text = `${header}${section}`;
+      const text = `${lead}${header}${section}`;
       fs.appendFileSync(filePath, text, "utf-8");
       const record = byPath.get(filePath)!;
       record.appended = Buffer.concat([record.appended, Buffer.from(text, "utf-8")]);
