@@ -55,7 +55,7 @@ test("AC2: body states when to use it and delegates to the code-reviewer SOP", (
 test("AC3: coord-05 dispatch line carries the when-to-pick clause and the pinned parenthetical", () => {
   const l = coord.find((x) => x.startsWith("- **No accept-policy injection.**"));
   assert.ok(l, "dispatch line present");
-  assert.ok(l.includes("When dispatching `reviewer-visual` (subagent-dispatch tool or `tw_switch_role`)"));
+  assert.ok(l.includes("When dispatching `reviewer-visual` (subagent-dispatch tool only; `tw_switch_role` has no `reviewer-visual` role, so that fallback switches to `code-reviewer`, whose SOP loads the visual rules)"));
   assert.ok(l.includes("picked over `code-reviewer` for the judge hop"));
   assert.ok(l.includes("design-armed"));
   assert.ok(l.includes("`design/<feature>.md` has `## Visual Baselines`"));

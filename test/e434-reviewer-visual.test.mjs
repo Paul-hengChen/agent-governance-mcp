@@ -58,7 +58,7 @@ const COPY = {
   crVisualStep:
     "6a. **Visual verdict**: WHEN `design/<feature>.md` declares `## Visual Baselines` → DO read the workspace's `.current/skill-reviewer-visual.md` when it has one, else `<agc install>/content/skill-reviewer-visual.md`, and follow it on the visual checks' output from step 6; it writes `qa_reports/visual_<task-id>.md` and reads an image only for a surface over its threshold → ELSE do not read it.",
   coord05Dispatch:
-    "When dispatching `reviewer-visual` (subagent-dispatch tool or `tw_switch_role`) — picked over `code-reviewer` for the judge hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY",
+    "When dispatching `reviewer-visual` (subagent-dispatch tool only; `tw_switch_role` has no `reviewer-visual` role, so that fallback switches to `code-reviewer`, whose SOP loads the visual rules) — picked over `code-reviewer` for the judge hop when the feature is design-armed and `design/<feature>.md` has `## Visual Baselines` — the brief MAY",
   qaVisualLabel: "**Visual checks**",
   const11Head: "**Visual verdict is reviewer-visual-owned.**",
   const11Measure: "**Measure first, judge over threshold.**",
