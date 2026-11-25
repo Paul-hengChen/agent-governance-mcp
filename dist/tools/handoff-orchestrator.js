@@ -195,8 +195,8 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                 // v7 (c9-protocol-fields AC-4) — structured Amend-Resume field.
                 // Replaces the former next_pending_notes token grep; legacy
                 // `resume_of: <role>` pending_notes lines are inert (DR-2).
-                // Only code-reviewer resumes (E435).
-                next_resume_of: parsed.resume_of === "code-reviewer" ? "code-reviewer" : undefined,
+                // Only code-reviewer resumes: normalised at handler entry.
+                next_resume_of: parsed.resume_of,
                 // v9 — hop-cap inputs (d2-server-brake-accounting). Arms the
                 // HOP_CAP_EXCEEDED override: fires when the feature's persisted
                 // hop_count is at/over cap on a counted role transition that is not
@@ -1119,6 +1119,12 @@ async function handleUpdateStateCore(parsed) {
     // skips zod may omit it. Normalise once so every gate reads a list
     // and omission and [] stay one input class. (E150)
     parsed = { ...parsed, completed_tasks: parsed.completed_tasks ?? [] };
+    // Only code-reviewer resumes; zod rejects any other resume_of, but a
+    // direct caller may pass one. Normalise once so every consumer reads
+    // a stale or empty value exactly as an absent one.
+    if (parsed.resume_of !== "code-reviewer") {
+        parsed = { ...parsed, resume_of: undefined };
+    }
     // Defense-in-depth: zod refine already enforces this on PASS, but a
     // client that bypasses zod still hits this guard. (E431, E435)
     if (parsed.status === "PASS") {
@@ -1296,7 +1302,7 @@ async function handleUpdateStateCore(parsed) {
         // (AC-3): persisted only when set on this write. File-mode only
         // (DR-5): SqliteHandoffStorage.writeState ignores all three.
         nextRole: parsed.next_role,
-        resumeOf: parsed.resume_of === "code-reviewer" ? "code-reviewer" : undefined,
+        resumeOf: parsed.resume_of,
         reviewVerdict: parsed.review_verdict,
         // v8 — dispatch_pins (c14-dispatch-pins). Pass-through only:
         // advisory bookkeeping like next_role (AC-5) — NOT cross-checked
