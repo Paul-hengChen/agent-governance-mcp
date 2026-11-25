@@ -27,3 +27,10 @@ test/e427-ci-wiring.test.mjs | AC14 ci.yml keeps job test on [20, 22], runs Test
 # test/e427-ticket-format-doc.test.mjs — docs/ticket-format.md has no `## Named tests checked in CI` section and its
 # tooling section does not name the checker, adapter or CI step yet (T-E427-05).
 test/e427-ticket-format-doc.test.mjs | AC16 the format doc explains the CI check of named tests in the general part and names the tooling in the closing section
+
+# --- Amendment 2026-11-25 (T-E427-06, qa-engineer) ---
+# History: every entry above was the T-E427-01 red set; all are resolved (green since T-E427-02..05, code-reviewer
+# PASS). They are kept as history, not as current reds; the only current red is the AC18 entry below.
+# test/e427-check-scenario-tests.test.mjs — scripts/check-scenario-tests.mjs prints only adapterInvalid when the
+# adapter import throws; the adapterLoadError line after it is not built yet (T-E427-07).
+test/e427-check-scenario-tests.test.mjs | AC18 an adapter that cannot be imported prints adapterInvalid then adapterLoadError with the reason; a module without readResults prints no adapterLoadError

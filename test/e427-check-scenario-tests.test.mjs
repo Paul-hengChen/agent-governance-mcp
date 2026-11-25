@@ -321,3 +321,34 @@ test("AC13 a missing --results or an unknown option exits 2 with the usage line 
   assert.ok(i >= 0, r2.raw);
   assert.equal(r2.err[i + 1], USAGE, "the usage line follows the unknown-option line");
 });
+
+test("AC18 an adapter that cannot be imported prints adapterInvalid then adapterLoadError with the reason; a module without readResults prints no adapterLoadError", () => {
+  // WHY: a typo in --adapter and a module lacking readResults used to print the same line, so the CI log gave no
+  // clue which one happened (amendment 2026-11-25, R2). The adapterInvalid line stays as it was (AC11's anchored
+  // assertion), and only an import that threw adds the reason line directly after it; exit stays 2 (cannot run).
+  const dir = withResults(workspace([["t18.md", ticket("T18", "done", [["S1", `test ${A} — passing case`]])]]));
+  fs.copyFileSync(path.join(FIXTURES, "no-read-adapter.mjs"), path.join(dir, "no-read-adapter.mjs"));
+  // Written at run time, never tracked: a deliberately unparseable module must not sit in the repo for other tooling.
+  fs.writeFileSync(path.join(dir, "broken-adapter.mjs"), "export function readResults( {\n");
+
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const invalidRe = (name) => new RegExp(`^check-scenario-tests: adapter \\S*${esc(name)} has no readResults function$`);
+  const loadErrorRe = (name) => new RegExp(`^check-scenario-tests: cannot load adapter \\S*${esc(name)}: (.+)$`);
+
+  // A path that does not exist, and a module that exists but does not parse: both are import failures.
+  for (const name of ["missing-adapter.mjs", "broken-adapter.mjs"]) {
+    const r = run(dir, ["--results", "results.xml", "--tickets", "tickets", "--adapter", `./${name}`]);
+    assert.equal(r.code, 2, `${name}: ${r.raw}`);
+    const i = r.err.findIndex((l) => invalidRe(name).test(l));
+    assert.ok(i >= 0, `${name}: the adapterInvalid line is printed unchanged\n${r.raw}`);
+    const m = loadErrorRe(name).exec(r.err[i + 1] ?? "");
+    assert.ok(m, `${name}: the adapterLoadError line directly follows adapterInvalid\n${r.raw}`);
+    assert.ok(m[1].trim().length > 0, `${name}: the reason is non-empty\n${r.raw}`);
+  }
+
+  // The AC11 case: the import succeeds, so there is no load error to report.
+  const r3 = run(dir, ["--results", "results.xml", "--tickets", "tickets", "--adapter", "./no-read-adapter.mjs"]);
+  assert.equal(r3.code, 2, r3.raw);
+  assert.ok(r3.err.some((l) => invalidRe("no-read-adapter.mjs").test(l)), r3.raw);
+  assert.ok(!r3.err.some((l) => l.startsWith(`${P} cannot load adapter `)), `an importable module prints no adapterLoadError\n${r3.raw}`);
+});

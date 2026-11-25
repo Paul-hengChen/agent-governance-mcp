@@ -8,3 +8,5 @@
 {"ts":"2026-11-25T15:46:07.046Z","feature":"e427-ci-scenario-tests","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T15:53:11.310Z","feature":"e427-ci-scenario-tests","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T15:56:44.008Z","feature":"e427-ci-scenario-tests","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T16:01:19.843Z","feature":"e427-ci-scenario-tests","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T16:02:21.310Z","feature":"e427-ci-scenario-tests","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

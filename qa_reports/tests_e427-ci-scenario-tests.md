@@ -26,6 +26,8 @@ covers this scope.
 | AC15 | — (command scenario; judge runs it) | `node scripts/check-scenario-tests.mjs --results /nonexistent/test-results.xml; echo "exit=$?"` → `none` line, `exit=0` |
 | AC16 | `test/e427-ticket-format-doc.test.mjs` | AC16 the format doc explains the CI check of named tests in the general part and names the tooling in the closing section (plus existing `test/e422-ticket-format-doc.test.mjs`, `test/e455-ticket-checker-strict.test.mjs` stay green) |
 | AC17 | — (command scenario; judge runs it) | `node scripts/test-lock.mjs -- npm test` exit 0, `# fail 0`; CI `test (20)` / `test (22)` green |
+| AC18 | `test/e427-check-scenario-tests.test.mjs` | AC18 an adapter that cannot be imported prints adapterInvalid then adapterLoadError with the reason; a module without readResults prints no adapterLoadError |
+| AC19 | — (command scenario; judge runs it) | `node bin/agc-init.mjs check 2>&1 \| grep -E "comments: scripts/(check-scenario-tests\|scenario-results-node)\.mjs" ; echo "matches-exit=$?"` → only `matches-exit=1` |
 
 Fixtures (`test/fixtures/e427/`, never matched by the suite glob `test/*.test.mjs`): `results-basic.xml` (frozen
 Node-junit-shaped results with `classname` = file, per D3), `not-junit.txt`, `fixed-adapter.mjs`,
@@ -67,7 +69,24 @@ asserted valid with `parseTicketFile` before use (except the deliberately malfor
   the new section itself. Tooling section: both script paths, the CI step name, and 0 / 1 / 2 after the checker's
   first mention; it stays the last `## ` section.
 
+- **AC18 (amendment, T-E427-06).** Two import failures are exercised: a path that does not exist
+  (`./missing-adapter.mjs`, the spec's example) and a module that exists but does not parse (`broken-adapter.mjs`,
+  the brief's example). The broken module is written into the per-test temp dir at run time, not tracked under
+  `test/fixtures/e427/`, so no deliberately unparseable file sits in the repo for other tooling to trip on. The
+  `adapterLoadError` `<module>` is matched like `adapterInvalid`'s (`\S*` prefix + file name); `<reason>` is asserted
+  non-empty only (the spec ties it to `reason()`'s cut, which is an implementation detail). "Directly after" is
+  asserted as the next non-empty stderr line after the `adapterInvalid` line. The AC11 no-readResults case is
+  re-run inside AC18 to assert no line starting `check-scenario-tests: cannot load adapter `. AC9/AC11/AC13 tests
+  are unchanged.
+
 ## Red Reasons
+
+### Amendment 2026-11-25 (T-E427-06) — current
+
+- AC18: `scripts/check-scenario-tests.mjs` prints only the `adapterInvalid` line when the adapter import throws; no
+  `adapterLoadError` line follows it — T-E427-07.
+
+### T-E427-01 — resolved (history; green since T-E427-02..05)
 
 - AC1–AC9, AC11–AC13: `scripts/check-scenario-tests.mjs` not built (child process: Cannot find module) — T-E427-03.
 - AC6 additionally: `scripts/scenario-results-node.mjs` not built (ERR_MODULE_NOT_FOUND for the reporter) — T-E427-02.
