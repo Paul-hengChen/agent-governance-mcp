@@ -15,7 +15,7 @@ researcher (optional) → design-auditor (optional) → pm → architect (if com
 ```
 
 qa-engineer writes one test per ticket scenario, sr-engineer builds to those tests, and code-reviewer, the chain's judge, reviews both and writes PASS. Each code-reviewer rejection (`(code-reviewer, FAIL)`) counts once in `review_round`, whichever role it routes to; past the `review_round` cap only pm may take the feature.
-Each sr-engineer return to qa-engineer counts toward the `sr_return` cap, past which only pm may take the feature; a scenario that cannot be built stops to pm (Blocked), never to qa-engineer.
+Each sr-engineer return to qa-engineer counts toward the `sr_return` cap, past which that return is rejected until pm re-enters (file mode only); a scenario that cannot be built stops to pm (Blocked), never to qa-engineer.
 
 Each role finishes with `tw_update_state` whose first-class `next_role` field names the successor role so the coordinator (or human) knows where to route (`pending_notes` stays free-text prose for the next reader — it carries no routing token).
 
