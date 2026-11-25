@@ -157,7 +157,8 @@ export interface HandoffState {
   dispatch_pins?: Partial<Record<AgentName, string>>;
   // Dispatch-mode classification; absence means "feature". PM sets "bugfix"
   // at cut time, which arms REPRO_MANIFEST_MISSING on the sr-engineer →
-  // code-reviewer fix-phase edge and makes QA's expected-red check decisive.
+  // code-reviewer fix-phase edge and makes the judge's Expected-Red Diff
+  // decisive.
   // Feature-scoped, not re-armed on PM re-entry; an explicit PM write can
   // change it. File mode only. It never gates a transition edge itself.
   dispatch_mode?: DispatchMode;

@@ -961,10 +961,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         run: (ctx) => {
             const { parsed, storage, evidenceSchemaPin } = ctx;
             if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
-                // Expected-red diff gate: dormant unless sr-engineer declared
-                // qa_reports/expected-red_<feature>.txt. When armed, at least one
-                // review file for the PASS'd ids (or a covers: file) must have an
-                // `## Expected-Red Diff` section with QA's suite-vs-manifest
+                // Expected-red diff gate: dormant unless the manifest
+                // qa_reports/expected-red_<feature>.txt exists (qa-engineer writes
+                // it with the scenario tests). When armed, at least one judge
+                // report for the PASS'd ids (or a covers: file) must have an
+                // `## Expected-Red Diff` section with the judge's suite-vs-manifest
                 // disposition. Section existence only; the server runs no tests.
                 // File mode only: the manifest is a qa_reports/ file.
                 if (storage instanceof FileHandoffStorage) {
