@@ -749,3 +749,53 @@ test("AC7 no paragraph, bullet or row of the base migration guide is removed", (
   const missing = FROZEN_MIG_UNITS.filter((p) => !doc.includes(norm(p)));
   assert.deepEqual(missing, []);
 });
+
+// ---------------------------------------------------------------------------
+// AC9 (amendment after the PASS): three more comment-only fixes. Resident half only: the old phrases in
+// (a) and (b) are gone and the (b) build-entry comment names qa-engineer. The (c) comment-length scan and
+// the transpileModule invariance are judge-run per the spec's AC9 proof, not resident tests.
+// ---------------------------------------------------------------------------
+
+// All `//` comment text of a file, markers stripped and whitespace-normalised, so a phrase re-wrapped across
+// two comment lines is still found.
+const commentText = (t) =>
+  norm(
+    lines(t)
+      .filter((l) => l.trim().startsWith("//"))
+      .map((l) => l.trim().replace(/^\/\/+/, ""))
+      .join(" "),
+  );
+
+// The `//` block that starts at the line containing `marker` and runs to the first non-comment line.
+const commentBlockAt = (t, marker) => {
+  const ls = lines(t);
+  const start = ls.findIndex((l) => l.trim().startsWith("//") && l.includes(marker));
+  if (start < 0) return null;
+  const out = [];
+  for (let i = start; i < ls.length && ls[i].trim().startsWith("//"); i++) out.push(ls[i].trim().replace(/^\/\/+/, ""));
+  return norm(out.join(" "));
+};
+
+test("AC9 tools/handoff-orchestrator.ts no longer calls the completion-evidence gate a QA gate", () => {
+  // WHY: in the v5 chain the judge (code-reviewer) writes completed_tasks and its evidence lives in the judge
+  // report; a comment that still says "QA completion-evidence gate" / "per-id QA evidence" sends a maintainer
+  // looking for a qa-engineer verdict the chain no longer has.
+  const src = read("tools", "handoff-orchestrator.ts");
+  const comments = commentText(src);
+  for (const phrase of ["QA completion-evidence gate", "per-id QA evidence"]) {
+    assert.ok(!src.includes(phrase), `phrase still in the file: ${phrase}`);
+    assert.ok(!comments.includes(phrase), `phrase still in the comment text (re-wrapped): ${phrase}`);
+  }
+});
+
+test("AC9 gates/visual.ts source-credibility comment names the pm to architect or qa-engineer build entry", () => {
+  // WHY: the build-entry edge is pm -> {architect, qa-engineer}; a comment naming pm -> sr-engineer describes
+  // a hop the transition table no longer has, so a reader would misplace where the gate fires.
+  const src = read("gates", "visual.ts");
+  const old = "pm to architect or sr-engineer hop";
+  assert.ok(!src.includes(old), `old edge still in the file: ${old}`);
+  assert.ok(!commentText(src).includes(old), `old edge still in the comment text (re-wrapped): ${old}`);
+  const block = commentBlockAt(src, "Source-credibility gate");
+  assert.ok(block !== null, "the `Source-credibility gate` comment block exists");
+  assert.ok(block.includes("qa-engineer"), `the source-credibility comment names qa-engineer: ${block}`);
+});

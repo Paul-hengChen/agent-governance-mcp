@@ -45,3 +45,9 @@ test/e423-spec-workshop.test.mjs | AC10: done condition (one verification, devic
 test/e445-spec-workshop-questioning.test.mjs | AC5: step 4 keeps the dated/replacing ruling sentence and follows it with a separate reopen sentence
 test/e445-spec-workshop-questioning.test.mjs | AC6: step 4 marks look-and-feel questions `needs prototype`, defers them, builds none, and ends `not ready to cut` if open
 test/e445-spec-workshop-questioning.test.mjs | AC9: step 5 keeps its three base sentences in order, then the one-time accept-all reminder
+
+# AC9 amendment (qa-engineer, T-E462-10; red at 4620ebc because T-E462-11 is not built yet).
+# AC9 (a): tools/handoff-orchestrator.ts still says `QA completion-evidence gate` and `per-id QA evidence` (~lines 737/739).
+test/e462-stale-comments-wording.test.mjs | AC9 tools/handoff-orchestrator.ts no longer calls the completion-evidence gate a QA gate
+# AC9 (b): gates/visual.ts ~line 862 still says `pm to architect or sr-engineer hop`; the block names no qa-engineer.
+test/e462-stale-comments-wording.test.mjs | AC9 gates/visual.ts source-credibility comment names the pm to architect or qa-engineer build entry

@@ -11,3 +11,5 @@
 {"ts":"2026-11-25T11:01:11.762Z","feature":"e462-stale-comments-wording","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T11:04:48.990Z","feature":"e462-stale-comments-wording","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T11:06:34.931Z","feature":"e462-stale-comments-wording","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T11:07:44.418Z","feature":"e462-stale-comments-wording","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T11:08:02.356Z","feature":"e462-stale-comments-wording","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

@@ -1,10 +1,10 @@
-# Tests — e462-stale-comments-wording (T-E462-01, T-E462-02)
+# Tests — e462-stale-comments-wording (T-E462-01, T-E462-02, T-E462-10)
 
 Author: qa-engineer. Spec: `specs/e462-stale-comments-wording.md` (no ticket file; the spec's Acceptance
 Criteria stand in as the scenarios). Test-file placement: the spec's "Test placement and base reads" names
 one new file, `test/e462-stale-comments-wording.test.mjs`, fixtures inline in temp dirs, imports from
 `dist/` — acted on as written. Red-test manifest: `qa_reports/expected-red_e462-stale-comments-wording.txt`
-(22 entries).
+(22 entries from T-E462-01 / T-E462-02, plus 2 AC9 entries from T-E462-10).
 
 ## Scenario → Test Map
 
@@ -45,6 +45,10 @@ starts `AC<n> ` so the spec's `proof:` patterns (`--test-name-pattern "^AC<n> "`
 | AC7 | `AC7 `## SQLite / HTTP mode` has mig.sqlite_checks immediately followed by mig.review_evidence, no server mix` | red |
 | AC7 | `AC7 no paragraph, bullet or row of the base migration guide is removed` | green (guard) |
 | AC8 | whole suite, `node scripts/test-lock.mjs -- npm test` | command — judge/sr run, no test |
+| AC9 (a) | `AC9 tools/handoff-orchestrator.ts no longer calls the completion-evidence gate a QA gate` | red at `4620ebc` (T-E462-10) |
+| AC9 (b) | `AC9 gates/visual.ts source-credibility comment names the pm to architect or qa-engineer build entry` | red at `4620ebc` (T-E462-10) |
+| AC9 (c) | `gates/expected-red.ts` header ≤ 7 lines (comment-length scan vs `83ca8c0`) | not a resident test — judge-run (spec AC9 `proof:`) |
+| AC9 | transpileModule invariance of the three files vs `4620ebc` | not a resident test — judge-run (spec AC9 `proof:`) |
 
 T-E462-02 re-pins (intent kept, each now red until the implementation lands):
 
@@ -92,6 +96,13 @@ the files the spec lists) are untouched: they are the AC3 "old reports stay read
   split into bullets (plus continuation lines) and rows; each unit, whitespace-normalised, must still occur
   in the whitespace-normalised doc. mig.review_evidence may continue the sqlite_checks paragraph or start
   the next line; the check is on whitespace-normalised text.
+- **AC9 (a)/(b) "no longer contains"** (T-E462-10): checked twice per phrase — in the raw file text and in
+  the file's `//` comment text with markers stripped and whitespace normalised, so the old phrase cannot
+  survive by being re-wrapped across two comment lines.
+- **AC9 (b) "names `qa-engineer`"**: the `//` block that starts at the line containing
+  `Source-credibility gate` and runs to the first non-comment line must contain `qa-engineer` (whitespace
+  normalised, so the edge may wrap). Only `qa-engineer` is pinned, as the spec's proof states; the example
+  wording is not pinned verbatim.
 
 ## Red Reasons
 
@@ -109,6 +120,8 @@ the files the spec lists) are untouched: they are the AC3 "old reports stay read
 - `AC7 ... mig.midline` / `AC7 ... mig.review_evidence` — the guide has neither sentence yet (T-E462-07).
 - e161 AC-E161-2, e236 AC-E236-6, qa-flow `recordReviewInFile creates ...` — re-pinned to `# Review — <id>`; writer not changed yet.
 - e423 AC10, e445 AC5 / AC6 / AC9 — re-pinned to sw.done / sw.reopen; SOP not changed yet.
+- `AC9 tools/handoff-orchestrator.ts no longer calls ... a QA gate` — `QA completion-evidence gate` (~737) and `per-id QA evidence` (~739) still in the comment (T-E462-11).
+- `AC9 gates/visual.ts source-credibility comment names ... qa-engineer ...` — ~862 still says `pm to architect or sr-engineer hop` (T-E462-11).
 
 ## Scratch build check (never committed)
 
@@ -131,6 +144,14 @@ to the worktree; run `node --test --test-name-pattern "^AC5 " test/e462-stale-co
 | last unknown token wins (`if (firstUnknown === null)` → `if (true)`) | `AC5 the first unknown token wins: inline mockup over an H2 N/A`, `AC5 the first unknown token wins: inline N/A over an H2 mockup` (the two prototype tests stay green) | all four green |
 
 code-reviewer re-runs both mutations against sr-engineer's real `gates/visual.ts` build (scratch copy only).
+
+## AC9 Satisfiability Check (T-E462-10, never committed)
+
+The two AC9 tests' bodies were run in a scratch file against in-memory copies of the two source files with
+the spec's example wording applied (`Completion-evidence gate`, `per-id evidence in the judge report`,
+`pm to architect or qa-engineer hop`): 2/2 green. At HEAD (`ac22ed7` tree) both are red and the other 29
+tests in the file stay green (31 tests, 29 pass, 2 fail). No other test in `test/` reads these comment
+phrases (grep). The example wording is not a design for sr-engineer.
 
 ## CI Runnability
 
