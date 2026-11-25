@@ -2,7 +2,7 @@
 base: 166a460    integration branch: integ/pre-v5-w2
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（人類 2026-11-25），待派工。**
+**狀態：已結案 2026-11-25。** e462、e461 依序 `--no-ff` 合進 `integ/pre-v5-w2`（merge `80e5ec5`、`fc9bd93`，兩次皆零衝突、無實質解衝突），merge-invariants 每次 PASS；派工 base `83ca8c0`（清單 PR #186）；integ 自 `main` @ `83ca8c0` 開出；merge 後 build 無 `dist/` 差異、audit exit 0、`agc check` exit 0、`CLAUDE.md` 250 行、`GATE_REGISTRY` 33、pipeline 17 步、`EVIDENCE_SCHEMA_CURRENT` 3。lane 層 CI：e461 run 45597945540 @ `8c1f14e`、e462 run 45605086872 @ `2c469cf`，整合層 CI run 45605774377 @ `fc9bd93`，皆綠（Node 20、22）。Roll-up：e462 11 個 task、hop 8/14、review 退回 0、sr 退回 0（含人類波中加的 AC9：PM 重新進場一次）；e461 8 個 task、hop 4/14、review 退回 0、sr 退回 0；證據 19/19。golden 與 context-budget 未動。2 張票 done-mark（尚未發版，隨 v5.0.0 發出）；pre-v5.0.0 系列 13 張至此全部落地。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out pre-v5.0.0 第 2 波：E461、E462」，2026-11-25）：兩張都要在 v5.0.0 tag 之前落地（人類 2026-11-25 裁定）。票面以 `docs/backlog.md` 的 E461、E462 列為準，含 2026-11-25 複核更正，以及整合者在第 1 波併進 E462 的 (6)(7)；佇列 `docs/v4.0.0-new-tickets.md` 第 272、273 號列。第 1 波（`specs/fanout-pre-v5-w1.md`，PR #185，merge `166a460`）已合進 `main`，`fanout.mjs handoff --check` exit 0（0 DIFF、3 MOVED）。
 
@@ -124,3 +124,21 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-25 | 人類 | e462 第一次 lane 報告（to-integrator#6，HEAD `4620ebc`，lane 層 CI run 45600784645 綠）之後，reviewer 列為 optional／recommended 的三項也要在 e462 修：`tools/handoff-orchestrator.ts` completion-evidence 註解的 QA 說法、`gates/visual.ts` source-credibility 註解的舊 build-entry 邊、`gates/expected-red.ts` 標頭註解換行（`agc check` 註解長度提醒）。整合者轉成 AC9 送回 e462（to-lane#3、#4），只限註解 | 整合者 session（「那兩處舊註解也順手修掉」「expected-red 那項也一起修」） |
 | 2026-11-25 | 整合者 | e462 AC9 修訂 cut（to-integrator#7，spec @ `db08c85`，T-E462-10 qa、T-E462-11 sr）`close`（to-lane#5），依 manifest tier 自動核准。e462 lane 報告（to-integrator#8，取代 #6）驗證通過：HEAD `2c469cf`（22 commits）、worktree 乾淨、build 後 `dist/` 無差異、`check --base main` 56 檔 0 越界、證據 11/11（`review_reports/review_T-E462-01.md` covers 01..09、`review_reports/review_T-E462-10.md` covers 10..11，皆 APPROVED；`qa_reports/review_T-E462-01..11.md` 最後一筆伺服器 PASS）、共用生成物（golden、context-budget）未動、無新發現；lane 層 CI run 45605086872 @ `2c469cf` 綠；review 退回 0、hop 8/14；`close`（to-lane#6） | e462 信箱 to-integrator#8 |
 | 2026-11-25 | 整合者 | 整合：`integ/pre-v5-w2` 自 `main` @ `83ca8c0` 開出，依序 `--no-ff` 合 e462（merge `80e5ec5`）、e461（merge `fc9bd93`），兩次皆零衝突、無實質解衝突，merge-invariants 每次 PASS；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`GATE_REGISTRY` 33、pipeline 17 步、`EVIDENCE_SCHEMA_CURRENT` 3、`CLAUDE.md` 250 行；整合層 CI run 45605774377 @ `fc9bd93` 綠（Node 20、22） | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 83ca8c0
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/pre-v5-w2 @ 4e63a16）
+- lane-status：primary（main ← integ/pre-v5-w2 @ 4e63a16）release-cd-v5.0.0／PASS／code-reviewer，hop 4，commits 0，clean
+### 已結案
+- 第 2 波兩條 lane（e462、e461）全部合進 `integ/pre-v5-w2`、finish、拆除；E461、E462 done-mark，尚未發版。lane 紀錄在 `.current/history/2026-11/{e462,e461}/`。兩條 lane 都沒有未配號的新發現。pre-v5.0.0 系列 13 張（E448、E451–E462）全部落地。
+- 未開票的 reviewer／QA 建議（列出、不開票）：`gates/expected-red.ts` 第 6 行合併後 82 欄（外觀）；設計 mode 回報的 40 字截斷可能切開 surrogate pair（只影響顯示）；e461 配對規則的否定詞判斷可能遮掉同子句的違規句（cut 已接受的限制）；e419 完整報告案例的 early-return 字串寫死、boundary 測試綁 zod issue 數 1。
+- e462 改了 server 程式：合併進 `main` 後要重啟 primary 的 MCP server，下一次 `tw_*` 才跑新規則（新報告標題 `# Review — <id>`、未知 design mode 回報原文）。
+### 待人類決定
+- v5.0.0 何時發版：`release-cd-v5.0.0` 的發版驗證（PASS @ `bb28ef6`）只涵蓋九張，13 張 pre-v5 票都不在內，要在新的 `main` 重做並更新 CHANGELOG（`[Unreleased]` 目前寫九張）；上次 code-reviewer 的兩項建議（AC3 的 `gh run view --json attempt` 在 gh 2.29.0 不支援、AC6 預期長度寫錯）可一併修。
+- `cutApprovalAutoTier.manifest` 是否保留為 true（第 1、2 波都用它自動核准）。
+### 進行中的背景工作
+無
