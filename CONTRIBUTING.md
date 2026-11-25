@@ -35,7 +35,7 @@ index.ts                  # MCP server entry (~300 lines): wiring only —
                           #   resolves the workspace path, picks a transport
 tools/
   registry.ts             #   TOOL_REGISTRY + PROMPT_REGISTRY — add tools HERE
-  handoff-orchestrator.ts #   tw_update_state / tw_get_state + the 18-step
+  handoff-orchestrator.ts #   tw_update_state / tw_get_state + the 17-step
                           #     UPDATE_STATE_GATE_PIPELINE
   handoff.ts              #   read/write .current/handoff.md (uses js-yaml)
   handoff-parse.ts        #   YAML/markdown parsing
@@ -61,7 +61,7 @@ tools/
   rag.ts                  #   PRD chunking + embeddings (SQLite mode)
   rag-coalesce.ts         #   shared _indexingInFlight registry
 gates/                    # one module per gate predicate (14 files)
-  registry.ts             #   GATE_REGISTRY — 35 gate definitions
+  registry.ts             #   GATE_REGISTRY — 33 gate definitions
   pipeline.ts             #   runUpdateStatePipeline() step runner
   {cut-approval,scope-decision,feature-lease,external-refs,
    code-review,qa-review,evidence-schema,visual,expected-red,
@@ -95,7 +95,7 @@ bin/                      # agc-init.mjs (agc init/check), SessionStart hook
 templates/
   agent-adapters/         #   CLAUDE.md / AGENTS.md / .antigravityrules stubs
   claude-code-agents/     #   12 model-pinned Claude Code subagent templates
-test/                     # 87 test files (node --test) + eval/ harness
+test/                     # node --test suites + eval/ harness
 dist/                     # compiled JS (committed for npx remote usage)
 specs/                    # design docs (qa-flow, rag-lifecycle, schema-versioning, …)
 docs/                     # user-facing docs + backlog
@@ -137,7 +137,7 @@ second.** Flipping the repo to private *before* removing the files is what kept 
 
 1. **Prompts** — thin wrappers around `prompts/build.ts`, which composes the constitution from `content/const-*.md` (15 fragments, selected per dispatch mode by `prompts/constitution-manifest.ts`) + the role SOP + live handoff state, then applies text-transform passes for size. 13 prompts registered.
 2. **Tools** — twelve `tw_*` tools declared in `tools/registry.ts` that read/write `.current/handoff.md`, `tasks.md`, and (HTTP/SQLite mode) PRD-derived RAG chunks.
-3. **Guards + gates** — `guards/session.ts` (pre-flight check) and `guards/file-lock.ts` (O_EXCL lock + mtime freshness), then the 18-step `UPDATE_STATE_GATE_PIPELINE` in `tools/handoff-orchestrator.ts` with predicates under `gates/`.
+3. **Guards + gates** — `guards/session.ts` (pre-flight check) and `guards/file-lock.ts` (O_EXCL lock + mtime freshness), then the 17-step `UPDATE_STATE_GATE_PIPELINE` in `tools/handoff-orchestrator.ts` with predicates under `gates/`.
 
 Mutating tools (`writeHandoffState`, `completeTask`, `rollbackTask`) MUST:
 1. Acquire `withFileLock` on a sibling `.lock` path.
@@ -249,7 +249,7 @@ node -e "..."  # spawn dist/index.js, send initialize, expect "online" on stderr
 node --input-type=module -e "import { writeHandoffState, parseHandoff } from './dist/tools/handoff.js'; ..."
 ```
 
-`test/` holds 87 test files covering guards, transitions and round caps, every gate in `GATE_REGISTRY`, drift and sync, schema migrations, prompt composition and context budget, the agc adapters, and RAG. `test/eval/` is a separate behavioural eval harness (`npm run eval`). New behaviour needs a test; bug fixes need a regression test.
+`test/` holds the `node --test` suites covering guards, transitions and round caps, every gate in `GATE_REGISTRY`, drift and sync, schema migrations, prompt composition and context budget, the agc adapters, and RAG. `test/eval/` is a separate behavioural eval harness (`npm run eval`). New behaviour needs a test; bug fixes need a regression test.
 
 ---
 
