@@ -81,7 +81,10 @@ All four drive the real tool entry (`TOOL_REGISTRY` `tw_update_state` `.run`, fi
 ### E461 (9a) — `scripts/smoke-qa-flow.mjs`
 
 - **AC16** — Given the smoke's "qa-engineer PASS rejected" probe (base lines ~103–115), when the server rejects the qa-engineer PASS, then the probe records `[PASS]` only when the text carries the tool-boundary judge rejection `status="PASS" requires agent_id="code-reviewer": code-reviewer is the judge` and the write did not succeed; any other failure (including the orchestrator's defence-in-depth `BLOCKED … reserved for code-reviewer` or a `TRANSITION_REJECTED` whose text names code-reviewer) records `[FAIL]`. Mutation M9a: `dist/tools/registry.js` `if (d.status === "PASS" && d.agent_id !== "code-reviewer") {` → `if (false) {` — on base the probe still prints `[PASS]` (the orchestrator's message names code-reviewer); on the branch it prints `[FAIL]`.
-  proof: `node scripts/smoke-qa-flow.mjs`, the `qa-engineer PASS rejected` line: `[PASS]` on the branch, `[FAIL]` under M9a. (The smoke's overall exit code is not the proof: see *Findings for the integrator*.)
+  The matched prefix is `PASS_IDENTITY_REFINE_MESSAGE` / `QA_PASS_REFINE_MESSAGE` in `tools/transitions.ts` (~347–349, code, not a comment; e462 does not change it), so matching on it is stable across the e462 merge.
+  proof: `node scripts/smoke-qa-flow.mjs`: on the branch the `qa-engineer PASS rejected` line is `[PASS]` and the run exits 0 (with AC18); under M9a that line is `[FAIL]` and the run exits 1.
+- **AC18** — Given the smoke's last probe ("code-reviewer PASS with qa_review accepted + evidence file written"), when it runs, then it is accepted: before that probe the smoke seeds `review_reports/review_X1.md` in its temp workspace (the file-mode judge PASS evidence; `MISSING_REVIEW_EVIDENCE` checks only that the file exists, PM-verified: a two-line markdown file suffices), so the smoke prints `12/12 smoke tests passed.` and exits 0. Base: `11/12`, exit 1 (the probe is rejected `MISSING_REVIEW_EVIDENCE`). The probe's own check (success + `qa_reports/review_X1.md` written from `qa_review`) is unchanged.
+  proof: `node scripts/smoke-qa-flow.mjs; echo "exit=$?"` on the branch prints `12/12 smoke tests passed.` and `exit=0` (base: `11/12`, `exit=1`).
 
 ### Lane-wide
 
@@ -113,7 +116,6 @@ All four drive the real tool entry (`TOOL_REGISTRY` `tw_update_state` `.run`, fi
 - Assertions that read the source text of an e462-owned file (`tools/handoff-orchestrator.ts`, `tools/handoff-types.ts`, `tools/transitions.ts`, `gates/registry.ts` comments and the rest of the e462 row).
 - `test/e431-test-first-server-path.test.mjs` (owned by e462), `test/handoff-migration.test.mjs` and `test/rag-lifecycle.test.mjs` (not named: the new tests do not need them).
 - The orchestrator's own PASS judge check (already caught by four tests, per the ticket's closing note).
-- The smoke's base failure in its last probe (see *Findings for the integrator*).
 
 ## Dependencies / Prerequisites
 
@@ -121,6 +123,7 @@ All four drive the real tool entry (`TOOL_REGISTRY` `tw_update_state` `.run`, fi
 - If the pairing rule finds a real violation in current served text, qa stops and mails the integrator (content is not this lane's; manifest 讀對方檔案文字 row). PM probe found none on base.
 - Node 20 and 22 (CI matrix): any base text a test compares against is read into memory at capture time; no test reads a temp directory again after the fact; no `git show` (the T-E77-02 meta-test blocks it). The new tests read only live files and temp workspaces.
 - SQLite binding: AC8 and e435 AC9 skip with a visible reason when `better-sqlite3` cannot load.
+- Integrator pre-review (to-lane#1, 2026-11-25): accepted; the smoke's base failure (last probe rejected `MISSING_REVIEW_EVIDENCE`, 11/12, exit 1) is folded into this lane as AC18 (integrator's option (a)). The amendment also edited the unchecked T-E461-04 and T-E461-08 descriptions in `.current/e461/tasks.md` in place (cut-amender exemption).
 - No design source (mode no-design). No external references (Resource Audit: the ticket and the manifest cite only repo paths).
 
 ## Gate Summary
@@ -143,15 +146,11 @@ manifest-tier: no option choice, no needs-human-ruling item
 
 **Mutation probe** (PM, throwaway copies of `dist/` + `content/` under the PM scratchpad, never the worktree): M1a appended to const-06 → the pairing rule finds 1 violation in each of the five composed prompts (0 on base); M1b in the qa SOP → 1 violation (0 on base); M2a → `sr_return_count` 3 (base 1); M2b → `SR_RETURN_CAP_EXCEEDED` (base accepted); M2c → healed v17 file has no `sr_return_count` and the third return is accepted (base: kept, rejected); M2d → `qa-engineer:In_Progress` loses the "only legal if the next write opens a new feature" annotation at count 2; M4 → the chunk survives the code-reviewer PASS (base: `getPrdIndexMeta` null); M6b → a plain `Error` naming the retired code is thrown instead of the `ZodError` (base test still passes); M9a → the smoke's qa PASS line still prints `[PASS]` with the orchestrator's `BLOCKED … reserved for code-reviewer` text. M1c, M1d, M5, M6a, M7a, M7b follow the ticket's re-check (each survives today's suite).
 
-## Findings for the integrator (not in this cut)
-
-- `scripts/smoke-qa-flow.mjs` already fails on base: its last probe ("code-reviewer PASS with qa_review accepted + evidence file written") is rejected `MISSING_REVIEW_EVIDENCE` (a file-mode code-reviewer PASS now needs `review_reports/review_<id>.md`), so the smoke prints `11/12` and exits 1 on base. The smoke is in this lane's owned set but the fix is not an E461 item; the cut leaves it alone and AC16 is judged on its own probe line. Fold-in (seed `review_reports/review_X1.md` before that probe) is the integrator's call.
-
 ## Cut
 
 | id | desc | depends_on | est. files | touches | design-link |
 |---|---|---|---|---|---|
-| E461 | mutation-verified test gaps except (3): AC1/AC3/AC4 pairing rule + qa step 7 `next_role` + sr return-route status; `CLAUDE.md` line pin removed; four `sr_return` mutation tests and the SQLite RAG judge-PASS cleanup test in a new file; e435 AC4 migration drop; e419 full drift report + exact boundary rejection; e422 README case + word boundary; smoke accepts only the judge rejection | — | 5 tests + 1 new test + 1 script | `test/e433-test-first-rules.test.mjs`、`test/e435-remove-old-path.test.mjs`、`test/e419-retired-write-mechanisms.test.mjs`、`test/e422-*.test.mjs`、`test/e461-*.test.mjs`、`scripts/smoke-qa-flow.mjs` | — |
+| E461 | mutation-verified test gaps except (3): AC1/AC3/AC4 pairing rule + qa step 7 `next_role` + sr return-route status; `CLAUDE.md` line pin removed; four `sr_return` mutation tests and the SQLite RAG judge-PASS cleanup test in a new file; e435 AC4 migration drop; e419 full drift report + exact boundary rejection; e422 README case + word boundary; smoke accepts only the judge rejection and seeds the judge's review evidence before its last probe (12/12, exit 0) | — | 5 tests + 1 new test + 1 script | `test/e433-test-first-rules.test.mjs`、`test/e435-remove-old-path.test.mjs`、`test/e419-retired-write-mechanisms.test.mjs`、`test/e422-*.test.mjs`、`test/e461-*.test.mjs`、`scripts/smoke-qa-flow.mjs` | — |
 
 ## Test placement (fixed for qa)
 
@@ -164,6 +163,7 @@ manifest-tier: no option choice, no needs-human-ruling item
 | (6) | AC11, AC12 | `test/e419-retired-write-mechanisms.test.mjs` |
 | (7) | AC13, AC14 | `test/e422-ticket-file.test.mjs` (the only e422 file touched) |
 | (9a) | AC16 | `scripts/smoke-qa-flow.mjs` |
+| smoke base failure (integrator fold-in, to-lane#1) | AC18 | `scripts/smoke-qa-flow.mjs` |
 
 ## Tasks
 
@@ -172,11 +172,11 @@ Order: qa T-01 … T-04 → sr T-05 … T-08 → code-reviewer judges every id a
 - [ ] T-E461-01 [P0] qa-engineer: `test/e433-test-first-rules.test.mjs` — pairing rule in AC1 (replaces the keyword filter), qa SOP pairing + step 7 `next_role` in AC3, return-route 1 status in AC4, remove the `CLAUDE.md` 250-line assertion in AC12; base green, each of M1a–M1d red; test report section | AC1, AC2, AC3, AC15 | depends_on: none
 - [ ] T-E461-02 [P0] qa-engineer: new `test/e461-*.test.mjs` — AC4–AC7 (`sr_return`, one test per mutation M2a–M2d) and AC8 (SQLite RAG cleanup, skip with reason without the binding) | AC4–AC8, AC10 | depends_on: none
 - [ ] T-E461-03 [P0] qa-engineer: `test/e435-remove-old-path.test.mjs` AC4 (M5), `test/e419-retired-write-mechanisms.test.mjs` AC8 full report + exact boundary rejection (M6a, M6b), `test/e422-ticket-file.test.mjs` README case + word boundary (M7a, M7b) | AC9, AC10, AC11, AC12, AC13, AC14 | depends_on: none
-- [ ] T-E461-04 [P0] qa-engineer: `scripts/smoke-qa-flow.mjs` qa PASS probe (M9a); `qa_reports/expected-red_e461-mutation-test-gaps.txt` with zero entries; `qa_reports/tests_e461-mutation-test-gaps.md` listing every mutation and its observed red/green | AC16, AC17 | depends_on: T-E461-01, T-E461-02, T-E461-03
+- [ ] T-E461-04 [P0] qa-engineer: `scripts/smoke-qa-flow.mjs` qa PASS probe (M9a) and `review_reports/review_X1.md` seeded before the last probe (12/12, exit 0); `qa_reports/expected-red_e461-mutation-test-gaps.txt` with zero entries; `qa_reports/tests_e461-mutation-test-gaps.md` listing every mutation and its observed red/green | AC16, AC17, AC18 | depends_on: T-E461-01, T-E461-02, T-E461-03
 - [ ] T-E461-05 [P0] sr-engineer: confirm nothing to build for AC1–AC3, AC15 (no source / content change needed; the qa tests are green on the unchanged source); run `test/e433-test-first-rules.test.mjs` | AC1, AC2, AC3, AC15 | depends_on: T-E461-04
 - [ ] T-E461-06 [P0] sr-engineer: confirm nothing to build for AC4–AC8, AC10; run the new e461 file | AC4–AC8, AC10 | depends_on: T-E461-04
 - [ ] T-E461-07 [P0] sr-engineer: confirm nothing to build for AC9–AC14; run the e435, e419, e422 files | AC9–AC14 | depends_on: T-E461-04
-- [ ] T-E461-08 [P0] sr-engineer, last: run `node scripts/smoke-qa-flow.mjs` (AC16 line) and the full suite on a clean tree, confirm the manifest still lists zero reds and `git diff --name-only 83ca8c0..HEAD` stays inside the Cut `touches`; hand off to code-reviewer | AC16, AC17 | depends_on: T-E461-05, T-E461-06, T-E461-07
+- [ ] T-E461-08 [P0] sr-engineer, last: run `node scripts/smoke-qa-flow.mjs` (AC16 line; AC18: 12/12, exit 0) and the full suite on a clean tree, confirm the manifest still lists zero reds and `git diff --name-only 83ca8c0..HEAD` stays inside the Cut `touches`; hand off to code-reviewer | AC16, AC17, AC18 | depends_on: T-E461-05, T-E461-06, T-E461-07
 
 ### Task Budget Map
 
@@ -185,4 +185,4 @@ Order: qa T-01 … T-04 → sr T-05 … T-08 → code-reviewer judges every id a
 | T-E461-05 | sr | 0 (run only) | 0 |
 | T-E461-06 | sr | 0 (run only) | 0 |
 | T-E461-07 | sr | 0 (run only) | 0 |
-| T-E461-08 | sr | 0 (run only) | 0 |
+| T-E461-08 | sr | 0 (run only: full suite + smoke, AC16/AC17/AC18) | 0 |
