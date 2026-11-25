@@ -86,9 +86,17 @@ function isKnownStatus(text: string): boolean {
   return text === "not started" || text === "done" || STOPPED_RE.test(text);
 }
 
-function asTextList(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  return value.every((v) => typeof v === "string" && v.trim().length > 0) ? (value as string[]) : null;
+/**
+ * Returns a list field's entries when every one is non-blank text; otherwise
+ * reports each non-text or blank entry by its 1-based position and returns null.
+ */
+function checkListEntries(name: string, list: readonly unknown[], problems: string[]): string[] | null {
+  const before = problems.length;
+  list.forEach((entry, i) => {
+    if (typeof entry !== "string") problems.push(`field "${name}" entry ${i + 1} is not text`);
+    else if (entry.trim() === "") problems.push(`field "${name}" entry ${i + 1} is empty`);
+  });
+  return problems.length === before ? (list as string[]) : null;
 }
 
 function checkFields(block: Record<string, unknown>, problems: string[]): Record<string, string | string[]> {
@@ -103,15 +111,20 @@ function checkFields(block: Record<string, unknown>, problems: string[]): Record
     if (blank || (def.kind === "path-list" && Array.isArray(value) && value.length === 0)) {
       if (def.required) problems.push(`missing field "${def.name}"`);
     } else if (def.kind === "id-list" || def.kind === "path-list" || def.kind === "source") {
-      const list = def.kind === "source" && typeof value === "string" ? [value] : asTextList(value);
+      const isList = Array.isArray(value);
+      const list = isList
+        ? checkListEntries(def.name, value, problems)
+        : def.kind === "source" && typeof value === "string" ? [value] : null;
       const bad = def.kind === "source" && list !== null ? list.filter((e) => !SOURCE_ENTRY_RE.test(e.trim())) : [];
       for (const e of bad) problems.push(`source entry "${e}" is not "<number> rev <revision>"`);
-      if (list === null) problems.push(`field "${def.name}" must be a list`);
-      else if (bad.length === 0) fields[def.name] = list;
+      if (list === null && !isList) problems.push(`field "${def.name}" must be a list`);
+      else if (list !== null && bad.length === 0) fields[def.name] = list;
     } else if (typeof value !== "string") {
       problems.push(`field "${def.name}" must be text`);
     } else if (def.kind === "status" && !isKnownStatus(value.trim())) {
       problems.push(`unknown status "${value.trim()}" (expected not started, done, or stopped — <reason>)`);
+    } else if (def.kind === "yes-no" && value.trim() !== "yes" && value.trim() !== "no") {
+      problems.push(`field "${def.name}" must be yes or no, not "${value.trim()}"`);
     } else {
       fields[def.name] = value.trim();
     }
