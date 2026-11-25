@@ -140,6 +140,37 @@ The project's backlog stays the index of all work. A backlog entry for a ticket 
 at it by the ticket file's path relative to the repository root. Older backlog entries without a ticket file
 are not converted.
 
+## Named tests checked in CI
+
+A project may check, on every push and pull request, that the tests its finished tickets name exist and
+passed, using the test runner's own result file rather than anyone's report. The check reads every ticket
+whose status is `done`; `not started` and `stopped — <reason>` tickets are not checked, since their tests may
+not exist yet. Within a `done` ticket it checks only scenarios verified by
+`Verification: test <test file path> — <test title>`. An unnamed `automated test`, a `command` and a
+`device-or-person` verification are out of scope: they name no test to look up.
+
+A named test is found when both halves match one test in the result file:
+
+- the test file path equals the file the runner recorded for the test, relative to the repository root
+  (a leading `./` is ignored);
+- the test title equals the test's full nested title: the names of its enclosing groups (for example
+  `describe` blocks, or a parent test that holds subtests), from the file's top level down to the test itself,
+  joined by ` > ` (a space, `>` and a space). A test at the top level of its file has its own name as full
+  nested title. Case and spaces count. A name that resolves to a group matches the group as a whole.
+
+The check fails for a named test that is not found, was skipped (a todo test counts as skipped) or failed,
+and for a `done` ticket whose own format has problems. When no `done` ticket names a test, it passes without
+reading the result file.
+
+Another project that uses a different test runner supplies one function, `readResults(resultsPath)`. It reads
+the runner's result file at `resultsPath` and returns a list with one entry per test (and per group), each an
+object `{ file, title, status }`: `file` is the test file path as described above, `title` the full nested
+title, and `status` one of `passed`, `failed` or `skipped`. When the same test appears more than once, the
+worst status counts: failed, then skipped, then passed.
+
+Renaming a test that a `done` ticket names makes the check report it as not found. A change that renames such
+a test therefore updates the ticket's verification line in the same change.
+
 ## Example ticket
 
 ```markdown
@@ -201,3 +232,14 @@ checks ticket files against this format. With no argument it checks every `.md` 
 ticket directory, except `README.md`; the directory is the `ticketDir` key of `.current/.config.json`, default
 `docs/tickets`. It prints one line per problem, or `check-tickets: ok <file> (<n> scenarios)` per valid file,
 then a summary line. Exit status: 0 when every file is valid, 1 when any problem is found, 2 when it cannot run.
+
+The CI check of named tests is `node scripts/check-scenario-tests.mjs --results <file> [--tickets <dir>]
+[--adapter <module>]`. It reads the same ticket directory, and reads the results through the default adapter
+`scripts/scenario-results-node.mjs`, whose `readResults` reads Node's JUnit output; `--adapter` loads another
+module that exports `readResults`, resolved from the working directory. The same file is also a Node test
+reporter that writes that JUnit output with each test's file recorded. In `.github/workflows/ci.yml` the
+`Test` step runs the suite with that reporter writing `$RUNNER_TEMP/test-results.xml`, and the next step,
+`Check ticket scenario tests`, runs the checker on it even when `Test` failed. It prints one line per problem
+naming the ticket id, scenario id and test, then a summary line. Exit status: 0 when every named test of every
+`done` ticket passed or there is none, 1 when any problem is found, 2 when it cannot run (usage error,
+unreadable ticket directory, unreadable or unparseable results, adapter without `readResults`).
