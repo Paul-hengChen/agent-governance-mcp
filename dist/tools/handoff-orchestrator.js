@@ -666,13 +666,12 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         run: (ctx) => {
             const { parsed, storage, prevState } = ctx;
             const { judge, dir: judgeReportDir } = resolveJudgeReport(parsed.workspace_path);
-            // QA completion-evidence gate: a write by the judge
-            // (code-reviewer, E432/E435) whose
-            // completed_tasks adds ids not in the on-disk set needs per-id QA evidence on disk
-            // (hasEvidenceInFile: a per-id file or a covers: line), whatever the
-            // status. Ids already on disk need none. Runs after the qa_review record,
-            // so a write's own review counts. No exemptions and no prevState guard;
-            // other identities belong to the gate above. File mode only.
+            // Completion-evidence gate: a write by the judge (code-reviewer) whose completed_tasks
+            // adds ids not in the on-disk set needs per-id evidence in the judge report on disk
+            // (hasEvidenceInFile: a per-id file or a covers: line), whatever the status. Ids
+            // already on disk need none. Runs after the qa_review record, so a write's own review
+            // counts. No exemptions and no prevState guard; other identities belong to the gate
+            // above. File mode only.
             // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — QA_COMPLETION_EVIDENCE_MISSING".
             if (storage instanceof FileHandoffStorage &&
                 parsed.agent_id === judge &&

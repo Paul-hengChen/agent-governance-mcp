@@ -3,8 +3,7 @@
 // in qa_reports/expected-red_<feature>.txt (`<test file> | <test name>` per
 // line); the judge records its diff against the suite run under a
 // `## Expected-Red Diff` H2 in the judge report. Existence only: the manifest
-// arms, the H2 clears; rows are never parsed and tests never run. File mode
-// only.
+// arms, the H2 clears; rows are never parsed and tests never run. File mode only.
 // Spec: specs/c15-expected-red-manifest.md.
 import * as fs from "fs";
 import * as path from "path";

@@ -700,7 +700,7 @@ export function checkBaselineManifest(workspacePath, activeFeature) {
     return { ok: true, code: null, detail: "", designPath, auditedCount };
 }
 // ---------- Source-credibility gate ----------
-// Build-entry gate on the pm to architect or sr-engineer hop: every audited
+// Build-entry gate on the pm to architect or qa-engineer hop: every audited
 // `## Source` row of a fetch-based design must carry
 // `credibility: full-page-composite`, proving the design-auditor's step-2b
 // classification ran. Reuses parseBaselineManifestRows, so the table is read once.
