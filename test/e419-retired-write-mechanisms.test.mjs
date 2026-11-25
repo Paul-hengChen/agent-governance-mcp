@@ -122,6 +122,30 @@ test("AC8: the drift report has no stampAdvisory key, on a hand-written-stamp ha
   assert.equal("stampAdvisory" in JSON.parse(detectDrift(empty)), false);
 });
 
+test("AC8: the full drift report (handoff and task list both present) has no stampAdvisory key", async () => {
+  // The early-return reports above never reach the final report object; this case does, so a stamp
+  // advisory re-added there is caught.
+  const ws = mkWs("e419-ac8c-");
+  await seed(ws, "e419-feat", HAND_WRITTEN_STAMP);
+  const addTask = TOOL_REGISTRY.find((t) => t.name === "tw_add_task");
+  resetSession(ws);
+  markStateRead(ws);
+  const added = await addTask.run({ workspace_path: ws, task_id: "T-E419-1", description: "seeded task" });
+  assert.ok(!added.isError, `task seeded: ${added.content?.[0]?.text}`);
+  const report = JSON.parse(detectDrift(ws));
+  const earlyReturns = [
+    "No handoff state or task list found. Fresh project.",
+    "Task list exists but handoff state is missing. State was never initialized.",
+    "Handoff state exists but no task list found. Likely vibe-coding only mode.",
+  ];
+  assert.ok(!report.details.some((d) => earlyReturns.includes(d)), `full report, not an early return: ${report.details}`);
+  assert.ok(
+    [...report.tasksIncomplete, ...report.tasksCompleted].includes("T-E419-1"),
+    `the full report lists the seeded task: ${JSON.stringify(report)}`,
+  );
+  assert.equal("stampAdvisory" in report, false);
+});
+
 test("AC8: the tw_detect_drift description does not name stampAdvisory", () => {
   const drift = TOOL_REGISTRY.find((t) => t.name === "tw_detect_drift");
   assert.doesNotMatch(drift.description, /stampAdvisory/);
@@ -130,12 +154,19 @@ test("AC8: the tw_detect_drift description does not name stampAdvisory", () => {
 test("boundary: an empty active_feature on a stale bookkeeping_write is still validated normally (no silent acceptance)", async () => {
   const ws = mkWs("e419-bound-");
   await seed(ws, "e419-feat", SAFE_SEED_STAMP);
-  let rejected = false;
+  // Only the tool-boundary schema rejection of active_feature counts: any other throw or error result
+  // (e.g. a retired bookkeeping code coming back) means the empty feature was handled by something else.
+  let caught = null;
+  let result = null;
   try {
-    const r = await write(ws, { active_feature: "", bookkeeping_write: true });
-    rejected = Boolean(r.isError);
-  } catch {
-    rejected = true;
+    result = await write(ws, { active_feature: "", bookkeeping_write: true });
+  } catch (err) {
+    caught = err;
   }
-  assert.ok(rejected, "an invalid payload must not be rescued by the dropped key");
+  assert.equal(result, null, `expected a schema rejection, got a result: ${result?.content?.[0]?.text}`);
+  assert.ok(caught, "an invalid payload must not be rescued by the dropped key");
+  assert.equal(caught.name, "ZodError", `rejected by the schema, not another error: ${caught.message}`);
+  assert.equal(caught.issues.length, 1, `one schema issue: ${caught.message}`);
+  assert.deepEqual(caught.issues[0].path, ["active_feature"], "the issue is on active_feature");
+  assert.equal(caught.issues[0].code, "too_small", "the issue is the min-length check");
 });

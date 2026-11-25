@@ -179,6 +179,14 @@ test("AC3 the field name id is not forbidden even though agent_id contains the w
   assert.deepEqual(parseTicketFile(ticket()).problems, []);
 });
 
+test("AC3 forbidden names match whole words: a rounding field is unknown, not forbidden", () => {
+  // WHY: round is listed, rounding is a different word; a substring match would refuse ordinary names.
+  const r = checkText(ticket({ fields: { rounding: "x" } }));
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /unknown field "rounding"/);
+  assert.doesNotMatch(r.out, /forbidden field name "rounding"/);
+});
+
 test("AC3 the forbidden list holds the seven documented names in order", () => {
   assert.deepEqual(
     [...FORBIDDEN_FIELD_NAMES],
@@ -413,6 +421,16 @@ test("AC10 the readme exclusion ignores case and the listing does not recurse in
   fs.writeFileSync(path.join(ws, "docs/tickets/sub/deep.md"), "not a ticket");
   const r = check([], ws);
   assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /1 file\(s\)/);
+});
+
+test("AC10 the readme exclusion ignores case for a name the .md filter keeps (ReadMe.md)", () => {
+  // WHY: ReadMe.md ends in .md, so only the case-insensitive README check keeps it out of the listing.
+  // One README spelling per directory: case-folding file systems would merge two spellings into one file.
+  const ws = workspaceWithTickets({ "ReadMe.md": "# not a ticket\n", "t.md": ticket() });
+  const r = check([], ws);
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /ReadMe\.md/);
   assert.match(r.out, /1 file\(s\)/);
 });
 

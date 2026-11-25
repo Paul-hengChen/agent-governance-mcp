@@ -100,7 +100,9 @@ async function main() {
     t.slice(0, 120),
   );
 
-  // Test 3: PASS by qa-engineer rejected — code-reviewer is the only judge
+  // Test 3: PASS by qa-engineer rejected at the tool boundary — code-reviewer is the only judge.
+  // Only the boundary's judge rejection counts: another failure that merely names code-reviewer
+  // (a later defence-in-depth check, a transition rejection) means the boundary check is gone.
   r = await callTool("tw_update_state", {
     workspace_path: ws,
     active_feature: "smoke",
@@ -109,8 +111,9 @@ async function main() {
   });
   t = textOf(r);
   record(
-    "qa-engineer PASS rejected, judge named",
-    !t.includes('"success":true') && t.includes("code-reviewer"),
+    "qa-engineer PASS rejected at the tool boundary, judge named",
+    !t.includes('"success":true') &&
+      t.includes('status="PASS" requires agent_id="code-reviewer": code-reviewer is the judge'),
     t.slice(0, 160),
   );
 
@@ -208,7 +211,10 @@ async function main() {
     t.slice(0, 160),
   );
 
-  // Test 12: same PASS with qa_review → server auto-records evidence and accepts
+  // Test 12: same PASS with qa_review → server auto-records evidence and accepts.
+  // A file-mode judge PASS also needs the code-reviewer's own review file; seed it as the judge would.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "review_reports", "review_X1.md"), "# Code review X1\n\nVerdict: APPROVED\n");
   await callTool("tw_get_state", { workspace_path: ws });
   r = await callTool("tw_update_state", {
     workspace_path: ws,

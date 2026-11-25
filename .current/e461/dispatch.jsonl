@@ -1,1 +1,4 @@
 {"ts":"2026-11-25T09:59:09.943Z","feature":"e461-mutation-test-gaps","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:02:34.031Z","feature":"e461-mutation-test-gaps","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:03:01.842Z","feature":"e461-mutation-test-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-25T10:12:26.674Z","feature":"e461-mutation-test-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

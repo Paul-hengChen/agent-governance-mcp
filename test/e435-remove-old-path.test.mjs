@@ -17,7 +17,7 @@ import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { TOOL_REGISTRY, PROMPT_REGISTRY } from "../dist/tools/registry.js";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 import { readHandoffState } from "../dist/tools/handoff-parse.js";
-import { CURRENT_VERSIONS } from "../dist/schema/versions.js";
+import { CURRENT_VERSIONS, runMigrations } from "../dist/schema/versions.js";
 import { buildPromptForRole } from "../dist/prompts/build.js";
 // Namespace import: the new exports do not exist before the build, and a named import would fail the whole file.
 import * as T from "../dist/tools/transitions.js";
@@ -201,6 +201,17 @@ test("AC4: a schema 16 handoff carrying chain_path lazily migrates to 17 with ch
   }
   assert.match(disk, /^schema_version: 17$/m, "heal write persisted v17");
   assert.doesNotMatch(disk, /chain_path|qa_round/);
+  // The v16 -> v17 step itself, through the public runner: the parser drops unknown keys on its own, so only
+  // this check fails when the step stops dropping the three fields. Every other field passes through unchanged.
+  const v16 = {
+    schema_version: 16, active_feature: F, status: "In_Progress", last_updated: "2026-01-01T00:00:00.123Z",
+    last_agent: "pm", cut_approved: true, chain_path: "test-first", qa_round: 2, qa_rounds_total: 3,
+    review_round: 1, review_rounds_total: 4, sr_return_count: 1, hop_count: 5,
+  };
+  const m = runMigrations("handoff", v16);
+  assert.deepEqual(m.applied, [17], "exactly the v16 -> v17 step ran");
+  const { chain_path: _c, qa_round: _q, qa_rounds_total: _t, ...kept } = v16;
+  assert.deepEqual(m.payload, { ...kept, schema_version: 17 }, "the three fields are dropped, every other field kept");
 });
 
 test("AC4: tw_update_state has no chain_path property, resume_of accepts only code-reviewer, an incoming chain_path is stripped", async () => {

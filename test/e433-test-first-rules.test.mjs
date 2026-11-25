@@ -155,28 +155,40 @@ const END_LPA = rangeSkipReason ? null : textAt(END_SHA, "docs/lane-protocol-add
 
 // ------------------------------------------------------------------ AC1
 
-// Sentences of the bundle that assign (or describe who may do) PASS, tw_complete_task or completed_tasks growth.
-function judgeAssignmentSentences(text) {
+// Pairing rule: a clause that gives qa-engineer a judge action (PASS, tw_complete_task, completed_tasks) and
+// neither negates it nor names the judge is a violation. Clause-level pairing catches an affirmative
+// sentence whatever verb it uses, which a keyword filter on the sentence misses.
+const JUDGE_TERM = /status=PASS|\bPASS\b(?!_)|tw_complete_task|completed_tasks/;
+const QA_ACTOR = /qa-engineer(?!'s)/;
+const NEGATED = /\b(never|not|no|cannot|can't|don't|nor|must not)\b/i;
+const JUDGE_NAMED = /code-reviewer|the chain's judge/;
+function clauses(text) {
   return text
     .split(/(?<=[.;!?])\s+|\n+/)
-    .filter((s) => /status=PASS|`tw_complete_task`|completed_tasks/.test(s))
-    .filter((s) => /flips|require|grows|ownership|only the|your PASS|PASS row|PASS and|Then `tw_complete_task\(/.test(s));
+    .flatMap((s) => s.split(/, | — |: |(?= then )/))
+    .filter((c) => c.trim() !== "");
+}
+// everyClauseIsQa: the raw qa SOP addresses qa-engineer as "you", so every clause there has the qa actor.
+function judgePairing(text, { everyClauseIsQa = false } = {}) {
+  const judgeClauses = clauses(text).filter((c) => JUDGE_TERM.test(c));
+  const violations = judgeClauses.filter(
+    (c) => (everyClauseIsQa || QA_ACTOR.test(c)) && !NEGATED.test(c) && !JUDGE_NAMED.test(c),
+  );
+  return { judgeClauses, violations };
 }
 
 for (const role of Object.keys(FIVE)) {
-  test(`AC1 (E435): composed ${role} prompt carries chain.main, no forbidden old-judge or marker string, and every PASS / tw_complete_task / completed_tasks sentence names code-reviewer`, () => {
+  test(`AC1 (E435): composed ${role} prompt carries chain.main, no forbidden old-judge or marker string, and no clause gives qa-engineer PASS / tw_complete_task / completed_tasks`, () => {
     const text = BUNDLE[role];
     assert.ok(text.includes(COPY.chainMain), `${role}: chain.main line present`);
     for (const f of COPY.forbidden) assert.ok(!text.includes(f), `${role}: forbidden string present: ${f}`);
-    const sentences = judgeAssignmentSentences(text);
-    assert.ok(sentences.length > 0, `${role}: the judge-assignment sentences were found`);
-    for (const s of sentences) {
-      assert.ok(!/agent_id="qa-engineer"/.test(s), `${role}: qa-engineer named as PASS / completion identity: ${s.slice(0, 160)}`);
-      assert.ok(
-        !/\bqa-engineer\b[^.;\n]{0,40}\b(flips|owns|grows|may write|writes `status=PASS`)\b/.test(s),
-        `${role}: qa-engineer assigned judge duties: ${s.slice(0, 160)}`,
-      );
-    }
+    const { judgeClauses, violations } = judgePairing(text);
+    assert.ok(judgeClauses.length > 0, `${role}: the scan saw at least one judge-term clause (vacuity guard)`);
+    assert.deepEqual(
+      violations.map((c) => c.slice(0, 160)),
+      [],
+      `${role}: affirmative clause pairs qa-engineer with a judge action`,
+    );
     // Positive: the judge is named where PASS is assigned, and the ownership bullet names code-reviewer.
     assert.ok(
       text.includes("`status=PASS` and `tw_complete_task` require the chain's judge, `agent_id=\"code-reviewer\"`"),
@@ -290,6 +302,15 @@ test("AC3 (E435): skill-qa-engineer.md alone makes qa the test author (scenarios
   assert.ok(qa.includes(COPY.qaLine13Tail), "line 13 tail: no qa round is counted");
   assert.ok(qa.includes(COPY.qaLine31), "claim rejection sentence carries no marker diagnosis");
   for (const s of ["qa_round", "QA_ROUND_EXCEEDED", "chain_path"]) assert.ok(!qa.includes(s), `qa SOP no longer names ${s}`);
+  // Pairing rule over the raw SOP: no affirmative clause hands qa-engineer a judge action.
+  const { judgeClauses, violations } = judgePairing(qa, { everyClauseIsQa: true });
+  assert.ok(judgeClauses.length > 0, "the scan saw at least one judge-term clause (vacuity guard)");
+  assert.deepEqual(violations.map((c) => c.slice(0, 160)), [], "qa SOP clause gives qa-engineer a judge action");
+  // Step 7 hands off to sr-engineer and names no other next role (qa never routes to the judge).
+  const step7 = qa.split("\n").find((l) => l.startsWith("7. **Hand off to sr-engineer**"));
+  assert.ok(step7, "step 7 hand-off line exists");
+  assert.ok(step7.includes('next_role="sr-engineer"'), 'step 7 carries next_role="sr-engineer"');
+  assert.deepEqual(step7.match(/next_role="[^"]*"/g), ['next_role="sr-engineer"'], "step 7 names no other next_role");
 });
 
 // ------------------------------------------------------------------ AC4
@@ -319,6 +340,8 @@ test("AC4: skill-sr-engineer.md builds to pre-written tests, has both return rou
   const row1 = routes.split("\n").find((l) => l.includes("(return route 1)"));
   const row2 = routes.split("\n").find((l) => l.includes("(return route 2)"));
   assert.ok(row1 && /\| qa-engineer \|$/.test(row1.trim()), "return route 1 row routes to qa-engineer");
+  // A return keeps the feature moving (In_Progress); Blocked would stall it instead of handing qa the test.
+  assert.equal(row1.split("|").map((c) => c.trim())[2], "In_Progress", "return route 1 status cell is In_Progress");
   assert.ok(row2 && /\| Blocked \|/.test(row2) && /\| pm \|$/.test(row2.trim()), "return route 2 row is Blocked to pm");
   assert.ok(routes.includes("`sr_return` cap reached"), "a row for the cap");
 });
@@ -554,11 +577,10 @@ test("AC10 (E435): README / architecture / release-cd — chain.docs, qa opus ro
 
 // ------------------------------------------------------------------ AC12
 
-test("AC12 (E435): counts and hygiene — 33 gates, 17 pipeline steps, untouched server files, CLAUDE.md, dist diff", (t) => {
+test("AC12 (E435): counts and hygiene — 33 gates, 17 pipeline steps, untouched server files (CLAUDE.md in the closed range), dist diff", (t) => {
   // No live `agc check` here (E450): adapter-stamp freshness is release-time state, re-checked by the runner's prepare phase.
   assert.equal(GATE_REGISTRY.length, 33, "GATE_REGISTRY 33 entries (E435)");
   assert.equal(UPDATE_STATE_GATE_PIPELINE.length, 17, "UPDATE_STATE_GATE_PIPELINE 17 steps");
-  assert.equal(read("CLAUDE.md").split("\n").length - (read("CLAUDE.md").endsWith("\n") ? 1 : 0), 250, "CLAUDE.md is 250 lines");
 
   if (rangeSkipReason) return t.skip(rangeSkipReason);
   // Closed range base..last content commit: byte-identical means "not in the diff".
