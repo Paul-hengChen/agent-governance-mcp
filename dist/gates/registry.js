@@ -207,9 +207,12 @@ export const GATE_REGISTRY = [
         producer: "orchestrator",
         envelope: "plain-text",
         triggerEdge: "status=PASS with completed_tasks",
-        armCondition: "hasEvidence().missing non-empty",
-        clearingArtifact: "qa_review / qa_reports/review_<id>.md",
-        hintStatic: "Provide qa_review or write qa_reports/review_<id>.md (file mode) / insert reports row (SQLite) before PASS.",
+        armCondition: "hasPassEvidenceInFile(completed_tasks).missing non-empty (file mode) / hasEvidence(completed_tasks).missing non-empty (SQLite)",
+        clearingArtifact: "qa_review on the PASS write, or qa_reports/review_<id>.md (or a covers: report) ending with a server-recorded PASS verdict / a PASS reports row (SQLite)",
+        hintStatic: "Provide qa_review naming the id on this PASS write, or make the id's " +
+            "qa_reports/review_<id>.md (or the report whose covers: line names it) end " +
+            "with a server-recorded PASS verdict (file mode) / insert a PASS reports " +
+            "row (SQLite) before PASS.",
         documentedInProse: true,
     },
     {

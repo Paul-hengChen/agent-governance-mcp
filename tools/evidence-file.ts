@@ -32,6 +32,48 @@ export function resolveJudgeReport(workspacePath: string): JudgeReport {
 // qa-engineer for reports written before v5.0.0 (DR-6).
 export const REPORT_SIGNERS: readonly string[] = [JUDGE_ROLE, "qa-engineer"];
 
+// ---------- judge report standing ----------
+// The one PASS-evidence predicate every reader shares (the file-mode PASS
+// gate, lane-status, drift). A report's standing is its LAST server-recorded
+// verdict section in document order, or all-null when it has none.
+export type ReportVerdict = "PASS" | "FAIL";
+
+export interface ReportStanding {
+  readonly verdict: ReportVerdict | null;
+  readonly signer: string | null; // the "by <signer>" token of that last section
+  readonly recordedAt: string | null; // its ISO timestamp, as written
+}
+
+// Exactly the heading the qa_review auto-record writes:
+//   `## ${new Date().toISOString()} — ${status} — by ${reviewer}`
+// Single spaces, em dashes, ISO-8601 UTC with milliseconds and Z. A trailing
+// \r is tolerated (CRLF-edited reports). Any other heading is not a verdict.
+const SERVER_VERDICT_HEADING_RE =
+  /^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) — (PASS|FAIL) — by (\S+)[ \t]*\r?$/gm;
+
+// Pure, no I/O, never throws.
+export function judgeReportStanding(content: string): ReportStanding {
+  let verdict: ReportVerdict | null = null;
+  let signer: string | null = null;
+  let recordedAt: string | null = null;
+  const re = new RegExp(SERVER_VERDICT_HEADING_RE.source, "gm"); // fresh lastIndex per call
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    recordedAt = m[1];
+    verdict = m[2] === "PASS" ? "PASS" : "FAIL";
+    signer = m[3];
+  }
+  return { verdict, signer, recordedAt };
+}
+
+// True when the standing is PASS; with `signers`, the last section's signer
+// must also be one of them.
+export function isPassStanding(standing: ReportStanding, signers?: readonly string[]): boolean {
+  if (standing.verdict !== "PASS") return false;
+  if (signers === undefined) return true;
+  return standing.signer !== null && signers.includes(standing.signer);
+}
+
 // ---------- task-id → evidence filename stem ----------
 // Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its
 // stem from the task id through this one encoder, so two distinct ids can

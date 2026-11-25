@@ -17,6 +17,34 @@ export function resolveJudgeReport(workspacePath) {
 // Signers a multi-feature report reader (lane-status) accepts: the judge, and
 // qa-engineer for reports written before v5.0.0 (DR-6).
 export const REPORT_SIGNERS = [JUDGE_ROLE, "qa-engineer"];
+// Exactly the heading the qa_review auto-record writes:
+//   `## ${new Date().toISOString()} — ${status} — by ${reviewer}`
+// Single spaces, em dashes, ISO-8601 UTC with milliseconds and Z. A trailing
+// \r is tolerated (CRLF-edited reports). Any other heading is not a verdict.
+const SERVER_VERDICT_HEADING_RE = /^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) — (PASS|FAIL) — by (\S+)[ \t]*\r?$/gm;
+// Pure, no I/O, never throws.
+export function judgeReportStanding(content) {
+    let verdict = null;
+    let signer = null;
+    let recordedAt = null;
+    const re = new RegExp(SERVER_VERDICT_HEADING_RE.source, "gm"); // fresh lastIndex per call
+    let m;
+    while ((m = re.exec(content)) !== null) {
+        recordedAt = m[1];
+        verdict = m[2] === "PASS" ? "PASS" : "FAIL";
+        signer = m[3];
+    }
+    return { verdict, signer, recordedAt };
+}
+// True when the standing is PASS; with `signers`, the last section's signer
+// must also be one of them.
+export function isPassStanding(standing, signers) {
+    if (standing.verdict !== "PASS")
+        return false;
+    if (signers === undefined)
+        return true;
+    return standing.signer !== null && signers.includes(standing.signer);
+}
 // ---------- task-id → evidence filename stem ----------
 // Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its
 // stem from the task id through this one encoder, so two distinct ids can

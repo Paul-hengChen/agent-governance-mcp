@@ -5,6 +5,14 @@ export interface JudgeReport {
 }
 export declare function resolveJudgeReport(workspacePath: string): JudgeReport;
 export declare const REPORT_SIGNERS: readonly string[];
+export type ReportVerdict = "PASS" | "FAIL";
+export interface ReportStanding {
+    readonly verdict: ReportVerdict | null;
+    readonly signer: string | null;
+    readonly recordedAt: string | null;
+}
+export declare function judgeReportStanding(content: string): ReportStanding;
+export declare function isPassStanding(standing: ReportStanding, signers?: readonly string[]): boolean;
 export declare function encodeEvidenceId(taskId: string): string;
 export declare function decodeEvidenceId(stem: string): string | null;
 export declare const COVERS_LINE_RE: RegExp;

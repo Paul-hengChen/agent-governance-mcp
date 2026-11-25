@@ -42,7 +42,7 @@ import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-e
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
-import { hasEvidenceInFile, qaEvidencePath, recordReviewInFileUndoable } from "../gates/qa-review.js";
+import { hasEvidenceInFile, hasPassEvidenceInFile, qaEvidencePath, recordReviewInFileUndoable } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { featureLaneLedger, listOpenFeatureTasks } from "../gates/open-tasks.js";
 import { gate, TRANSITION_GATE_CODES } from "../gates/registry.js";
@@ -815,14 +815,23 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["MISSING_EVIDENCE"],
     run: async (ctx) => {
       const { parsed, storage } = ctx;
-        // Evidence gate for PASS path
+        // Evidence gate for PASS path. File mode: every listed id needs a
+        // report (direct or covers:) whose last server-recorded verdict is
+        // PASS; runs after the qa_review auto-record, so this write's own
+        // verdict counts. SQLite: a PASS reports row.
         if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
-          const ev = await storage.hasEvidence(parsed.workspace_path, parsed.completed_tasks);
+          const fileMode = storage instanceof FileHandoffStorage;
+          const ev = fileMode
+            ? hasPassEvidenceInFile(parsed.workspace_path, parsed.completed_tasks)
+            : await storage.hasEvidence(parsed.workspace_path, parsed.completed_tasks);
           if (ev.missing.length > 0) {
+            const detail = fileMode
+              ? `The last server-recorded verdict for each listed id is not PASS (checked: ${ev.missing.map((id) => qaEvidencePath(parsed.workspace_path, id)).join(", ")}, plus any report whose covers: line names the id). `
+              : "";
             return {
               content: [{
                 type: "text" as const,
-                text: `⛔ MISSING_EVIDENCE: ${ev.missing.join(", ")}. ${gate("MISSING_EVIDENCE").hintStatic}`,
+                text: `⛔ MISSING_EVIDENCE: ${ev.missing.join(", ")}. ${detail}${gate("MISSING_EVIDENCE").hintStatic}`,
               }],
               isError: true,
             };

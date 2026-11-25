@@ -1,13 +1,22 @@
 // Coded by @sr-engineer
 // QA evidence gate predicates: each QA round appends a timestamped section to
-// qa_reports/review_<task_id>.md. A per-id file's existence is enough; when it is
-// absent, a lazy `covers:` fallback lets one covering report satisfy other ids
-// (parseCoversIds / buildCoverageIndex in tools/evidence-file.ts).
+// qa_reports/review_<task_id>.md. For the completion check a per-id file's
+// existence is enough (hasEvidenceInFile); the file-mode PASS check needs a
+// report whose last server-recorded verdict is PASS (hasPassEvidenceInFile).
+// When the per-id file does not qualify, a lazy `covers:` fallback lets one
+// covering report satisfy other ids (tools/evidence-file.ts).
 // Spec: specs/c3-covering-evidence.md.
 
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex, encodeEvidenceId, resolveJudgeReport } from "../tools/evidence-file.js";
+import {
+  buildCoverageIndex,
+  encodeEvidenceId,
+  isPassStanding,
+  judgeReportStanding,
+  parseCoversIds,
+  resolveJudgeReport,
+} from "../tools/evidence-file.js";
 
 function evidenceDir(workspacePath: string): string {
   return resolveJudgeReport(workspacePath).dir;
@@ -145,6 +154,61 @@ export async function recordReviewInFileUndoable(
     throw err;
   }
   return undo;
+}
+
+// Read a file as UTF-8, or null when it is absent or unreadable.
+function readOrNull(filePath: string): string | null {
+  try {
+    return fs.readFileSync(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+// Ids named by the covers: line of any qa_reports/*.md report with standing
+// PASS. A set, not a first-seen map, so a later PASS covering report is never
+// hidden behind an earlier non-PASS one. Unreadable entries are skipped.
+function passCoveredIds(dir: string): Set<string> {
+  const covered = new Set<string>();
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort();
+  } catch {
+    return covered;
+  }
+  for (const name of entries) {
+    const content = readOrNull(path.join(dir, name));
+    if (content === null || !isPassStanding(judgeReportStanding(content))) continue;
+    for (const id of parseCoversIds(content)) covered.add(id);
+  }
+  return covered;
+}
+
+// File-mode PASS evidence: each id needs a candidate report with standing PASS
+// (direct review_<id>.md, else any qa_reports/*.md whose covers: names it).
+// Never throws: unreadable files read as no evidence.
+export function hasPassEvidenceInFile(
+  workspacePath: string,
+  taskIds: string[],
+): { present: string[]; missing: string[] } {
+  const present: string[] = [];
+  const missing: string[] = [];
+  // Built at most once per call, only on the first direct miss.
+  let covered: Set<string> | null = null;
+  for (const id of taskIds) {
+    const direct = readOrNull(evidencePath(workspacePath, id));
+    if (direct !== null && isPassStanding(judgeReportStanding(direct))) {
+      present.push(id);
+      continue;
+    }
+    if (covered === null) covered = passCoveredIds(evidenceDir(workspacePath));
+    if (covered.has(id)) {
+      present.push(id);
+    } else {
+      missing.push(id);
+    }
+  }
+  return { present, missing };
 }
 
 export function hasEvidenceInFile(
