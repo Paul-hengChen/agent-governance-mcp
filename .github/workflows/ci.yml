@@ -31,4 +31,8 @@ jobs:
         run: npm run build
 
       - name: Test
-        run: npm test
+        run: node scripts/test-lock.mjs -- node --test --test-reporter=tap --test-reporter-destination=stdout --test-reporter=./scripts/scenario-results-node.mjs --test-reporter-destination="$RUNNER_TEMP/test-results.xml" test/*.test.mjs
+
+      - name: Check ticket scenario tests
+        if: ${{ !cancelled() }}
+        run: node scripts/check-scenario-tests.mjs --results "$RUNNER_TEMP/test-results.xml"
