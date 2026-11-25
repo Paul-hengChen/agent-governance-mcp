@@ -164,6 +164,9 @@ test("FM2/AC2 (E435): code-reviewer PASS write with completed_tasks=[T-Y,T-Z] an
   );
 
   await seedFileState(ws, "qrsa-fm2", "code-reviewer", "In_Progress");
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  for (const id of ["T-QRSA2-Y", "T-QRSA2-Z"]) fs.writeFileSync(path.join(ws, "review_reports", `review_${id}.md`), "# Code review\n\nVerdict: APPROVED\n");
   resetSession(ws);
   markStateRead(ws);
 

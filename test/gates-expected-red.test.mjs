@@ -178,6 +178,10 @@ async function seedQaInProgress(ws, feature) {
   // look hand-authored, so the write path's stamp check stays quiet. See
   // test/e148-seed-stamp.mjs. (E148)
   forceSeedStamp(ws);
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id; these
+  // scenarios test the expected-red check, so every id they PASS has its code-review report.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  for (const id of ["T01", "T02"]) fs.writeFileSync(path.join(ws, "review_reports", `review_${id}.md`), "# Code review\n\nVerdict: APPROVED\n");
 }
 
 test("I1: PASS rejected with EXPECTED_RED_DIFF_MISSING when manifest armed + qa_review carries no disposition section", async () => {

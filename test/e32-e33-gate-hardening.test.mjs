@@ -212,6 +212,9 @@ test("C3 (E435): legit code-reviewer PASS write with qa_review (auto-recorded as
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("e32e33-c3-");
   await seedFileState(ws, "c3-feat", "code-reviewer", "In_Progress");
+  // E448 re-pin: a file-mode judge PASS also needs the code-review report for every reviewed id.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "review_reports", "review_T-C3-01.md"), "# Code review\n\nVerdict: APPROVED\n");
   resetSession(ws);
   markStateRead(ws);
 

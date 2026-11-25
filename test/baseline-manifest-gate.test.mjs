@@ -517,9 +517,10 @@ test("E2: AC-1 — verbatim BASELINE_MANIFEST_MISSING error string in dist/index
     distIndex.includes("the Source manifest (## Source section) contains no audited baseline rows"),
     "ERR-BMM-01 body text must appear verbatim in dist/index.js",
   );
+  // E448 re-pin (E458 item 8): the hint no longer points adopters at a repo-only spec path.
   assert.ok(
-    distIndex.includes("See specs/figma-baseline-manifest-gate.md"),
-    "ERR-BMM-01 must include the spec reference",
+    !distIndex.includes("See specs/figma-baseline-manifest-gate.md"),
+    "ERR-BMM-01 must not name the repo-only spec path",
   );
 });
 
@@ -586,11 +587,13 @@ test("E5: AC-N3 — ## Visual Baselines present, NO ## Source → gate dormant a
   assert.equal(manifest.code, null);
 });
 
-test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (full string verification)", () => {
+test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (full string verification)", async () => {
   // Why: Copy/Strings fidelity gate. The spec pins exact strings including the ⛔ prefix.
   // Any paraphrase, truncation, or punctuation change breaks the operator runbook.
-  const ERR_BMM_01 = "⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections). See specs/figma-baseline-manifest-gate.md.";
-  const ERR_BPI_01 = "⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c. See specs/figma-baseline-manifest-gate.md.";
+  // E448 re-pin (E458 item 8): hint.baseline_manifest_missing / hint.baseline_provenance_incomplete drop
+  // "See specs/figma-baseline-manifest-gate.md." (a path that does not exist in an adopter workspace).
+  const ERR_BMM_01 = "⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections).";
+  const ERR_BPI_01 = "⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c.";
 
   // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
   // body (including these baseline-manifest gate strings) compiles into
@@ -599,14 +602,12 @@ test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (ful
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "gates", "registry.js"),
     "utf-8",
   );
-  assert.ok(
-    distIndex.includes(ERR_BMM_01),
-    "dist/index.js must contain verbatim ERR-BMM-01 string (including ⛔ prefix and trailing period)",
-  );
-  assert.ok(
-    distIndex.includes(ERR_BPI_01),
-    "dist/index.js must contain verbatim ERR-BPI-01 string (including ⛔ prefix and trailing period)",
-  );
+  assert.ok(distIndex.includes("BASELINE_MANIFEST_MISSING"), "the compiled registry carries the code");
+  // The source may split a literal across concatenated lines, so compare the compiled registry's runtime values.
+  const { GATE_REGISTRY } = await import(new URL("../dist/gates/registry.js", import.meta.url).href);
+  const hint = (code) => GATE_REGISTRY.find((g) => g.errorCode === code).hintStatic;
+  assert.equal(hint("BASELINE_MANIFEST_MISSING"), ERR_BMM_01, "verbatim ERR-BMM-01 (including ⛔ prefix and trailing period)");
+  assert.equal(hint("BASELINE_PROVENANCE_INCOMPLETE"), ERR_BPI_01, "verbatim ERR-BPI-01 (including ⛔ prefix and trailing period)");
 });
 
 // ===========================================================================

@@ -215,6 +215,9 @@ test("AC15 (E435): a code-reviewer PASS carrying only the current ids keeps earl
   const ws = mkWs();
   await seed(ws, { agent: "code-reviewer", ledger: ["T-A", "T-B"] });
   qaEvidence(ws, "T-C");
+  // E448 re-pin: a file-mode judge PASS needs review_reports/review_<id>.md for every reviewed id.
+  fs.mkdirSync(path.join(ws, "review_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "review_reports", "review_T-C.md"), "# Code review\n\nVerdict: APPROVED\n");
   const r = await handleUpdateState({
     workspace_path: ws,
     active_feature: F,

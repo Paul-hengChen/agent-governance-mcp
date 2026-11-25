@@ -96,26 +96,28 @@ async function dispatch(ws, args) {
 // AC1 — evidence_schema server-stamped, feature-scoped: stamp / carry / drop-restamp
 // ============================================================================
 
-test("AC1-1: first write of a new active_feature stamps evidence_schema: 2 on disk (EVIDENCE_SCHEMA_CURRENT)", async () => {
+// E448 re-pin (E452): EVIDENCE_SCHEMA_CURRENT is 3 (v2 plus the accepted-surface listing rule), so a new
+// feature is stamped 3; the stamp / carry / drop-restamp mechanics are unchanged.
+test("AC1-1: first write of a new active_feature stamps evidence_schema: 3 on disk (EVIDENCE_SCHEMA_CURRENT)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
-  assert.equal(EVIDENCE_SCHEMA_CURRENT, 2, "sanity: gates/evidence-schema.ts pins v2 (D2 normalized-contains)");
+  assert.equal(EVIDENCE_SCHEMA_CURRENT, 3, "sanity: gates/evidence-schema.ts pins v3 (v2 normalized-contains + accepted-surface listing)");
   const res = await dispatch(ws, { active_feature: "ac1-fresh-feat", status: "In_Progress", agent_id: "pm" });
   assert.ok(!res.isError, `first write must be accepted: ${res.content?.[0]?.text}`);
   const raw = readRaw(ws);
-  assert.match(raw, /evidence_schema:\s*2/, "first write of a new feature must stamp evidence_schema: 2 verbatim");
-  assert.equal(parseHandoff(ws).evidence_schema, 2);
+  assert.match(raw, /evidence_schema:\s*3/, "first write of a new feature must stamp evidence_schema: 3 verbatim");
+  assert.equal(parseHandoff(ws).evidence_schema, 3);
 });
 
 test("AC1-2: a subsequent same-feature write (no client arg exists to set it) preserves the stamped pin", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
   await dispatch(ws, { active_feature: "ac1-carry-feat", status: "In_Progress", agent_id: "pm" });
-  assert.equal(parseHandoff(ws).evidence_schema, 2, "sanity: stamped on first write");
+  assert.equal(parseHandoff(ws).evidence_schema, 3, "sanity: stamped on first write");
 
   const res = await dispatch(ws, { active_feature: "ac1-carry-feat", status: "In_Progress", agent_id: "pm" });
   assert.ok(!res.isError, `same-feature write must be accepted: ${res.content?.[0]?.text}`);
-  assert.equal(parseHandoff(ws).evidence_schema, 2, "same-feature write must carry the pin forward verbatim (feature-scoped, no PM-re-entry re-arm)");
+  assert.equal(parseHandoff(ws).evidence_schema, 3, "same-feature write must carry the pin forward verbatim (feature-scoped, no PM-re-entry re-arm)");
 });
 
 test("AC1-3: an active_feature change drops a stale pin and re-stamps EVIDENCE_SCHEMA_CURRENT — never carries the old value forward", async () => {
@@ -166,7 +168,7 @@ evidence_schema: 1
   assert.ok(!res.isError, `active_feature change write must be accepted: ${res.content?.[0]?.text}`);
   const state = parseHandoff(ws);
   assert.equal(state.active_feature, "ac1-new-feat");
-  assert.equal(state.evidence_schema, 2, "active_feature change must DROP the stale v1 pin and re-stamp EVIDENCE_SCHEMA_CURRENT (2) — never carry v1 forward");
+  assert.equal(state.evidence_schema, 3, "active_feature change must DROP the stale v1 pin and re-stamp EVIDENCE_SCHEMA_CURRENT (3) — never carry v1 forward");
 });
 
 test("AC1-4: evidence_schema is not a client-settable arg — a hostile write_options field never reaches disk (no zod plumbing, D1)", async () => {
