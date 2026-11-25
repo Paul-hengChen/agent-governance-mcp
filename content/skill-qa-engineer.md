@@ -53,6 +53,7 @@ Details go in files.
    - `## Red Reasons` in the test report: one line per red test with the reason it is red now (e.g. "module not found: `exportReport` not built yet").
    - `qa_reports/expected-red_<feature>.txt`: one line per red test, `<relative test file path> | <exact test name>`, with a `#` reason line above each entry or group; blank and `#` lines are comments. Feature-scoped: append, never overwrite (sr-engineer appends the reds it leaves itself); on a later pass, update the entries for the tests you changed.
    - **No new test needed** (existing tests already cover every scenario, or no scenario is automatable): write `qa_reports/no-new-test_<feature>.txt` instead, one line per scenario naming the covering test or the reason. The server rejects your hand-off to sr-engineer with `REPRO_MANIFEST_MISSING` unless one of the two files exists.
+   - **Ticket verification field**: with a ticket file, replace the `Verification: automated test` line of each scenario you wrote a test for with `Verification: test <test file path> — <full nested title>` (the names of the enclosing groups and of the test, joined by ` > `). Edit only that line, never a Given, When or Then line.
 
 7. **Hand off to sr-engineer**: `tw_update_state(status=In_Progress, agent_id="qa-engineer", next_role="sr-engineer", pending_notes=["qa-engineer: <feature> tests ready — <n> red; report qa_reports/tests_<feature>.md"])`. Always sr-engineer, never code-reviewer. STOP.
 
