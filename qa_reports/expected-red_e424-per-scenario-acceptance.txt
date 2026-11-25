@@ -1,0 +1,34 @@
+# Expected-red manifest — e424-per-scenario-acceptance (T-E424-02, qa-engineer).
+# Format: <relative test file path> | <exact test name>. Blank and # lines are comments.
+
+# The ticket check does not exist yet: a code-reviewer PASS on a spec citing a ticket file is
+# accepted today, so every rejection the AC demands is missing (built in T-E424-03 / T-E424-04).
+test/e424-per-scenario-acceptance.test.mjs | AC2: pass entries for two of three ids -> rejected, the missing id named under ac.ticket.no_entry, recorded ids not named
+test/e424-per-scenario-acceptance.test.mjs | AC3: one of three entries marked fail -> rejected, that id named under ac.ticket.not_pass
+test/e424-per-scenario-acceptance.test.mjs | AC4: an added-during-build blocking scenario without an entry blocks PASS; with a pass entry the same write lands
+test/e424-per-scenario-acceptance.test.mjs | AC5: device-or-person never blocks — (a) accepted without its entry; (b) listed under ac.ticket.manual, not as missing
+test/e424-per-scenario-acceptance.test.mjs | AC6: no ## AC Execution Log at all — (a) no proof: line -> every blocking id under no_entry; (b) proof: line -> today's text alone
+test/e424-per-scenario-acceptance.test.mjs | AC7: cited ticket file missing or unparsable -> rejected (fail closed) with ac.ticket.missing_file / ac.ticket.parse
+test/e424-per-scenario-acceptance.test.mjs | AC9: the ticket check runs no scenario command and imports no child_process
+
+# The orchestrator does not call evaluateTicketAcceptance( yet (T-E424-04).
+test/e424-per-scenario-acceptance.test.mjs | AC10: the ticket check sits inside the PASS_AC_EXECUTION_LOG step's FileHandoffStorage guard (SQLite dormant)
+
+# Step 8 of content/skill-code-reviewer.md still ends with the old sentence (T-E424-05).
+test/e424-per-scenario-acceptance.test.mjs | AC12: skill-code-reviewer.md step 8 carries Copy sop.step8 verbatim and keeps the E433-pinned substrings
+
+# The new gates/ac-execution.ts exports do not exist yet (T-E424-03): each test fails on the
+# missing export (namespace import, so the file still loads and every test reports on its own).
+test/e424-ac-execution-exports.test.mjs | contract 1: AC_TICKET_HINT is Copy ac.ticket.hint verbatim
+test/e424-ac-execution-exports.test.mjs | contract 2 (OQ-1): findTicketCitations accepts only an in-dir .md path right after a line-leading Ticket:
+test/e424-ac-execution-exports.test.mjs | contract 2 (DR-5, OQ-5 dedupe): fenced Ticket: lines are ignored; the same path twice counts once; order kept
+test/e424-ac-execution-exports.test.mjs | contract 2: a configured ticketDir moves the accepted directory
+test/e424-ac-execution-exports.test.mjs | contract 3 (OQ-6): sliceLastAcExecutionLog returns the body of the LAST matching H2, null when none
+test/e424-ac-execution-exports.test.mjs | contract 4 (OQ-3, DR-5, DR-6): parseAcceptanceRecord keeps only id-led ` — ` lines; last field decides pass
+test/e424-ac-execution-exports.test.mjs | contract 5: evaluateTicketAcceptance is not armed without an in-dir citation (every list empty)
+test/e424-ac-execution-exports.test.mjs | contract 5 (OQ-5): two distinct in-dir citations -> problem many, ticket not evaluated
+test/e424-ac-execution-exports.test.mjs | contract 5: evaluated ticket fills missing / manual ids and specPath; a pass entry clears
+test/e424-ac-execution-exports.test.mjs | contract 6: renderTicketAcceptanceRejection follows Copy ac.ticket.order (problem branch, Inspected fallback)
+
+# Not on this manifest, outside the qa-owned set this round: test/e118-reviewer-ac-completeness.test.mjs
+# AC7 (size cap) turns red with T-E424-05 and is re-pinned in T-E424-06 (planned sr -> qa return).

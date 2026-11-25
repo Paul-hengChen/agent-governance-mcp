@@ -1,0 +1,13 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [x] T-E427-01 [P0] qa-engineer: one test per AC (AC1–AC14, AC16) in test/e427-check-scenario-tests.test.mjs, test/e427-scenario-results-node.test.mjs, test/e427-ci-wiring.test.mjs, test/e427-ticket-format-doc.test.mjs; new fixtures only under test/fixtures/e427/; write qa_reports/expected-red_e427-ci-scenario-tests.txt (spec specs/e427-ci-scenario-tests.md) | depends_on: none
+- [x] T-E427-02 [P0] sr-engineer: runner adapter scripts/scenario-results-node.mjs — default-export reporter (Node junit + classname = repo-relative file) and readResults(path) → [{file,title,status}] per D3–D5 (AC10) | depends_on: T-E427-01
+- [x] T-E427-03 [P0] sr-engineer: checker CLI scripts/check-scenario-tests.mjs — args, done-ticket selection (D7), matching (D4–D6), Copy/Strings messages, exit codes (D8–D10), --adapter (AC1–AC9, AC11–AC13, AC15) | depends_on: T-E427-02
+- [x] T-E427-04 [P1] sr-engineer: CI wiring in .github/workflows/ci.yml — Test step run: per D1 (reporters before the glob, via test-lock), new step "Check ticket scenario tests" per D11; job name and matrix unchanged (AC14, AC17) | depends_on: T-E427-03
+- [x] T-E427-05 [P1] sr-engineer: docs/ticket-format.md — general section "## Named tests checked in CI" (scope limit, done-only, full nested title with " > ", readResults contract, rename rule; no repo paths/ids) + tooling-section additions (checker, adapter, CI step, exit codes) (AC16) | depends_on: T-E427-03
+- [x] T-E427-06 [P0] qa-engineer: AC18 test in test/e427-check-scenario-tests.test.mjs — adapter path that cannot be imported → exit 2, stderr adapterInvalid line immediately followed by adapterLoadError (`check-scenario-tests: cannot load adapter <module>: <reason>`, reason non-empty); no-readResults adapter → no adapterLoadError line; existing AC9/AC11/AC13 assertions unchanged; add the AC18 test to qa_reports/expected-red_e427-ci-scenario-tests.txt (spec amendment 2026-11-25, integrator R2) | depends_on: none
+- [x] T-E427-07 [P0] sr-engineer: R2 — scripts/check-scenario-tests.mjs loadReadResults prints the adapterLoadError line (first clause of the import error via reason()) on stderr directly after the unchanged adapterInvalid line, only when the import throws; exit stays 2 (AC18) | depends_on: T-E427-06
+- [x] T-E427-08 [P1] sr-engineer: R1 — trim the file-head comments of scripts/check-scenario-tests.mjs and scripts/scenario-results-node.mjs to ≤7 lines (one-sentence summary ≤80 cols + caller essentials + one-line pointer to specs/e427-ci-scenario-tests.md); no executable change; proof: agc check prints no comments: warning for either file (AC19) | depends_on: T-E427-07

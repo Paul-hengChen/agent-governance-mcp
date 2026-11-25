@@ -13,7 +13,7 @@ import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition, hasNoNewTestRecord } from "../gates/expected-red.js";
 import { resolveJudgeReport } from "./evidence-file.js";
-import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-execution.js";
+import { hasProofAnnotatedAC, hasAcExecutionLogDisposition, evaluateTicketAcceptance, renderTicketAcceptanceRejection, } from "../gates/ac-execution.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
@@ -1027,6 +1027,19 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                 isError: true,
                             };
                         }
+                    }
+                    // Ticket path, additive: runs only when the proof: check above did
+                    // not reject. A spec citing a ticket file needs a passing record
+                    // entry for every scenario verified by a test or a command; with no
+                    // citation the result is not armed and nothing changes.
+                    const ticket = evaluateTicketAcceptance(parsed.workspace_path, parsed.active_feature, parsed.completed_tasks, evidenceSchemaPin);
+                    if (ticket.armed && ticket.rejected) {
+                        return {
+                            content: [{ type: "text",
+                                    text: `⛔ AC_EXECUTION_LOG_MISSING: ${parsed.completed_tasks.join(", ")}. ` +
+                                        renderTicketAcceptanceRejection(ticket, evidenceSchemaLabel), }],
+                            isError: true,
+                        };
                     }
                 }
             }
