@@ -17,3 +17,6 @@
 {"ts":"2026-11-26T09:15:50.614Z","feature":"e428-tracker-mirror","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T09:19:06.580Z","feature":"e428-tracker-mirror","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T09:26:38.331Z","feature":"e428-tracker-mirror","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T09:35:19.971Z","feature":"e428-tracker-mirror","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T09:35:52.232Z","feature":"e428-tracker-mirror","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T09:36:27.463Z","feature":"e428-tracker-mirror","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
