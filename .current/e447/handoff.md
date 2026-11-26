@@ -2,11 +2,12 @@
 schema_version: 17
 active_feature: "e447-local-knowledge-files"
 status: "In_Progress"
-last_updated: "2026-11-26T10:35:50.477Z"
+last_updated: "2026-11-26T10:37:45.966Z"
 last_agent: "pm"
 prd_path: "specs/e447-local-knowledge-files.md"
 scope_decision: "single-feature"
 scope_decision_why: "One ticket (E447), one cut per specs/fanout-post-v5-w6.md; five sr tasks inside one feature (A1 config+init, A2a start/reseed, A2b finish/numbering, B1 check --cut + SOP texts, B2 docs) after the integrator's task_size pre-review; no architect (data model and module boundaries fixed in the spec)."
+cut_approved: true
 dispatch_pins:
   pm: "opus"
   architect: "opus"
@@ -15,8 +16,8 @@ dispatch_pins:
   qa-engineer: "opus"
 evidence_schema: 3
 next_role: "qa-engineer"
-dispatched_at: "2026-11-26T10:35:50.477Z"
-dispatch_mechanism: "task"
+dispatched_at: "2026-11-26T10:37:45.966Z"
+dispatch_mechanism: "inline"
 dispatch_mechanism_tier: "opus"
 review_round: 0
 visual_round: 0
@@ -30,11 +31,8 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM cut amended per integrator pre-review (task_size): specs/e447-local-knowledge-files.md Tasks + Hop estimate sections, plus the Test impact heading now records the integrator's assignment of test/lane-paths.test.mjs and test/e410-task-alias-content-tail.test.mjs to e447. HALT for human approval (lane approval = human); cut_approved NOT set by PM (Task-dispatched).
-- Ledger edits in .current/e447/tasks.md (all rows unchecked): T-E447-03 description + depends_on edited in place (now A2a start/reseed, dep 02); T-E447-04 edited in place (now B1 check --cut + const-08/coord-03/skill-integrator, dep 06); T-E447-05 edited in place (dep 07; re-pins marked assigned); T-E447-06 added (A2b finish/numbering, dep 03); T-E447-07 added (B2 docs, dep 04, last implementation task). Order 01 -> 02 -> 03 -> 06 -> 04 -> 07 -> 05.
-- A2 line estimate ~400 in bin/agc-init.mjs (> 300) -> split: A2a ~185, A2b ~220. A1 ~120, B1 ~60 (4 files), B2 ~70 (3 files).
-- Hop estimate corrected: hop_count counts role transitions only (tools/transitions.ts), so 6 of 14 (pm, qa, sr x5 sessions, qa return, sr, code-reviewer); +2 per code-reviewer FAIL round. The earlier 10/14 overcounted same-agent writes.
-- Needs human ruling at approval: O1 (rec. a: --knowledge=local|repo, key knowledge, no schema bump), O2 (rec. a: agc feature reseed <path>... in the lane), O3 (rec. a: same-path copy-back, refuse when both sides changed). Integrator accepted D1-D10 and the dist/tools/* outputs.
+- Cut approved by the human in the lane coordinator's own chat (2026-11-26): "核准，O1–O3 都照 (a)" — O1 (a) --knowledge=local|repo + key knowledge, no config schema bump; O2 (a) agc feature reseed <path>... in the lane; O3 (a) same-path copy-back, refuse when both sides changed; D1-D10 stand. Recorded in specs/e447-local-knowledge-files.md under Options. Integrator pre-review close at spec c4a5b91 (mailbox to-lane#5). Not manifest tier (lane approval = human).
+- Tasks T-E447-01..07, order 01 -> 02 -> 03 -> 06 -> 04 -> 07 -> 05 (05 = planned sr->qa return for goldens/budget/re-pins). Hop estimate 6/14.
 - Baseline at 07a6d47: 4789 pass / 0 fail / 2 skipped (4791 tests).
 
 ---
