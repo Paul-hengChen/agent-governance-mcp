@@ -60,7 +60,8 @@ test("AC-E349-2: addendum heading list unchanged; the nine §5 bullets follow th
   assert.deepEqual(headings, ["## §1 開工", "## §2 檔案邊界", "## §3 執行與驗證", "## §4 新發現", "## §5 信箱", "## §7 中途修 base"]);
 
   const FANOUT = "- `fanout.mjs` 在本 repo 用 `node scripts/fanout.mjs …` 呼叫，例如 cut 預審之後跑 `node scripts/fanout.mjs check --cut specs/fanout-<id>.md <lane> specs/<feature>.md`。";
-  const TOOLS = "- 整合者 SOP 與 coordinator 呼叫的其他 agc 工具，在本 repo 一樣用 repo 相對路徑：`node scripts/mailbox-watch.mjs`、`node scripts/lane-status.mjs`、`node scripts/merge-invariants.mjs`、`node scripts/test-lock.mjs`（全套一律 `node scripts/test-lock.mjs -- npm test`）、`node scripts/feature-rollup.mjs`。";
+  // E425 re-pin: the integrator SOP now calls batch-summary, so the §5 tool line names it last.
+  const TOOLS = "- 整合者 SOP 與 coordinator 呼叫的其他 agc 工具，在本 repo 一樣用 repo 相對路徑：`node scripts/mailbox-watch.mjs`、`node scripts/lane-status.mjs`、`node scripts/merge-invariants.mjs`、`node scripts/test-lock.mjs`（全套一律 `node scripts/test-lock.mjs -- npm test`）、`node scripts/feature-rollup.mjs`、`node scripts/batch-summary.mjs`。";
   const CI = "- 整合者 SOP 的「repo 的 CI 檢查」在本 repo 是 `node scripts/verify-release.mjs --ci-check --sha <sha>`（只在本 repo 能用：它從自己的位置找 repo）。";
   const BOOK = "- 整合者 5c 的記帳檢查是 `npm run check:bookkeeping`：記帳 commit 前跑、要 exit 0；它也透過測試檔在 `npm test` 裡，PR 的 CI 會再跑一次。";
   const f = addLines.indexOf(FANOUT);
@@ -92,7 +93,7 @@ test("AC-E349-2: addendum heading list unchanged; the nine §5 bullets follow th
 
   // every tool the SOP calls through the install path has a repo-relative call in the addendum
   const called = new Set([...SOP.matchAll(/node <agc install>\/scripts\/([a-z-]+)\.mjs/g)].map((m) => m[1]));
-  for (const t of ["fanout", "mailbox-watch", "lane-status", "merge-invariants", "test-lock"]) assert.ok(called.has(t), `SOP calls ${t}`);
+  for (const t of ["fanout", "mailbox-watch", "lane-status", "merge-invariants", "test-lock", "batch-summary"]) assert.ok(called.has(t), `SOP calls ${t}`);
   for (const t of [...called, "feature-rollup"]) assert.ok(ADD.includes(`node scripts/${t}.mjs`), `addendum names node scripts/${t}.mjs`);
   assert.ok(ADD.includes("node scripts/verify-release.mjs --ci-check --sha <sha>"));
   assert.equal(count(ADD, "npm run check:bookkeeping"), 1);

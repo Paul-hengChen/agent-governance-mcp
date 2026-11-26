@@ -57,10 +57,16 @@ A required field written with no value counts as missing.
 |---|---|
 | `not started` | Nobody has started the work. |
 | `done` | Every scenario is met and verified. |
-| `stopped — <reason>` | Work stopped before it was done. The reason follows an em dash (`—`) on the same line, for example `stopped — waiting on vendor firmware`. A bare `stopped` with no reason is not valid. |
+| `stopped — <reason>` | Work stopped before it was done. The reason follows an em dash (`—`) on the same line, for example `stopped — vendor firmware not available yet`. A bare `stopped` with no reason is not valid. |
 
 No other value is valid; "in progress" is deliberately not a status, because who is working on what is not
 recorded in the ticket.
+
+Two reasons have a fixed wording, so that a summary can read them. `stopped — waiting on <id>`: this ticket
+depends, directly or through other tickets, on ticket `<id>`, which stopped with an open question; when more
+than one such ticket stopped, list every id, separated by `, `. `stopped — awaiting manual verification`:
+every scenario that automation can check passed, and a `device-or-person` scenario is still to be checked. Any
+other stop states its question in an `## Open question` section (see *Batch summary*).
 
 ### Field names that are not allowed
 
@@ -171,6 +177,29 @@ worst status counts: failed, then skipped, then passed.
 Renaming a test that a `done` ticket names makes the check report it as not found. A change that renames such
 a test therefore updates the ticket's verification line in the same change.
 
+## Batch summary
+
+When tickets run as a batch, nobody is asked anything while the batch runs. A ticket stops in only two cases:
+a scenario is wrong (contradictory, missing a case that changes behaviour, impossible to build, or needing a
+change or removal), or the work needs something the ticket did not authorise (a file outside `allowed paths`,
+a schema change, an external contract, or any other decision only a person may make). Everything else, whoever
+does the work decides and records. At the end one summary lists, for the person who rules on the batch:
+
+| summary item | where it is recorded |
+|---|---|
+| done | `status: done` |
+| stopped, with its question | `status: stopped — <reason>`, and the question in an `## Open question` section |
+| waiting, with the ticket it waits on | `status: stopped — waiting on <id>` |
+| awaiting manual verification | `status: stopped — awaiting manual verification`; the summary names each `device-or-person` scenario |
+| scenarios added during the work | the `## Added during build` section |
+| decisions made during the work | a `## Decisions made during the work` section, one list item per decision: `- <who>, <YYYY-MM-DD>: <decision> — <reason>` |
+| interface details the test author decided | the test author's report, outside the ticket file (location: *Checking with this repository's tooling*) |
+| accepted visual differences | the visual review's report, outside the ticket file (location: *Checking with this repository's tooling*) |
+
+`## Open question` and `## Decisions made during the work` are free prose: like `## Context`, they go between
+the field block and `## Scenarios`. Writing them, changing `status` and filling in a test name do not change a
+scenario.
+
 ## Example ticket
 
 ```markdown
@@ -243,3 +272,13 @@ reporter that writes that JUnit output with each test's file recorded. In `.gith
 naming the ticket id, scenario id and test, then a summary line. Exit status: 0 when every named test of every
 `done` ticket passed or there is none, 1 when any problem is found, 2 when it cannot run (usage error,
 unreadable ticket directory, unreadable or unparseable results, adapter without `readResults`).
+
+The batch summary is `node scripts/batch-summary.mjs [--reports <dir>] [<file or directory> ...]`. It
+summarises the given ticket files (no argument: every ticket file in the ticket directory, as above) and reads
+reports from `--reports` (default `qa_reports`): the `## Open Interface Details` section of each
+`tests_<feature>.md` and the `## Allowed Differences` section of each `visual_<task id>.md` whose file name
+holds a summarised ticket's id as a whole word (bounded by the start or end of the name, `_`, `-` or `.`; case
+ignored). A missing reports directory means no reports. It writes nothing. A ticket file with format problems
+is listed under `unreadable tickets` with its problem count and not summarised. Exit status: 0 when it printed
+the summary, 2 when it cannot run (unknown option, `--reports` without a directory, unreadable ticket file,
+directory or reports directory).
