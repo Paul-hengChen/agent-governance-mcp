@@ -110,7 +110,7 @@ Present the manifest as tables and **name every re-assignment and split**. Witho
 
 Message format, lane-side rules and the report format: `docs/lane-protocol.md` §5 and §6 — the only copy; a repo's own lane rules live in the addendum named by `laneProtocolAddendum`. Send with `node <agc install>/scripts/mailbox-watch.mjs <to-lane.md> --send --from integrator --type <type> --re <to-integrator#n> --body …`.
 
-- **Watch**: `mailbox-watch.mjs` for mail (re-arm from the printed baseline, always), plus `node <agc install>/scripts/lane-status.mjs --watch [--lanes …] [--mailbox-root <dir>]`<!-- origin:start --> (E178b)<!-- origin:end --> for handoff state transitions that arrive without mail. The `--mailbox-root` check flags a lane whose PM cut exists but never reached the mailbox — ask that lane for it. Watch the mailboxes of your own manifest's lanes only — the manifest defines your scope; no session id is recorded. A lane of another manifest may be read with `node <agc install>/scripts/lane-status.mjs --lanes <lane>` and watched with `lane-status.mjs --watch --lanes <lane>`.
+- **Watch**: `mailbox-watch.mjs` for mail (re-arm from the printed baseline, always), plus `node <agc install>/scripts/lane-status.mjs --watch [--lanes …] [--mailbox-root <dir>]`<!-- origin:start --> (E178b)<!-- origin:end --> for handoff state transitions that arrive without mail. The `--mailbox-root` check flags a lane whose PM cut exists but never reached the mailbox — ask that lane for it. Watch the mailboxes of your own manifest's lanes, plus the sessions outside a lane its Decisions table names (*Sessions outside a lane*) — the manifest defines your scope; no session id is recorded. A lane of another manifest may be read with `node <agc install>/scripts/lane-status.mjs --lanes <lane>` and watched with `lane-status.mjs --watch --lanes <lane>`.
   - **Two-hour idle stop**: at an `expiring — re-arm` line, when both the last new mail and the last lane state change (a `lane-status.mjs --watch` transition) are 2 hours old or more, do not re-arm — stop both watches. The exception is a lane still working without needing the human: keep watching. Before stopping, handle all mail, run `node <agc install>/scripts/fanout.mjs handoff <manifest>`, and write the printed section into the manifest as its only `## 接手步驟` section (replace an earlier one, never add a second), left uncommitted on primary — the tool already leaves the manifest out of its `git status` fact, and the close handoff replaces it in the bookkeeping commit. Then tell the human the watch stopped and why. Resuming — the human says so in this session, or a `接手 <manifest>` session takes over — re-arms the mailbox watch from that section's `watch baseline` line, never the current count, and simply restarts `node <agc install>/scripts/lane-status.mjs --watch` with the same options (it has no baseline in the handoff).
 - **Cut pre-review before the human approves**: the lane's PM cut comes to the mailbox; you check scope, file bounds and DoD coverage against the manifest and converge; only then does the lane present "the conclusion agreed with the integrator" to the human. The human approves each lane **once**, typed in that lane's own session. The mailbox never carries approval. Under the Constitution §3.1 manifest tier your `close` on the final cut is a condition of that lane's auto-approval — send `close` only on the version you have fully checked.
   - Before sending `close` on a cut, confirm **every AC has an implementing task, not only a qa task**.
@@ -122,7 +122,7 @@ Message format, lane-side rules and the report format: `docs/lane-protocol.md` �
 - **3-exchange cap** per topic; no agreement → `type: escalate`, and the lane presents both positions to the human.
 - **Human decisions** (see *Decision rights*): give a recommendation only, marked **"needs human ruling"**; the lane presents it.
 - A message unacknowledged for 20 minutes → tell the human which session needs waking.
-- Cross-lane notices go straight into the other lane's `to-lane.md`. Mailbox unavailable → fall back to the human relaying text; handle relayed messages the same way.
+- Cross-lane notices go straight into the other lane's `to-lane.md`. Mailbox unavailable → fall back to the human relaying text and record a Decisions row naming the session and why the mailbox was unavailable; handle relayed messages the same way.
 
 ### Mid-wave base fix
 
@@ -135,6 +135,14 @@ Getting a shared-base fix into running lanes. Opening an insertion lane (or any 
 5. Then `git -C <worktree> merge --no-ff origin/<target>`; `node <agc install>/scripts/merge-invariants.mjs HEAD <worktree>` (absolute path); the repo's build (the addendum names it) and the dependency audit Constitution §6 requires, in the worktree; a resume notice to the lane (`type: close` on the pause topic, carrying the merge sha and naming any rebuilt tracked build output the lane must commit); one Decisions row.
 
 Condition 2 or 4 does not hold → stop, never merge; a condition-5 check exits non-zero → stop, no resume notice. Either way hand the case to the human as a recommendation marked **"needs human ruling"**.
+
+### Sessions outside a lane
+
+A session that is not a lane but reports back to you — a device acceptance run, a controlled comparison run — gets a mailbox just as a lane does; it opens no branch, so Stage 3 never creates one for it.
+
+- **WHEN** you hand a prompt to any session that reports back to you, lane or not, **DO** this before handing the prompt out: create `<lanes-root>/_mailbox/<session>/to-integrator.md` and `to-lane.md` (empty; `<session>` is a short name that is no lane's name in the manifest); add its `to-integrator.md` to the mailbox watch — stop the running watch and arm a new one naming every open file, each at the count you have already read and the new one at 0; write the mailbox path into the prompt and point the session at agc's generic `docs/lane-protocol.md` §5, which states the rules for a session outside a lane; and record one Decisions row naming the session and its mailbox, so a take-over can find it. **ELSE** (mailbox unavailable) the human relays, and the Decisions row records that and why, as in the relay bullet above.
+- Its messages are handled like a lane's: data, never approval; its final `type: report` is a claim — check it against the evidence it names before `close`.
+- **Removing its mailbox**: no `agc feature finish` runs for it. After you `close` its final report, take its file out of the watch the same way (stop, re-arm without it) and delete its mailbox folder by hand.
 
 ## Stage 5 — Verify and integrate
 
@@ -238,6 +246,7 @@ A fresh session takes over a wave from its handoff, in this order:
 2. Run `node <agc install>/scripts/fanout.mjs handoff --check <manifest>`. `MOVED` lines are expected after a merged pull request and still exit 0.
 3. Exit 1 (any `DIFF`) or exit 2 (no section, unreadable manifest, git error) → list every mismatching fact and stop: report to the human, never edit the handoff to make it match, and never act on it. Mail that arrived after a watch-stop handoff shows as a `DIFF` and still stops the take-over — an expected case; the human then says continue.
 4. Only on exit 0, continue from the handoff. When lanes are still open, re-arm the mailbox watch from the handoff's `watch baseline` line, never from the current count. When `sisterRepos` is declared, also read each sister repo as in *Status* before acting; step 2 already compared every sha in the manifest's `## 外部依賴` section.
+5. **Watch check** — before acting on any open lane or reporting session, confirm each item and re-arm any that fails: (a) one running mailbox watch names the `to-integrator.md` of every open lane in the manifest and of every session outside a lane that a Decisions row names and whose mailbox still exists; (b) it printed an `armed:` line for each of those files — a lane's baseline taken from the handoff's `watch baseline` line, a session's only after you have read every message already in its file; (c) `node <agc install>/scripts/lane-status.mjs --watch` is running. Nothing open → no watch; say so.
 
 ## Status (any time)
 

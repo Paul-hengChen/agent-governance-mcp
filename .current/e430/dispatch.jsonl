@@ -2,3 +2,8 @@
 {"ts":"2026-11-26T02:52:48.722Z","feature":"e430-mailbox-and-verify-rule","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T02:56:41.598Z","feature":"e430-mailbox-and-verify-rule","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T02:58:57.066Z","feature":"e430-mailbox-and-verify-rule","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T02:59:31.276Z","feature":"e430-mailbox-and-verify-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T03:04:12.839Z","feature":"e430-mailbox-and-verify-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T03:11:30.235Z","feature":"e430-mailbox-and-verify-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T03:12:14.369Z","feature":"e430-mailbox-and-verify-rule","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T03:12:44.502Z","feature":"e430-mailbox-and-verify-rule","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
