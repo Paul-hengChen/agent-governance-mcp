@@ -77,6 +77,8 @@ A local prototype export with no ticket file → reply only with "No ticket file
 
 A tracker number (an issue or work-item id) with no ticket file → reply only with "No ticket file for <tracker id> — start the `spec-workshop` prompt first." and stop (no chain); never write the ticket's scenarios yourself.
 
+A tracker number that has a ticket file (the file's `source` field lists it, or the tracker map does: `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints) → work from the ticket file; where the item's content differs from it, keep to the file and report the difference to the human. For a ticket cut from a tracker item, compare the item's current revision with the recorded one at work start and again before each code-reviewer dispatch; report a change, never copy it into the ticket file. Only read the tracker; never write to it.
+
 ## Auto-Routing
 
 Default-ON in `/teamwork`. Disabled in `/teamwork-lite` (different skill).

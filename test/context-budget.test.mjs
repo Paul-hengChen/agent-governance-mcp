@@ -502,7 +502,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 5196 cap", () => {
   assert.ok(toks <= 5196, `skill-pm stripped body (${toks} ~tok) must be ≤ 5196 (AC9, E426 re-baseline, zero headroom)`);
 });
 
-test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1415 cap", () => {
+test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1663 cap", () => {
   // WHY: the spec-workshop prompt is prompt-only and human-started, but its SOP body still loads in full
   // on every invocation; a cap stops it growing unnoticed. Same measurement as the pm cap: the body is
   // measured as production composes it, stripRationale(stripOriginTags(expandSkill(body))), frontmatter
@@ -515,7 +515,8 @@ test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1
   const toks = approxTokens(stripped);
   // E423 baseline: new SOP, measured 1092 ~tok, zero headroom.
   // E445 re-baseline: spec-workshop questioning rules in steps 2–5, +323 ~tok (measured 1415); was 1092, zero headroom.
-  assert.ok(toks <= 1415, `skill-spec-workshop stripped body (${toks} ~tok) must be ≤ 1415 (AC21, E445 re-baseline, zero headroom)`);
+  // E428 re-baseline: C-SW1 + C-SW2, the tracker-mirror input and ticket-file rules, +248 ~tok (measured 1663); was 1415, zero headroom.
+  assert.ok(toks <= 1663, `skill-spec-workshop stripped body (${toks} ~tok) must be ≤ 1663 (AC21, E428 re-baseline, zero headroom)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3409 cap", () => {
@@ -614,7 +615,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19559 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19699 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -643,7 +644,8 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
 
   // E449 re-baseline: C-E449, the const-15 verify-before-asserting bullet (no coord-* change), +71 ~tok (measured 19520); was 19449, zero headroom.
   // E426 re-baseline: C-CO7a, the coord-07 (ii) mini-chain ticket-file sentence (no constitution change), +39 ~tok (measured 19559); was 19520, zero headroom.
-  assert.ok(bundle <= 19559, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19559 (AC8 design-arm floor, E426 re-baseline, zero headroom)`);
+  // E428 re-baseline: C-CO1, the coord-01 tracker-number-with-ticket-file paragraph (no constitution change), +140 ~tok (measured 19699); was 19559, zero headroom.
+  assert.ok(bundle <= 19699, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19699 (AC8 design-arm floor, E428 re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

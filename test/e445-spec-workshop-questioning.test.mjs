@@ -22,6 +22,9 @@ const { ALL_GATE_CODES } = await import(path.join(ROOT, "dist", "gates", "regist
 const SOP = fs.readFileSync(path.join(ROOT, "content", "skill-spec-workshop.md"), "utf-8");
 
 // The SOP as it stood before this ticket, byte for byte (one array entry per line; the trailing "" is the final newline).
+// E428 re-pin: the tracker-mirror ticket edits this SOP outside steps 2-5 on purpose — the Ticket files
+// bullet carries C-SW1 in place of the one-item sentence, and a `## Tracker mirror` section (C-SW2) follows
+// Outputs — so BASE_SOP holds those two edits; every other line is still the pre-E445 text.
 const BASE_SOP = [
   "---",
   "recommended_model: opus",
@@ -53,10 +56,14 @@ const BASE_SOP = [
   "## Outputs",
   "",
   "- **Discussion record** — the formal output; tickets carry only its conclusions. Default path `docs/discussions/<YYYY-MM-DD>-<topic>.md` unless the human names another. It holds a `## Rulings` table `| # | date | question | ruling | replaces |`, the wave table and the approval table.",
-  "- **Ticket files** — written only by this role, in the ticket format: `<agc install>/docs/ticket-format.md` and `<agc install>/templates/ticket.md` (`<agc install>` = agc's install directory, not the workspace). They go in the ticket directory (`ticketDir` in `.current/.config.json`, default `docs/tickets/`). One ticket file maps to at most one tracker item; `source` = `<item number> rev <revision>`, the number only, never a link, and empty in a public repository. Describe internal URLs, codenames and people by class, never by name. When the project keeps a backlog, add one index line per ticket.",
+  "- **Ticket files** — written only by this role, in the ticket format: `<agc install>/docs/ticket-format.md` and `<agc install>/templates/ticket.md` (`<agc install>` = agc's install directory, not the workspace). They go in the ticket directory (`ticketDir` in `.current/.config.json`, default `docs/tickets/`). `source` = `<item number> rev <revision>`, the number only, never a link, and empty in a public repository, where the tracker map holds the item instead (*Tracker mirror*). Describe internal URLs, codenames and people by class, never by name. When the project keeps a backlog, add one index line per ticket.",
   "- **Wave table** — `| wave | ticket | depends on |`, one row per ticket.",
   "- **Approval table** — `| date | decided by | content | source |`; the human's approval is a row with `decided by` = `human`, written only after the human approves in this session.",
   "- After the approval row is written, commit the record and the ticket files together per the repository's commit rules (branch and pull request where the main branch is protected), so the commit can be cited.",
+  "",
+  "## Tracker mirror",
+  "",
+  "Only when the human asks for it in this session; without that request write nothing to any tracker (reading the items the human names stays allowed). After the approval row is written, use the host's own tracker tools to create one item for each ticket file that has none, holding the ticket's id, title and file path and saying the file is the record. A ticket cut from a tracker item gets no new item: its source item stands for it, and one child item under that source item per ticket file is created only when the human asks. A ticket file never gets a second created item; the items it was cut from do not count. Record each created item in the tracker map, by number, never a link: `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints, never tracked. Its `write-back` switch, which lets the integrator update source items, stays `off` unless the human turns it on. Format: `<agc install>/docs/ticket-format.md`, *Tracker mirror*.",
   "",
   "## Governance state",
   "",
