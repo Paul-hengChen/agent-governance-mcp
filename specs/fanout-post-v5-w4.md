@@ -2,7 +2,7 @@
 base: 2d6e2be    integration branch: integ/post-v5-w4
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（人類 2026-11-26），派工中。**
+**狀態：已結案 2026-11-26。** e426 `--no-ff` 合進 `integ/post-v5-w4`（merge `5774267`，零衝突），merge-invariants PASS；派工 base `ce36112`（清單 PR #199）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17、`check:bookkeeping` exit 0。lane 層 CI run 45772427530 @ `02214e9` 綠（Node 20、22）。Roll-up：e426 6 個 task、hop 6/14、review 退回 0、證據 6/6。E426 done-mark。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out 下一波」，2026-11-26；候選 E426、E428、E443、E420 照佇列順序，整合者提四題，人類答「照建議」）：一條 lane 只做 E426，一次 cut。票面以 `docs/backlog.md` 的 E426 列為準（含 2026-11-17 的重排註記與 2026-11-19 的審查修訂，修訂優先）；佇列 `docs/v4.0.0-new-tickets.md` 第 252 號列。E426 屬 v5.0.0 里程碑，依排定順序在 v5.0.0 之後以 v5.x 發出。本波不發版。
 
@@ -96,3 +96,20 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-26 | 人類 | 在 e426 的 session 核准 cut（spec @ `619de34`）並裁定 (4) = (a)（有票檔的票一律走 pm，C-CO7a）、(5) = (a)（ticket-format 範例改 `the test author` 並加通用規則段，C-TF1 + C-TF2）；兩題都寫在已核准的 spec 裡，只影響本 lane 的交付內容 | e426 lane session；`specs/e426-ticket-scenarios-fixed.md` 第 5 行「Human rulings」@ `07ea51b`、`.current/e426/handoff.md`（`cut_approved: true`）；e426 信箱 to-integrator#2 |
 | 2026-11-26 | 整合者 | 接受 `test/e118-reviewer-ac-completeness.test.mjs` 超出原劃歸範圍（cap 與一行註解）的機械性改動：AC7 測試標題與 assert 訊息的 4466 → 4820，是新 cap 14345 減 BASE 9525 的衍生數字；斷言邏輯與 BASE 未動（diff @ `e185f63`） | e426 信箱 to-integrator#5、to-lane#3 |
 | 2026-11-26 | 整合者 | e426 收工報告（to-integrator#7，HEAD `02214e9`）驗證通過：11 commits、乾淨樹、`check` 越界只有已劃歸的 e118、e422；證據 6/6（`review_reports/review_T-E426-01.md` covers 六個 id、APPROVED；`qa_reports/review_T-E426-01..06.md`）；無新發現；無 `.ts`／`dist/`／`templates/` 變動；lane 層 CI run 45772427530 @ `02214e9` 綠（Node 20、22）；review 退回 0、hop 6/14；`close`（to-lane#4）。波次報告不開票的意見：(R) `content/const-12-chain-r10-s4.md` 第 14 行（與 `content/const-05-core-standards.md` 第 6 行 Build gate 的括號）描述 sr → qa 退回理由時只列兩種，C-SR1 經同一路線加了第三種——描述而非窮舉、reviewer 判定無矛盾、server 不據此判斷，未達開票門檻；(O) AC9 掃 Copy 字串而非實際插入行（reviewer 手動確認相同）；(O) `agc check` 對 `test/context-budget.test.mjs` 的註解比例 advisory（lane 前即偏高）；(O) sr 與 code-reviewer 同為 opus | e426 信箱 to-integrator#7、to-lane#4 |
+| 2026-11-26 | 整合者 | 整合：`integ/post-v5-w4` 自 `main` @ `ce36112` 開出，`--no-ff` 合 e426（merge `5774267`），零衝突、無實質解衝突，merge-invariants PASS；build 無 `dist/` 差異、audit exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17；`check:bookkeeping` exit 0；E426 done-mark；`agc feature finish e426 --shipped --base integ/post-v5-w4` 無新發現可配號，worktree、branch（本機與遠端）、信箱已拆除 | 本清單；`docs/backlog.md`、`docs/v4.0.0-new-tickets.md` |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ ce36112
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v5-w4 @ e09b964）
+- lane-status：primary（main ← integ/post-v5-w4 @ e09b964）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
+### 已結案
+- e426（E426）PASS，merge `5774267`，以本波 PR 合進 `main`；lane 紀錄在 `.current/history/2026-11/e426/`；沒有未配號的新發現。波次報告不開票的意見四則（一則 recommended、三則 optional）記在 Decisions 表。
+### 待人類決定
+- 要不要發 v5.x：E424、E425、E427、E430、E449、E426 都已完成，合進 `main` 後尚未發版。
+- 下一波要不要開、開哪些票，由人類決定；佇列上還沒做的 v5.x 票見 `docs/v4.0.0-new-tickets.md`（E420 另需新鏈上結一個 design-armed feature）。
+### 進行中的背景工作
+無
