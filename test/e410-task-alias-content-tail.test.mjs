@@ -47,6 +47,8 @@ test("AC1 control: the rule is occurrence-level (flags tasks.md lines; skips the
 // the watermark row moved from line 33 to 31 and the file from 37 to 35 lines.
 // E425 re-pin: const-08 gains the batch-lane sub-bullet (row 5 -> 6, 11 -> 12 lines); skill-integrator gains
 // three stopped-batch-lane sub-bullets (rows 177 -> 179, 181 -> 183, 248 -> 251, 249 -> 252 lines).
+// E430 re-pin: skill-integrator gains the non-lane session mailbox text (C-IN1..C-IN4), rows 179 -> 187,
+// 183 -> 191, 251 -> 260, 252 -> 261 lines; span strings unchanged.
 const ROWS = [
   ["const-01-core-head.md", 31,"Task-spawned with `model:` pinned by the parent (`Task(subagent_type=…)`)", "Subagent-dispatched with `model:` pinned by the parent"],
   ["const-05-core-standards.md", 9, "Task-dispatched with a silent brief", "dispatched with a silent brief"],
@@ -59,9 +61,9 @@ const ROWS = [
   ["skill-integrator.md", 41, "dispatch PM (Task) to write", "dispatch PM to write"],
   ["skill-integrator.md", 78, "**Dispatch PM via Task**", "**Subagent-dispatch PM**"],
   ["skill-integrator.md", 81, "re-dispatch PM via Task to revise", "re-dispatch PM to revise"],
-  ["skill-integrator.md", 179, "dispatch `code-reviewer` via Task on", "subagent-dispatch `code-reviewer` on"],
-  ["skill-integrator.md", 183, "dispatch `qa-engineer` via Task to", "subagent-dispatch `qa-engineer` to"],
-  ["skill-integrator.md", 251, "is not Task-spawned,", "is not a subagent,"],
+  ["skill-integrator.md", 187, "dispatch `code-reviewer` via Task on", "subagent-dispatch `code-reviewer` on"],
+  ["skill-integrator.md", 191, "dispatch `qa-engineer` via Task to", "subagent-dispatch `qa-engineer` to"],
+  ["skill-integrator.md", 260, "is not Task-spawned,", "is not a subagent,"],
   ["skill-pm.md", 111, "Task-subagent dispatch: if your turn ends", "Subagent dispatch: if your turn ends"],
 ];
 
@@ -75,7 +77,7 @@ test("AC2: each site carries its new span, the old span is gone, the line has no
 });
 
 test("AC2: each edited file keeps its line count", () => {
-  const counts = { "const-01-core-head.md": 35,"const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 12, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 252, "skill-pm.md": 120 };
+  const counts = { "const-01-core-head.md": 35,"const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 12, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 261, "skill-pm.md": 120 };
   for (const [f, c] of Object.entries(counts)) assert.equal(read(f).split("\n").length, c, f);
 });
 
