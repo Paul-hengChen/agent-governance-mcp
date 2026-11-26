@@ -17,3 +17,4 @@
 {"ts":"2026-11-26T03:42:33.975Z","feature":"e430-mailbox-and-verify-rule","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T03:53:00.997Z","feature":"e430-mailbox-and-verify-rule","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T04:02:41.496Z","feature":"e430-mailbox-and-verify-rule","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T04:04:29.149Z","feature":"e430-mailbox-and-verify-rule","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
