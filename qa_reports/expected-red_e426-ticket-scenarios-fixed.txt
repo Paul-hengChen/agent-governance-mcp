@@ -1,0 +1,21 @@
+# e426-ticket-scenarios-fixed — red until the build (T-E426-02..05). Written by qa-engineer, T-E426-01.
+# Format: <relative test file path> | <exact test name>. AC2 and AC10 are green at base (existing behaviour), not listed.
+
+# T-E426-02: C-PM1 is not yet at the head of skill-pm's Acceptance Criteria bullet.
+test/e426-ticket-scenarios-fixed.test.mjs | AC1: skill-pm's Acceptance Criteria bullet starts with C-PM1 directly after the bullet label (ticket file cited, scenarios not copied, where feasible not applicable)
+# T-E426-02: C-PM2 is not yet on skill-pm's Acceptance Criteria line.
+test/e426-ticket-scenarios-fixed.test.mjs | AC3: skill-pm carries C-PM2 once, between C-PM1's `does not apply.` and `**No ticket file**: `, on the same line; the file keeps 119 lines
+# T-E426-03: C-QA1 (step 3), C-QA2 (step 4 sub-step h) and C-QA3 (step 8) are not yet in skill-qa-engineer.
+test/e426-ticket-scenarios-fixed.test.mjs | AC4: skill-qa-engineer reads the Added during build section (C-QA1), ends step 4 with sub-step h (C-QA2) before `5. **Run**`, and step 8's sr-engineer return carries C-QA3; e425's C-QA stays last in step 6
+# T-E426-04: C-SR1 is not yet in skill-sr-engineer step 4c.
+test/e426-ticket-scenarios-fixed.test.mjs | AC5: skill-sr-engineer step 4c carries C-SR1 directly before ` ELSE build to the tests.`; its Escalation Routes are unchanged
+# T-E426-04: C-CR1 (Clean context) and C-CR2 (step 4) are not yet in skill-code-reviewer.
+test/e426-ticket-scenarios-fixed.test.mjs | AC6: skill-code-reviewer Clean context reads the Added during build section (C-CR1); step 4 carries C-CR2 directly after `a rejection reason (test defect).`; step 4a then step 5 follow
+# T-E426-05: C-CO7a (ruled item (4) option (a)) is not yet appended to coord-07's (ii) mini-chain bullet.
+test/e426-ticket-scenarios-fixed.test.mjs | AC7: coord-07's (ii) mini-chain bullet is the base line plus C-CO7a at its end, nothing else changed (ruled option (a))
+# T-E426-05: the C-TF1 paragraph and the C-TF2 example line (ruled item (5) option (a)) are not yet in docs/ticket-format.md.
+test/e426-ticket-scenarios-fixed.test.mjs | AC8: the ticket-format section Scenarios added during the work ends with the C-TF1 paragraph and the example's Added: line is C-TF2; the example still checks with 4 scenarios (ruled option (a))
+# T-E426-02..05: none of the lane's Copy strings is present yet, so the presence half of the scan fails.
+test/e426-ticket-scenarios-fixed.test.mjs | AC9: every string the lane adds is present and names no repo-only path, no bare ticket id or version label, no backtick-quoted error code, and gives qa-engineer no judge action
+# T-E426-05: line 160 re-pinned (integrator-assigned) from `the implementer` to `the test author`; the doc's example says `the implementer` until C-TF2 lands.
+test/e422-ticket-format-doc.test.mjs | AC8 the example is generic: no tracker link, no local path, and it shows an added-during-build scenario
