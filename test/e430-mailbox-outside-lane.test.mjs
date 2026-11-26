@@ -150,7 +150,9 @@ test("AC8: Two-hour idle stop sub-bullet holds C-IN5 once, before the byte-uncha
   const resumeSentence = BASE_IDLE_STOP.slice(BASE_IDLE_STOP.indexOf(RESUME));
   assert.ok(idle.endsWith(resumeSentence), "the Resuming sentence is byte-unchanged and still the sub-bullet's last sentence");
   assert.equal(idle, BASE_IDLE_STOP.replace(RESUME, C_IN5 + " " + RESUME), "sub-bullet is its pre-amendment text with C-IN5 + one space inserted, nothing else");
-  assert.equal(count(SOP, "\n"), 260, "file line count unchanged (C-IN5 adds no line)");
+  // E428 re-pin: the `## Tracker items` section (E428 C-IN1) adds nine lines after Stage 6, so 260 -> 269;
+  // C-IN5 itself still adds none. The title keeps "260" so archived evidence still names this test.
+  assert.equal(count(SOP, "\n"), 269, "file line count: 260 at E430 + 9 for the E428 Tracker items section (C-IN5 adds no line)");
 
   const served = linesOf(stripRationale(stripOriginTags(SOP)));
   assert.ok(served[onlyLine(served, (l) => l.includes(C_IN5), "served line holding C-IN5")].includes(C_IN5), "C-IN5 survives serving verbatim");
