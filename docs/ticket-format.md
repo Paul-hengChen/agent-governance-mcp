@@ -140,6 +140,14 @@ section are not read.
 Existing scenarios are never edited or removed while the work is under way. If one has to change or go, the
 ticket is stopped (`stopped — <reason>`) and re-agreed instead.
 
+A case that turns up during the work is sorted three ways. When it extends behaviour that the ticket or the
+existing code already decides, it is appended as a scenario, with its verification line. When it would decide
+new behaviour, it is not appended: the ticket is stopped with the question (see *Batch summary*). When it is
+only an interface detail the scenarios leave open, such as a name, a parameter, an exit code or an output
+format, the test author decides it and records it in their report. Scenarios are appended only by whoever
+plans the work, when it is cut, and by the test author, while writing the tests; whoever builds or reviews the
+work and finds such a case hands it to the test author instead.
+
 ## Where ticket files are listed
 
 The project's backlog stays the index of all work. A backlog entry for a ticket that has a ticket file points
@@ -251,7 +259,7 @@ Column order and quoting rules do not change.
 - When the report is exported as CSV
 - Then that header cell is written in double quotes
 - Verification: command npm test -- export-csv
-- Added: the implementer, 2026-01-15, a column name with a comma broke the header row
+- Added: the test author, 2026-01-15, a column name with a comma broke the header row
 ```
 
 ## Checking with this repository's tooling
