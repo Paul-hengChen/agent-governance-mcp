@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// Scenario tests for specs/e430-mailbox-and-verify-rule.md AC1–AC4 (T-E430-01).
+// Scenario tests for specs/e430-mailbox-and-verify-rule.md AC1–AC4 (T-E430-01) and AC8 (T-E430-04).
 // WHY: a session outside a lane that reports to the integrator must get a mailbox in the watch, the
 // lane protocol must tell it which rules apply, and a take-over must check the watch as an item.
 // C_* strings are the spec's Copy / Strings table verbatim; BASE_* lines are frozen pre-edit text the
@@ -26,6 +26,8 @@ const BASE_MAILBOX_READY = "3. **Mailbox ready**: create `<lanes-root>/_mailbox/
 const BASE_TAKEOVER_STEP4 = "4. Only on exit 0, continue from the handoff. When lanes are still open, re-arm the mailbox watch from the handoff's `watch baseline` line, never from the current count. When `sisterRepos` is declared, also read each sister repo as in *Status* before acting; step 2 already compared every sha in the manifest's `## 外部依賴` section.";
 const OLD_WATCH_SENTENCE = "Watch the mailboxes of your own manifest's lanes only — the manifest defines your scope; no session id is recorded.";
 const LP_RULE6 = "6. 30 分鐘沒有回覆 → 告訴人類，不要一直空等。";
+const C_IN5 = "Whichever way it resumes, the mailbox watch also names the `to-integrator.md` of every session outside a lane that a Decisions row names and whose mailbox still exists, armed only after you have read every message already in its file, as *Take-over* step 5 (b) does — the handoff has no `watch baseline` for it.";
+const BASE_IDLE_STOP = "  - **Two-hour idle stop**: at an `expiring — re-arm` line, when both the last new mail and the last lane state change (a `lane-status.mjs --watch` transition) are 2 hours old or more, do not re-arm — stop both watches. The exception is a lane still working without needing the human: keep watching. Before stopping, handle all mail, run `node <agc install>/scripts/fanout.mjs handoff <manifest>`, and write the printed section into the manifest as its only `## 接手步驟` section (replace an earlier one, never add a second), left uncommitted on primary — the tool already leaves the manifest out of its `git status` fact, and the close handoff replaces it in the bookkeeping commit. Then tell the human the watch stopped and why. Resuming — the human says so in this session, or a `接手 <manifest>` session takes over — re-arms the mailbox watch from that section's `watch baseline` line, never the current count, and simply restarts `node <agc install>/scripts/lane-status.mjs --watch` with the same options (it has no baseline in the handoff).";
 
 const SOP = read("content/skill-integrator.md");
 const LP = read("docs/lane-protocol.md");
@@ -130,4 +132,29 @@ test("AC4: every line the lane adds or changes in the integrator SOP cites no re
   assert.equal(count(SOP, "npm test"), 0, "no `npm test`");
   assert.equal(count(SOP.toLowerCase(), "this repo"), 0, "no `this repo`");
   assert.equal(count(SOP, "node scripts/"), 0, "no `node scripts/`");
+});
+
+// AC8: a same-session resume after the idle stop must also re-arm sessions outside a lane, which the
+// handoff's `watch baseline` line never names. C-IN5 is its own sentence before `Resuming — …` because
+// another suite pins that sentence verbatim and as the sub-bullet's ending; BASE_IDLE_STOP is frozen.
+const RESUME = "Resuming — the human says so in this session";
+const AFTER = "Then tell the human the watch stopped and why. ";
+
+test("AC8: Two-hour idle stop sub-bullet holds C-IN5 once, before the byte-unchanged last Resuming sentence; file stays 260 lines; C-IN5 served text is adopter-safe", () => {
+  assert.equal(count(BASE_IDLE_STOP, RESUME), 1, "sanity: frozen base holds the Resuming anchor once");
+  const ls = linesOf(SOP);
+  const idle = ls[onlyLine(ls, (l) => l.startsWith("  - **Two-hour idle stop**"), "Two-hour idle stop sub-bullet")];
+  assert.equal(count(idle, C_IN5), 1, "idle-stop sub-bullet contains C-IN5 exactly once");
+  assert.equal(count(SOP, C_IN5), 1, "C-IN5 occurs exactly once in the file");
+  assert.equal(count(idle, AFTER + C_IN5 + " " + RESUME), 1, "C-IN5 sits directly after the tell-the-human sentence and directly before Resuming, one space each side");
+  const resumeSentence = BASE_IDLE_STOP.slice(BASE_IDLE_STOP.indexOf(RESUME));
+  assert.ok(idle.endsWith(resumeSentence), "the Resuming sentence is byte-unchanged and still the sub-bullet's last sentence");
+  assert.equal(idle, BASE_IDLE_STOP.replace(RESUME, C_IN5 + " " + RESUME), "sub-bullet is its pre-amendment text with C-IN5 + one space inserted, nothing else");
+  assert.equal(count(SOP, "\n"), 260, "file line count unchanged (C-IN5 adds no line)");
+
+  const served = linesOf(stripRationale(stripOriginTags(SOP)));
+  assert.ok(served[onlyLine(served, (l) => l.includes(C_IN5), "served line holding C-IN5")].includes(C_IN5), "C-IN5 survives serving verbatim");
+  assert.doesNotMatch(C_IN5, REPO_ONLY, "C-IN5 names no repo-only path");
+  assert.doesNotMatch(C_IN5, TICKET, "C-IN5 names no bare ticket id");
+  for (const c of ALL_GATE_CODES) assert.ok(!C_IN5.includes(`\`${c}\``), `C-IN5 quotes no gate code ${c}`);
 });

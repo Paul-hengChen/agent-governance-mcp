@@ -15,6 +15,7 @@ Test-file placement: the dispatch brief's `Test-file placement` line pre-authori
 | AC5 | `test/e449-verify-before-asserting.test.mjs` | `AC5: C-E449 appears exactly once in every composition, under §7 directly after Fail loud and before External-reference policy; other §7 lines unchanged` |
 | AC6 | `test/e449-verify-before-asserting.test.mjs` | `AC6: the C-E449 line in the constitution cites no repo-only path, no bare ticket id and no digit` |
 | AC7 | — | no test this hop: T-E449-03 (re-capture goldens, re-baseline caps, re-pin e410), then the spec's `proof:` commands |
+| AC8 | `test/e430-mailbox-outside-lane.test.mjs` | `AC8: Two-hour idle stop sub-bullet holds C-IN5 once, before the byte-unchanged last Resuming sentence; file stays 260 lines; C-IN5 served text is adopter-safe` (revision 2, T-E430-04) |
 
 ## Open Interface Details
 
@@ -25,6 +26,7 @@ Test-file placement: the dispatch brief's `Test-file placement` line pre-authori
 - **AC4/AC6 repo-only pattern**: the served-text pin's single `REPO_ONLY` regex (`test/e453-served-text-v5.test.mjs`); `<agc install>/…` passes its lookbehind natively, and `docs/lane-protocol.md` (shipped by agc) is removed from the line before matching, as the spec allows. Ticket id: `/\bE\d{2,}[a-z]?\b/` (spec). Gate codes: every `ALL_GATE_CODES` entry in backticks. File-wide: `npm test`, `this repo` (case-insensitive), `node scripts/` absent.
 - **AC5 compositions (11)**: the 8 `buildPromptForRole` modes (lite/chain × design/non-design × fullDetail on/off, same workspace shape as `test/compose-equivalence.test.mjs`), the SessionStart hook's lite (default env) and full (`AGC_DEFAULT_SKILL=full`) output, and the raw 15-fragment concatenation. Per composition: one §7 heading in the whole output, `C-E449` exactly once in the whole output (also guards against a role-SOP copy, per ruling Q2 (a)), and the §7 line block equals `heading, blank, the five base bullets through Fail loud, C-E449, External-reference (variant), blank`. Rationale is kept in the fullDetail builds, both hooks and the concatenation; stripped in the four non-fullDetail builds (matches the base goldens).
 - **AC6** scans the line as it sits in `content/const-15-core-tail.md` (what ships), and also requires it to equal `C-E449`.
+- **AC8 (revision 2)**: `C_IN5` was extracted mechanically from the spec's `C-IN5` Copy row (the text between the row's outer backticks, up to `` ` — inserted``) and `BASE_IDLE_STOP` from the current (pre-amendment) `**Two-hour idle stop**` line, both embedded as JSON string literals. The exact-line check is `idle === BASE_IDLE_STOP.replace(RESUME, C_IN5 + " " + RESUME)` with `RESUME = "Resuming — the human says so in this session"`; position, byte-unchanged `Resuming — …` sentence and last-sentence are also asserted separately for a clear failure message. Line count: `count(SOP, "\n") === 260` (same as `wc -l`; e410's `split("\n").length` 261). Hygiene runs on `C_IN5` itself after confirming it survives `stripRationale(stripOriginTags(...))` verbatim on exactly one served line; same `REPO_ONLY`, ticket-id and backtick-gate-code checks as AC4.
 
 ## Red Reasons
 
@@ -34,6 +36,7 @@ Test-file placement: the dispatch brief's `Test-file placement` line pre-authori
 - AC4: `### Sessions outside a lane heading: expected exactly one line, found 0` — no added lines to scan yet.
 - AC5: `build lite non-design: C-E449 appears exactly once` (0 !== 1) — C-E449 not in const-15.
 - AC6: `exactly one Verify before asserting line in the §7 fragment` (0 !== 1) — C-E449 not in const-15.
+- AC8 (revision 2): `idle-stop sub-bullet contains C-IN5 exactly once` (0 !== 1) — C-IN5 not inserted yet (T-E430-05).
 
 Validity probe: with the spec's six strings applied temporarily to `content/const-15-core-tail.md`, `content/skill-integrator.md` and `docs/lane-protocol.md`, all six tests passed (6/6); the three files were then restored from saved copies and `git status` showed no change to them.
 
@@ -88,3 +91,13 @@ Rows 40, 41, 78, 81 unchanged (above the insertions). A two-line `E430 re-pin` c
 `node scripts/test-lock.mjs -- npm test` on a clean worktree at `5be69f7`: **4765 pass / 0 fail / 2 skipped of 4767**, exit 0. `npm run build` before the commit left no `dist/` diff.
 
 Expected-red manifest `qa_reports/expected-red_e430-mailbox-and-verify-rule.txt`: **fully resolved** — its six entries went green with sr-engineer's commit `b86f965`, and the 17 planned shared-artifact reds (11 goldens, 4 caps, 2 e410) are green after this commit. The manifest is kept as the record (not deleted).
+
+## T-E430-04 — revision 2 (AC8): C-IN5 pin
+
+Test-file placement acted on: the brief's `Test-file placement` line — the AC8 test added to the existing `test/e430-mailbox-outside-lane.test.mjs` (header comment now names AC8 / T-E430-04); no other test file touched; no `content/**` edit.
+
+Red now: only AC8, failing at its first content assertion (`idle-stop sub-bullet contains C-IN5 exactly once`, 0 !== 1). AC1–AC4 stay green (AC8 reads only the idle-stop line and the file's line count).
+
+Validity probe: `C-IN5` (extracted from the spec, not retyped) applied temporarily to `content/skill-integrator.md` directly before `Resuming — the human says so in this session` with one space; `node --test` over `e430-mailbox-outside-lane`, `e285-integrator-session-handoff`, `e410-task-alias-content-tail`, `e292-integrator-sop`: 31 pass / 0 fail. Restored by copying the saved base content back; `git diff --stat -- content` empty afterwards.
+
+Expected-red manifest: one entry appended (AC8).

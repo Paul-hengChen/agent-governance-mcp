@@ -14,3 +14,6 @@ test/e430-mailbox-outside-lane.test.mjs | AC4: every line the lane adds or chang
 test/e449-verify-before-asserting.test.mjs | AC5: C-E449 appears exactly once in every composition, under §7 directly after Fail loud and before External-reference policy; other §7 lines unchanged
 # AC6: no `- **Verify before asserting**` line in content/const-15-core-tail.md yet (T-E449-02)
 test/e449-verify-before-asserting.test.mjs | AC6: the C-E449 line in the constitution cites no repo-only path, no bare ticket id and no digit
+
+# Revision 2 (qa-engineer, T-E430-04). AC8: the Stage 4 `**Two-hour idle stop**` sub-bullet does not yet hold C-IN5 before `Resuming — …` (T-E430-05); went green in a temporary probe with C-IN5 applied (then restored)
+test/e430-mailbox-outside-lane.test.mjs | AC8: Two-hour idle stop sub-bullet holds C-IN5 once, before the byte-unchanged last Resuming sentence; file stays 260 lines; C-IN5 served text is adopter-safe
