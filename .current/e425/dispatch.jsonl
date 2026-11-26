@@ -19,3 +19,4 @@
 {"ts":"2026-11-25T17:50:40.654Z","feature":"e425-stop-ticket-batch","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T17:53:15.205Z","feature":"e425-stop-ticket-batch","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-25T17:53:45.804Z","feature":"e425-stop-ticket-batch","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T00:50:09.291Z","feature":"e425-stop-ticket-batch","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
