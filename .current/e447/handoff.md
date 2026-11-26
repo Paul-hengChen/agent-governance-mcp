@@ -2,7 +2,7 @@
 schema_version: 17
 active_feature: "e447-local-knowledge-files"
 status: "In_Progress"
-last_updated: "2026-11-26T12:46:58.368Z"
+last_updated: "2026-11-26T13:17:35.583Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e447-local-knowledge-files.md"
 scope_decision: "single-feature"
@@ -16,7 +16,7 @@ dispatch_pins:
   qa-engineer: "opus"
 evidence_schema: 3
 next_role: "sr-engineer"
-dispatched_at: "2026-11-26T12:46:58.368Z"
+dispatched_at: "2026-11-26T13:17:35.583Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 review_round: 0
@@ -31,11 +31,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E447-03 built (commit 112957a) in bin/agc-init.mjs (+272/-4): feature start seeds untracked knowledge files (specs/, design/, research/, ticketDir, docs/backlog.md) when the primary config sets "knowledge": "local" (read raw), only where the lane path is absent and git-ignored in the lane (one check-ignore --stdin batch); symlink copied as target bytes, dangling skipped with e447.start-dangling; hashes in .current/<lane>/knowledge-seed.json (resolveLanePaths().knowledgeSeedPath, filename via laneFile("knowledgeSeed")), e447.start-seeded line. feature reseed <path>... (O2 a): all-or-nothing, refuses non-knowledge/escaping paths (exit 2), lane-changed/created/deleted files (exit 1), non mode-on lane (exit 1). Usage + (start | finish | reseed). Next T-E447-06.
-- Correction: T-E447-02 is commit 18ffb6f — the earlier note's 3461754 was rewritten away (amend; Constitution §6 forbids it, this session used none).
-- Green now (T-03): AC3, AC4, Copy usage-init/usage-feature, Copy feature-unknown, AC9 match, AC9 reseed refuses, AC9 reseed boundaries. Still red as planned: AC1, AC5-AC8 (T-06 finish), AC9 changed + AC9 reseed (reseed works; the test first needs check --cut MANIFEST_CHANGED, T-04), AC11 (T-04), AC12 (T-07), lane-paths REG1 (T-05 re-pin). Expected-red manifest: status note appended, no entry removed (AC2/AC10-init/T-03 green entries left for qa to reconcile in T-05).
-- Full suite (node scripts/test-lock.mjs -- npm test): 4817 tests, 4804 pass / 11 fail / 2 skipped; the 11 = 10 e447 manifest entries + lane-paths REG1; no newly red existing test. A first run hung in test/lane-migrate.test.mjs (99% CPU 52 min under load ~12; same file passes 39/39 in 10s standalone) and was killed and rerun. npm run build clean (dist unchanged: bin only); npm audit --audit-level=high exit 0 (6 moderate + 1 low, pre-existing).
-- Unscripted strings added (no qa test): start warns when .current/<lane>/knowledge-seed.json would not be git-ignored in the lane (seeds nothing), on a per-file copy failure, and on a seeding failure; reseed refuses a path not git-ignored in the lane (tracked, or no rule), a path that is not a file in the primary checkout, and an unreadable seed record; reseed with no operand is a usage error (exit 2). A lane-absent, unrecorded file is seeded fresh by reseed.
+- sr-engineer: T-E447-06 built (commit 208b793) in bin/agc-init.mjs (+198/-17, 1 file). Mode on ("knowledge": "local", read raw): planKnowledgeHarvest runs before any mutation; lane untracked git-ignored knowledge files whose sha256 differs from the seed record go to the same path (--shipped; a changed seed overwrites primary only while primary still has the seeded hash, else the e180 refuse line) or <root>/abandoned/<lane>/<sub> (--abandoned, D6); unchanged seeds counted (e447.finish-unchanged); lane-deleted seeds stay (D7); specs/ filtered out of the evidence harvest at the call (constants unchanged).
+- Fix (4): worktree-only pending-tickets.md numbered via planPendingApply (new optional backlogBlob param; mode off reads --base as before) into primary's untracked docs/backlog.md, no commit, e447.finish-numbered; lane pending marked applied before the .current/<lane>/ history copy; E287 preserve skipped in mode on. Finish usage +6 lines. readKnowledgeSeedFiles factored out, reused by reseed.
+- Green now: AC1, AC5, AC6 overwrite, AC6 both changed, AC7, AC8. Finish regression suites (e180 e196 e205 e213 e217 e246 e287 e298 e335 e351 e385 e429, agc-feature-finish-history, agc-feature-lifecycle) green.
+- Full suite (test-lock npm test, no hang): 4817 tests, 4810 pass / 5 fail / 2 skipped; the 5 = AC9 changed, AC9 reseed, AC11 (T-04), AC12 (T-07), lane-paths REG1 (T-05); no newly red existing test. Build clean (dist unchanged); npm audit --audit-level=high exit 0. Expected-red manifest: status note appended, no entry removed.
+- Untested behaviour: malformed seed record at finish refuses; no seed record = every lane knowledge file counts as created; blocking non-dir ancestor at dst refuses; lane dangling symlink / non-ignored untracked file skipped; --shipped with a lane-changed docs/backlog.md appends rows to the lane copy (a re-run after a late failure then refuses it as both-changed); malformed pending blocks in mode on refuse; absent backlog with blocks to number refuses; finish usage wording (no Copy row).
+- next T-E447-04
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
