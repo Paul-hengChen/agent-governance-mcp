@@ -51,3 +51,29 @@ Every text assertion in AC1 and AC3–AC7 runs twice: once on the raw source and
 - Sanity check of the tests themselves: I applied every Copy row with the ruled options to a scratch copy of `content/` and `docs/` (outside the repo; nothing tracked was touched). There all 10 e426 tests and the re-pinned e422 test are green, and skill-pm stays at 119 lines. So each red is red only because the build has not happened, not because of a test defect. In that copy, the e425, e5-intake-tiering, ac-execution, e455, e427, e410 and e413 pins also stayed green.
 - The full suite was not run (per the brief, it runs on the T-E426-06 planned return).
 - CI runnability: headless `node --test`. It needs no human, network or git, and fixtures live under `os.tmpdir()`.
+
+## T-E426-06 — re-baseline goldens and caps (planned return, AC11)
+
+Placement: the brief's `Test-file placement` line (existing files only; no new test file). Measured values are from this worktree after T-E426-02..05 (`npm run build`, then the assertion messages of the failing tests); each matches sr-engineer's report.
+
+### Compose golden
+
+- Route: the repo's own capture tool, `npm run build && node scripts/capture-constitution-golden.mjs` (regenerates all 12 fixtures in `test/fixtures/compose-golden/`).
+- Result: only `skill-coordinator-monolith.txt` changed; the other 11 (constitution and hook bundles) hold no `coord-*` text and came back byte-identical.
+- `git diff -U0 test/fixtures/compose-golden/`: 1 file, 1 hunk (`@@ -272 +272 @@`, the *(ii) mini-chain* bullet). The new line is the old line plus one sentence at its end, the C-CO7a text verbatim (` A ticket that has a ticket file does not take this shortcut: pm writes its spec, and the spec's `Ticket:` line is what the per-scenario check at PASS reads.`). No other byte moved.
+
+### Caps (each: cap value in title, assertion and message, plus one re-baseline comment line directly above the assertion, as the E425 re-baseline did)
+
+| file | test | was | now | delta | Copy ids |
+|---|---|---|---|---|---|
+| `test/context-budget.test.mjs` | skill-pm stripped token count | 4942 | 5196 | +254 ~tok | C-PM1, C-PM2 |
+| `test/context-budget.test.mjs` | skill-sr-engineer stripped token count | 3308 | 3409 | +101 ~tok | C-SR1 |
+| `test/context-budget.test.mjs` | teamwork coordinator bundle (design-arm) | 19520 | 19559 | +39 ~tok | C-CO7a (no constitution change) |
+| `test/e118-reviewer-ac-completeness.test.mjs` | AC7 token discipline | 13991 bytes (BASE 9525 + 4466) | 14345 bytes (BASE 9525 + 4820) | +354 bytes | C-CR1, C-CR2 |
+
+- Comment discipline: every changed block stays within seven lines (skill-pm block 6, skill-sr block 6, teamwork E449/E426 block 2, e118 new single line inside the test body, so the 7-line header block above the test is unchanged).
+- The skill-qa-engineer SOP has no cap in these files, so C-QA1..C-QA3 move none.
+
+### Red manifest
+
+`qa_reports/expected-red_e426-ticket-scenarios-fixed.txt` is unchanged: its entries are the T-E426-01 scenario tests, all green after the build. The five shared-artifact reds above were never listed there (they were sr-engineer's reported reds) and are green after this task.

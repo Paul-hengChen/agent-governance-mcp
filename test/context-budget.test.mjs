@@ -481,7 +481,7 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 4942 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 5196 cap", () => {
   // WHY: the stripped pm skill must stay within its reduction budget, bounding each pm dispatch.
   // Cap rule: a qa-owned re-measure sets the cap to the exact measured size (zero headroom). The
   // body is measured as production composes it: stripRationale(stripOriginTags(expandSkill(body))).
@@ -498,7 +498,8 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4942 cap", () => {
   // E433 re-baseline: skill-pm test-first chain routing, +207 ~tok (measured 4998); was 4791, zero headroom.
   // E434 re-baseline: skill-pm names reviewer-visual in place of qa-visual, +1 ~tok (measured 4999); was 4998, zero headroom.
   // E435 re-baseline (T-E435-40): T-E435-36 drops the chain_path marker from the step-8 write and its marker sentence plus the bugfix-mode marker clause, -57 ~tok (measured 4942); was 4999, zero headroom.
-  assert.ok(toks <= 4942, `skill-pm stripped body (${toks} ~tok) must be ≤ 4942 (AC9, E435 re-baseline, zero headroom)`);
+  // E426 re-baseline: C-PM1 + C-PM2 on the Acceptance Criteria line (ticket-file citation, appended scenarios at the cut), +254 ~tok (measured 5196); was 4942, zero headroom.
+  assert.ok(toks <= 5196, `skill-pm stripped body (${toks} ~tok) must be ≤ 5196 (AC9, E426 re-baseline, zero headroom)`);
 });
 
 test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1415 cap", () => {
@@ -517,7 +518,7 @@ test("AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1
   assert.ok(toks <= 1415, `skill-spec-workshop stripped body (${toks} ~tok) must be ≤ 1415 (AC21, E445 re-baseline, zero headroom)`);
 });
 
-test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3308 cap", () => {
+test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3409 cap", () => {
   // WHY: the same budget for the sr-engineer dispatch, with the same composition and zero-headroom
   // cap rule as the pm cap test above. History: specs/e260i-comment-rationale.md
   // (test/context-budget.test.mjs).
@@ -532,7 +533,8 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 3308 cap", () =>
   // E433 re-baseline: skill-sr-engineer builds to qa tests, return routes + Escalation rows replace the QA Round Reply, +530 ~tok (measured 3335); was 2805, zero headroom.
   // E434 re-baseline: the visual split request leaves skill-sr-engineer and the whole-surface loop runs qa-engineer's checks, -50 ~tok (measured 3285); was 3335, zero headroom.
   // E453 re-baseline: step 4c says SQLite/HTTP mode counts no returns and that a pm In_Progress write resets the sr_return count, and step 3b routes an infeasible repro to the scenario-cannot-be-built row, +23 ~tok (measured 3308); was 3285, zero headroom.
-  assert.ok(toks <= 3308, `skill-sr stripped body (${toks} ~tok) must be ≤ 3308 (AC2, E453 re-baseline, zero headroom)`);
+  // E426 re-baseline: C-SR1 in step 4c (a case no scenario covers routes back to qa-engineer), +101 ~tok (measured 3409); was 3308, zero headroom.
+  assert.ok(toks <= 3409, `skill-sr stripped body (${toks} ~tok) must be ≤ 3409 (AC2, E426 re-baseline, zero headroom)`);
 });
 
 // --- Constitution rationale fencing (second-round strip) ---
@@ -612,7 +614,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19520 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19559 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -640,7 +642,8 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // E453 re-baseline: the design-arm constitution change above (+49) plus the coord-01 routing rows naming how sr-engineer, code-reviewer and qa-engineer are reached, the coord-03 "awaiting an independent judge" note and the coord-05 reviewer-visual dispatch and void-policy sentences (+109), +158 ~tok (measured 19221); was 19063, zero headroom.
 
   // E449 re-baseline: C-E449, the const-15 verify-before-asserting bullet (no coord-* change), +71 ~tok (measured 19520); was 19449, zero headroom.
-  assert.ok(bundle <= 19520, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19520 (AC8 design-arm floor, E449 re-baseline, zero headroom)`);
+  // E426 re-baseline: C-CO7a, the coord-07 (ii) mini-chain ticket-file sentence (no constitution change), +39 ~tok (measured 19559); was 19520, zero headroom.
+  assert.ok(bundle <= 19559, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19559 (AC8 design-arm floor, E426 re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
