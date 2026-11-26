@@ -164,9 +164,9 @@ SOP / doc text. Every item below ships to adopters: it cites no repo-only path a
    - **知識檔也留本機的 repo**：fan-out 清單不在 lane branch 上，manifest tier 改看 `feature start` 複製進來的那份；`check --cut` 另外逐 byte 比對它和 primary 當下的清單，不同就 exit 非 0 並印 `manifest changed since lane start — re-seed`，這時先跑 `agc feature reseed specs/fanout-<id>.md` 再重跑 `check --cut`。
 ```
 
-**DOC-INST-5** (starts with one space; appended to the (iii) disposition cell)
+**DOC-INST-5** (starts with a period and one space, because the existing cell has no closing period; appended to the (iii) disposition cell — amended by the coordinator after T-E447-07 showed the run-on join)
 ```text
- With `"knowledge": "local"`, the knowledge exclude rules are kept, so untracked knowledge files never show up for a `git add -A`; remove them by hand from the shared `.git/info/exclude` when you no longer need them.
+. With `"knowledge": "local"`, the knowledge exclude rules are kept, so untracked knowledge files never show up for a `git add -A`; remove them by hand from the shared `.git/info/exclude` when you no longer need them.
 ```
 
 **DOC-CFG** — a section headed "`knowledge` — keep knowledge files out of git too (optional)": an example `{"artifacts": "local", "knowledge": "local"}`; a value table (`"local"`: `agc init` writes root-anchored exclude rules for `specs/`, `design/`, `research/`, the ticket directory and `docs/backlog.md`, plus `AGENTS.md` / `.antigravityrules` only when agc creates them; `"repo"` or absent: today's behaviour); semantics bullets: needs `"artifacts": "local"`; read raw from the primary checkout's file by `agc init`, `agc feature start`, `agc feature reseed`, `agc feature finish` and `fanout.mjs check --cut`; lanes see a snapshot, recorded in `.current/<lane>/knowledge-seed.json`; closing bullet verbatim:
@@ -237,6 +237,7 @@ Probe: literal and regex grep of `test/` for every owned file's path and for the
 **Will go red, outside the manifest's owned set — assigned to e447 by the integrator at cut pre-review (standing unowned-red rule); re-pinned by qa in T-E447-05:**
 - `test/lane-paths.test.mjs` — REG1 pins `LANE_FILES` at 8 entries and its filename list; D4 makes 9 (`knowledge-seed.json`). Re-pin: count 9, 8 optional, list + `knowledge-seed.json`.
 - `test/e410-task-alias-content-tail.test.mjs` — AC2 pins const-08 at 12 `split("\n")` parts and its Lease-Override alias site at line 6; C-C08K makes 13 and line 7.
+- `test/e428-tracker-mirror.test.mjs` — AC6 and AC12 freeze the sha256 of `content/skill-integrator.md` with that file's own Copy taken out; C-IN-R4 changes it. Re-pin: the frozen hash value only, every other assertion unchanged (assigned by the integrator after T-E447-04, mailbox to-lane#7).
 
 **Readers that stay green if the constraints above hold (owned; listed by the manifest or the probe):** `test/e106-init-artifacts-flag.test.mjs`, `test/e239-init-subdir-exclude.test.mjs`, `test/e108-eject.test.mjs`, `test/e351-lane-protocol-gaps.test.mjs`, `test/e429-lane-config-copy.test.mjs`, `test/e213-shipped-ignored-shape.test.mjs`, `test/e217-abandoned-specs-harvest.test.mjs`, `test/e180-abandoned-harvest.test.mjs`, `test/e335-symlinked-pending-harvest.test.mjs`, `test/e385-worktree-evidence.test.mjs`, `test/agc-feature-finish-history.test.mjs`, `test/agc-adapters.test.mjs`, `test/e444-claude-local-adapter.test.mjs`, `test/e296-manifest-tier.test.mjs`, `test/e350-fanout-call-form.test.mjs`, `test/e433-test-first-rules.test.mjs`, `test/e453-served-text-v5.test.mjs`, `test/e391-prompt-audit-stale-facts.test.mjs`, `test/e178a-integrator-role.test.mjs`, `test/skill-evolution-v3.11.test.mjs`. `test/e395-claude-md-tail.test.mjs` and `test/e436-stale-handoff-paths.test.mjs` stay green because D10 adds no `tools/*.ts` and leaves `CLAUDE.md` alone.
 
