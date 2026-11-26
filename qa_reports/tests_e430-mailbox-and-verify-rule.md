@@ -42,3 +42,49 @@ Validity probe: with the spec's six strings applied temporarily to `content/cons
 Full suite under `node scripts/test-lock.mjs -- npm test` after the commit: see the hand-off note for the counts. Expected: only the six tests above red. The reds that sr-engineer's content edits will add (11 compose goldens, 4 context-budget caps, 2 e410 line pins) are T-E449-03's, not listed here.
 
 CI runnability: both files run headless under `node --test` with no network, no fixed sha and temp workspaces under `os.tmpdir()` that are removed in `finally`.
+
+## T-E449-03 — planned return (AC7): goldens, caps, e410 re-pin
+
+Wave rule R3 (b), spec *Shared-artifact plan*. Commit `5be69f7`. Test-file placement acted on: the brief's `Test-file placement` line (`test/fixtures/compose-golden/**`, `test/context-budget.test.mjs`, `test/e410-task-alias-content-tail.test.mjs` row numbers and line count only); no other test file touched; no `content/**`, `docs/**`, `dist/**` or `.ts` edit.
+
+### Goldens (11) — re-captured, not hand-written
+
+Mechanism: `npm run build`, then `node scripts/capture-constitution-golden.mjs` (the script `test/compose-equivalence.test.mjs` mirrors; it rewrites all 12 fixtures from the current sources). `git diff --stat -- test/fixtures/compose-golden/`: 11 files, 11 insertions, 0 deletions; `skill-coordinator-monolith.txt` unchanged (no coord-* edit in this lane).
+
+| golden | hunk |
+|---|---|
+| build-lite-nondesign, build-lite-design, build-lite-nondesign-fd, build-lite-design-fd, build-full-nondesign, build-full-design, build-full-nondesign-fd, build-full-design-fd, hook-lite, hook-full, constitution-monolith | one added line, `C-E449` (`- **Verify before asserting**: …`), directly after the §7 `Fail loud` bullet and before `External-reference policy`; byte-equal to `content/const-15-core-tail.md` line 44 |
+
+Check: `git diff -U0` over the golden dir has exactly one distinct `+` content line (count 11) and no `-` content line.
+
+### Context-budget caps (4) — set to measured, zero headroom
+
+Measured with the file's own estimator (the failing assertions printed the actual values before the edit; matched sr-engineer's numbers). Each cap gets a one-line `// E449 re-baseline: C-E449, the const-15 verify-before-asserting bullet, +71 ~tok (measured N); was M, zero headroom.` comment, separated from the existing history block by a blank line so the changed comment block is 1 line (seven-line rule). Test titles, assertion messages and the two inline path comments in the non-design test carry the new numbers.
+
+| test | was | measured / cap | delta | hunk |
+|---|---|---|---|---|
+| AC2 lean always-on bundle | 6003 | 6074 | +71 | C-E449 (const-15 is core, lands in lite) |
+| AC8 design-arm stripped constitution | 9336 | 9407 | +71 | C-E449 |
+| AC8 teamwork coordinator bundle | 19449 | 19520 | +71 | C-E449 only; no coord-* change |
+| AC8 non-design constitution | 7424 | 7495 | +71 | C-E449 lands on both arms; design-only saving stays 9407 − 7495 = 1912 (≥ 1912 floor unchanged) |
+
+`agc check` comment advisory after the edit: no `long-block` finding; one pre-existing whole-file `high-ratio` note on `test/context-budget.test.mjs` (41.5%, limit 30%), advisory only.
+
+### e410 re-pin — row numbers and line count only
+
+`content/skill-integrator.md` gained C-IN1..C-IN4 above the three pinned rows; each span string is unchanged and was confirmed on its new line by reading the file.
+
+| row | was | now |
+|---|---|---|
+| `subagent-dispatch \`code-reviewer\` on` | 179 | 187 |
+| `subagent-dispatch \`qa-engineer\` to` | 183 | 191 |
+| `is not a subagent,` | 251 | 260 |
+| line count (`split("\n").length`) | 252 | 261 |
+
+Rows 40, 41, 78, 81 unchanged (above the insertions). A two-line `E430 re-pin` comment extends the existing re-pin history block to 6 lines.
+
+### Suite after T-E449-03
+
+`node scripts/test-lock.mjs -- npm test` on a clean worktree at `5be69f7`: **4765 pass / 0 fail / 2 skipped of 4767**, exit 0. `npm run build` before the commit left no `dist/` diff.
+
+Expected-red manifest `qa_reports/expected-red_e430-mailbox-and-verify-rule.txt`: **fully resolved** — its six entries went green with sr-engineer's commit `b86f965`, and the 17 planned shared-artifact reds (11 goldens, 4 caps, 2 e410) are green after this commit. The manifest is kept as the record (not deleted).
