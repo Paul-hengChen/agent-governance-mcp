@@ -226,13 +226,13 @@ test("AC6 - example report gains exactly one AC Completeness section (second, af
 // E434 re-baseline: code-reviewer gains step 6a (Copy cr.visual_step, 398 bytes + newline) and nothing else
 // (spec AC2): 12691 -> 13090 bytes, so the cap moves 12800 -> 13190 (the expected size plus ~100 bytes of slack).
 // E424 re-baseline: step 8 gains the per-scenario record line format and the ticket rule (Copy sop.step8, spec AC13):
-// 13090 -> 13663 bytes (+573), so the cap moves 13190 -> 13760 (the measured size plus ~100 bytes of slack).
-test("AC7 - token discipline: file grows by at most 4235 bytes over BASE (9525 bytes)", () => {
+// 13090 -> 13663 bytes (+573), cap 13190 -> 13760. E425: step 4a (Copy C-CR) 13663 -> 13991, cap = measured size.
+test("AC7 - token discipline: file grows by at most 4466 bytes over BASE (9525 bytes)", () => {
   const size = fs.statSync(SKILL_PATH).size;
   const BASE_SIZE = 9525;
   const growth = size - BASE_SIZE;
   // eslint-disable-next-line no-console -- the token-discipline check requires the measured number on record (AC7).
   console.log(`AC7: measured content/skill-code-reviewer.md size=${size} bytes, growth=${growth} bytes over BASE=${BASE_SIZE}`);
   assert.ok(growth >= 0, `size ${size} is smaller than BASE ${BASE_SIZE} — unexpected shrink`);
-  assert.ok(size <= 13760, `size ${size} exceeds the AC7 cap of 13760 (BASE ${BASE_SIZE} + 4235)`);
+  assert.ok(size <= 13991, `size ${size} exceeds the AC7 cap of 13991 (BASE ${BASE_SIZE} + 4466)`);
 });
