@@ -1,0 +1,16 @@
+# Expected reds for e430-mailbox-and-verify-rule (qa-engineer, T-E430-01 + T-E449-01).
+# Each test is red at base because the spec's new text is not in content/** or docs/** yet; all six
+# went green in a temporary probe with the spec's verbatim strings applied (then restored).
+
+# AC1: content/skill-integrator.md has no `### Sessions outside a lane` block (C-IN2) yet; C-IN1 / C-IN4 not applied (T-E430-02)
+test/e430-mailbox-outside-lane.test.mjs | AC1: integrator SOP Stage 4 has the Sessions-outside-a-lane block (C-IN2), relay bullet C-IN1, Watch bullet C-IN4; Stage 3 check 3 unchanged
+# AC2: docs/lane-protocol.md §5 has no `### 非 lane 的 session` block (C-LP1) yet (T-E430-03)
+test/e430-mailbox-outside-lane.test.mjs | AC2: lane protocol §5 has the 非 lane 的 session block (C-LP1) after rule 6; finish sentence, eight ## lines and generic wording kept
+# AC3: Take-over step 4 is not yet followed by step 5 `**Watch check**` (C-IN3) (T-E430-02)
+test/e430-mailbox-outside-lane.test.mjs | AC3: Take-over step 4 unchanged and directly followed by step 5 C-IN3; section still directly before ## Status (any time)
+# AC4: the added lines to scan do not exist yet (anchor: `### Sessions outside a lane` heading missing) (T-E430-02)
+test/e430-mailbox-outside-lane.test.mjs | AC4: every line the lane adds or changes in the integrator SOP cites no repo-only path, bare ticket id or gate code
+# AC5: C-E449 is absent from content/const-15-core-tail.md, so every composition has it 0 times, not 1 (T-E449-02)
+test/e449-verify-before-asserting.test.mjs | AC5: C-E449 appears exactly once in every composition, under §7 directly after Fail loud and before External-reference policy; other §7 lines unchanged
+# AC6: no `- **Verify before asserting**` line in content/const-15-core-tail.md yet (T-E449-02)
+test/e449-verify-before-asserting.test.mjs | AC6: the C-E449 line in the constitution cites no repo-only path, no bare ticket id and no digit
