@@ -217,6 +217,15 @@ The five verifier constraints<!-- origin:start --> (E192)<!-- origin:end --> hol
 
 **Your own commits** (bookkeeping, plans, backlog, docs) ride the open wave's `integ/<feature>` branch or, when no wave is open, a `docs/<date>-<slug>` branch landed by pull request the same way (steps 3–6 above) — never local `main`. They are verified the same way — CI on the pushed branch (the repo's CI check on `<HEAD>` after the push), the local full suite only under the *CI fallback* (5a) — the same bar as a lane. "Docs only" is not an exemption. A local full suite for them — under the *CI fallback* or as a pre-push run — MUST run inside the 5a verifier, never in your own context.
 
+## Tracker items
+
+Only a ticket with a row in the tracker map gets tracker writes — `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints, never tracked (format: `<agc install>/docs/ticket-format.md`, *Tracker mirror*). No row, no write. Use the host's own tracker tools (update an item's state, add a comment):
+
+- **`mirror` or `child` row** — update that item as the ticket moves: in progress at dispatch; at a stop, the stopped state and the reason after `stopped — `; the pull request's number once it is open; done at merge.
+- **`source` row** — the same updates, only when the map's `write-back` line reads `on`. It is off by default; only the human turns it on.
+- **A stop's question** (the ticket's `## Open question`) is never posted, whatever the row: draft it in your report; the human decides whether to post it.
+- **One way only** — never copy tracker content into a ticket file. Where an item and its ticket file differ, the file wins; report the difference.
+
 ## Git operations
 
 Constitution §6 is the authority: the base list for all roles, plus the integrator-only grant. `git fetch` (5b-1) and `git -c pull.rebase=false pull --ff-only` on `main` (5b-1, 6-5) are on the base list — the `-c pull.rebase=false` override is there because a user-level `pull.rebase` setting otherwise makes `pull --ff-only` refuse while `.current/` has uncommitted files; `main` itself is never pushed — it moves only by pull request merge. When each granted operation is used: `switch -c` (5b-2), `merge --no-ff` (5b-3; also `merge --no-ff main` into the integration branch for a `BEHIND` pull request, 6-4; and the base-fix merge `merge --no-ff origin/<target>` run in a lane worktree, Stage 4 *Mid-wave base fix*), `switch main` (never `--force` / `--discard-changes`) followed by `pull --ff-only` (6-5), `gh pr create` and `gh pr merge --auto --merge` (6-3; never `--squash` / `--rebase` / `--admin`), `worktree remove` (never `--force`) and `branch -d` (never `-D`) only for teardown the tool does not already do (6-6), `update-ref -d <ref> <expected-sha>` only to compare-and-delete a stray ref you verified points at `<expected-sha>` — never to get past a refusal. Any git operation hits a wall → stop and report branch, sha and the trigger.

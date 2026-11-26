@@ -1,2 +1,6 @@
 {"ts":"2026-11-26T07:40:31.425Z","feature":"e428-tracker-mirror","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T08:02:23.462Z","feature":"e428-tracker-mirror","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T08:11:20.907Z","feature":"e428-tracker-mirror","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T08:11:46.414Z","feature":"e428-tracker-mirror","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T08:19:12.428Z","feature":"e428-tracker-mirror","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T08:26:33.696Z","feature":"e428-tracker-mirror","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

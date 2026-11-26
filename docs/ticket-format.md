@@ -154,6 +154,49 @@ The project's backlog stays the index of all work. A backlog entry for a ticket 
 at it by the ticket file's path relative to the repository root. Older backlog entries without a ticket file
 are not converted.
 
+## Tracker mirror
+
+The ticket file is the record. A team that also wants its tickets on an issue tracker may ask for a one-way
+mirror; nothing is mirrored unless a person asks for it.
+
+- Direction is fixed, repository to tracker. Content edited on the tracker is never read back into a ticket
+  file; when an item and its ticket file differ, the file wins and the difference is reported to a person.
+- A ticket file gets at most one tracker item created for it: a mirror item, or, for a ticket cut from an
+  item, one child item under that item when a person asks. The items a ticket was cut from (its `source`)
+  are not counted, and a ticket cut from an item gets no mirror item.
+- A ticket file holds tracker item numbers only in its `source` field, never a link; in a public repository
+  it holds none. Every other number, and in a public repository the source items too, goes in the tracker map.
+- Before work starts and again before acceptance, a source item's current revision is compared with the
+  recorded one; a change is reported to a person, never copied into the ticket file.
+- Writing to a source item (its state, stop reason and pull-request number) is off unless the tracker map
+  turns it on. A stop's open question is never posted by a tool: it is drafted for a person to post or not.
+- Without a mirror request nothing is written to a tracker. Reading an item and comparing its revision stay
+  allowed.
+
+### Tracker map
+
+The tracker map is a local file named `agc-tracker-map.md`, directly in the directory that
+`git rev-parse --git-common-dir` prints. That directory is git's own storage, so git never tracks the file
+and no ignore rule is needed, and every linked worktree of the repository reads the same file. It does not
+travel with a clone. Never keep it in the working tree. For example:
+
+```
+write-back: off
+
+| ticket | item | kind | revision |
+|---|---|---|---|
+| E900 | 1234 | source | 7 |
+| E899 | 1240 | mirror | — |
+```
+
+- `write-back` is `on` or `off`. A missing file, a missing line or any other value means `off`; only a
+  person turns it on.
+- Each table row pairs one ticket id with one tracker item number, never a link. `kind` is `source` (an
+  item the ticket was cut from), `mirror` (the item created for the ticket) or `child` (the item created
+  for the ticket under its source item). `revision` is a source item's revision when the ticket was written,
+  and `—` for the other kinds.
+- A ticket has at most one `mirror` or `child` row.
+
 ## Named tests checked in CI
 
 A project may check, on every push and pull request, that the tests its finished tickets name exist and
