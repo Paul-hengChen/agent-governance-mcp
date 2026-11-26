@@ -2,7 +2,7 @@
 base: 11a35b2    integration branch: integ/post-v5-w5
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（2026-11-26），派工中。**
+**狀態：已結案 2026-11-26。** e428 `--no-ff` 合進 `integ/post-v5-w5`（merge `4e12d01`，零衝突），merge-invariants PASS；派工 base `32e7f7e`（清單 PR #201）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17、`check:bookkeeping` exit 0。lane 層 CI run 45795128772 @ `16d9be7` 綠。Roll-up：e428 7 個 task、hop 10/14、review 退回 1、證據 7/7。E428 done-mark；E443 Phase 0 第一段紀錄 `specs/e443-phase0-host-check.md`（用量上限四項待觀察）。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out 下一波」，2026-11-26；候選 E428、E443、E420 照佇列順序，整合者提五題，人類答「照建議，這波做 E428」）：一條 lane 只做 E428，一次 cut；E443 的 Phase 0 由一個非 lane 的 session 同時進行；E420 不列。票面以 `docs/backlog.md` 的 E428 列為準（含 2026-11-18 的補充與 2026-11-19 的審查修訂，修訂優先）；佇列 `docs/v4.0.0-new-tickets.md` 第 254 號列。E428 屬 v5.0.0 里程碑，依排定順序在 v5.0.0 之後以 v5.x 發出。本波不發版。
 
@@ -106,3 +106,21 @@ E428 與 E443 同改 `content/skill-integrator.md`、compose golden 與 `test/co
 | 2026-11-26 | 人類 | 在 e428 的 session 核准修訂 cut（spec @ `dede8b2`）並選 (a)（「approve (a)」）：整合者也認票檔 `source` 欄；只影響本 lane 的交付內容，spec 本身即照 (a) 撰寫 | e428 lane session；`specs/e428-tracker-mirror.md`「Amendment after review round 1」段 @ `dede8b2`、`.current/e428/handoff.md`（`cut_approved: true`）；e428 信箱 to-integrator#11 |
 | 2026-11-26 | 整合者 | e428 收工報告（to-integrator#14，HEAD `16d9be7`）驗證通過、`close`（to-lane#4）：14 commits、乾淨樹；`check` 越界只有已劃歸的 e410、e430、e445、e462；證據 7/7（`review_reports/review_T-E428-01.md` Round 2 APPROVED、covers T-E428-01..07；`qa_reports/review_T-E428-01..07.md`）；無新發現；無 `.ts`／`dist/`／`scripts/`／`templates/` 變動；lane 層 CI run 45795128772 @ `16d9be7` 綠；review 退回 1（F1，情境缺陷，人類選 (a) 後修正）、hop 10/14。波次報告不開票的意見：(O) C-SW2 與 C-TF1 對照檔 bullet 的「under that/its source item」在 `source` 有多個 item 時仍有歧義（改會動 spec-workshop 預算上限與凍結文字）；(O) C-TF1 bullet 6 沒說開 `write-back` 是否算鏡射要求（C-IN1 已講清開關規則）；(A) `agc check` 註解 advisory：`test/e428-tracker-mirror.test.mjs` 開頭與 `test/e410-task-alias-content-tail.test.mjs` 第 45 行的區塊 9 行，超過本 lane spec 自訂的 7 行——不退回（約 3 hop，exit 0）；(O) `test/context-budget.test.mjs` 註解比例 advisory（lane 前即偏高） | e428 信箱 to-integrator#14、to-lane#4 |
 | 2026-11-26 | 整合者 | 整合：`integ/post-v5-w5` 自 `main` @ `32e7f7e` 開出，`--no-ff` 合 e428（merge `4e12d01`），零衝突、無實質解衝突，merge-invariants PASS；build 無 `dist/` 差異、audit exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17；E428 done-mark（`docs/backlog.md`、佇列第 254 號列），`check:bookkeeping` exit 0；E443 Phase 0 第一段紀錄寫入 `specs/e443-phase0-host-check.md`。Roll-up：e428 7 個 task、hop 10/14、review 退回 1（PM 重入後 `review_round` 歸零）、證據 7/7 | 本清單；`docs/backlog.md`、`docs/v4.0.0-new-tickets.md`、`specs/e443-phase0-host-check.md` |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 32e7f7e
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v5-w5 @ 504e478）
+- lane-status：primary（main ← integ/post-v5-w5 @ 504e478）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
+### 已結案
+- e428（E428）PASS，merge `4e12d01`，以本波 PR 合進 `main`；lane 紀錄在 `.current/history/2026-11/e428/`；沒有未配號的新發現。波次報告不開票的意見四則（三則 optional、一則 advisory）與 `mailbox-watch.mjs --send` 對非 lane session 寫不出 `hop: —` 的既有缺口（沿用第 3 波不開票的決定）記在 Decisions 表。
+- 非 lane session p0host（E443 Phase 0 第一段）已結案、信箱已刪；紀錄 `specs/e443-phase0-host-check.md`：方案 A 第一段可行，前提為主 repo 在根目錄被明確信任、slash 指令在 session 就緒後才送。
+### 待人類決定
+- 要不要發 v5.x：E424、E425、E427、E430、E449、E426、E428 都已完成，合進 `main` 後尚未發版。
+- E443 Phase 0 第二段：用量上限四項（重置後是否自己接續、subagent 撞到上限的行為、第三次接續之後、可辨識的訊號）待人類在真的 lane 撞到上限時回報，整合者補進 `specs/e443-phase0-host-check.md`；四項有結論前 E443 Phase 1 不開 lane。
+- 下一波要不要開、開哪些票，由人類決定；E420 仍需新鏈上結一個 design-armed feature。
+### 進行中的背景工作
+無
