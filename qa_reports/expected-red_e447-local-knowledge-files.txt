@@ -44,3 +44,7 @@ test/e447-mode-off.test.mjs | AC10: mode off -> init writes no knowledge rule; -
 test/e447-served-text.test.mjs | AC11: C-C08K served once directly after the Batch-lane line on both design arms, not in lite; C-CO3K ends coord-03's bookkeeping line; C-IN-R4 ends Stage 1 step 3; all portable
 # DOC-CFG, DOC-INST-1..5 and DOC-LP-1..3 are not in docs/ yet (T-E447-07).
 test/e447-served-text.test.mjs | AC12: docs/config.md has exactly one knowledge section after ticketDir; docs/install.md carries DOC-INST-1..5; docs/lane-protocol.md carries DOC-LP-1..3 at their anchors
+
+# sr-engineer T-E447-02: the D4 knowledgeSeed LANE_FILES entry makes 9 entries; REG1 pins 8. Planned
+# re-pin by qa in T-E447-05 (integrator-assigned unowned red).
+test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 8 entries — 1 required (handoff) + 7 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks/baseSha)

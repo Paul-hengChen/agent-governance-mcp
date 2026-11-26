@@ -37,6 +37,11 @@ export declare const LANE_FILES: readonly [{
     readonly key: "baseSha";
     readonly filename: "base-sha";
     readonly required: false;
+}, {
+    readonly key: "knowledgeSeed";
+    readonly filename: "knowledge-seed.json";
+    readonly required: false;
+    readonly noFlatCounterpart: true;
 }];
 export type LaneFileKey = (typeof LANE_FILES)[number]["key"];
 export interface LanePaths {
@@ -48,6 +53,7 @@ export interface LanePaths {
     pendingTicketsPath: string;
     tasksPath: string;
     baseShaPath: string;
+    knowledgeSeedPath: string;
 }
 export declare function laneFile(key: LaneFileKey): LaneFileEntry;
 export declare const HANDOFF_LOCK_FILENAME = ".handoff.lock";

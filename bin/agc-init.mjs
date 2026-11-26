@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // `agc` — agent-governance-mcp workspace CLI (details: specs/e260c-bin-scripts.md).
-//   agc init [--artifacts=local|repo] [--adapter=shared|local]  scaffold
+//   agc init [--artifacts=local|repo] [--adapter=shared|local] [--knowledge=local|repo]  scaffold
 //     .current/.config.json, tasks.md, adapters.
 //     Never writes .current/<lane>/handoff.md: any seeded prev tuple dead-ends the
 //     ALLOWED_TRANSITIONS lookup, so the first pm:In_Progress write creates it (E34).
@@ -34,7 +34,7 @@ const ADAPTERS = [
 
 const STR_USAGE =
   "Usage: agc <command>\n" +
-  "  init [--artifacts=local|repo] [--adapter=shared|local]\n" +
+  "  init [--artifacts=local|repo] [--adapter=shared|local] [--knowledge=local|repo]\n" +
   "          Scaffold .current/.config.json, tasks.md, and per-agent entry\n" +
   "          adapters (CLAUDE.md, AGENTS.md, .antigravityrules) in the current\n" +
   "          directory. Existing files are left as-is, except CLAUDE.md's agc\n" +
@@ -47,6 +47,9 @@ const STR_USAGE =
   "          instead, kept out of git via .git/info/exclude. With no flag,\n" +
   "          local is picked only on a first install into a tracked CLAUDE.md\n" +
   "          with local artifacts — see docs/install.md.\n" +
+  "          --knowledge=local (opt-in, needs local artifacts) also keeps specs/,\n" +
+  "          design/, research/, the ticket directory and docs/backlog.md out\n" +
+  "          of git; agc feature start then seeds each lane with them.\n" +
   "  check   Warn if any generated adapter files are stale vs the installed\n" +
   "          agent-governance-mcp version.\n";
 
@@ -301,14 +304,15 @@ function isArtifactsMode(v) {
   return v === "local" || v === "repo";
 }
 
-// Upsert top-level "artifacts": "<value>" into an EXISTING .current/.config.json,
+// Upsert top-level "artifacts": "<value>" (or `key`, another local|repo mode
+// key such as "knowledge") into an EXISTING .current/.config.json,
 // with the same splice and reparse guard as upsertHostKey. Unlike `host`, the
 // other valid value IS overwritten: the value is always an explicit request
 // (or the fresh-workspace default), so switching local <-> repo is legitimate.
 //   returns "updated"       — key added, repaired, or switched; file rewritten
 //   returns "has-artifacts" — already this value; file left byte-identical
 //   returns "malformed"     — not a JSON object, or no unambiguous rewrite
-function upsertArtifactsKey(abs, value) {
+function upsertArtifactsKey(abs, value, key = "artifacts") {
   const raw = fs.readFileSync(abs, "utf-8");
   let parsed;
   try {
@@ -319,10 +323,10 @@ function upsertArtifactsKey(abs, value) {
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return "malformed";
   }
-  if (parsed.artifacts === value) return "has-artifacts";
+  if (parsed[key] === value) return "has-artifacts";
 
-  const hasKey = Object.prototype.hasOwnProperty.call(parsed, "artifacts");
-  const updated = spliceTopLevelKey(raw, "artifacts", JSON.stringify(value), hasKey);
+  const hasKey = Object.prototype.hasOwnProperty.call(parsed, key);
+  const updated = spliceTopLevelKey(raw, key, JSON.stringify(value), hasKey);
   if (updated === null) return "malformed";
 
   // Load-bearing for the same reason as upsertHostKey's guard: the
@@ -334,7 +338,7 @@ function upsertArtifactsKey(abs, value) {
   } catch {
     return "malformed";
   }
-  if (reparsed === null || typeof reparsed !== "object" || reparsed.artifacts !== value) {
+  if (reparsed === null || typeof reparsed !== "object" || reparsed[key] !== value) {
     return "malformed";
   }
 
@@ -357,15 +361,47 @@ function readDeclaredArtifacts(abs) {
   return undefined;
 }
 
+// The already-declared "knowledge" value ("local" | "repo"), or undefined, and
+// the configured ticket directory (raw value, or undefined), from an existing
+// config. Read raw like readDeclaredArtifacts: never through loadConfig.
+function readDeclaredKnowledge(abs) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(abs, "utf-8"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return {
+        knowledge: isArtifactsMode(parsed.knowledge) ? parsed.knowledge : undefined,
+        ticketDir: parsed.ticketDir,
+      };
+    }
+  } catch {
+    // absent / unreadable / unparseable — undeclared
+  }
+  return { knowledge: undefined, ticketDir: undefined };
+}
+
+// The ticket directory as a workspace-relative posix path without a trailing
+// slash: a usable configured `ticketDir` (the server's rule in
+// tools/config.ts: relative, no "~", not "." or above the workspace), else
+// docs/tickets.
+function knowledgeTicketDir(value) {
+  if (typeof value !== "string" || value.trim() === "") return "docs/tickets";
+  if (path.posix.isAbsolute(value) || path.win32.isAbsolute(value) || /^[A-Za-z]:/.test(value) || value.startsWith("~")) {
+    return "docs/tickets";
+  }
+  const normalized = path.posix.normalize(value.replace(/\\/g, "/")).replace(/\/$/, "");
+  return normalized === "." || normalized.split("/")[0] === ".." ? "docs/tickets" : normalized;
+}
+
 // --- subcommand: init ------------------------------------------------------
-// Parse `agc init`'s arguments. Only --artifacts and --adapter are
+// Parse `agc init`'s arguments. Only --artifacts, --adapter and --knowledge are
 // recognised (`--name value` or `--name=value`); any other argument is
 // ignored, as before the flags existed. An invalid value throws a usage error
 // BEFORE anything is written, so a typo never leaves a partial scaffold
-// behind. Returns { artifacts, adapter } — each undefined when omitted.
+// behind. Returns { artifacts, adapter, knowledge } — each undefined when omitted.
 function parseInitArgs(argv) {
   let artifacts;
   let adapter;
+  let knowledge;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--artifacts") {
@@ -376,6 +412,10 @@ function parseInitArgs(argv) {
       adapter = i + 1 < argv.length ? argv[++i] : "";
     } else if (a.startsWith("--adapter=")) {
       adapter = a.slice("--adapter=".length);
+    } else if (a === "--knowledge") {
+      knowledge = i + 1 < argv.length ? argv[++i] : "";
+    } else if (a.startsWith("--knowledge=")) {
+      knowledge = a.slice("--knowledge=".length);
     }
   }
   if (artifacts !== undefined && !isArtifactsMode(artifacts)) {
@@ -386,7 +426,10 @@ function parseInitArgs(argv) {
   if (adapter !== undefined && !Object.prototype.hasOwnProperty.call(ADAPTER_PLACEMENTS, adapter)) {
     throw usageError(`agc init: --adapter must be "shared" or "local" (got ${JSON.stringify(adapter)})`);
   }
-  return { artifacts, adapter };
+  if (knowledge !== undefined && !isArtifactsMode(knowledge)) {
+    throw usageError(`agc init: --knowledge must be "local" or "repo" (got ${JSON.stringify(knowledge)})`);
+  }
+  return { artifacts, adapter, knowledge };
 }
 
 function runInit(cwd, argv = []) {
@@ -399,7 +442,7 @@ function runInit(cwd, argv = []) {
 
   // Everything that can fail on bad input or an unusable git setup runs
   // before the first write, so a failure leaves the directory untouched.
-  const { artifacts: requested, adapter: requestedAdapter } = parseInitArgs(argv);
+  const { artifacts: requested, adapter: requestedAdapter, knowledge: requestedKnowledge } = parseInitArgs(argv);
   const repoRoot = resolveRepoRootOrNull(cwd); // null = not inside a git repo
   // Rules and pathspecs are anchored at the workspace, not at the repo root:
   // run from a subdirectory, the scaffold lands there and so must the rules.
@@ -425,6 +468,27 @@ function runInit(cwd, argv = []) {
   // without a flag is left byte-identical.
   const keyValue = requested !== undefined ? requested : declared === undefined ? mode : null;
 
+  // Knowledge mode: an explicit flag wins, else the declared value; absent
+  // means "repo" (nothing changes). Only a flag writes the key. "local" needs
+  // local artifacts: the lane seed record lives in the git-ignored .current/.
+  const declaredKnowledge = readDeclaredKnowledge(configAbs);
+  const knowledgeLocal = (requestedKnowledge ?? declaredKnowledge.knowledge) === "local";
+  if (knowledgeLocal && mode !== "local") {
+    throw usageError(
+      `agc init: --knowledge=local needs local artifacts — the lane seed record lives in the git-ignored ` +
+        `.current/; re-run with --artifacts=local`
+    );
+  }
+  const ticketDir = knowledgeTicketDir(declaredKnowledge.ticketDir);
+  if (knowledgeLocal && repoRoot !== null && ticketDir.split("/").some((seg) => GITIGNORE_UNSAFE_SEGMENT_RE.test(seg))) {
+    throw usageError(
+      `agc init: refusing --knowledge=local — ticketDir "${escapeSegmentForDisplay(ticketDir)}" contains a character ` +
+        `unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character). ` +
+        `Rename the directory, or re-run with --knowledge=repo.`
+    );
+  }
+  const knowledgeBaseRules = [...new Set([...KNOWLEDGE_LOCAL_RULES, `/${ticketDir}/`, `/${BACKLOG_REL}`])];
+
   // A workspace path segment with a character unsafe for a gitignore exclude
   // rule (see GITIGNORE_UNSAFE_SEGMENT_RE) cannot be turned into an exclude
   // rule that matches exactly the scaffold, so local mode refuses here —
@@ -444,6 +508,8 @@ function runInit(cwd, argv = []) {
   // CLAUDE.local.md holds it, in any artifacts mode and git state. Failing
   // that, "local" only on a first install into a team file: inside git,
   // CLAUDE.md tracked, artifacts mode "local", and no block in CLAUDE.md yet.
+  // With "knowledge": "local", "local" whenever CLAUDE.md holds no block yet,
+  // tracked or not: a new untracked CLAUDE.md would be visible to git.
   // Every other case is "shared", so a workspace whose CLAUDE.md holds the
   // block (alone or beside CLAUDE.local.md) re-runs exactly as before.
   const claudeTracked = isWorkspaceFileTracked({ repoRoot, workspace }, "CLAUDE.md");
@@ -455,7 +521,7 @@ function runInit(cwd, argv = []) {
       ? requestedAdapter
       : keepsLocalBlock
         ? "local"
-        : claudeTracked && mode === "local" && !claudeHoldsBlock
+        : (claudeTracked || knowledgeLocal) && mode === "local" && !claudeHoldsBlock
           ? "local"
           : "shared";
 
@@ -487,6 +553,7 @@ function runInit(cwd, argv = []) {
   "schema_version": 2,
   "host": "claude-code"` +
     (keyValue ? `,\n  "artifacts": ${JSON.stringify(keyValue)}` : "") +
+    (requestedKnowledge ? `,\n  "knowledge": ${JSON.stringify(requestedKnowledge)}` : "") +
     `
 }
 `;
@@ -526,7 +593,10 @@ function runInit(cwd, argv = []) {
       const hostResult = upsertHostKey(configAbs);
       const artifactsResult = keyValue ? upsertArtifactsKey(configAbs, keyValue) : "has-artifacts";
       artifactsRecorded = artifactsResult !== "malformed" && (keyValue !== null || declared !== undefined);
-      const results = [hostResult, artifactsResult];
+      const knowledgeResult = requestedKnowledge
+        ? upsertArtifactsKey(configAbs, requestedKnowledge, "knowledge")
+        : "has-artifacts";
+      const results = [hostResult, artifactsResult, knowledgeResult];
       if (hostResult === "malformed") {
         warnings.push(
           `${configRel}: could not add "host" — left untouched (not valid JSON, ` +
@@ -537,6 +607,12 @@ function runInit(cwd, argv = []) {
         warnings.push(
           `${configRel}: could not add "artifacts" — left untouched (not valid JSON, ` +
             `or the "artifacts" key could not be rewritten unambiguously)`
+        );
+      }
+      if (knowledgeResult === "malformed") {
+        warnings.push(
+          `${configRel}: could not add "knowledge" — left untouched (not valid JSON, ` +
+            `or the "knowledge" key could not be rewritten unambiguously)`
         );
       }
       if (results.includes("updated")) {
@@ -594,6 +670,37 @@ function runInit(cwd, argv = []) {
         `\nNot defaulting to "local" automatically — re-run with --artifacts=local ` +
         `or --artifacts=repo to choose explicitly.`
     );
+  }
+
+  // Git-side half of the knowledge choice (mode is "local" here, by the
+  // refusal above). "repo" writes nothing, as for artifacts. AGENTS.md and
+  // .antigravityrules get a rule only when they are agc's own: absent (init
+  // creates them below) or untracked and stamped; a team file never does.
+  if (knowledgeLocal && repoRoot !== null) {
+    const agcAdapters = ADAPTERS.filter(({ rel, mode: m }) => {
+      if (m !== "skip" || isWorkspaceFileTracked({ repoRoot, workspace }, rel)) return false;
+      const abs = path.join(cwd, rel);
+      return !fs.existsSync(abs) || STAMP_RE.test(fs.readFileSync(abs, "utf-8"));
+    }).map(({ rel }) => `/${rel}`);
+    const added = upsertSharedExclude(
+      repoRoot,
+      artifactExcludeRulesForPrefix(workspace.prefix, [...knowledgeBaseRules, ...agcAdapters])
+    );
+    if (added.length > 0) {
+      notices.push(`agc init — added ${added.join(", ")} to the shared info/exclude`);
+    }
+    const trackedKnowledge = trackedArtifactPaths(repoRoot, artifactPathsForPrefix(workspace.prefix, knowledgeBaseRules));
+    if (trackedKnowledge.length > 0) {
+      // Report only, as for artifacts: untracking is a deliberate human act.
+      errBlocks.push(
+        `agc init — warning: the following knowledge path(s) are already tracked in this repo — ` +
+          `the exclude rule just added has no effect on tracked files:\n` +
+          trackedKnowledge.map((t) => `  ${t.display}`).join("\n") +
+          `\nUntrack them with${workspace.prefix === "" ? "" : " (run from the repository root)"}:\n` +
+          `  git rm -r --cached ${trackedKnowledge.map((t) => t.target).join(" ")}\n` +
+          `Note: history still contains these files after that command.`
+      );
+    }
   }
 
   // Git-side half of the adapter choice, independent of the artifacts mode.
@@ -1231,6 +1338,11 @@ const ARTIFACT_EXCLUDE_RULES = ["/.current/", "/tasks.md", "/qa_reports/", "/rev
 // deletes every artifact path wholesale while CLAUDE.local.md may also hold
 // the user's own notes.
 const ADAPTER_LOCAL_EXCLUDE_RULES = ["/CLAUDE.local.md"];
+
+// The knowledge directories `agc init --knowledge=local` excludes besides the
+// ticket directory (from ticketDir) and docs/backlog.md; root-anchored, and
+// re-anchored for a subdirectory workspace by artifactExcludeRulesForPrefix().
+const KNOWLEDGE_LOCAL_RULES = ["/specs/", "/design/", "/research/"];
 
 // Characters unsafe in a path segment agc writes verbatim into a gitignore
 // rule: the wildcards `* ? [ ]` (match too much), a backslash (git reads an

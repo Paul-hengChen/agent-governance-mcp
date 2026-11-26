@@ -74,6 +74,12 @@ export interface WorkspaceConfig {
   // NOT defaulted to "local" here, because `agc check` reports an undeclared
   // workspace and a synthesized default would hide that.
   artifacts?: WorkspaceArtifactsMode;
+  // Declared git posture for knowledge files (specs/, design/, research/,
+  // the ticket directory, docs/backlog.md), written by `agc init
+  // --knowledge=local|repo`: "local" keeps them out of git too and has
+  // `agc feature start` seed each lane with a snapshot; "repo" or absent is
+  // the default (tracked). bin/agc-init.mjs reads the key raw, not here.
+  knowledge?: WorkspaceKnowledgeMode;
   // Directories whose node_modules `agc feature start` links to the primary
   // checkout's (E291), normalized by parseNodeModulesLinks: "." is the repo
   // root. Present (possibly []) only when the key is an array; it replaces
@@ -106,6 +112,8 @@ export interface SisterRepo {
 }
 
 export type WorkspaceArtifactsMode = "local" | "repo";
+
+export type WorkspaceKnowledgeMode = "local" | "repo";
 
 // Result of parseNodeModulesLinks for an array value: the valid entries,
 // normalized and deduplicated in list order, plus every rejected raw entry.
@@ -414,6 +422,13 @@ function loadConfigEntry(workspacePath: string): ConfigCacheEntry {
   const artifacts = migration.payload.artifacts;
   if (artifacts === "local" || artifacts === "repo") {
     result.artifacts = artifacts;
+  }
+  // Additive-optional field (no schema_version bump — same precedent as
+  // host/nodeModulesLinks). Same narrow filter as `artifacts`: any other
+  // value reads as absent (the default), never an error.
+  const knowledge = migration.payload.knowledge;
+  if (knowledge === "local" || knowledge === "repo") {
+    result.knowledge = knowledge;
   }
   // Additive-optional field (no schema_version bump — same precedent as
   // host/driftBaselineIds). Surfaced only for an array value; invalid

@@ -308,6 +308,13 @@ function loadConfigEntry(workspacePath) {
         result.artifacts = artifacts;
     }
     // Additive-optional field (no schema_version bump — same precedent as
+    // host/nodeModulesLinks). Same narrow filter as `artifacts`: any other
+    // value reads as absent (the default), never an error.
+    const knowledge = migration.payload.knowledge;
+    if (knowledge === "local" || knowledge === "repo") {
+        result.knowledge = knowledge;
+    }
+    // Additive-optional field (no schema_version bump — same precedent as
     // host/driftBaselineIds). Surfaced only for an array value; invalid
     // entries are dropped here, never an error (E291).
     const nodeModulesLinks = parseNodeModulesLinks(migration.payload.nodeModulesLinks);
