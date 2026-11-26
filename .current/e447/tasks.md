@@ -1,0 +1,10 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [ ] T-E447-01 [P0] qa-engineer: write AC1-AC12 of specs/e447-local-knowledge-files.md as tests in test/e447-*.test.mjs (scratch git repos, CLI level) and list every red one in qa_reports/expected-red_e447-local-knowledge-files.txt; goldens and budget caps untouched | depends_on: none
+- [ ] T-E447-02 [P0] sr-engineer (A1): `knowledge` config key surfaced by tools/config.ts (additive, no schema bump); LANE_FILES knowledgeSeed entry (knowledge-seed.json, noFlatCounterpart) in tools/lane-paths.ts; agc init --knowledge=local|repo (exclude rules incl. ticketDir and agc-created AGENTS.md/.antigravityrules, D1 refusal, D2 adapter default, tracked-path report, usage); rebuild dist/ — AC1 init part, AC2, AC10 init part | depends_on: T-E447-01
+- [ ] T-E447-03 [P0] sr-engineer (A2): bin/agc-init.mjs lane flow in mode on — feature start seed + sha256 record (Fix 2, D5); feature reseed (O2 a); finish --shipped/--abandoned record-filtered harvest to the same path / abandoned bucket (O3 a, D6, D7); numbering from the worktree pending-tickets.md into the primary untracked docs/backlog.md, no commit (Fix 4); usage — AC1, AC3-AC8, AC9 reseed, AC10 start/finish | depends_on: T-E447-02
+- [ ] T-E447-04 [P0] sr-engineer (B): check --cut byte comparison of the lane's seeded manifest with the primary checkout's (MANIFEST_CHANGED, `manifest changed since lane start — re-seed`, exit 1; D9) in tools/fanout-manifest.ts runCheckCut; SOP texts C-C08K, C-CO3K, C-IN-R4; docs DOC-CFG, DOC-INST-1..5, DOC-LP-1..3; rebuild dist/ — AC9, AC11, AC12; last implementation task, then planned return to qa | depends_on: T-E447-03
+- [ ] T-E447-05 [P1] qa-engineer (planned return, 1 sr_return): re-capture the 7 moved compose goldens; set the moved test/context-budget.test.mjs caps (AC8 design-arm constitution, teamwork coordinator bundle, non-design constitution) to measured values with a per-hunk note; re-pin test/lane-paths.test.mjs REG1 and test/e410-task-alias-content-tail.test.mjs (const-08 row + count) once the integrator assigns them; update the expected-red manifest; back to sr then code-reviewer | depends_on: T-E447-04
