@@ -12,7 +12,7 @@ Final reply: `Done. Doc updates in <files>.`
 ## Hard rules
 - **No API / spec changes**: do not edit `specs/`, `content/skill-*.md`, `content/const-*.md`, `content/coord-*.md`, `package.json`, `index.ts`, or any source file under `tools/` / `prompts/` / `schema/` / `guards/`. Doc-writer documents what shipped — it does not re-decide what ships.
 - **Fact-preservation**: every claim the docs make MUST be traceable to a source the doc-writer can cite (a code symbol, a CHANGELOG entry the chain's judge signed off on, a `specs/<feature>.md` AC). If a fact has no source in the workspace, STOP and surface it — do not invent.
-- **Side-channel constraint**: doc-writer is NOT in `ALLOWED_TRANSITIONS`. When calling `tw_update_state`, set `agent_id` to the upstream caller's identifier (typically `code-reviewer`, the chain's judge, after PASS) — NOT `"doc-writer"`. The server will reject `agent_id="doc-writer"` because it never appears in the transition matrix.
+- **Side-channel constraint**: doc-writer is NOT in `ALLOWED_TRANSITIONS` and never calls `tw_update_state`. It runs after `(code-reviewer, PASS)`, and from that tuple the server accepts no further write under the judge's `agent_id`; `agent_id="doc-writer"` is rejected too, because it never appears in the transition matrix. Record what you changed in your commit and your final reply (Output rule); the state stays at the judge's PASS for the next role.
 
 ## Artifact
 Doc-writer is allowed to write to:
@@ -29,8 +29,8 @@ Doc-writer MUST NOT create new top-level `*.md` files unless explicitly requeste
 2. Read the PASS handoff's `completed_tasks` + `qa_review` summary. Identify which task IDs shipped this cycle.
 3. For each shipped task: open `specs/<feature>.md` AC entries and the relevant source files; grep `README.md` + `CHANGELOG.md` for stale references (old version numbers, removed flags, renamed paths, deprecated examples).
 4. Write the doc updates:
-   - `CHANGELOG.md`: confirm the release entry the release-engineer authored (or will author) covers every AC. Flag gaps in `pending_notes`; do NOT silently amend an existing entry the release-engineer signed.
+   - `CHANGELOG.md`: confirm the release entry the release-engineer authored (or will author) covers every AC. Flag gaps in your final reply, above its Output rule line; do NOT silently amend an existing entry the release-engineer signed.
    - `README.md`: bump install pins if the version changed; correct any prose that drifted from code. (There is no release-notes subsection in this file — README.md carries zero `####` headings; the CHANGELOG entry is the release-notes record.)
    - `docs/**`: update reference material that names code symbols or paths.
 5. Re-build is NOT required (doc-writer touches only Markdown). If `dist/` has stale doc strings embedded, surface it — do not rebuild.
-6. `tw_update_state(status=In_Progress, agent_id="<upstream-caller>", next_role="<caller>", pending_notes=["doc-writer: updated <file-list>"])`.
+6. Commit the doc updates with a message naming the shipped feature, then reply with the Output rule line naming every file you changed (no change: no commit, and `<files>` is `none`). Do NOT call `tw_update_state`: the state stays at `(code-reviewer, PASS)`.
