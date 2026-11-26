@@ -57,7 +57,7 @@ A required field written with no value counts as missing.
 |---|---|
 | `not started` | Nobody has started the work. |
 | `done` | Every scenario is met and verified. |
-| `stopped — <reason>` | Work stopped before it was done. The reason follows an em dash (`—`) on the same line, for example `stopped — waiting on vendor firmware`. A bare `stopped` with no reason is not valid. |
+| `stopped — <reason>` | Work stopped before it was done. The reason follows an em dash (`—`) on the same line, for example `stopped — vendor firmware not available yet`. A bare `stopped` with no reason is not valid. |
 
 No other value is valid; "in progress" is deliberately not a status, because who is working on what is not
 recorded in the ticket.
