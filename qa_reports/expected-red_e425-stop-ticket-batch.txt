@@ -35,3 +35,6 @@ test/e425-stop-ticket-batch.test.mjs | AC13: qa-engineer step 6 ends with C-QA; 
 test/e425-stop-ticket-batch.test.mjs | AC14: every string this lane adds under content/** names no repo-only path and no bare ticket id
 
 # T-E425-06 (qa-engineer): golden re-capture and the e118 / e410 / e349 / context-budget re-pins are green on arrival; no red added.
+
+# T-E425-07 (qa-engineer, rework R1): docs/ticket-format.md *Status values* still gives `stopped — waiting on vendor firmware`, not C-TF4 (T-E425-08)
+test/e425-stop-ticket-batch.test.mjs | AC16: the Status values example reason for 'stopped — <reason>' is C-TF4, not a 'waiting on' form

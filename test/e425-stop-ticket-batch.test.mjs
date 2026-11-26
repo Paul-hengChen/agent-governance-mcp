@@ -1,16 +1,10 @@
 // Coded by @qa-engineer
-// Tests (T-E425-01) for specs/e425-stop-ticket-batch.md AC1-AC14 (E425 stop-ticket batch, E427 amendment (2)).
-// WHY: in an unattended batch, a ticket that needs a ruling must stop only itself and its dependents, and the
-// human must get one summary screen instead of being asked during the run. The rule lives in exactly one
-// place (docs/lane-protocol.md §3 *批次 lane*); the constitution, coordinator and integrator only point at it
-// and name what it overrides; the ticket format fixes the stop wordings and where each summary item is
-// recorded; scripts/batch-summary.mjs prints the summary from ticket files and reports and writes nothing.
-// These tests pin the spec's `## Copy / Strings` blocks verbatim at their stated places, and drive the
-// summary script as a black box against ticket files and reports built in temp dirs.
-// Each title starts with its AC id: `--test-name-pattern "AC<n>:"` runs one AC.
-// Resident-test hygiene: the Copy / Strings blocks and the byte-unchanged served lines are frozen literals in
-// this file (FROZEN below, extracted once from the spec and from the served text at base 3de5b143), never read
-// through git or from the growable spec.
+// Tests (T-E425-01, T-E425-07) for specs/e425-stop-ticket-batch.md AC1-AC16 (E425 stop-ticket batch).
+// WHY: a batch ticket that needs a ruling stops only itself and its dependents, and the human gets one summary
+// instead of being asked mid-run; the rule lives once in docs/lane-protocol.md §3 and the rest point at it.
+// Copy / Strings are pinned verbatim; scripts/batch-summary.mjs is driven as a black box over temp dirs.
+// Each title starts with its AC id. FROZEN literals come from the spec and the served text at base 3de5b143,
+// never read through git or from the growable spec.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -55,7 +49,8 @@ const FROZEN = {
     "C-CR": "4a. **Named tests**: for each scenario whose verification line names a test (`Verification: test <file> — <title>`), confirm a test with that full nested title exists in that file and its assertions check that scenario; a name that matches no test, or a test that checks something else, is a `required` finding (test defect).",
     "C-TF1": "Two reasons have a fixed wording, so that a summary can read them. `stopped — waiting on <id>`: this ticket depends, directly or through other tickets, on ticket `<id>`, which stopped with an open question; when more than one such ticket stopped, list every id, separated by `, `. `stopped — awaiting manual verification`: every scenario that automation can check passed, and a `device-or-person` scenario is still to be checked. Any other stop states its question in an `## Open question` section (see *Batch summary*).",
     "C-TF2": "## Batch summary\n\nWhen tickets run as a batch, nobody is asked anything while the batch runs. A ticket stops in only two cases: a scenario is wrong (contradictory, missing a case that changes behaviour, impossible to build, or needing a change or removal), or the work needs something the ticket did not authorise (a file outside `allowed paths`, a schema change, an external contract, or any other decision only a person may make). Everything else, whoever does the work decides and records. At the end one summary lists, for the person who rules on the batch:\n\n| summary item | where it is recorded |\n|---|---|\n| done | `status: done` |\n| stopped, with its question | `status: stopped — <reason>`, and the question in an `## Open question` section |\n| waiting, with the ticket it waits on | `status: stopped — waiting on <id>` |\n| awaiting manual verification | `status: stopped — awaiting manual verification`; the summary names each `device-or-person` scenario |\n| scenarios added during the work | the `## Added during build` section |\n| decisions made during the work | a `## Decisions made during the work` section, one list item per decision: `- <who>, <YYYY-MM-DD>: <decision> — <reason>` |\n| interface details the test author decided | the test author's report, outside the ticket file (location: *Checking with this repository's tooling*) |\n| accepted visual differences | the visual review's report, outside the ticket file (location: *Checking with this repository's tooling*) |\n\n`## Open question` and `## Decisions made during the work` are free prose: like `## Context`, they go between the field block and `## Scenarios`. Writing them, changing `status` and filling in a test name do not change a scenario.",
-    "C-TF3": "The batch summary is `node scripts/batch-summary.mjs [--reports <dir>] [<file or directory> ...]`. It summarises the given ticket files (no argument: every ticket file in the ticket directory, as above) and reads reports from `--reports` (default `qa_reports`): the `## Open Interface Details` section of each `tests_<feature>.md` and the `## Allowed Differences` section of each `visual_<task id>.md` whose file name holds a summarised ticket's id as a whole word (bounded by the start or end of the name, `_`, `-` or `.`; case ignored). A missing reports directory means no reports. It writes nothing. A ticket file with format problems is listed under `unreadable tickets` with its problem count and not summarised. Exit status: 0 when it printed the summary, 2 when it cannot run (unknown option, `--reports` without a directory, unreadable ticket file, directory or reports directory)."
+    "C-TF3": "The batch summary is `node scripts/batch-summary.mjs [--reports <dir>] [<file or directory> ...]`. It summarises the given ticket files (no argument: every ticket file in the ticket directory, as above) and reads reports from `--reports` (default `qa_reports`): the `## Open Interface Details` section of each `tests_<feature>.md` and the `## Allowed Differences` section of each `visual_<task id>.md` whose file name holds a summarised ticket's id as a whole word (bounded by the start or end of the name, `_`, `-` or `.`; case ignored). A missing reports directory means no reports. It writes nothing. A ticket file with format problems is listed under `unreadable tickets` with its problem count and not summarised. Exit status: 0 when it printed the summary, 2 when it cannot run (unknown option, `--reports` without a directory, unreadable ticket file, directory or reports directory).",
+    "C-TF4": "stopped — vendor firmware not available yet"
   },
   "CUT_LINE": "- **Cut-Approval Gate**: WHEN a write crosses the same build-entry edge (any feature, visual or not) → DO set `cut_approved: true` on the `pm:In_Progress` state write, ONLY after the human approved the inline cut in chat → ELSE rejected `CUT_APPROVAL_REQUIRED`. File-mode only (skipped in SQLite/HTTP mode); predecessor pinned to `pm:In_Progress`, so resume/re-entry is never re-blocked. Re-armed by a fresh PM `In_Progress` entry (a code-reviewer rejection routed back to PM included), or any `active_feature` change — re-present and re-approve the cut. Sanctioned writer: ONLY the context that directly witnessed the human's chat-turn approval in its OWN conversation, never another agent's summary or relayed claim — the PM itself in same-context dispatch (lite, full non-subagent, `tw_switch_role` fallback); under subagent dispatch — where the PM subagent ends its turn after presenting the draft — it is the coordinator, via `tw_update_state(agent_id=\"pm\", cut_approved: true, ...)` on the PM's still-current state tuple. Attestation-based trust boundary: the server cannot verify the witnessing. Role actions live in `skill-pm` Gate Summary and `skill-coordinator` *Cut-approval gate writer obligation*, which MUST NOT restate this mechanism.",
   "MANIFEST_LINE": "  - **Manifest tier**: WHEN ALL hold — (1) `cutApprovalAutoTier.manifest` is `true` (strict); (2) the lane branch carries `specs/fanout-<id>.md` with a `人類` row in its `## Decisions` table and this lane's row in its Lanes table; (3) `node <agc install>/scripts/fanout.mjs check --cut <manifest> <lane> <spec>` exits 0 (every file the cut names is in that row's owned set); (4) the PM's Gate Summary attests no option choice and no needs-human-ruling item; (5) the schema-change and design-armed conditions, allow flags included, hold as above, and the row replaces `maxFiles` / `maxPriority`; (6) the integrator's mailbox pre-review returned `close` on this final cut (the mailbox never carries approval); (7) the row's optional `approval` column is not `human`; (8) the SAME write carries the `pending_notes` line `cut-approved: manifest-tier (<manifest path>, Decisions <date>)`, `<date>` = the `日期` of the latest `人類` Decisions row → DO let the same writer set `cut_approved: true` without halting → ELSE HALT exactly as today. A manifest changed mid-wave needs a fresh `人類` row, merged into the lane, before the lane auto-approves against it. Writer actions live in `skill-coordinator` and MUST NOT restate this mechanism.",
@@ -571,4 +566,17 @@ test("AC14: every string this lane adds under content/** names no repo-only path
       check(`content/${file}`, line);
     }
   }
+});
+
+// ------------------------------------------------------------------ AC16
+
+test("AC16: the Status values example reason for 'stopped — <reason>' is C-TF4, not a 'waiting on' form", () => {
+  // WHY: an example `stopped — waiting on <text>` reads as the fixed wording C-TF1, so a summary would list it as
+  // waiting on a ticket; the only `waiting on` status the doc may show is `stopped — waiting on <id>`.
+  const rows = TICKET_FORMAT.split("\n").filter((l) => l.startsWith("| `stopped — <reason>` |"));
+  assert.equal(rows.length, 1, "exactly one *Status values* row for `stopped — <reason>`");
+  const examples = [...rows[0].matchAll(/for example `([^`]+)`/g)].map((m) => m[1]);
+  assert.equal(examples.length, 1, "the row gives exactly one example status");
+  assert.doesNotMatch(examples[0], /^stopped — waiting on\b/, "the example reason does not begin with `waiting on`");
+  assert.equal(examples[0], C["C-TF4"], "the example is C-TF4 verbatim");
 });

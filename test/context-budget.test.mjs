@@ -601,7 +601,6 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // E434 re-baseline: visual counter rows / bullets leave const-01/05/09/13, const-11 gains const11.measure and names reviewer-visual, -46 ~tok (measured 9219); was 9265, zero headroom.
   // E435 re-baseline (T-E435-40): const-06 judge sentence loses the marker conditional (T-E435-36), const-08 Non-Judge gate rename (T-E435-33), const-11 "on the test-first chain" dropped (T-E435-41), -32 ~tok (measured 9187); was 9219, zero headroom.
   // E453 re-baseline: the const-01 Limits rows (review_round cap 4, sr_return and hop scope), the const-05 builder ≠ judge bullet, and the sr_return sentences in const-06 / const-12 and the per-feature hop bullet in const-15, +49 ~tok (measured 9236); was 9187, zero headroom.
-  // E425 re-baseline: the const-08 batch-lane sub-bullet after the Manifest-tier line (C-C08), +100 ~tok (measured 9336; spends 100 of the E418 -1065 saving, net -965 vs pre-E418); was 9236, zero headroom.
   assert.ok(stripped <= 9336, `stripped constitution (${stripped} ~tok) must be ≤ 9336 (AC8 design-arm floor, E425 re-baseline, zero headroom)`);
   assert.ok(
     raw - stripped >= 240,
@@ -635,7 +634,6 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // E434 re-baseline: the design-arm constitution change above plus the coordinator's reviewer-visual dispatch wording, -47 ~tok (measured 19108); was 19155, zero headroom.
   // E435 re-baseline (T-E435-40): the design-arm constitution change above (-32) plus coord-03 qa_round / "review/qa" wording (T-E435-32, T-E435-41) and the coord-07 mini-chain marker clause (T-E435-36), -45 ~tok (measured 19063); was 19108, zero headroom.
   // E453 re-baseline: the design-arm constitution change above (+49) plus the coord-01 routing rows naming how sr-engineer, code-reviewer and qa-engineer are reached, the coord-03 "awaiting an independent judge" note and the coord-05 reviewer-visual dispatch and void-policy sentences (+109), +158 ~tok (measured 19221); was 19063, zero headroom.
-  // E425 re-baseline: the design-arm constitution change above (+100) plus the coord-03 batch-lane Escalation Routes row (C-CO3) and the coord-07 step 6 pointer (C-CO7) (+128), +228 ~tok (measured 19449; spends 228 of the E418 -2490 saving, net -2262 vs pre-E418); was 19221, zero headroom.
   assert.ok(bundle <= 19449, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19449 (AC8 design-arm floor, E425 re-baseline, zero headroom)`);
 });
 
@@ -966,7 +964,6 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // E434 re-baseline: the Limits rows and the visual_fail: token leave core const-01/05 on both arms, -62 ~tok (measured 7301); was 7363, zero headroom.
   // E435 re-baseline (T-E435-40): const-06 (T-E435-36) and const-08 (T-E435-33) land on both arms; const-11 is design-only, -26 ~tok (measured 7275); was 7301, zero headroom.
   // E453 re-baseline: every constitution edit of this change (const-01 Limits rows, const-05, const-06, const-12, const-15) lands on both arms, so the design-only saving stays 1912, +49 ~tok (measured 7324); was 7275, zero headroom.
-  // E425 re-baseline: the const-08 batch-lane sub-bullet (C-C08) is a chain fragment on both arms, so the design-only saving stays 1912, +100 ~tok (measured 7424; spends 100 of the E418 -985 saving, net -885 vs pre-E418); was 7324, zero headroom.
   assert.ok(nonDesign <= 7424, `non-design constitution (${nonDesign} ~tok) must be ≤ 7424 (AC8 non-design floor, E425 re-baseline, zero headroom)`);
   assert.ok(
     ratStripped - nonDesign >= 1912,

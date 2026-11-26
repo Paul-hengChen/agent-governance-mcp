@@ -40,6 +40,7 @@ All tests are in `test/e425-stop-ticket-batch.test.mjs`.
 | AC13 | `AC13: qa-engineer step 6 ends with C-QA; code-reviewer carries step C-CR directly after step 4` |
 | AC14 | `AC14: every string this lane adds under content/** names no repo-only path and no bare ticket id` |
 | AC15 | T-E425-06 (no new test; existing pins re-baselined): `test/compose-equivalence.test.mjs` (the six build/hook/monolith golden tests), `test/skill-manifest.test.mjs` t-golden-byte-identity, `test/context-budget.test.mjs` `AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9336 ~tok)`, `AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19449 ~tok)`, `AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7424 ~tok)` |
+| AC16 | `AC16: the Status values example reason for 'stopped — <reason>' is C-TF4, not a 'waiting on' form` (doc half; the `agc check` half is a command for the judge, see T-E425-07) |
 
 Not automated by these tests, for the judge: AC1's proof also names `node --test test/e290-lane-protocol-generic.test.mjs
 test/e433-test-first-rules.test.mjs test/e383-lane-ledger-worktree.test.mjs test/e385-worktree-evidence.test.mjs`
@@ -77,6 +78,24 @@ Re-pinned tests (integrator-assigned; only the assigned values changed):
   `<agc install>`).
 
 Expected-red manifest: unchanged in substance — the re-pins are green on arrival, so T-E425-06 adds no red.
+
+## T-E425-07 — rework (AC16, R2)
+
+Spec: `## Rework after lane report` (human-approved cut @ 7c20a10a). Placement: the brief's `Test-file placement` line
+(existing file `test/e425-stop-ticket-batch.test.mjs`).
+
+- **AC16 (R1)**: new test; reads the one `| \`stopped — <reason>\` |` row of `docs/ticket-format.md`, takes its single
+  ``for example `…` `` value, asserts it does not begin with `stopped — waiting on` and equals C-TF4 (added to
+  `FROZEN.COPY` verbatim from the spec table). Red now: the example is `stopped — waiting on vendor firmware`.
+- **AC16 `agc check` half (command, for the judge)**: `node bin/agc-init.mjs check` — after this commit it prints no
+  `comments` line at all for the lane's files (checked before commit: zero `comments` warnings in the whole run).
+- **R2 trims (comments only; no assertion, cap, title or expected value changed)**:
+  - `test/e425-stop-ticket-batch.test.mjs:1` header 13 → 7 lines (Coded-by line + 6).
+  - `test/context-budget.test.mjs`: the three `// E425 re-baseline:` cap-history lines are removed, so the blocks at
+    594 / 624 / 957 are byte-identical to `main` and the file adds no comment line (the high-ratio advisory fires only
+    when the file adds one; ratio back to main's). The E425 cap detail lives in the spec rework section, the
+    `T-E425-06` table above and the assert messages ("E425 re-baseline, zero headroom").
+  - `test/e118-reviewer-ac-completeness.test.mjs:223`: the E425 line is folded into the E424 entry, block 8 → 7 lines.
 
 ## Open Interface Details
 
@@ -120,6 +139,7 @@ The spec's C-BS / C-TF3 fix the output lines, messages and exit codes. Decided h
 - AC7–AC12 — `scripts/batch-summary.mjs` does not exist: node exits 1 with "Cannot find module" (AC8 and AC10 also need
   C-LP2 in the lane protocol).
 - AC13 — the last bullet of qa step 6 is still *No new test needed*, not C-QA.
+- AC16 — `docs/ticket-format.md` *Status values* example is still `stopped — waiting on vendor firmware` (T-E425-08 sets C-TF4).
 - AC14 — C-C08 is not yet in `content/const-08-chain-31-mid.md` (presence is checked before the scan).
 
 ## CI Runnability
