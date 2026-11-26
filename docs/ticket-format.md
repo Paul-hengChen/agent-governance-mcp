@@ -161,9 +161,9 @@ mirror; nothing is mirrored unless a person asks for it.
 
 - Direction is fixed, repository to tracker. Content edited on the tracker is never read back into a ticket
   file; when an item and its ticket file differ, the file wins and the difference is reported to a person.
-- A ticket file gets at most one tracker item created for it: a mirror item, or, for a ticket cut from an
-  item, one child item under that item when a person asks. The items a ticket was cut from (its `source`)
-  are not counted, and a ticket cut from an item gets no mirror item.
+- A ticket file gets at most one tracker item created for it: a mirror item, or, for a ticket cut from
+  items, one child item under one of them, chosen by the person who asks for it. The items a ticket was
+  cut from (its `source`) are not counted, and a ticket cut from an item gets no mirror item.
 - A ticket file holds tracker item numbers only in its `source` field, never a link; in a public repository
   it holds none. Every other number, and in a public repository the source items too, goes in the tracker map.
 - Before work starts and again before acceptance, a source item's current revision is compared with the

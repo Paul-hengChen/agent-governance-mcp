@@ -219,11 +219,11 @@ The five verifier constraints<!-- origin:start --> (E192)<!-- origin:end --> hol
 
 ## Tracker items
 
-Only a ticket with a row in the tracker map gets tracker writes — `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints, never tracked (format: `<agc install>/docs/ticket-format.md`, *Tracker mirror*). No row, no write. Use the host's own tracker tools (update an item's state, add a comment):
+Only a ticket with a tracker item gets tracker writes: an item its ticket file's `source` field lists, or a row in the tracker map — `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints, never tracked (format: `<agc install>/docs/ticket-format.md`, *Tracker mirror*). No item, no write. Use the host's own tracker tools (update an item's state, add a comment):
 
 - **`mirror` or `child` row** — update that item as the ticket moves: in progress at dispatch; at a stop, the stopped state and the reason after `stopped — `; the pull request's number once it is open; done at merge.
-- **`source` row** — the same updates, only when the map's `write-back` line reads `on`. It is off by default; only the human turns it on.
-- **A stop's question** (the ticket's `## Open question`) is never posted, whatever the row: draft it in your report; the human decides whether to post it.
+- **Source item** (one the ticket file's `source` field lists, or a `source` row) — the same updates to each, only when the map's `write-back` line reads `on`, whether or not the map has a row for the ticket. It is off by default; only the human turns it on.
+- **A stop's question** (the ticket's `## Open question`) is never posted, whatever the item: draft it in your report; the human decides whether to post it.
 - **One way only** — never copy tracker content into a ticket file. Where an item and its ticket file differ, the file wins; report the difference.
 
 ## Git operations
