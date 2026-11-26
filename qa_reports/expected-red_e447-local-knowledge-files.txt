@@ -58,3 +58,31 @@ test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 8 entries — 1 required
 # sr-engineer T-E447-06 status note (no entry removed; qa reconciles the list in T-E447-05): green after
 # T-E447-06 are AC1, AC5, AC6 overwrite, AC6 both changed, AC7, AC8. Still red: AC9 changed and AC9 reseed
 # (T-E447-04), AC11 (T-E447-04), AC12 (T-E447-07), lane-paths REG1 (T-E447-05).
+
+# sr-engineer T-E447-04 (no entry removed; qa reconciles the list in T-E447-05): green after T-E447-04
+# are AC9 changed, AC9 reseed and AC11. Still red: AC12 (T-E447-07), lane-paths REG1 (T-E447-05).
+# Newly red, all shared generated artifacts owned by this lane, re-captured / re-pinned by qa in T-E447-05:
+# C-C08K adds one const-08 line (chain arms only) and C-CO3K lengthens the coord-03 bookkeeping line, so
+# the six constitution/hook goldens and the coordinator monolith golden move.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+# The same text moves three zero-headroom budget caps (measured after T-E447-04: 9541, 19905, 7629 ~tok).
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9407 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19699 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7495 ~tok)
+# C-C08K makes const-08 13 split parts and moves the Lease-Override alias site from line 6 to line 7
+# (integrator-assigned unowned red, re-pinned by qa in T-E447-05).
+test/e410-task-alias-content-tail.test.mjs | AC2: each site carries its new span, the old span is gone, the line has no `Task` alias
+test/e410-task-alias-content-tail.test.mjs | AC2: each edited file keeps its line count
+# NOT in the spec's Test impact and NOT owned by this lane (standing unowned-red rule -> integrator assigns):
+# test/e428-tracker-mirror.test.mjs freezes the sha256 of the whole content/skill-integrator.md (its own Copy
+# removed). Any edit to that file turns it red, so C-IN-R4 at its spec placement (end of Stage 1 step 3) cannot
+# avoid it. Re-pin = set BASE[IN_FILE].sha to bebdd0e874912302b06f2ae81812aa924b1089f21a3a1b0767e2b078f6f58d06
+# (measured after T-E447-04); no other assertion in either test fails.
+test/e428-tracker-mirror.test.mjs | AC6: integrator `## Tracker items` (C-IN1) sits after the Stage 6 *Your own commits* paragraph and before `## Git operations`; nothing else moves
+test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the four files holds no URL, repo-only path, bare ticket id, version label, quoted error code or vendor name
