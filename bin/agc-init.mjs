@@ -5,7 +5,7 @@
 //     Never writes .current/<lane>/handoff.md: any seeded prev tuple dead-ends the
 //     ALLOWED_TRANSITIONS lookup, so the first pm:In_Progress write creates it (E34).
 //   agc check  exit 1 on a stale adapter stamp; every other check is advisory.
-//   agc feature start|finish  lane branch + linked worktree lifecycle (E73).
+//   agc feature start|finish|reseed  lane branch + linked worktree lifecycle (E73).
 //   agc eject [--yes] [--purge-knowledge]  print or apply the removal plan.
 
 import * as fs from "fs";
@@ -13,6 +13,7 @@ import * as path from "path";
 import * as os from "os";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import * as crypto from "node:crypto";
 
 // --- version-stamp parsing -------------------------------------------------
 // Matches "<!-- agc-version: 3.28.0 -->" and "# agc-version: 3.28.0".
@@ -1290,6 +1291,9 @@ const STR_USAGE_FEATURE =
   "          has none and git ignores it there (a snapshot: later edits in\n" +
   "          primary do not reach the lane). An ignored CLAUDE.local.md is\n" +
   "          byte-copied the same way (agc init --adapter=local).\n" +
+  "          With \"knowledge\": \"local\", also copies the primary checkout's\n" +
+  "          untracked specs/, design/, research/, ticket files and\n" +
+  "          docs/backlog.md (a snapshot, hashes in .current/<lane>/).\n" +
   "  feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>] [--pr <n>]\n" +
   "          Tear a lane down from the primary checkout. --shipped requires\n" +
   "          the branch merged into --base (default main), moves the lane's\n" +
@@ -1314,7 +1318,11 @@ const STR_USAGE_FEATURE =
   "          ruling. Also deletes\n" +
   "          <worktree-parent>/_mailbox/<lane>/ when it holds only\n" +
   "          to-integrator.md, to-lane.md and watch-lock sidecars; otherwise\n" +
-  "          keeps it with a warning.\n";
+  "          keeps it with a warning.\n" +
+  "  feature reseed <path>...\n" +
+  "          Inside a lane worktree, with \"knowledge\": \"local\": copy each named\n" +
+  "          knowledge file from the primary checkout over the lane's copy and\n" +
+  "          record its new hash. Refuses a file the lane has changed.\n";
 
 // Exclude rules upserted into the SHARED info/exclude (git-common-dir), never
 // the tracked .gitignore. `/node_modules` has no trailing slash because the
@@ -1920,6 +1928,168 @@ function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
   return { out, warn };
 }
 
+// --- "knowledge": "local" lane seeding (E447) --------------------------------
+// The primary checkout's knowledge mode, read raw from its config (never
+// through loadConfig, which may heal-write): `local` and the knowledge roots
+// as repo-relative posix paths — the four directories (ticket directory from
+// ticketDir) and the backlog file.
+function readKnowledgeMode(repoRoot) {
+  const declared = readDeclaredKnowledge(path.join(repoRoot, ".current", ".config.json"));
+  const dirs = [...new Set(["specs", "design", "research", knowledgeTicketDir(declared.ticketDir)])];
+  return { local: declared.knowledge === "local", dirs, files: [BACKLOG_REL] };
+}
+
+// true iff repo-relative posix `rel` names a file under a knowledge root.
+function isKnowledgePath(rel, mode) {
+  return mode.files.includes(rel) || mode.dirs.some((d) => rel.startsWith(`${d}/`));
+}
+
+const sha256Tag = (buf) => "sha256:" + crypto.createHash("sha256").update(buf).digest("hex");
+
+// Every file or symlink under the knowledge roots of the checkout at `root`,
+// repo-relative posix. A root directory that is a symlink is followed; below
+// it symlinks are listed, not followed (the caller resolves them).
+function listKnowledgeEntries(root, mode) {
+  const out = [];
+  const walk = (abs, rel) => {
+    for (const name of fs.readdirSync(abs).sort()) {
+      const st = lstatOrNull(path.join(abs, name));
+      if (!st) continue;
+      if (st.isDirectory()) walk(path.join(abs, name), `${rel}/${name}`);
+      else if (st.isFile() || st.isSymbolicLink()) out.push(`${rel}/${name}`);
+    }
+  };
+  for (const dir of mode.dirs) {
+    let st = null;
+    try {
+      st = fs.statSync(path.join(root, dir));
+    } catch {
+      // absent root: nothing to list
+    }
+    if (st && st.isDirectory()) walk(path.join(root, dir), dir);
+  }
+  for (const file of mode.files) if (lstatOrNull(path.join(root, file))) out.push(file);
+  return [...new Set(out)];
+}
+
+// The subset of repo-relative `rels` git ignores in the checkout at `cwd`, in
+// one `check-ignore --stdin -z` call (exit 1 = none ignored). A tracked path
+// is never reported as ignored.
+function gitIgnoredSet(cwd, rels) {
+  if (rels.length === 0) return new Set();
+  try {
+    const out = execFileSync("git", ["check-ignore", "-z", "--stdin"], {
+      cwd,
+      input: rels.join("\0") + "\0",
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return new Set(out.split("\0").filter((p) => p.length > 0));
+  } catch (err) {
+    if (err && err.status === 1) return new Set();
+    throw err;
+  }
+}
+
+// The regular-file bytes behind `abs` (a symlink is followed), "dangling" for
+// a symlink that resolves to nothing, or null for anything else.
+function readKnowledgeBytes(abs) {
+  let st;
+  try {
+    st = fs.statSync(abs);
+  } catch {
+    return lstatOrNull(abs)?.isSymbolicLink() ? "dangling" : null;
+  }
+  return st.isFile() ? fs.readFileSync(abs) : null;
+}
+
+// Write `buf` to `abs` through a temp file in `tmpDir` (git-ignored) + rename.
+function writeViaRename(abs, buf, tmpDir) {
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const tmp = path.join(tmpDir, `.agc-seed-${process.pid}-${crypto.randomBytes(4).toString("hex")}.tmp`);
+  fs.writeFileSync(tmp, buf);
+  fs.renameSync(tmp, abs);
+}
+
+// D4 record body: {"version":1,"files":{...}} with the keys sorted.
+function knowledgeSeedJson(files) {
+  const sorted = {};
+  for (const rel of Object.keys(files).sort()) sorted[rel] = files[rel];
+  return JSON.stringify({ version: 1, files: sorted }, null, 2) + "\n";
+}
+
+// Fix (2) / D5: copy the primary checkout's untracked knowledge files into a
+// fresh lane and record their hashes. Only with "knowledge": "local"; a file
+// is copied when it is not tracked in primary, its lane path is absent after
+// checkout and git ignores that path in the lane (the condition the config
+// copy uses), so the lane's status stays clean. A symlink is copied as its
+// target's bytes; a dangling one is skipped with a warning. Returns
+// { out, warn } lines; never throws (a failure only leaves fewer seeds).
+function seedLaneKnowledge(repoRoot, lanePath, lanePaths, lane) {
+  const out = [];
+  const warn = [];
+  const mode = readKnowledgeMode(repoRoot);
+  if (!mode.local) return { out, warn };
+  const seedAbs = lanePaths.resolveLanePaths(lanePath, lane).knowledgeSeedPath;
+  const seedRel = `.current/${lane}/${lanePaths.laneFile("knowledgeSeed").filename}`;
+  try {
+    if (!gitIgnoredSet(lanePath, [seedRel]).has(seedRel)) {
+      warn.push(
+        `agc feature start — warning: ${seedRel} would not be ignored by git in the lane — no knowledge ` +
+          `file copied (run agc init --artifacts=local in the primary checkout)`
+      );
+      return { out, warn };
+    }
+    const tracked = new Set(
+      git(repoRoot, ["--literal-pathspecs", "ls-files", "-z", "--", ...mode.dirs, ...mode.files])
+        .split("\0")
+        .filter((f) => f.length > 0)
+    );
+    const candidates = [];
+    for (const rel of listKnowledgeEntries(repoRoot, mode)) {
+      if (tracked.has(rel) || lstatOrNull(path.join(lanePath, rel))) continue;
+      const bytes = readKnowledgeBytes(path.join(repoRoot, rel));
+      if (bytes === "dangling") {
+        warn.push(
+          `agc feature start — warning: ${rel} in the primary checkout is a symlink that does not resolve — ` +
+            `not copied into the lane`
+        );
+      } else if (bytes !== null) {
+        candidates.push({ rel, bytes });
+      }
+    }
+    const ignored = gitIgnoredSet(lanePath, candidates.map((c) => c.rel));
+    const files = {};
+    for (const { rel, bytes } of candidates) {
+      if (!ignored.has(rel)) continue;
+      const laneAbs = path.join(lanePath, rel);
+      try {
+        fs.mkdirSync(path.dirname(laneAbs), { recursive: true });
+        fs.writeFileSync(laneAbs, bytes, { flag: "wx" });
+        files[rel] = sha256Tag(bytes);
+      } catch (err) {
+        // Only recorded files count as seeded; this one stays out of the record.
+        warn.push(
+          `agc feature start — warning: could not copy ${rel} into the lane ` +
+            `(${err && err.message ? err.message : String(err)}) — not seeded`
+        );
+      }
+    }
+    writeViaRename(seedAbs, knowledgeSeedJson(files), path.dirname(seedAbs));
+    out.push(
+      `agc feature start — copied ${Object.keys(files).length} knowledge file(s) from the primary checkout ` +
+        `(a snapshot; content hashes recorded in ${seedRel})`
+    );
+  } catch (err) {
+    warn.push(
+      `agc feature start — warning: could not seed the lane's knowledge files ` +
+        `(${err && err.message ? err.message : String(err)}) — copy them by hand or re-run in a new lane`
+    );
+  }
+  return { out, warn };
+}
+
 // The lane's missing-hooks warning (E215), or null. git resolves a relative
 // core.hooksPath against each checkout's own working-tree root (githooks(5)),
 // so a hooks directory that is generated and git-ignored (husky's `.husky/_`)
@@ -2062,6 +2232,11 @@ async function runFeatureStart(cwd, argv) {
     );
   }
 
+  // E447 Fix (2) — after the fork-point write, so `.current/<lane>/` exists.
+  const seeded = seedLaneKnowledge(repoRoot, lanePath, lanePaths, ticketId);
+  for (const line of seeded.out) process.stdout.write(`${line}\n`);
+  for (const line of seeded.warn) process.stderr.write(`${line}\n`);
+
   // AC3 — the printed lane id IS resolveCurrentLane over the new worktree.
   const lane = lanePaths.resolveCurrentLane(lanePath);
   if (lane !== ticketId) {
@@ -2070,6 +2245,98 @@ async function runFeatureStart(cwd, argv) {
     );
   }
   process.stdout.write(`lane: ${lane}\n`);
+}
+
+// `agc feature reseed <path>...` (E447 O2 (a)): the one sanctioned way to
+// refresh a lane's seeded knowledge copy. Run inside a lane worktree whose
+// primary checkout sets "knowledge": "local". All-or-nothing: every path is
+// checked first (knowledge path, git-ignored in the lane, a file in primary,
+// lane copy still the recorded seed), then the copies and the record update.
+async function runFeatureReseed(cwd, argv) {
+  const { positionals } = parseFeatureArgs(argv, [], []);
+  if (positionals.length === 0) throw usageError("agc feature reseed: expected at least one <path>");
+  const notLane = new FeatureError(
+    'agc feature reseed: run it inside a lane worktree of a workspace whose .current/.config.json sets "knowledge": "local"'
+  );
+  const top = gitTry(cwd, ["rev-parse", "--show-toplevel"]);
+  if (top.status !== 0 || !isLinkedWorktree(top.stdout.trim())) throw notLane;
+  const laneRoot = top.stdout.trim();
+  const primary = listWorktrees(laneRoot)[0]?.path ?? null;
+  if (primary === null || canonicalPath(primary) === canonicalPath(laneRoot)) throw notLane;
+  const mode = readKnowledgeMode(primary);
+  const lanePaths = await loadLanePaths();
+  const lane = lanePaths.resolveCurrentLane(laneRoot);
+  if (!mode.local || lane === lanePaths.PRIMARY_LANE) throw notLane;
+
+  // Repo-relative posix path of each operand; the parent directory is
+  // canonicalised so `..` or a symlinked directory cannot escape the lane.
+  const rels = [];
+  for (const p of positionals) {
+    const abs = path.resolve(cwd, p);
+    const relNative = path.relative(
+      canonicalPath(laneRoot),
+      path.join(canonicalPath(path.dirname(abs)), path.basename(abs))
+    );
+    const rel = relNative.split(path.sep).join("/");
+    if (relNative.startsWith("..") || path.isAbsolute(relNative) || !isKnowledgePath(rel, mode)) {
+      throw new FeatureError(
+        `agc feature reseed: ${escapeSegmentForDisplay(p)} is not under a knowledge path of this workspace — nothing changed`,
+        { exitCode: 2 }
+      );
+    }
+    if (!rels.includes(rel)) rels.push(rel);
+  }
+
+  const seedAbs = lanePaths.resolveLanePaths(laneRoot, lane).knowledgeSeedPath;
+  const seedRel = `.current/${lane}/${lanePaths.laneFile("knowledgeSeed").filename}`;
+  let files = {};
+  if (lstatOrNull(seedAbs)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(seedAbs, "utf-8"));
+      if (!parsed || typeof parsed.files !== "object" || parsed.files === null || Array.isArray(parsed.files)) {
+        throw new Error("no files map");
+      }
+      files = { ...parsed.files };
+    } catch (err) {
+      throw new FeatureError(
+        `agc feature reseed: cannot read ${seedRel} (${err && err.message ? err.message : String(err)}) — nothing changed`
+      );
+    }
+  }
+
+  const ignored = gitIgnoredSet(laneRoot, rels);
+  const refusals = [];
+  const copies = [];
+  for (const rel of rels) {
+    const bytes = readKnowledgeBytes(path.join(primary, rel));
+    const laneStat = lstatOrNull(path.join(laneRoot, rel));
+    const recorded = Object.prototype.hasOwnProperty.call(files, rel) ? files[rel] : undefined;
+    if (!ignored.has(rel)) {
+      refusals.push(`agc feature reseed: ${rel} is not ignored by git in this lane (tracked, or no exclude rule) — nothing changed`);
+    } else if (!Buffer.isBuffer(bytes)) {
+      refusals.push(`agc feature reseed: ${rel} is not a file in the primary checkout — nothing changed`);
+    } else if (
+      laneStat
+        ? !laneStat.isFile() || recorded === undefined || sha256Tag(fs.readFileSync(path.join(laneRoot, rel))) !== recorded
+        : recorded !== undefined
+    ) {
+      // Copy / Strings e447.reseed-refuse-changed (a lane-created or lane-deleted file counts as changed).
+      refusals.push(`agc feature reseed: ${rel} was changed in this lane since it was seeded — not re-seeded (nothing changed)`);
+    } else {
+      copies.push({ rel, bytes });
+    }
+  }
+  if (refusals.length > 0) throw new FeatureError(refusals.join("\n"));
+
+  const tmpDir = path.dirname(seedAbs);
+  for (const { rel, bytes } of copies) {
+    writeViaRename(path.join(laneRoot, rel), bytes, tmpDir);
+    files[rel] = sha256Tag(bytes);
+  }
+  writeViaRename(seedAbs, knowledgeSeedJson(files), tmpDir);
+  for (const { rel } of copies) {
+    process.stdout.write(`agc feature reseed — re-seeded ${rel} from the primary checkout\n`);
+  }
 }
 
 // NUL-separated `git status --porcelain -z` -> every path it names (both
@@ -4025,10 +4292,11 @@ async function runFeature(cwd, argv) {
   const verb = argv[0];
   if (verb === "start") return runFeatureStart(cwd, argv.slice(1));
   if (verb === "finish") return runFeatureFinish(cwd, argv.slice(1));
+  if (verb === "reseed") return runFeatureReseed(cwd, argv.slice(1));
   throw usageError(
     verb === undefined
-      ? "agc feature: missing subcommand (start | finish)"
-      : `agc feature: unknown subcommand ${JSON.stringify(verb)} (start | finish)`
+      ? "agc feature: missing subcommand (start | finish | reseed)"
+      : `agc feature: unknown subcommand ${JSON.stringify(verb)} (start | finish | reseed)`
   );
 }
 

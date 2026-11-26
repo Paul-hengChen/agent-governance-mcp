@@ -48,3 +48,9 @@ test/e447-served-text.test.mjs | AC12: docs/config.md has exactly one knowledge 
 # sr-engineer T-E447-02: the D4 knowledgeSeed LANE_FILES entry makes 9 entries; REG1 pins 8. Planned
 # re-pin by qa in T-E447-05 (integrator-assigned unowned red).
 test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 8 entries — 1 required (handoff) + 7 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks/baseSha)
+
+# sr-engineer T-E447-03 status note (no entry removed; qa reconciles the list in T-E447-05): green after
+# T-E447-02/03 are AC2 (a)-(f), both Copy rows, AC3, AC4, AC9 match, AC9 reseed refuses, AC9 reseed
+# boundaries, AC10 init. Still red: AC1 and AC5-AC8 (finish, T-E447-06); AC9 changed and AC9 reseed
+# (reseed works, but the test first needs check --cut's MANIFEST_CHANGED, T-E447-04); AC11 (T-E447-04);
+# AC12 (T-E447-07); lane-paths REG1 (T-E447-05).
