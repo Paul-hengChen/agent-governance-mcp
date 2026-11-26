@@ -179,6 +179,22 @@ agc init --adapter=local     # the block goes in CLAUDE.local.md, kept out of gi
 
 `agc check` covers both placements. The stale-version check reads whichever of `CLAUDE.md` and `CLAUDE.local.md` holds the block (with neither holding one, it checks `CLAUDE.md` for a version stamp), and a stale block in either file exits 1. Two advisories never change the exit code: the block found in **both** files (Claude Code loads both, so it is read twice), and `CLAUDE.md` or `CLAUDE.local.md` **flagged skip-worktree or assume-unchanged** in the git index, printed with the `git update-index --no-…` command that clears the flag (silent outside a git repository). `agc feature start` copies an ignored `CLAUDE.local.md` into a new lane, and `agc eject` removes the block from it, and removes its exclude rule only when the file is deleted (both below).
 
+### Keeping knowledge files out of git too: `agc init --knowledge=local|repo`
+
+`--artifacts=local` keeps only agc's runtime artifacts out of git. In a team repo where nothing agc writes may reach the repository or its history, `--knowledge=local` also keeps the knowledge files out: `specs/`, `design/`, `research/`, the ticket directory (`ticketDir` in `.current/.config.json`, default `docs/tickets/`) and `docs/backlog.md`. The choice is stored as `"knowledge"` in `.current/.config.json` ([docs/config.md](config.md#knowledge--keep-knowledge-files-out-of-git-too-optional)). It is opt-in: without the flag nothing changes.
+
+```bash
+agc init --artifacts=local --knowledge=local   # keep every agc file out of git
+agc init --knowledge=repo                      # back to tracking the knowledge files
+```
+
+- **`local`** adds root-anchored rules for those paths (prefixed in a subdirectory workspace, e.g. `/sub/specs/`) to the repo's shared `.git/info/exclude`, never to the tracked `.gitignore`. `AGENTS.md` and `.antigravityrules` get a rule too, but only when agc creates them; a file your team already has is never excluded or changed.
+- **Needs local artifacts.** `--knowledge=local` with `--artifacts=repo` (or an already-declared `repo`) exits 2 and writes nothing: each lane's seed record lives in the git-ignored `.current/`.
+- **Adapter default.** With the mode on and no `--adapter`, the agc block goes in `CLAUDE.local.md` (kept out of git) unless `CLAUDE.md` already holds it, so init never creates an untracked `CLAUDE.md`. An explicit `--adapter` still wins.
+- **Already-tracked paths.** As for artifacts, an exclude rule does nothing for a tracked file: `agc init` prints the tracked knowledge paths, the exact `git rm -r --cached …` command that would untrack them, and a note that history still contains them. It never runs that command for you.
+- **`repo`** writes only the config key and leaves any rules an earlier `local` run added. **Re-running** without the flag keeps the declared value. An invalid value (`--knowledge=foo`) exits 2 with a usage error and writes nothing.
+- **Lanes.** `agc feature start`, `agc feature reseed` and `agc feature finish` (below) keep the lane flow working in this mode: a lane gets a snapshot of the knowledge files, and finish brings back what the lane created or changed.
+
 ---
 
 ## Feature lanes: `agc feature start` / `agc feature finish`
@@ -201,6 +217,7 @@ agc feature start e73-agc-feature-lifecycle --base develop --path ~/lanes/e73
   - If the primary checkout has a `.env`, it is byte-copied into the lane.
   - If the primary checkout has a `CLAUDE.local.md` at the repo root (where `agc init --adapter=local` puts the agc block for a root workspace), it is byte-copied into the lane, but only when the lane has no file there and git ignores `CLAUDE.local.md` in the lane (the `/CLAUDE.local.md` exclude rule), so the lane's `git status` stays clean and `finish` can remove the worktree. When git does not ignore it, nothing is copied and one warning line says to run `agc init --adapter=local` in the primary checkout to add the rule. A subdirectory workspace's `CLAUDE.local.md` is not copied.
   - `.env` and `/node_modules` are added to the repo's shared `info/exclude` (`git rev-parse --git-common-dir`), not to the tracked `.gitignore`, so a fresh lane's `git status` is clean. The upsert is idempotent.
+  - **With `"knowledge": "local"`** (see above): every untracked knowledge file of the primary checkout (`specs/`, `design/`, `research/`, the ticket directory, `docs/backlog.md`) is byte-copied into the lane, but only where the lane has no file after checkout and git ignores the lane path. A symlink is copied as its target's bytes; a dangling one is skipped with a warning; a tracked path is never copied (the checkout already has it). Each copied file's content hash is recorded in `.current/<lane>/knowledge-seed.json`. The lane holds a snapshot: later edits in the primary checkout do not reach it, except through `agc feature reseed`.
 - `agc feature start` does not run `agc init` in the lane. The lane's tracked files (including `CLAUDE.md`) are exactly what `git worktree add` checks out.
 
 ### `agc feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>]`
@@ -214,11 +231,28 @@ Pass the bare ticket id (`e73`, not the slug). Exactly one of `--shipped` / `--a
   3. Tracked evidence moves with `git mv`, then gets one commit on the lane branch: `chore(lane): abandon <ticket-id> — evidence to abandoned/`. If no tracked evidence matched, no commit is made.
   4. `git worktree remove` runs (never `--force`).
   - **Rough edge — untracked evidence:** an untracked evidence file is moved with a plain rename and stays untracked, so step 4 fails with git's own "use --force" error. `agc` never retries with `--force`. Either `git add` + commit the file in the lane and re-run `finish --abandoned` (nothing is left to move, so the re-run only removes the worktree), or remove the worktree by hand once the evidence is dealt with.
+- **With `"knowledge": "local"`** — finish compares the lane's untracked knowledge files with `.current/<lane>/knowledge-seed.json`, before it removes anything:
+  - `--shipped` copies each knowledge file the lane created or changed to the same path in the primary checkout (an fs copy, not committed), `specs/` included — in this mode it does not go to `specs/abandoned/`. A changed file overwrites the primary copy only while that copy still has the seeded bytes.
+  - Seeded copies the lane did not change are discarded, so a newer primary copy (for example a backlog row added after the lane started) is kept. A seeded file the lane deleted stays in the primary checkout.
+  - **Both sides changed.** When the primary copy was edited too, finish refuses with the harvest-destination line naming that path, and nothing is removed or changed.
+  - `--abandoned` copies created or changed knowledge files to `<dir>/abandoned/<ticket-id>/<path>` instead (`design/abandoned/<ticket-id>/…`; `docs/backlog.md` goes to `docs/abandoned/<ticket-id>/backlog.md`), never committed.
+  - **Numbering.** The lane's `.current/<lane>/pending-tickets.md` is never committed in this mode, so on both paths finish numbers its findings straight from the worktree and appends the new rows to the primary checkout's untracked `docs/backlog.md`, without a commit.
 - Removing a lane leaves the primary checkout's `node_modules` intact: git removes the lane's symlink and does not follow it.
 - **Integrator mailbox.** On both paths, right after the worktree is removed, `finish` deletes `<worktree parent>/_mailbox/<lane>/` (`agc feature finish — removed mailbox <path>`) when it holds only `to-integrator.md`, `to-lane.md` and watch-lock files whose watch has exited. Anything else in it, or a watch still running, keeps the folder with one warning line (`agc feature finish — kept mailbox <path>: <reason>`); the exit code is unchanged, and no mailbox folder means no output. A mailbox kept outside that default location is not touched.
 - **Calling `git worktree remove` directly on a lane, bypassing `agc feature finish`, is undefined behaviour.** No evidence disposition runs, and neither the shipped nor the abandoned guard applies.
 
 **Secrets:** `agc feature` copies `.env` with a kernel-level byte copy (`fs.copyFileSync`). Its contents are never read into a JavaScript string, logged, or printed by any `agc feature` command. `CLAUDE.local.md` is copied the same way.
+
+### `agc feature reseed <path>...`
+
+```bash
+agc feature reseed specs/fanout-<id>.md     # run inside the lane worktree
+```
+
+- Only with `"knowledge": "local"`, and unlike `start` and `finish`, it runs **inside a lane worktree**. Elsewhere it exits 1 and changes nothing.
+- Copies each named knowledge file from the primary checkout over the lane's copy and records its new hash in `.current/<lane>/knowledge-seed.json`, so finish later sees it as unchanged. All paths are checked before anything is copied.
+- **Refuses a file the lane changed** since it was seeded (exit 1, nothing changed): the lane's edit would be lost. A path outside the knowledge paths exits 2.
+- When `fanout.mjs check --cut` in a lane prints `manifest changed since lane start — re-seed`, the primary checkout's fan-out manifest changed after the lane started: run `agc feature reseed specs/fanout-<id>.md` here, then run `check --cut` again.
 
 ---
 
@@ -247,7 +281,7 @@ agc eject --yes --purge-knowledge    # apply, including those
 | (i) machine state | `.current/` | Removed: deleted if untracked, else listed in the `git rm -r` line |
 | (ii-b) process evidence | `tasks.md`, `qa_reports/`, `review_reports/` | Removed, same per-path rule |
 | (ii-a) domain knowledge | `design/`, `specs/`, `docs/backlog.md` | KEPT by default. These are the project's own rationale, and `docs/backlog.md` may be its plan. With `--purge-knowledge`, the same per-path rule applies |
-| (iii) host traces | `CLAUDE.md` and `CLAUDE.local.md` adapter blocks, `AGENTS.md`, `.antigravityrules`, this workspace's artifact lines and `/CLAUDE.local.md` line in `.git/info/exclude` | `CLAUDE.md` / `CLAUDE.local.md`: only the `<!-- BEGIN/END agc-adapter -->` block is removed and all other content (such as your own notes in `CLAUDE.local.md`) is kept. Each file is deleted if the block was its only content. `AGENTS.md` / `.antigravityrules`: deleted only when the file equals the installed template (version stamp aside). Otherwise it is KEPT with an advisory to review it by hand. `.git/info/exclude`: only this workspace's artifact rules and its `/CLAUDE.local.md` rule (prefixed in a subdirectory workspace) are removed. The `/CLAUDE.local.md` rule is removed only when `CLAUDE.local.md` is deleted (it held only the block). While the file stays (your own notes beside the block, or a `CLAUDE.local.md` with no agc block, which eject leaves untouched), the rule stays too, so the notes never show as untracked for a `git add -A` to commit. The plan prints one line saying it is kept; remove it by hand from the shared `.git/info/exclude` when you no longer need it. Lane rules and unrelated lines stay. Outside a git repository this step is skipped with a note |
+| (iii) host traces | `CLAUDE.md` and `CLAUDE.local.md` adapter blocks, `AGENTS.md`, `.antigravityrules`, this workspace's artifact lines and `/CLAUDE.local.md` line in `.git/info/exclude` | `CLAUDE.md` / `CLAUDE.local.md`: only the `<!-- BEGIN/END agc-adapter -->` block is removed and all other content (such as your own notes in `CLAUDE.local.md`) is kept. Each file is deleted if the block was its only content. `AGENTS.md` / `.antigravityrules`: deleted only when the file equals the installed template (version stamp aside). Otherwise it is KEPT with an advisory to review it by hand. `.git/info/exclude`: only this workspace's artifact rules and its `/CLAUDE.local.md` rule (prefixed in a subdirectory workspace) are removed. The `/CLAUDE.local.md` rule is removed only when `CLAUDE.local.md` is deleted (it held only the block). While the file stays (your own notes beside the block, or a `CLAUDE.local.md` with no agc block, which eject leaves untouched), the rule stays too, so the notes never show as untracked for a `git add -A` to commit. The plan prints one line saying it is kept; remove it by hand from the shared `.git/info/exclude` when you no longer need it. Lane rules and unrelated lines stay. Outside a git repository this step is skipped with a note With `"knowledge": "local"`, the knowledge exclude rules are kept, so untracked knowledge files never show up for a `git add -A`; remove them by hand from the shared `.git/info/exclude` when you no longer need them. |
 
 **What `agc eject` cannot do.** Every run prints these four items, plus a fifth when it applies. Act on them yourself:
 
