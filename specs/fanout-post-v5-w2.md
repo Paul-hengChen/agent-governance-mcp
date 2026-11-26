@@ -2,7 +2,7 @@
 base: 3b695e2    integration branch: integ/post-v5-w2
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准，派工中。**
+**狀態：已結案 2026-11-26。** e425 `--no-ff` 合進 `integ/post-v5-w2`（merge `9a13186`，零衝突），merge-invariants PASS；派工 base `976a789`（清單 PR #195）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0。lane 層 CI run 45733593344 @ `5b581db`；整合層 CI run 45734144653 @ `99d1a5d`，皆綠（Node 20、22）。Roll-up：e425 8 個 task、hop 10/14、review 退回 0、證據 8/8。E425、E427 done-mark。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out E425 E427」，2026-11-26）。分波與分組沿用第 1 波清單 `specs/fanout-post-v5-w1.md` 已核准的切法 A（人類 2026-11-25）：第 2 波 = E425 全部，加上 E427 修正條款 (2) 的兩句 SOP。票面以 `docs/backlog.md` 的 E425、E427 列為準，含 2026-11-19 的修正條款；佇列 `docs/v4.0.0-new-tickets.md` 第 250、253 號列。兩張都屬 v5.0.0 里程碑，以 v5.x 發出；本波不發版。
 
@@ -97,3 +97,22 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-26 | 整合者 | e425 rework cut（to-integrator#7，spec @ `7c20a10a`：AC16、T-E425-07 qa、T-E425-08 sr）`close`（to-lane#8）；`check --cut` 把 `test/e118-reviewer-ac-completeness.test.mjs` 判為越界，屬本表第 8 列已劃給 e425 的檔，確認有效；approval = human，由人類在 lane 的 session 核准 | e425 信箱 to-integrator#7、to-lane#8 |
 | 2026-11-26 | 整合者 | e425 rework 後報告（to-integrator#8，取代 #6，HEAD `5b581db`）驗證通過：29 commits、標題都帶 E425、乾淨樹、`check` 38 檔，越界 4 檔（addendum、e118、e349、e410）都在本表第 8–10 列核准範圍內；證據 8/8（`review_reports/review_T-E425-01.md` covers 01..06、`review_reports/review_T-E425-07.md` covers 07、08，皆 APPROVED；`qa_reports/review_T-E425-01..08.md`）；R1、R2 都已修，`agc check` 無本 lane 加的註解 advisory；lane 層 CI run 45733593344 @ `5b581db` 綠（Node 20、22）；review 退回 0、hop 10/14；`close`（to-lane#9） | e425 信箱 to-integrator#8、to-lane#9 |
 | 2026-11-26 | 整合者 | 整合：`integ/post-v5-w2` 自 `main` @ `976a789` 開出，`--no-ff` 合 e425（merge `9a13186`），零衝突，merge-invariants PASS；build 無 `dist/` 差異、audit exit 0、`agc check` exit 0；`check:bookkeeping` exit 0；E425、E427 done-mark。波次報告不開票的意見：`batch-summary.mjs` 同時收到資料夾與其中的票檔時，同一張票會算兩次（optional，非本波缺陷）。 | 本清單；`docs/backlog.md`、`docs/v4.0.0-new-tickets.md` |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 976a789
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v5-w2 @ 55290be）
+- lane-status：primary（main ← integ/post-v5-w2 @ 55290be）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
+### 已結案
+- e425（E425，加上 E427 修正條款 (2) 的兩句 SOP）`--no-ff` 合進 `integ/post-v5-w2`（merge `9a13186`），零衝突；lane 層 CI run 45733593344 @ `5b581db`、整合層 CI run 45734144653 @ `99d1a5d`，皆綠（Node 20、22）。
+- lane 紀錄：`.current/history/2026-11/e425/`。
+- 新發現：無，lane 沒有 `pending-tickets.md`，finish 沒有配號。
+- 記帳：E425、E427 done-mark（佇列第 250、253 列）。
+### 待人類決定
+- 要不要發 v5.x：E424、E425、E427 都已完成，合進 `main` 後尚未發版。
+- 下一波要不要開、開哪些票，由人類決定；佇列上還沒做的 v5.x 票見 `docs/v4.0.0-new-tickets.md`。
+### 進行中的背景工作
+無
