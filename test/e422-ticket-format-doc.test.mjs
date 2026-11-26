@@ -157,7 +157,7 @@ test("AC8 the example is generic: no tracker link, no local path, and it shows a
   assert.doesNotMatch(s, /https?:\/\//);
   assert.doesNotMatch(s, /\/Users\/|C:\\/);
   assert.match(s, /## Added during build/);
-  assert.match(s, /Added: the implementer, \d{4}-\d{2}-\d{2}, /);
+  assert.match(s, /Added: the test author, \d{4}-\d{2}-\d{2}, /);
 });
 
 test("AC8 templates/ticket.md, written to a temp file, passes the checker with exit 0", () => {
