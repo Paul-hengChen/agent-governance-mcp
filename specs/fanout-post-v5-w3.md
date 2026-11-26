@@ -2,7 +2,7 @@
 base: ca6dade    integration branch: integ/post-v5-w3
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：規劃中 2026-11-26。**
+**狀態：已結案 2026-11-26。** e430 `--no-ff` 合進 `integ/post-v5-w3`（merge `6ca6de9`，零衝突），merge-invariants PASS；派工 base `f08ea57`（清單 PR #197）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17、`check:bookkeeping` exit 0。lane 層 CI run 45759043059 @ `c0e9c73` 綠（Node 20、22）。Roll-up：e430 8 個 task、hop 10/14、review 退回 0、證據 8/8；收工後依人類裁定在 lane 內修一個本票造成的缺口（修訂 2，idle-stop 恢復路徑）。E430、E449 done-mark。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out 下一波」，2026-11-26；整合者提三題，人類答「照建議」）：一條 lane 做 E430 與 E449，一次 cut。票面以 `docs/backlog.md` 的 E430、E449 列為準（E430 含 2026-11-19 的里程碑註記）；佇列 `docs/v4.0.0-new-tickets.md` 第 251、260 號列。E430 屬 v5.0.0 里程碑、依排定順序在 v5.0.0 之後以 v5.x 發出；E449 不屬里程碑，人類 2026-11-24 裁定以 v5.x 發出。本波不發版。
 
@@ -90,3 +90,20 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-26 | 整合者 | e430 cut 修訂 2（to-integrator#9，spec @ `a4f0348`：C-IN5、AC8、T-E430-04 qa、T-E430-05 sr）`close`（to-lane#5）：接受 C-IN5 以獨立句放在 Resuming 句之前，而非句內子句——`test/e285-integrator-session-handoff.test.mjs` AC-E344-1 逐字 pin 該句且要求它是子項最後一句，獨立句版不必動不在擁有欄的 e285；只重述 C-IN3 (a)(b)；不增行、golden 與預算不動。Q4 建議 (a) | e430 信箱 to-integrator#9、to-lane#5 |
 | 2026-11-26 | 人類 | 在 e430 的 session 選 (a)：merge 前在本 lane 修 idle-stop 恢復路徑的缺口（不另開票）；核准修訂 2 cut（spec @ `a4f0348`）並裁定 Q4 = (a)（C-IN5 獨立句、以接手第 5 步 (b) 編號指引）；只影響本 lane 的交付內容 | e430 lane session；`specs/e430-mailbox-and-verify-rule.md` 「Revision 2」段 @ `f108c19`、`.current/e430/handoff.md`（`cut_approved: true`）；e430 信箱 to-integrator#8、#10 |
 | 2026-11-26 | 整合者 | e430 修訂後報告（to-integrator#12，取代 #7，HEAD `c0e9c73`）驗證通過：14 commits、乾淨樹、`check` 34 檔越界只有已劃歸的 e410；證據 8/8（`review_reports/review_T-E430-01.md` covers 六個 id、`review_reports/review_T-E430-04.md` covers T-E430-04、05，皆 APPROVED；`qa_reports/review_T-<id>.md` ×8）；無新發現；lane 層 CI run 45759043059 @ `c0e9c73` 綠（Node 20、22）；review 退回 0、hop 10/14；`close`（to-lane#6）。波次報告不開票的意見：(1) `mailbox-watch.mjs --send` 對非 integrator 要求 hop 值、非 lane session 只能手寫；(2) C-IN5 的「Whichever way it resumes」在點名兩種恢復方式那句之前；(3) session 信箱以讀完後的則數掛、緊接的 lane 句寫「never the current count」 | e430 信箱 to-integrator#12、to-lane#6 |
+| 2026-11-26 | 整合者 | 整合：`integ/post-v5-w3` 自 `main` @ `f08ea57` 開出，`--no-ff` 合 e430（merge `6ca6de9`），零衝突、無實質解衝突，merge-invariants PASS；build 無 `dist/` 差異、audit exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17；`check:bookkeeping` exit 0；E430、E449 done-mark；`agc feature finish e430 --shipped --base integ/post-v5-w3` 無新發現可配號，worktree、branch、信箱已拆除 | 本清單；`docs/backlog.md`、`docs/v4.0.0-new-tickets.md` |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ f08ea57
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v5-w3 @ 74d40d3）
+- lane-status：primary（main ← integ/post-v5-w3 @ 74d40d3）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
+### 已結案
+- e430（E430、E449）PASS，merge `6ca6de9`，以本波 PR 合進 `main`；lane 紀錄在 `.current/history/2026-11/e430/`；沒有未配號的新發現。波次報告不開票的意見三則記在 Decisions 表。
+### 待人類決定
+- 要不要發 v5.x：E424、E425、E427、E430、E449 都已完成，合進 `main` 後尚未發版。
+- 下一波要不要開、開哪些票，由人類決定；佇列上還沒做的 v5.x 票見 `docs/v4.0.0-new-tickets.md`。
+### 進行中的背景工作
+無
