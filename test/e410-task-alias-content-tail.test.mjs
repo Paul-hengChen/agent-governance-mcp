@@ -51,11 +51,13 @@ test("AC1 control: the rule is occurrence-level (flags tasks.md lines; skips the
 // 183 -> 191, 251 -> 260, 252 -> 261 lines; span strings unchanged.
 // E428 re-pin: skill-integrator gains the `## Tracker items` section (C-IN1, nine lines after Stage 6),
 // row 260 -> 269, 261 -> 270 lines; rows 40-191 sit above it and do not move; span strings unchanged.
+// E447 re-pin: const-08 gains the local-knowledge-files sub-bullet directly after the batch-lane one
+// (row 6 -> 7, 12 -> 13 lines); skill-integrator's Stage 1 step 3 grows in place (no row or count moves).
 const ROWS = [
   ["const-01-core-head.md", 31,"Task-spawned with `model:` pinned by the parent (`Task(subagent_type=…)`)", "Subagent-dispatched with `model:` pinned by the parent"],
   ["const-05-core-standards.md", 9, "Task-dispatched with a silent brief", "dispatched with a silent brief"],
   ["const-08-chain-31-mid.md", 2, "under Task-subagent dispatch — where", "under subagent dispatch — where"],
-  ["const-08-chain-31-mid.md", 6, "under Task-subagent dispatch it is", "under subagent dispatch it is"],
+  ["const-08-chain-31-mid.md", 7, "under Task-subagent dispatch it is", "under subagent dispatch it is"],
   ["const-12-chain-r10-s4.md", 2, "Background/parallel `Task` fan-out", "Background/parallel subagents"],
   ["skill-coordinator-lite.md", 43, "After `Task(subagent_type=…)`,", "After a subagent dispatch,"],
   ["skill-coordinator-lite.md", 49, "ONLY after `Task(…)`;", "ONLY after subagents;"],
@@ -79,7 +81,7 @@ test("AC2: each site carries its new span, the old span is gone, the line has no
 });
 
 test("AC2: each edited file keeps its line count", () => {
-  const counts = { "const-01-core-head.md": 35,"const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 12, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 270, "skill-pm.md": 120 };
+  const counts = { "const-01-core-head.md": 35,"const-05-core-standards.md": 23, "const-08-chain-31-mid.md": 13, "const-12-chain-r10-s4.md": 22, "skill-coordinator-lite.md": 53, "skill-integrator.md": 270, "skill-pm.md": 120 };
   for (const [f, c] of Object.entries(counts)) assert.equal(read(f).split("\n").length, c, f);
 });
 

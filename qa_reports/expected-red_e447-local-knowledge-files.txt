@@ -47,7 +47,7 @@ test/e447-served-text.test.mjs | AC12: docs/config.md has exactly one knowledge 
 
 # sr-engineer T-E447-02: the D4 knowledgeSeed LANE_FILES entry makes 9 entries; REG1 pins 8. Planned
 # re-pin by qa in T-E447-05 (integrator-assigned unowned red).
-test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 8 entries — 1 required (handoff) + 7 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks/baseSha)
+test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 9 entries — 1 required (handoff) + 8 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks/baseSha/knowledgeSeed)
 
 # sr-engineer T-E447-03 status note (no entry removed; qa reconciles the list in T-E447-05): green after
 # T-E447-02/03 are AC2 (a)-(f), both Copy rows, AC3, AC4, AC9 match, AC9 reseed refuses, AC9 reseed
@@ -90,3 +90,10 @@ test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the fou
 # sr-engineer T-E447-07 (no entry removed; qa reconciles the list in T-E447-05): AC12 green after T-E447-07
 # (all 26 e447 tests green). Full suite 4817 tests: 4800 pass / 15 fail / 2 skipped; the 15 reds are lane-paths
 # REG1, e410 AC2 x2, the 7 goldens, the 3 budget caps and e428 AC6/AC12, all listed above.
+
+# qa-engineer T-E447-05 (2026-11-26) — MANIFEST FULLY RESOLVED: every entry above is green.
+# Goldens re-captured by scripts/capture-constitution-golden.mjs (7 moved, lite/hook-lite unchanged); context-budget
+# caps 9407 -> 9541, 19699 -> 19905, 7495 -> 7629; lane-paths REG1 re-pinned to 9 entries (its entry above now carries the
+# re-pinned title); e410 AC2 const-08 row 6 -> 7, 12 -> 13 lines; e428 BASE[IN_FILE].sha re-pinned
+# to bebdd0e874912302b06f2ae81812aa924b1089f21a3a1b0767e2b078f6f58d06. No red is left on purpose; entries are kept as
+# history (append-only), not as open reds.

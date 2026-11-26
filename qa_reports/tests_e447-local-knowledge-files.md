@@ -111,3 +111,43 @@ Full suite (`node scripts/test-lock.mjs -- npm test`, 2026-11-26, this worktree)
 ## CI Runnability
 
 Headless, no human interaction; every fixture is created and removed under `os.tmpdir()`. Requires `git` on `PATH` and POSIX symlinks (AC4) — both already required by the existing finish suites. The AC10 git shim is a `/bin/sh` script (POSIX hosts, as CI's Linux runners).
+
+## T-E447-05 — planned return: golden recapture, budget caps, re-pins (qa-engineer, 2026-11-26)
+
+Placement branch: dispatch brief `Test-file placement` line — re-pin only the five named existing files; no new test file written.
+
+### Compose goldens (re-captured with `npm run build && node scripts/capture-constitution-golden.mjs`, no hand edit)
+
+The tool rewrote all 12 fixtures; exactly 7 changed bytes, each with one hunk. The 4 `build-lite-*` and `hook-lite.txt` are byte-unchanged (const-08 is chain-only). Content diff against lane base `07a6d47` touches only `content/const-08-chain-31-mid.md` (+1 line), `content/coord-03-core-fallback.md` (1 line appended to) and `content/skill-integrator.md` (1 line appended to); each was checked to be a pure insert / append (`git diff --word-diff`).
+
+| golden | hunk | explained by |
+|---|---|---|
+| `build-full-nondesign.txt` | +1 line, 0 removed | C-C08K: the added line equals `content/const-08-chain-31-mid.md` line 6 byte for byte (536 chars, 544 bytes), directly after the Batch-lane sub-bullet (line 5); the next line is the Lease-Override bullet (origin tags stripped by the build) |
+| `build-full-design.txt` | +1 / 0 | C-C08K, same line, same placement |
+| `build-full-nondesign-fd.txt` | +1 / 0 | C-C08K, same line, same placement |
+| `build-full-design-fd.txt` | +1 / 0 | C-C08K, same line, same placement |
+| `hook-full.txt` | +1 / 0 | C-C08K, same line; next line is const-08 line 7 verbatim (origin tags kept in the hook) |
+| `constitution-monolith.txt` | +1 / 0 | C-C08K, same line; neighbours const-08 lines 5 and 7 verbatim |
+| `skill-coordinator-monolith.txt` | 1 line changed (+1 / -1) | C-CO3K: the new line starts with the old "Bookkeeping never lands on local `main`" line byte for byte and adds only the 289-char sentence `When .current/.config.json sets "knowledge": "local" ... only after agc feature reseed.`; the new line occurs verbatim in `content/coord-03-core-fallback.md` |
+
+C-IN-R4 (`content/skill-integrator.md`) reaches no golden: the integrator SOP is not part of any captured bundle. Nothing else moved.
+
+### `test/context-budget.test.mjs` caps (measured with the test's own `approxTokens` = ceil(chars / 4))
+
+| test | old cap | new cap | delta | cause |
+|---|---|---|---|---|
+| AC8/AC-P2-7 rationale-stripped (design-arm) constitution | 9407 | 9541 | +134 | C-C08K: 535 chars + newline = 536 chars = 134 ~tok; const-08 is a chain fragment, carries no origin or rationale fence, so both strips leave it whole |
+| AC8/AC-P2-7 teamwork coordinator bundle (design-arm, both strips) | 19699 | 19905 | +206 | C-C08K +134 (constitution half) plus C-CO3K, 289 chars appended to the coord-03 bookkeeping line = 72.25 ~tok; 134 + 72.25 = 206.25 → the whole bundle's ceil moves by 206 |
+| AC8/AC-P2-7 non-design constitution | 7495 | 7629 | +134 | C-C08K lands on both arms (chain fragment, not design-only); design-only saving stays 9541 − 7629 = 1912, so that `≥ 1912` assertion is unchanged |
+
+Each cap gets an `E447 re-baseline` history comment in the file's existing convention; the two inline `design-arm path` / `non-design path` comments in the non-design test now read 9541 / 7629. No other cap moved (AC2 lean, skill-pm, spec-workshop, sr caps all pass unchanged).
+
+### Re-pins outside the golden set
+
+- `test/lane-paths.test.mjs` REG1: count 8 → 9, optional 7 → 8, filename list + `knowledge-seed.json` (D4's `knowledgeSeed` entry, `required: false`); the test title names the new entry, so its name changed. Every other REG1 assertion (handoff sole required, `tasks` entry shape) unchanged.
+- `test/e410-task-alias-content-tail.test.mjs` AC2: const-08 Lease-Override alias row line 6 → 7, const-08 line count 12 → 13 (C-C08K inserted above it); an `E447 re-pin` comment added beside the earlier re-pin notes. The skill-integrator rows and its 270-line count do not move (C-IN-R4 is appended to an existing line). AC3 (span lengths) untouched.
+- `test/e428-tracker-mirror.test.mjs` AC6 / AC12: only `BASE[IN_FILE].sha` changed, `6e1a994b…a8bf60` → `bebdd0e8…f58d06` (integrator ruling: hash value only). The hash covers `content/skill-integrator.md` with C-IN1 taken out; the sole other difference from lane base is the C-IN-R4 append to Stage 1 step 3, so the new value is that file's base plus C-IN-R4. Value measured from the test's own `actual` output and equal to sr-engineer's measured value. No comment added (ruling: value only).
+
+### Result
+
+The 8 affected files (`node --test` on the five re-pinned files plus `compose-equivalence`, `skill-manifest`, `e90-golden-capture-completeness`, `e447-served-text`): 181 tests, 181 pass. All 15 reds from the T-E447-07 full suite are now green; the expected-red manifest is marked fully resolved.
