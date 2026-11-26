@@ -5,6 +5,8 @@
 // (spec-workshop, teamwork coordinator). Base text: each touched file's pre-edit sha256 is frozen below and
 // the base is rebuilt by removing the Copy, so "nothing else changed" is exact without a history read.
 // AC13 (full suite, goldens, caps) has no dedicated test here: see qa_reports/tests_e428-tracker-mirror.md.
+// Amended after review round 1 (finding F1, T-E428-06): C-IN1 also counts an item the ticket file's `source`
+// field lists (private repository), and C-TF1 bullet 2 names which source item a child item goes under.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -50,14 +52,21 @@ const SW2 = {
 const C_SW2 = ["## Tracker mirror", "", Object.values(SW2).join(" ")].join("\n");
 
 const IN_INTRO =
-  "Only a ticket with a row in the tracker map gets tracker writes — `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints, never tracked (format: `<agc install>/docs/ticket-format.md`, *Tracker mirror*). No row, no write. Use the host's own tracker tools (update an item's state, add a comment):";
+  "Only a ticket with a tracker item gets tracker writes: an item its ticket file's `source` field lists, or a row in the tracker map — `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints, never tracked (format: `<agc install>/docs/ticket-format.md`, *Tracker mirror*). No item, no write. Use the host's own tracker tools (update an item's state, add a comment):";
 const IN_B = [
   "- **`mirror` or `child` row** — update that item as the ticket moves: in progress at dispatch; at a stop, the stopped state and the reason after `stopped — `; the pull request's number once it is open; done at merge.",
-  "- **`source` row** — the same updates, only when the map's `write-back` line reads `on`. It is off by default; only the human turns it on.",
-  "- **A stop's question** (the ticket's `## Open question`) is never posted, whatever the row: draft it in your report; the human decides whether to post it.",
+  "- **Source item** (one the ticket file's `source` field lists, or a `source` row) — the same updates to each, only when the map's `write-back` line reads `on`, whether or not the map has a row for the ticket. It is off by default; only the human turns it on.",
+  "- **A stop's question** (the ticket's `## Open question`) is never posted, whatever the item: draft it in your report; the human decides whether to post it.",
   "- **One way only** — never copy tracker content into a ticket file. Where an item and its ticket file differ, the file wins; report the difference.",
 ];
 const C_IN1 = ["## Tracker items", "", IN_INTRO, "", ...IN_B].join("\n");
+// The pre-amendment C-IN1 wording (approved cut, shipped at review round 1): it must be gone.
+const OLD_IN = {
+  intro: "Only a ticket with a row in the tracker map gets tracker writes",
+  noWrite: "No row, no write.",
+  source: "- **`source` row** — the same updates, only when the map's `write-back` line reads `on`.",
+  stop: "is never posted, whatever the row:",
+};
 
 const CO = [
   "A tracker number that has a ticket file (the file's `source` field lists it, or the tracker map does: `agc-tracker-map.md` in the directory `git rev-parse --git-common-dir` prints) → work from the ticket file; where the item's content differs from it, keep to the file and report the difference to the human.",
@@ -75,9 +84,9 @@ const C_TF1 = [
   "",
   "- Direction is fixed, repository to tracker. Content edited on the tracker is never read back into a ticket",
   "  file; when an item and its ticket file differ, the file wins and the difference is reported to a person.",
-  "- A ticket file gets at most one tracker item created for it: a mirror item, or, for a ticket cut from an",
-  "  item, one child item under that item when a person asks. The items a ticket was cut from (its `source`)",
-  "  are not counted, and a ticket cut from an item gets no mirror item.",
+  "- A ticket file gets at most one tracker item created for it: a mirror item, or, for a ticket cut from",
+  "  items, one child item under one of them, chosen by the person who asks for it. The items a ticket was",
+  "  cut from (its `source`) are not counted, and a ticket cut from an item gets no mirror item.",
   "- A ticket file holds tracker item numbers only in its `source` field, never a link; in a public repository",
   "  it holds none. Every other number, and in a public repository the source items too, goes in the tracker map.",
   "- Before work starts and again before acceptance, a source item's current revision is compared with the",
@@ -119,6 +128,7 @@ function bulletsOf(block) {
 const TF_B = bulletsOf(C_TF1.slice(0, C_TF1.indexOf("### Tracker map"))); // the six format bullets
 const TF_MAP_B = bulletsOf(C_TF1.slice(C_TF1.indexOf("### Tracker map"))); // the three map bullets
 const MAP_ONE_ROW = "- A ticket has at most one `mirror` or `child` row.";
+const OLD_TF_CHILD = "one child item under that item when a person asks"; // pre-amendment C-TF1 bullet 2
 
 // ---------------------------------------------------------------------------
 // Frozen base text (pre-edit anchors the Copy must sit next to, byte for byte)
@@ -185,6 +195,8 @@ const SW_DESCRIPTION =
   "Spec workshop — turn specs, design sources, issue-tracker items or an idea into dated rulings, ticket files and a wave table, in rounds with the human. Human-started; writes no handoff state.";
 const servedSW = () => served("skill-spec-workshop.md", SW_DESCRIPTION);
 const servedCoord = () => served("skill-coordinator.md", "Agent Governance Coordinator. Route tasks or execute them.");
+const servedIntegrator = () =>
+  served("skill-integrator.md", "Integrator — plan parallel lanes, pre-review cuts, verify lane reports, merge, tear down. Cross-lane; writes no handoff state.");
 
 const linesOf = (t) => t.split("\n");
 // The text of the `## <heading>` section (heading line included) up to the next `## ` heading.
@@ -245,6 +257,8 @@ test("AC2: imported tickets get no new item, a child item only on request, at mo
   const doc = read(TF_FILE);
   assert.ok(TF_B[1].startsWith("- A ticket file gets at most one tracker item created for it:"), "sanity: bullet 2 is the first-level rule");
   assert.ok(doc.includes(TF_B[1]), "ticket format carries C-TF1 bullet 2");
+  assert.ok(TF_B[1].includes("for a ticket cut from\n  items, one child item under one of them, chosen by the person who asks for it."), "sanity: amended bullet 2 covers several source items");
+  assert.ok(!doc.includes(OLD_TF_CHILD), "the pre-amendment `one child item under that item` wording is gone (a `source` may list several items)");
   assert.equal(TF_MAP_B[2], MAP_ONE_ROW, "sanity: the map rule is the last map bullet");
   assert.equal(count(doc, MAP_ONE_ROW), 1, "the map rule `A ticket has at most one `mirror` or `child` row.` is present once");
   const text = servedSW();
@@ -255,14 +269,16 @@ test("AC2: imported tickets get no new item, a child item only on request, at mo
 // AC3 — no request, no write; reading stays allowed
 // ---------------------------------------------------------------------------
 
-test("AC3: without a mirror request nothing is written — C-SW2 opens with the request condition, C-TF1 bullet 6, C-IN1 `No row, no write.`, C-CO1 ends read-only", () => {
+test("AC3: without a mirror request nothing is written — C-SW2 opens with the request condition, C-TF1 bullet 6, C-IN1 `No item, no write.`, C-CO1 ends read-only", () => {
   // WHY: the tracker is shared with people outside the chain; a default write would publish without consent.
   const sop = read(SW_FILE);
   assert.ok(h2Section(sop, "## Tracker mirror").startsWith("## Tracker mirror\n\n" + SW2.request + " "), "C-SW2 opens with the request condition and its reading carve-out");
   assert.ok(TF_B[5].startsWith("- Without a mirror request nothing is written to a tracker. "), "sanity: bullet 6");
   assert.ok(read(TF_FILE).includes(TF_B[5]), "ticket format carries C-TF1 bullet 6");
   const integ = read(IN_FILE);
-  assert.ok(integ.includes(IN_INTRO) && IN_INTRO.includes(" No row, no write. "), "integrator C-IN1 says `No row, no write.`");
+  assert.ok(IN_INTRO.includes(" No item, no write. "), "sanity: amended intro");
+  assert.ok(integ.includes(IN_INTRO), "integrator C-IN1 intro says `No item, no write.`");
+  assert.ok(!integ.includes(OLD_IN.noWrite), "the pre-amendment `No row, no write.` is gone");
   const coord = read(CO_FILE);
   assert.ok(C_CO1.endsWith("Only read the tracker; never write to it."), "sanity: C-CO1 ending");
   assert.ok(coord.includes(C_CO1), "coord-01 carries C-CO1");
@@ -381,7 +397,8 @@ test("AC7: a stop shows the stopped state and reason; the open question is draft
   // WHY: what is said in public is the human's decision; a tool posting the question would speak for them.
   const integ = read(IN_FILE);
   assert.ok(integ.includes(IN_B[2]), "integrator carries C-IN1 bullet 3");
-  assert.ok(IN_B[2].includes("is never posted, whatever the row"), "sanity: bullet 3 covers every row kind");
+  assert.ok(IN_B[2].includes("is never posted, whatever the item:"), "sanity: bullet 3 covers every item kind (mirror, child, source)");
+  assert.ok(!integ.includes(OLD_IN.stop), "the pre-amendment `whatever the row` wording is gone (a source item may have no row)");
   assert.ok(integ.includes(IN_B[0]), "integrator carries C-IN1 bullet 1 (stopped state and reason)");
   const doc = read(TF_FILE);
   assert.ok(TF_B[4].includes("A stop's open question is never posted by a tool: it is drafted for a person to post or not."), "sanity: bullet 5");
@@ -392,16 +409,65 @@ test("AC7: a stop shows the stopped state and reason; the open question is draft
 // AC8 — write-back to source items is off by default, switched in the local map only
 // ---------------------------------------------------------------------------
 
-test("AC8: source items are written only when the map's `write-back` reads `on` (off by default, a person turns it on); no config key", () => {
-  // WHY: a source item belongs to whoever filed it; writing to it needs a person's explicit opt-in, kept in the
-  // untracked local map (human Q3 (B)) rather than a tracked config key.
-  assert.ok(read(IN_FILE).includes(IN_B[1]), "integrator carries C-IN1 bullet 2");
-  const sop = read(SW_FILE);
-  assert.ok(sop.includes(SW2.writeBack), "spec-workshop carries the C-SW2 switch sentence");
+// The AC8 worked example: ticket E900 cut from item 1234. Each rule below is applied only when the given text
+// states it verbatim, so the outcome follows the shipped text (old text: no `source`-field item, no write).
+const RULE = {
+  fieldCounts: "Only a ticket with a tracker item gets tracker writes: an item its ticket file's `source` field lists, or a row in the tracker map",
+  onlyOn: "only when the map's `write-back` line reads `on`",
+  noRowNeeded: "whether or not the map has a row for the ticket",
+  offDefault: "A missing file, a missing line or any other value means `off`",
+};
+const ticketFile = (source) => ["---", "id: E900", "title: CSV export adds a header row", "status: in progress", `source: ${source}`, "---", "", "## Context", ""].join("\n");
+const MAP_HEAD = ["| ticket | item | kind | revision |", "|---|---|---|---|"];
+function sourceWrites(integ, fmt, ticket, map) {
+  const src = (ticket.match(/^source: *\[(.*)\]$/m)?.[1] ?? "").split(",").map((e) => e.trim().match(/^(\d+) rev \d+$/)?.[1]).filter(Boolean);
+  const rows = (map ?? "").split("\n").filter((l) => /^\| *E900 *\|/.test(l)).map((l) => l.split("|").map((c) => c.trim()));
+  const srcRows = rows.filter((c) => c[3] === "source").map((c) => c[2]);
+  const items = [...new Set([...(integ.includes(RULE.fieldCounts) ? src : []), ...srcRows])];
+  if (items.length === 0) return [];
+  assert.ok(fmt.includes(RULE.offDefault), "format text: anything but `on` means off");
+  const wb = map === null ? undefined : map.match(/^write-back: *(\S*) *$/m)?.[1];
+  if (!integ.includes(RULE.onlyOn) || wb !== "on") return [];
+  return integ.includes(RULE.noRowNeeded) ? items : items.filter((i) => srcRows.includes(i));
+}
+
+test("AC8: source items (the ticket file's `source` field or a `source` row) are written only when the map's `write-back` reads `on`, row or no row (private repository); off by default; no config key", () => {
+  // WHY: in a private repository a source item lives only in the ticket file's `source` field, so the switch must
+  // reach it without a map row (review round 1, F1); yet a source item belongs to whoever filed it, so writing
+  // needs a person's explicit opt-in, kept in the untracked local map (human Q3 (B)), not a tracked config key.
+  const integ = read(IN_FILE);
+  assert.ok(IN_INTRO.startsWith(RULE.fieldCounts + " — "), "sanity: the intro admits an item the `source` field lists");
+  assert.ok(IN_B[1].includes(RULE.onlyOn) && IN_B[1].includes(RULE.noRowNeeded), "sanity: bullet 2 needs `on`, not a row");
+  assert.ok(TF_MAP_B[0].startsWith("- `write-back` is `on` or `off`. " + RULE.offDefault + ";"), "sanity: map bullet on write-back");
   const doc = read(TF_FILE);
-  assert.ok(TF_MAP_B[0].startsWith("- `write-back` is `on` or `off`. A missing file, a missing line or any other value means `off`;"), "sanity: map bullet on write-back");
+
+  // Private repository: the item is only in the ticket file; the map holds the switch and no E900 row.
+  const one = ticketFile("[1234 rev 7]");
+  const two = ticketFile("[1234 rev 7, 1301 rev 3]");
+  const otherRow = [...MAP_HEAD, "| E899 | 1240 | mirror | — |"].join("\n");
+  const cases = [
+    ["write-back: on, no map row", one, "write-back: on\n", ["1234"]],
+    ["write-back: on, no map row, two source items", two, "write-back: on\n" + otherRow + "\n", ["1234", "1301"]],
+    ["write-back: off", one, "write-back: off\n", []],
+    ["write-back line missing", one, otherRow + "\n", []],
+    ["write-back: yes (any other value)", one, "write-back: yes\n", []],
+    ["no map file", one, null, []],
+    // Public repository: `source` empty, the item is in a `source` row.
+    ["public: `source` row, write-back: on", ticketFile("").replace("source: ", "source:"), ["write-back: on", "", ...MAP_HEAD, "| E900 | 1234 | source | 7 |"].join("\n"), ["1234"]],
+  ];
+  for (const [label, text] of [["raw", integ], ["served", servedIntegrator()]]) {
+    for (const [name, ticket, map, want] of cases) {
+      assert.deepEqual(sourceWrites(text, doc, ticket, map), want, `${label} integrator text, ${name}: writes to ${JSON.stringify(want)}`);
+    }
+  }
+
+  assert.ok(integ.includes(IN_INTRO), "integrator carries the amended C-IN1 intro");
+  assert.ok(integ.includes(IN_B[1]), "integrator carries the amended C-IN1 bullet 2 (Source item)");
+  for (const old of [OLD_IN.intro, OLD_IN.source]) assert.ok(!integ.includes(old), `pre-amendment wording gone: ${old}`);
   assert.ok(doc.includes(TF_MAP_B[0]), "ticket format carries the write-back map bullet");
   assert.ok(doc.includes(TF_B[4]), "ticket format carries C-TF1 bullet 5 (writing to a source item is off unless the map turns it on)");
+  const sop = read(SW_FILE);
+  assert.ok(sop.includes(SW2.writeBack), "spec-workshop carries the C-SW2 switch sentence");
   assert.ok(servedSW().includes(SW2.writeBack), "served spec-workshop carries the switch sentence");
   for (const rel of ["tools/config.ts", "dist/tools/config.js", "docs/config.md"]) {
     assert.doesNotMatch(read(rel), /tracker|write-?back/i, `${rel} defines no tracker / write-back config key`);

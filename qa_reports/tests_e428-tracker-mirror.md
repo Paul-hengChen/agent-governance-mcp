@@ -1,4 +1,4 @@
-# Tests — e428-tracker-mirror (T-E428-01)
+# Tests — e428-tracker-mirror (T-E428-01, amended by T-E428-06)
 
 Author: qa-engineer. Scenarios: `specs/e428-tracker-mirror.md` AC1–AC13 (no ticket file; the spec's ACs stand in).
 Test-file placement: the dispatch brief's `Test-file placement` line (new `test/e428-tracker-mirror.test.mjs`, plus
@@ -10,14 +10,14 @@ re-pins in four existing files); no split, so the spec's `proof:` file names sta
 |---|---|---|
 | AC1 | `test/e428-tracker-mirror.test.mjs` | AC1: spec-workshop has `## Tracker mirror` (C-SW2) directly after the unchanged last Outputs bullet and before `## Governance state`; served text carries it |
 | AC2 | `test/e428-tracker-mirror.test.mjs` | AC2: imported tickets get no new item, a child item only on request, at most one created item (C-SW2, C-TF1 bullet 2, map rule) |
-| AC3 | `test/e428-tracker-mirror.test.mjs` | AC3: without a mirror request nothing is written — C-SW2 opens with the request condition, C-TF1 bullet 6, C-IN1 `No row, no write.`, C-CO1 ends read-only |
+| AC3 | `test/e428-tracker-mirror.test.mjs` | AC3: without a mirror request nothing is written — C-SW2 opens with the request condition, C-TF1 bullet 6, C-IN1 `No item, no write.`, C-CO1 ends read-only |
 | AC4 | `test/e428-tracker-mirror.test.mjs` | AC4: the Ticket files bullet carries C-SW1 in place of the old one-item sentence; e423 fragments kept; C-TF1 bullet 3; `source` field row byte-identical |
 | AC4 (cross-check) | `test/e423-spec-workshop.test.mjs` | existing, unchanged; green at base and with the Copy |
 | AC5 | `test/e428-tracker-mirror.test.mjs` | AC5 (format text): `## Tracker mirror` + `### Tracker map` are exactly C-TF1, after the unchanged `## Where ticket files are listed`, before `## Named tests checked in CI`; the map example parses |
 | AC5 | `test/e428-tracker-mirror.test.mjs` | AC5 (behaviour): a map written into `git rev-parse --git-common-dir` is untracked with no ignore rule and is the same file from a linked worktree |
 | AC6 | `test/e428-tracker-mirror.test.mjs` | AC6: integrator `## Tracker items` (C-IN1) sits after the Stage 6 *Your own commits* paragraph and before `## Git operations`; nothing else moves |
 | AC7 | `test/e428-tracker-mirror.test.mjs` | AC7: a stop shows the stopped state and reason; the open question is drafted, never posted (C-IN1 bullet 3, C-TF1 bullet 5) |
-| AC8 | `test/e428-tracker-mirror.test.mjs` | AC8: source items are written only when the map's `write-back` reads `on` (off by default, a person turns it on); no config key |
+| AC8 | `test/e428-tracker-mirror.test.mjs` | AC8: source items (the ticket file's `source` field or a `source` row) are written only when the map's `write-back` reads `on`, row or no row (private repository); off by default; no config key |
 | AC9 | `test/e428-tracker-mirror.test.mjs` | AC9: coord-01 carries C-CO1 directly after the unchanged no-ticket-file paragraph and before `## Auto-Routing`; served teamwork carries it |
 | AC9 (cross-check) | `test/e433-test-first-rules.test.mjs` | existing, unchanged; green at base and with the Copy |
 | AC10 | `test/e428-tracker-mirror.test.mjs` | AC10: the source item's revision is compared at work start and before each code-reviewer dispatch; a change is reported, never copied (C-CO1 sentence 2, C-TF1 bullet 4) |
@@ -25,6 +25,20 @@ re-pins in four existing files); no split, so the spec's `proof:` file names sta
 | AC12 | `test/e428-tracker-mirror.test.mjs` | AC12: every added or changed line in the four files holds no URL, repo-only path, bare ticket id, version label, quoted error code or vendor name |
 | AC12 (proof part 2) | `test/e437-repo-only-paths.test.mjs`, `test/error-code-contract.test.mjs` | existing, unchanged; run in the full suite |
 | AC13 | — | no dedicated test (see Open Interface Details 6); covered by the full suite, T-E428-04 and T-E428-05 |
+
+**Amendment after review round 1** (T-E428-06; spec *Amendment after review round 1*, finding F1, option (a)):
+the map above already carries the renamed AC3 and AC8 titles. Changed in `test/e428-tracker-mirror.test.mjs` only:
+
+| scenario | what changed in the test |
+|---|---|
+| AC2 | `C_TF1` bullet 2 = amended text ("for a ticket cut from items, one child item under one of them, chosen by the person who asks for it"); asserts the old `one child item under that item when a person asks` is gone |
+| AC3 | title and assertion: `No item, no write.` in the C-IN1 intro; the old `No row, no write.` is gone |
+| AC5 (format text), AC6, AC12 | no assertion change; they hold the amended `C_TF1` / `C_IN1` constants and rebuild the base from them (base sha256 unchanged) |
+| AC7 | bullet 3 says "whatever the item:"; the old "whatever the row:" is gone |
+| AC8 | title; amended intro + bullet 2 (**Source item**) on the raw file; the old intro and `` **`source` row** `` bullet are gone; the private-repository worked case on the raw AND served integrator text (below) |
+
+Unchanged tests: AC1, AC4, AC5 (behaviour), AC9, AC10, AC11 (bullet 4 and C-TF1 bullets 1, 3, 4 are not amended). No
+other test file moves (spec amendment probe; confirmed by the full suite below).
 
 Re-pins (integrator-assigned unowned pins, re-pin only, no logic change):
 
@@ -70,6 +84,21 @@ Each re-pin carries a two- or three-line `E428 re-pin:` comment in the style of 
 7. **Served text**: `buildPromptForRole("skill-spec-workshop.md", …)` and `buildPromptForRole("skill-coordinator.md",
    …)` in a fresh tmp workspace with `FileHandoffStorage`, as e423/e445/e258a do.
 
+8. **AC8 private-repository case (T-E428-06).** A small decision function, `sourceWrites(integratorText,
+   formatText, ticketFile, map)`, returns the source items the integrator text directs writes to for ticket E900.
+   Each step applies only when the given text states its rule verbatim: the `source` field counts only if the text
+   says "Only a ticket with a tracker item gets tracker writes: an item its ticket file's `source` field lists, or a
+   row in the tracker map"; writes need "only when the map's `write-back` line reads `on`"; a missing map row is
+   fine only with "whether or not the map has a row for the ticket"; and "A missing file, a missing line or any
+   other value means `off`" must be in the format text. Cases: `source: [1234 rev 7]` with a map of only
+   `write-back: on` → `["1234"]`; two source items → both; `write-back: off`, the line missing, `write-back: yes`,
+   no map file → `[]`; a public-repository `source` row with `on` → `["1234"]`. Run on the raw file and on the
+   served `integrator` prompt (`buildPromptForRole("skill-integrator.md", …)` with the registry's description). The
+   worked cases run before the exact-text checks, so on the pre-amendment text the test fails on the case itself
+   (`raw integrator text, write-back: on, no map row: writes to ["1234"]`), not only on a missing string. The
+   ticket fixture uses the format doc's example id `E900`, its front-matter layout and `[<n> rev <r>]` entries
+   joined by `, `.
+
 ## Red Reasons
 
 - AC1, AC4: C-SW1 / C-SW2 are not in `content/skill-spec-workshop.md` (T-E428-02).
@@ -83,6 +112,18 @@ Each re-pin carries a two- or three-line `E428 re-pin:` comment in the style of 
 - e445 AC10 (unchanged sections), e462 AC6: their frozen SOP now holds C-SW1 + C-SW2 (T-E428-02).
 - e410 AC2 ×2, e430 AC8: their pins now expect the nine C-IN1 lines (T-E428-03).
 
+Pass 2 (T-E428-06; all of the above went green at `697bef8`). Red now, until sr-engineer applies the amended Copy
+(T-E428-07):
+
+- AC2: `docs/ticket-format.md` still has the old C-TF1 bullet 2 (`one child item under that item when a person asks`).
+- AC3: `content/skill-integrator.md` still says `No row, no write.`
+- AC5 (format text): the C-TF1 section is not the amended block, so it is not exactly C-TF1 and the base rebuild fails.
+- AC6: the C-IN1 section is not the amended block.
+- AC7: bullet 3 still says "whatever the row".
+- AC8: the old intro does not count an item the ticket file's `source` field lists, so the private-repository
+  case (`write-back: on`, no map row) gets no write to item 1234.
+- AC12: the amended Copy is not in the two files, so the base rebuild cannot take it out.
+
 ## Probe
 
 Copy applied verbatim to the four shipped files in the worktree, then restored from a scratch backup (sha256 of all
@@ -92,6 +133,11 @@ red (12 in the new file, 5 re-pins).
 
 CI runnability: headless, no human interaction; the git test needs only a `git` binary on PATH (already required by
 other suites).
+
+Pass 2 probe (T-E428-06): a scratch copy of the worktree (outside it, `node_modules` linked) with the spec's
+amended `C-IN1` and `C-TF1` blocks extracted from `specs/e428-tracker-mirror.md` and applied: `e428`, `e410`,
+`e430`, `e425`, `e455`, `e437`, `error-code-contract` — 114 pass, 0 fail; `content/skill-integrator.md` stays
+269 lines. In the worktree (old text) `e428` shows exactly the 7 manifest entries red, 6 green.
 
 ## Golden and cap re-baseline (T-E428-04)
 
