@@ -1319,6 +1319,12 @@ const STR_USAGE_FEATURE =
   "          <worktree-parent>/_mailbox/<lane>/ when it holds only\n" +
   "          to-integrator.md, to-lane.md and watch-lock sidecars; otherwise\n" +
   "          keeps it with a warning.\n" +
+  "          With \"knowledge\": \"local\", copies back only the knowledge files\n" +
+  "          (specs/ included) the lane created or changed: to the same path\n" +
+  "          (--shipped; refused when primary changed that file too) or under\n" +
+  "          <dir>/abandoned/<lane>/ (--abandoned); a worktree-only\n" +
+  "          pending-tickets.md is numbered into primary's untracked\n" +
+  "          docs/backlog.md, not committed.\n" +
   "  feature reseed <path>...\n" +
   "          Inside a lane worktree, with \"knowledge\": \"local\": copy each named\n" +
   "          knowledge file from the primary checkout over the lane's copy and\n" +
@@ -2019,6 +2025,17 @@ function knowledgeSeedJson(files) {
   return JSON.stringify({ version: 1, files: sorted }, null, 2) + "\n";
 }
 
+// The D4 record's files map ({} when the record is absent); throws on a record
+// that is unreadable or has no files map.
+function readKnowledgeSeedFiles(seedAbs) {
+  if (!lstatOrNull(seedAbs)) return {};
+  const parsed = JSON.parse(fs.readFileSync(seedAbs, "utf-8"));
+  if (!parsed || typeof parsed.files !== "object" || parsed.files === null || Array.isArray(parsed.files)) {
+    throw new Error("no files map");
+  }
+  return { ...parsed.files };
+}
+
 // Fix (2) / D5: copy the primary checkout's untracked knowledge files into a
 // fresh lane and record their hashes. Only with "knowledge": "local"; a file
 // is copied when it is not tracked in primary, its lane path is absent after
@@ -2289,19 +2306,13 @@ async function runFeatureReseed(cwd, argv) {
 
   const seedAbs = lanePaths.resolveLanePaths(laneRoot, lane).knowledgeSeedPath;
   const seedRel = `.current/${lane}/${lanePaths.laneFile("knowledgeSeed").filename}`;
-  let files = {};
-  if (lstatOrNull(seedAbs)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(seedAbs, "utf-8"));
-      if (!parsed || typeof parsed.files !== "object" || parsed.files === null || Array.isArray(parsed.files)) {
-        throw new Error("no files map");
-      }
-      files = { ...parsed.files };
-    } catch (err) {
-      throw new FeatureError(
-        `agc feature reseed: cannot read ${seedRel} (${err && err.message ? err.message : String(err)}) — nothing changed`
-      );
-    }
+  let files;
+  try {
+    files = readKnowledgeSeedFiles(seedAbs);
+  } catch (err) {
+    throw new FeatureError(
+      `agc feature reseed: cannot read ${seedRel} (${err && err.message ? err.message : String(err)}) — nothing changed`
+    );
   }
 
   const ignored = gitIgnoredSet(laneRoot, rels);
@@ -2337,6 +2348,147 @@ async function runFeatureReseed(cwd, argv) {
   for (const { rel } of copies) {
     process.stdout.write(`agc feature reseed — re-seeded ${rel} from the primary checkout\n`);
   }
+}
+
+// --- "knowledge": "local" finish (E447 Fix (3)/(4), O3 (a), D6, D7) ---------
+// With the mode on, a knowledge dir (specs/) leaves the evidence harvest;
+// planKnowledgeHarvest brings it back instead. Mode off: the call as before.
+function planEvidenceHarvestOutsideKnowledge(knowledge, args) {
+  const dirs = knowledge.local ? args.dirs.filter((d) => !knowledge.dirs.includes(d)) : args.dirs;
+  if (dirs.length === 0) return { copies: [], verb: args.verb, display: args.display };
+  return planIgnoredEvidenceHarvest({ ...args, dirs });
+}
+
+// Read-only; null with the mode off. Lists the lane's untracked, git-ignored
+// knowledge files whose bytes differ from the seed record (created or changed
+// in the lane), each with its destination: the same path (--shipped) or
+// <root>/abandoned/<lane>/<path below root> (--abandoned; the backlog's root
+// is docs/). An unchanged seed is only counted; a seeded file the lane deleted
+// has no lane bytes and stays in primary (D7). A differing destination refuses
+// the run with the e180 refuse line, except on --shipped while the primary
+// copy still has the seeded bytes (then it is overwritten); an identical one
+// needs no copy (a re-run).
+function planKnowledgeHarvest({ knowledge, repoRoot, lanePath, lanePaths, ticketId, verb }) {
+  if (!knowledge.local) return null;
+  let seeded;
+  try {
+    seeded = readKnowledgeSeedFiles(lanePaths.resolveLanePaths(lanePath, ticketId).knowledgeSeedPath);
+  } catch (err) {
+    throw new FeatureError(
+      `agc feature finish ${verb}: cannot read .current/${ticketId}/${lanePaths.laneFile("knowledgeSeed").filename} ` +
+        `(${err && err.message ? err.message : String(err)}) — nothing removed`
+    );
+  }
+  const tracked = new Set(
+    git(lanePath, ["--literal-pathspecs", "ls-files", "-z", "--", ...knowledge.dirs, ...knowledge.files])
+      .split("\0")
+      .filter((f) => f.length > 0)
+  );
+  const untracked = listKnowledgeEntries(lanePath, knowledge).filter((rel) => !tracked.has(rel));
+  const ignored = gitIgnoredSet(lanePath, untracked);
+  const copies = [];
+  const conflicts = [];
+  let unchanged = 0;
+  for (const rel of untracked) {
+    const bytes = ignored.has(rel) ? readKnowledgeBytes(path.join(lanePath, rel)) : null;
+    if (!Buffer.isBuffer(bytes)) continue;
+    const recorded = Object.hasOwn(seeded, rel) ? seeded[rel] : undefined;
+    if (sha256Tag(bytes) === recorded) {
+      unchanged++;
+      continue;
+    }
+    const root = knowledge.dirs.find((d) => rel.startsWith(`${d}/`)) ?? path.posix.dirname(rel);
+    const dst = verb === "--shipped" ? rel : path.posix.join(root, "abandoned", ticketId, rel.slice(root.length + 1));
+    const dstAbs = path.join(repoRoot, ...dst.split("/"));
+    const blocker = blockingAncestor(dstAbs, repoRoot);
+    const dstStat = lstatOrNull(dstAbs);
+    if (blocker !== null) {
+      conflicts.push(blocker);
+    } else if (dstStat === null) {
+      copies.push({ rel, dst, dstAbs, bytes });
+    } else if (fileHasBytes(dstAbs, bytes)) {
+      continue;
+    } else if (
+      verb === "--shipped" && recorded !== undefined && dstStat.isFile() && sha256Tag(fs.readFileSync(dstAbs)) === recorded
+    ) {
+      copies.push({ rel, dst, dstAbs, bytes });
+    } else {
+      conflicts.push(dstAbs); // both sides changed, or an unrelated primary file
+    }
+  }
+  if (conflicts.length > 0) {
+    // Copy / Strings e180.evidence-harvest-refuse-line (reused).
+    throw new FeatureError(
+      `agc feature finish ${verb}: harvest destination already exists in the primary checkout and differs (nothing moved):\n` +
+        [...new Set(conflicts)].map((p) => `  ${escapeSegmentForDisplay(p)}`).join("\n")
+    );
+  }
+  return { copies, unchanged, verb };
+}
+
+// The copies planKnowledgeHarvest asked for (temp file + rename, never
+// committed). A failed copy leaves the worktree and branch; a re-run finds
+// the copies already made identical.
+function applyKnowledgeHarvest(h) {
+  for (const c of h.copies) {
+    try {
+      writeViaRename(c.dstAbs, c.bytes, path.dirname(c.dstAbs));
+    } catch (err) {
+      throw new FeatureError(
+        `agc feature finish ${h.verb}: harvest of ${escapeSegmentForDisplay(c.rel)} into the primary checkout failed ` +
+          `(${err && err.message ? err.message : String(err)}) — worktree and branch left in place (re-running finish is safe)`
+      );
+    }
+    // Copy / Strings e447.finish-harvest.
+    process.stdout.write(
+      `agc feature finish — harvested knowledge file ${escapeSegmentForDisplay(c.rel)} -> primary ` +
+        `${escapeSegmentForDisplay(c.dst)} (fs copy, not committed — the lane created or changed it)\n`
+    );
+  }
+  if (h.unchanged > 0) {
+    // Copy / Strings e447.finish-unchanged.
+    process.stdout.write(
+      `agc feature finish — ${h.unchanged} seeded knowledge file(s) unchanged in the lane — not copied back\n`
+    );
+  }
+}
+
+// Fix (4): with the mode on, the backlog and the lane's pending-tickets.md are
+// both git-ignored, so a worktree-only pending file (`findings`) is numbered
+// into the primary checkout's untracked docs/backlog.md, never committed. When
+// this run's harvest brings the lane's own backlog back to the same path, the
+// rows are appended to that copy. Read-only; null with nothing to number.
+async function planKnowledgeNumbering({ findings, harvest, repoRoot, lanePath, lane, verb }) {
+  if (!findings) return null;
+  const backlogAbs = path.join(repoRoot, BACKLOG_REL);
+  const laneBacklog = harvest?.copies.find((c) => c.dstAbs === backlogAbs);
+  const alloc = await loadTicketAllocation();
+  const plan = planPendingApply({
+    alloc, repoRoot, pendingText: findings.bytes.toString("utf-8"), revLabel: "the lane worktree",
+    base: "the primary checkout", lane, pendingRel: findings.pendingRel, verb,
+    backlogBlob: laneBacklog ? laneBacklog.bytes.toString("utf-8") : readFileOrNull(backlogAbs),
+  });
+  return plan && { alloc, plan, lane, backlogAbs, pendingAbs: path.join(lanePath, findings.pendingRel) };
+}
+
+// After the knowledge harvest, before the lane's .current/<lane>/ goes into
+// history (which then carries the blocks under ## Applied). Backlog first: a
+// re-run skips the rows already there.
+function applyKnowledgeNumbering(n) {
+  const { alloc, plan, lane } = n;
+  printSkipped(lane, plan.skipped);
+  const ids = plan.allocated.map((t) => t.id);
+  if (ids.length > 0) atomicWriteFile(n.backlogAbs, plan.newBacklogText);
+  atomicWriteFile(n.pendingAbs, newPendingText(alloc, plan));
+  if (ids.length > 0) {
+    // Copy / Strings e447.finish-numbered.
+    process.stdout.write(
+      `agc feature finish — appended ${ids.join(", ")} to ${BACKLOG_REL} in the primary checkout ` +
+        `(not committed — knowledge files stay out of git)\n`
+    );
+  }
+  printAppliedSummary(plan.allocated);
+  printTargetRepoListing(lane, plan.external);
 }
 
 // NUL-separated `git status --porcelain -z` -> every path it names (both
@@ -2915,8 +3067,10 @@ function readBlob(cwd, rev, rel) {
 // the live target_repo entries with no backlog provenance (E287 D4): never
 // numbered, archived with the rest. Throws FeatureError, listing every error
 // verbatim.
-function planPendingApply({ alloc, repoRoot, pendingText, revLabel, base, lane, pendingRel, verb }) {
-  const backlogBlob = readBlob(repoRoot, base, BACKLOG_REL);
+// `backlogBlob`, when given, replaces the --base read (E447: the primary
+// checkout's untracked backlog; `base` then only labels messages).
+function planPendingApply({ alloc, repoRoot, pendingText, revLabel, base, lane, pendingRel, verb, backlogBlob: given }) {
+  const backlogBlob = given !== undefined ? given : readBlob(repoRoot, base, BACKLOG_REL);
   const backlogText = backlogBlob ?? "";
   const prov = alloc.findAppliedProvenance(backlogText, lane);
   const parsed = alloc.parsePendingTickets(pendingText, lane, {
@@ -4136,6 +4290,9 @@ async function runFeatureFinish(cwd, argv) {
   // Before every check and mutation: it never sees finish's own writes, and
   // it prints even when finish later refuses.
   warnPrimaryNewPaths({ repoRoot, lanePath, ticketId });
+  // E447: "knowledge": "local" (read raw from primary) — record-filtered
+  // knowledge copy-back and worktree numbering; mode off changes nothing.
+  const knowledge = readKnowledgeMode(repoRoot);
 
   if (opts.shipped) {
     // AC16 — merge guard, --shipped only.
@@ -4165,7 +4322,7 @@ async function runFeatureFinish(cwd, argv) {
     // The shipped evidence harvest (E214) is planned on every run, the
     // alreadyClosed re-run included (a refused worktree remove leaves the
     // evidence at risk until it goes).
-    const evidenceHarvest = planIgnoredEvidenceHarvest({
+    const evidenceHarvest = planEvidenceHarvestOutsideKnowledge(knowledge, {
       repoRoot,
       lanePath,
       ticketId,
@@ -4173,6 +4330,9 @@ async function runFeatureFinish(cwd, argv) {
       bucket: "archive",
       verb: "--shipped",
       display: (s) => s,
+    });
+    const knowledgeHarvest = planKnowledgeHarvest({
+      knowledge, repoRoot, lanePath, lanePaths, ticketId, verb: "--shipped",
     });
     // E287 O6: a pending file only in the worktree is reported and kept, never
     // numbered; its collision checks run here, before the first mutation.
@@ -4183,8 +4343,15 @@ async function runFeatureFinish(cwd, argv) {
     const findings = await readUnallocatedFindings({
       lanePaths, repoRoot, lanePath, lane: ticketId, revs: [base, `refs/heads/${branch}`], revLabel: base,
     });
+    // With the mode on they are numbered instead of preserved (Fix (4)).
+    const numbering = knowledge.local
+      ? await planKnowledgeNumbering({
+          findings, harvest: knowledgeHarvest, repoRoot, lanePath, lane: ticketId, verb: "--shipped",
+        })
+      : null;
     const preserve =
       findings &&
+      !knowledge.local &&
       planFindingsPreserve({
         findings, target: shippedFindingsTarget({ close, findings, repoRoot }), verb: "--shipped",
       });
@@ -4197,6 +4364,8 @@ async function runFeatureFinish(cwd, argv) {
         pending !== null ? "pending tickets are" : "the lane-close pointer is"
       );
     }
+    if (knowledgeHarvest) applyKnowledgeHarvest(knowledgeHarvest);
+    if (numbering) applyKnowledgeNumbering(numbering);
     if (pending !== null) commitPendingOnShipped({ repoRoot, base, lane: ticketId, pending });
     if (close.alreadyClosed) {
       process.stdout.write(
@@ -4237,7 +4406,7 @@ async function runFeatureFinish(cwd, argv) {
     lanePaths, lanePath, ticketId, branch, now,
   });
   // E217: git-ignored specs would otherwise be deleted with the worktree.
-  const specsHarvest = planIgnoredEvidenceHarvest({
+  const specsHarvest = planEvidenceHarvestOutsideKnowledge(knowledge, {
     repoRoot,
     lanePath,
     ticketId,
@@ -4246,12 +4415,22 @@ async function runFeatureFinish(cwd, argv) {
     verb: "--abandoned",
     display: escapeSegmentForDisplay,
   });
+  // E447 D6: the same record filter, into <dir>/abandoned/<lane>/.
+  const knowledgeHarvest = planKnowledgeHarvest({
+    knowledge, repoRoot, lanePath, lanePaths, ticketId, verb: "--abandoned",
+  });
   // E287 O6 (see the --shipped branch): read and planned before any mutation.
   const findings = await readUnallocatedFindings({
     lanePaths, repoRoot, lanePath, lane: ticketId, revs: [`refs/heads/${branch}`], revLabel: branch,
   });
+  const numbering = knowledge.local
+    ? await planKnowledgeNumbering({
+        findings, harvest: knowledgeHarvest, repoRoot, lanePath, lane: ticketId, verb: "--abandoned",
+      })
+    : null;
   const preserve =
     findings &&
+    !knowledge.local &&
     planFindingsPreserve({
       findings,
       target: abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, findings, ticketId, now }),
@@ -4278,6 +4457,8 @@ async function runFeatureFinish(cwd, argv) {
         ` — git add + commit it in the lane and re-run, or remove the worktree by hand`
       : null;
   applyIgnoredEvidenceHarvest(specsHarvest);
+  if (knowledgeHarvest) applyKnowledgeHarvest(knowledgeHarvest);
+  if (numbering) applyKnowledgeNumbering(numbering);
   if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest, preserve);
   if (preserve) executeFindingsPreserve(preserve);
   removeWorktreeNoForce(repoRoot, lanePath, hint);

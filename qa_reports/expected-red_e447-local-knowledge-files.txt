@@ -54,3 +54,7 @@ test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 8 entries — 1 required
 # boundaries, AC10 init. Still red: AC1 and AC5-AC8 (finish, T-E447-06); AC9 changed and AC9 reseed
 # (reseed works, but the test first needs check --cut's MANIFEST_CHANGED, T-E447-04); AC11 (T-E447-04);
 # AC12 (T-E447-07); lane-paths REG1 (T-E447-05).
+
+# sr-engineer T-E447-06 status note (no entry removed; qa reconciles the list in T-E447-05): green after
+# T-E447-06 are AC1, AC5, AC6 overwrite, AC6 both changed, AC7, AC8. Still red: AC9 changed and AC9 reseed
+# (T-E447-04), AC11 (T-E447-04), AC12 (T-E447-07), lane-paths REG1 (T-E447-05).
