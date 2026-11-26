@@ -9,3 +9,7 @@
 {"ts":"2026-11-26T06:40:00.766Z","feature":"e426-ticket-scenarios-fixed","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T06:41:33.637Z","feature":"e426-ticket-scenarios-fixed","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-26T06:48:52.516Z","feature":"e426-ticket-scenarios-fixed","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T06:50:19.982Z","feature":"e426-ticket-scenarios-fixed","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T06:50:58.135Z","feature":"e426-ticket-scenarios-fixed","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T06:53:24.227Z","feature":"e426-ticket-scenarios-fixed","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-26T07:01:16.594Z","feature":"e426-ticket-scenarios-fixed","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
