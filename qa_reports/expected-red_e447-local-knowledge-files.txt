@@ -1,0 +1,46 @@
+# Expected-red manifest — e447-local-knowledge-files (T-E447-01, qa-engineer first pass, 2026-11-26)
+# Format: <relative test file path> | <exact test name>. Every entry is red because the interface it
+# drives is not built yet; none is red for a syntax or fixture error (each run individually).
+
+# agc init has no --knowledge flag yet (T-E447-02): no knowledge exclude rules, no D1/D2 handling,
+# no tracked-path report, no usage/argument errors; AC1 also needs start seeding (T-E447-03) and
+# finish numbering (T-E447-06) for its lane half.
+test/e447-init-knowledge.test.mjs | AC1: init --knowledge=local -> clean status and all rules; lane start/commit/merge/finish keeps status clean and history free of agc files
+test/e447-init-knowledge.test.mjs | AC2 (a): a ticketDir of work/tickets yields /work/tickets/ instead of /docs/tickets/
+test/e447-init-knowledge.test.mjs | AC2 (b): a tracked AGENTS.md / .antigravityrules gets no exclude rule and is byte-unchanged
+test/e447-init-knowledge.test.mjs | AC2 (c): a tracked docs/backlog.md is reported with the git rm -r --cached line and stays tracked
+test/e447-init-knowledge.test.mjs | AC2 (d): --knowledge=local --artifacts=repo exits 2 with the needs-local message and writes nothing (D1)
+test/e447-init-knowledge.test.mjs | AC2 (e): --knowledge=foo exits 2 with the bad-value message and writes nothing
+test/e447-init-knowledge.test.mjs | AC2 (f): a subdirectory workspace sub/ gets /sub/specs/ etc.
+# Usage strings (T-E447-02 init line, T-E447-03 start/reseed lines) and the feature subcommand list
+# (T-E447-03) do not carry the new text yet.
+test/e447-init-knowledge.test.mjs | Copy e447.usage-init / e447.usage-feature: usage names --knowledge, the start snapshot and feature reseed
+test/e447-init-knowledge.test.mjs | Copy e447.feature-unknown: the subcommand list names reseed
+
+# agc feature start does not seed knowledge files or write .current/<lane>/knowledge-seed.json yet (T-E447-03).
+test/e447-lane-seed-finish.test.mjs | AC3: start seeds all five knowledge files byte-identical, records exactly their hashes, lane clean, e447.start-seeded with 5
+test/e447-lane-seed-finish.test.mjs | AC4: a tracked knowledge path is neither overwritten nor recorded; a dangling design/ symlink is skipped with e447.start-dangling
+# agc feature finish has no record-filtered same-path / abandoned harvest, no both-sides refusal and no
+# worktree numbering yet (T-E447-06); the fixtures also need start seeding (T-E447-03).
+test/e447-lane-seed-finish.test.mjs | AC5: finish --shipped copies the lane's new design/x.md and research/y.md to the same paths, keeps the primary's newer backlog, copies no unchanged seed
+test/e447-lane-seed-finish.test.mjs | AC6 overwrite: a lane-appended docs/tickets/t1.md replaces the primary copy that still has the seeded bytes
+test/e447-lane-seed-finish.test.mjs | AC6 both changed: the primary copy was edited too -> non-zero exit, e180 refuse line naming it, nothing removed or changed
+test/e447-lane-seed-finish.test.mjs | AC7: finish --shipped numbers the worktree pending block into the untracked backlog (no commit, history under ## Applied, no E287 warning); a re-run allocates nothing new
+test/e447-lane-seed-finish.test.mjs | AC8: finish --abandoned harvests design/z.md to design/abandoned/e9/z.md, nothing under specs/abandoned/e9/, and numbers the pending finding
+
+# The manifest is not seeded into the lane yet (T-E447-03), agc feature reseed does not exist (T-E447-03),
+# and check --cut has no MANIFEST_CHANGED comparison (T-E447-04).
+test/e447-cut-reseed.test.mjs | AC9 match: in the lane, the seeded manifest equal to the primary's -> no MANIFEST_CHANGED, exit as today
+test/e447-cut-reseed.test.mjs | AC9 changed: the primary's manifest changed after start -> MANIFEST_CHANGED report line, exit 1
+test/e447-cut-reseed.test.mjs | AC9 reseed: agc feature reseed copies the primary's manifest, records the new hash, and check --cut passes again
+test/e447-cut-reseed.test.mjs | AC9 reseed refuses: a file the lane changed -> exit 1, e447.reseed-refuse-changed, lane copy and record unchanged
+test/e447-cut-reseed.test.mjs | AC9 reseed boundaries: non-knowledge and escaping paths exit 2; outside a mode-on lane exits 1; nothing written
+
+# agc init --knowledge=repo does not record "knowledge": "repo" yet (T-E447-02). The other two AC10 tests
+# in this file are green on purpose (mode-off regression guards) and are not listed.
+test/e447-mode-off.test.mjs | AC10: mode off -> init writes no knowledge rule; --knowledge=repo records "repo" and no rule; a flag-less re-run keeps it
+
+# C-C08K / C-CO3K / C-IN-R4 are not in content/ yet (T-E447-04).
+test/e447-served-text.test.mjs | AC11: C-C08K served once directly after the Batch-lane line on both design arms, not in lite; C-CO3K ends coord-03's bookkeeping line; C-IN-R4 ends Stage 1 step 3; all portable
+# DOC-CFG, DOC-INST-1..5 and DOC-LP-1..3 are not in docs/ yet (T-E447-07).
+test/e447-served-text.test.mjs | AC12: docs/config.md has exactly one knowledge section after ticketDir; docs/install.md carries DOC-INST-1..5; docs/lane-protocol.md carries DOC-LP-1..3 at their anchors
