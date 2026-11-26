@@ -92,3 +92,31 @@ red (12 in the new file, 5 re-pins).
 
 CI runnability: headless, no human interaction; the git test needs only a `git` binary on PATH (already required by
 other suites).
+
+## Golden and cap re-baseline (T-E428-04)
+
+Planned return (wave rule R3 (b)) after sr-engineer built T-E428-02/03 at `5172a02`. Base for the three reds:
+`419fca5`, full suite 4791 tests, 4786 pass, 3 fail, 2 skipped.
+
+**Golden re-capture.** Method: `npm run build && node scripts/capture-constitution-golden.mjs` (the repo's
+capture tool; it rewrites all 12 fixtures in `test/fixtures/compose-golden/` from `content/`). No hand edit.
+Of the 12, only `skill-coordinator-monolith.txt` changed; the other 11 came back byte-identical (`git diff --stat`
+lists one file, +2 lines). The one hunk (after line 79, between the "tracker number with no ticket file" paragraph
+and `## Auto-Routing`):
+- `+` the C-CO1 paragraph ("A tracker number that has a ticket file … Only read the tracker; never write to it."),
+  identical to the line sr-engineer added to `content/coord-01-core-head.md` in `5172a02`;
+- `+` one blank line separating it from `## Auto-Routing`.
+No other hunk. This clears `test/skill-manifest.test.mjs` "t-golden-byte-identity".
+
+**Cap changes** in `test/context-budget.test.mjs` (zero headroom, one comment line each; the cap number in each
+test title moves with the cap, as in prior re-baselines):
+
+| test | old → new (~tok) | Copy ids | delta |
+|---|---|---|---|
+| AC21 (spec-workshop): skill-spec-workshop stripped token count meets ≤ 1663 cap | 1415 → 1663 | C-SW1, C-SW2 (`content/skill-spec-workshop.md`) | +248 |
+| AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19699 ~tok) | 19559 → 19699 | C-CO1 (`content/coord-01-core-head.md`; no constitution change) | +140 |
+
+Both values are as measured by the tests themselves and match the spec's PM probe (+248 / +140). C-TF1
+(`docs/ticket-format.md`) and C-IN1 (`content/skill-integrator.md`) move no cap: neither file is in a capped
+bundle. No other golden or cap moved (`test/context-budget.test.mjs` + `test/skill-manifest.test.mjs`: 83 pass,
+0 fail after the change; full-suite result below).
