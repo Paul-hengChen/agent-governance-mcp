@@ -90,7 +90,13 @@ test("AC-E292-9 sop.takeover-sister is appended to Take-over step 4", () => {
 
 test("AC-E292-9 sop.stage1-ext is appended to Stage 1 step 6", () => {
   const line = lineStarting(h2("## Stage 1"), "6. **Write the manifest**");
-  assert.ok(line.endsWith(COPY.stage1Ext), "step 6 ends with the copy");
+  // Re-pinned by E443a (specs/e443a-manifest-waves.md, SOP_STAGE1_WAVES): step 6 now ends with this copy, one
+  // space, then the wave-and-dependency-columns sentence block, on the same line.
+  const at = line.indexOf(COPY.stage1Ext);
+  assert.ok(at >= 0, "step 6 carries the copy");
+  const tail = line.slice(at + COPY.stage1Ext.length);
+  assert.ok(tail.startsWith(" **Wave and dependency columns**: "), "the copy is followed only by the wave-columns block");
+  assert.ok(tail.endsWith("while the `波次` column is present, `validate` refuses any other `相依` value."), "step 6 ends with the wave-columns block");
 });
 
 test("AC-E292-9 the replaced wordings occur zero times", () => {

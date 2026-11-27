@@ -5,14 +5,16 @@
 // specs/e177a-fanout-manifest.md. It never guesses:
 // a legacy manifest part is reported unreadable by name. Read-only: writes
 // nothing of its own and fires no gate (render reads primary's config through
-// loadConfig, which shares that loader's heal-on-read); git is read via
+// loadConfig, which shares that loader's heal-on-read, and, with --batch, the
+// ticket files of primary's ticket directory); git is read via
 // execFileSync argv, never a shell.
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/fanout-manifest.ts — never guess".
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getConfigError, loadConfig } from "./config.js";
+import { getConfigError, loadConfig, resolveTicketDir } from "./config.js";
+import { parseTicketFile } from "./ticket-file.js";
 // --- constants ---------------------------------------------------------------
 /** Exact header of a dispatchable `## Lanes…` table, in order. */
 export const LANES_HEADER = ["lane", "票", "branch", "worktree", "擁有", "禁止", "範圍切線", "相依"];
@@ -26,6 +28,17 @@ export const APPROVAL_COLUMN = "approval";
  * else is a row error: a misspelt `human` must never read as "not human".
  */
 export const APPROVAL_VALUES = ["human", "—", ""];
+/**
+ * Optional wave header cell of a dispatchable `## Lanes…` table, right after
+ * `相依` and before `approval`. While present, `相依` is a checked lane list.
+ */
+export const WAVE_COLUMN = "波次";
+/** A `波次` cell: a positive integer without leading zeros. */
+const WAVE_RE = /^[1-9][0-9]*$/;
+/** Separators of a `相依` lane list and of a `票` cell's ticket ids. */
+const LIST_SEPARATOR_RE = /\s*[,，、]\s*/;
+/** The `相依` value that names no dependency. */
+const DEPS_NONE = "無";
 /** Exact header of a spec's `## Cut` table (= skill-pm's inline cut table header). */
 export const CUT_HEADER = ["id", "desc", "depends_on", "est. files", "touches", "design-link"];
 /**
@@ -97,6 +110,42 @@ export function replaceLanePointer(template, replacement) {
         return undefined;
     return template.slice(0, at) + replacement + template.slice(at + LANE_PROTOCOL_POINTER.length);
 }
+/** The template's first-step line that `render --batch` replaces with BATCH_FIRST_STEP_LINE. */
+const HAND_FIRST_STEP_LINE = "`feature start` 建好 worktree 之後，呼叫 `EnterWorktree`（path = <worktree>）把這個 session 切進去；這個工具不能用時，每個 Bash 指令照舊自帶 `cd <worktree> &&`。";
+/** The template's closing sentence that `render --batch` replaces with BATCH_CLOSING_LINE. */
+const HAND_CLOSING_LINE = "需要我核准的事，等我在這裡親手打字。";
+/** Batch first step: the launcher already opened the session in the worktree; confirm it. */
+export const BATCH_FIRST_STEP_LINE = "worktree 已建好，這個 session 就開在裡面；先用兩次各自獨立的 Bash 呼叫跑 `pwd` 與 `git branch --show-current`，確認前者是 <worktree>、後者是 <branch>，不符就停下來回報。";
+/** Batch closing line: nobody types approvals in a batch lane, so a human ruling stops the ticket. */
+export const BATCH_CLOSING_LINE = "需要人類裁定的事一律停票：照 lane 規則的「批次 lane」把問題寫進票檔的 `## Open question`、回報整合者，不等打字核准。";
+/** `text` with its one occurrence of `from` replaced by `to`; undefined when `from` occurs zero or several times. */
+function replaceOnce(text, from, to) {
+    const at = text.indexOf(from);
+    if (at < 0 || text.indexOf(from, at + 1) >= 0)
+        return undefined;
+    return text.slice(0, at) + to + text.slice(at + from.length);
+}
+/**
+ * The batch dispatch template derived from `template` (no second copy):
+ * the first-step line and the closing sentence each replaced exactly once.
+ * A source text that does not occur exactly once is pushed to `errors`.
+ */
+function batchTemplate(template, errors) {
+    let out = template;
+    for (const [from, to, label] of [
+        [HAND_FIRST_STEP_LINE, BATCH_FIRST_STEP_LINE, "first-step line"],
+        [HAND_CLOSING_LINE, BATCH_CLOSING_LINE, "closing line"],
+    ]) {
+        const replaced = replaceOnce(out, from, to);
+        if (replaced === undefined) {
+            errors.push(inputErr(FANOUT_CODES.templateBatchLineAbsent, `the dispatch-prompt template does not hold the ${label} exactly once, so batch render cannot replace it`));
+        }
+        else {
+            out = replaced;
+        }
+    }
+    return out;
+}
 /**
  * Replacement for LANE_PROTOCOL_POINTER when primary's config sets
  * laneProtocolAddendum: agc's generic lane rules plus the repo's addendum.
@@ -142,6 +191,21 @@ export const FANOUT_CODES = {
     mailboxTilde: "MAILBOX_TILDE",
     // Optional `approval` Lanes column holds a value outside APPROVAL_VALUES.
     approvalValueUnknown: "APPROVAL_VALUE_UNKNOWN",
+    // Row errors of a Lanes table with the `波次` column: the wave cell, then
+    // the 相依 cell (format, self edge, unknown lane, edge into a later wave).
+    waveNotInteger: "WAVE_NOT_INTEGER",
+    depsNotLaneList: "DEPS_NOT_LANE_LIST",
+    depsSelf: "DEPS_SELF",
+    depsLaneUnknown: "DEPS_LANE_UNKNOWN",
+    depsLaterWave: "DEPS_LATER_WAVE",
+    // Ticket-file lookup input errors (render --batch, waves; exit 2).
+    ticketFileAbsent: "TICKET_FILE_ABSENT",
+    ticketFileDuplicate: "TICKET_FILE_DUPLICATE",
+    ticketFileInvalid: "TICKET_FILE_INVALID",
+    // render --batch input errors (exit 2): a 票 cell with no ticket id, or a
+    // template missing a line the batch prompt replaces.
+    ticketCellEmpty: "TICKET_CELL_EMPTY",
+    templateBatchLineAbsent: "TEMPLATE_BATCH_LINE_ABSENT",
     // check --cut manifest-side failures (exit 1, reported as FAIL lines).
     approvalHuman: "APPROVAL_HUMAN",
     decisionsHumanRowAbsent: "DECISIONS_HUMAN_ROW_ABSENT",
@@ -195,13 +259,16 @@ export const PINS_NONE = "無";
 export const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
 /** Usage of the handoff subcommand, printed on its own usage errors. */
 export const HANDOFF_USAGE = "usage: node scripts/fanout.mjs handoff [--check] <manifest> [--target <branch>] [--repo <dir>] [--mailbox-root <dir>] [--closing]";
+/** render's value-less flag selecting the batch prompt; removed before the flag parser runs. */
+const BATCH_FLAG = "--batch";
 /** A subcommand usage line as a continuation line of USAGE (`usage: ` → 7 spaces). */
 const usageContinuation = (line) => `       ${line.slice("usage: ".length)}`;
 export const USAGE = [
     "usage: node scripts/fanout.mjs validate <manifest>",
-    "       node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]",
+    "       node scripts/fanout.mjs render <manifest> <lane> (--summary <text> --reading <text>... | --batch) [--mailbox-root <dir>] [--primary <path>] [--base <sha>]",
     "       node scripts/fanout.mjs check <manifest> <lane> [--base <ref>] [--repo <dir>]",
     "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
+    "       node scripts/fanout.mjs waves <manifest> <wave-table> [--primary <path>]",
     usageContinuation(OWNERS_USAGE),
     usageContinuation(HANDOFF_USAGE),
 ].join("\n");
@@ -457,6 +524,7 @@ function parseLanes(sections, m) {
             seen.set(id, heading);
         }
     };
+    const waveLanes = waveLaneIndex(laneSections);
     for (const s of laneSections) {
         const table = firstTable(s);
         if (table.length === 0) {
@@ -472,7 +540,8 @@ function parseLanes(sections, m) {
             });
             continue;
         }
-        if (!isDispatchableHeader(header)) {
+        const shape = lanesShape(header);
+        if (shape === undefined) {
             const missing = LANES_HEADER.filter((c) => !header.includes(c));
             for (const r of rows) {
                 const id = r.cells[0] ?? "";
@@ -511,7 +580,7 @@ function parseLanes(sections, m) {
                 continue;
             }
             const [lane, ticket, branch, worktree, owned, forbidden, scopeCut, deps] = r.cells;
-            const approvalCell = header.length > LANES_HEADER.length ? r.cells[LANES_HEADER.length] : "";
+            const approvalCell = shape.approval === undefined ? "" : r.cells[shape.approval];
             let ok = true;
             if (branch === "") {
                 rowErr("BRANCH_EMPTY", "branch cell is empty");
@@ -535,6 +604,16 @@ function parseLanes(sections, m) {
                 rowErr(FANOUT_CODES.approvalValueUnknown, `approval cell is "${approvalCell}" — allowed: human, —, or empty`);
                 ok = false;
             }
+            let waveFields;
+            if (shape.wave !== undefined) {
+                const problems = waveRowErrors(id, r.cells[shape.wave], deps, waveLanes);
+                for (const [code, message] of problems)
+                    rowErr(code, message);
+                if (problems.length > 0)
+                    ok = false;
+                else
+                    waveFields = { wave: Number(r.cells[shape.wave]), depLanes: depsList(deps) };
+            }
             if (!ok)
                 continue;
             m.dispatchable.push({
@@ -551,21 +630,113 @@ function parseLanes(sections, m) {
                 heading: s.heading,
                 line: r.line,
                 approval: approvalCell === "human" ? "human" : undefined,
+                ...waveFields,
             });
         }
     }
     return new Set(seen.keys());
 }
 /**
- * A Lanes table is dispatchable when its header is exactly LANES_HEADER, or
- * exactly LANES_HEADER followed by the optional `approval` column. Any other
- * shape (a different 9th cell, reordered columns) stays provisional.
+ * Lanes sections whose table has a `lane` header but no `波次` column.
+ *
+ * Covers provisional tables too. Sections without a readable table are left
+ * out: parseManifest already reports them. Returns the heading line and its
+ * 1-based line number, in manifest order.
  */
-function isDispatchableHeader(h) {
-    const prefixOk = LANES_HEADER.every((c, i) => h[i] === c);
-    if (!prefixOk)
-        return false;
-    return h.length === LANES_HEADER.length || (h.length === LANES_HEADER.length + 1 && h[LANES_HEADER.length] === APPROVAL_COLUMN);
+export function lanesSectionsWithoutWave(text) {
+    return splitSections(splitLines(text))
+        .filter((s) => s.name.startsWith("Lanes"))
+        .filter((s) => {
+        const table = firstTable(s);
+        if (table.length === 0)
+            return false;
+        const { header } = tableRows(table);
+        return header[0] === "lane" && lanesShape(header)?.wave === undefined;
+    })
+        .map((s) => ({ heading: s.heading, line: s.line }));
+}
+/**
+ * The shape of a dispatchable Lanes header, or undefined when it is not one.
+ * Dispatchable: LANES_HEADER, optionally followed by `波次`, optionally
+ * followed by `approval` — exactly those four shapes. Any other shape (a
+ * different extra cell, reordered columns) stays provisional.
+ */
+function lanesShape(h) {
+    if (!LANES_HEADER.every((c, i) => h[i] === c))
+        return undefined;
+    const extra = h.slice(LANES_HEADER.length);
+    const n = LANES_HEADER.length;
+    if (extra.length === 0)
+        return { wave: undefined, approval: undefined };
+    if (extra.length === 1 && extra[0] === APPROVAL_COLUMN)
+        return { wave: undefined, approval: n };
+    if (extra.length === 1 && extra[0] === WAVE_COLUMN)
+        return { wave: n, approval: undefined };
+    if (extra.length === 2 && extra[0] === WAVE_COLUMN && extra[1] === APPROVAL_COLUMN)
+        return { wave: n, approval: n + 1 };
+    return undefined;
+}
+/**
+ * Every lane id of a Lanes table with the `波次` column, mapped to its wave,
+ * or to undefined when that row's wave cannot be read (cell count or wave
+ * cell in error). A row with a row error is still a known lane; the first
+ * occurrence of a duplicated id wins.
+ */
+function waveLaneIndex(laneSections) {
+    const index = new Map();
+    for (const s of laneSections) {
+        const table = firstTable(s);
+        if (table.length === 0)
+            continue;
+        const { header, rows } = tableRows(table);
+        const shape = lanesShape(header);
+        if (shape?.wave === undefined)
+            continue;
+        for (const r of rows) {
+            const id = r.cells[0] ?? "";
+            if (!LANE_ID_RE.test(id) || index.has(id))
+                continue;
+            const cell = r.cells.length === header.length ? r.cells[shape.wave] : "";
+            index.set(id, WAVE_RE.test(cell) ? Number(cell) : undefined);
+        }
+    }
+    return index;
+}
+/** Entries of a well-formed `相依` cell: [] for `無`, else the separated lane ids. */
+function depsList(cell) {
+    return cell === DEPS_NONE ? [] : cell.split(LIST_SEPARATOR_RE);
+}
+/**
+ * Row errors of the `波次` and `相依` cells of lane `id`, as [code, message]
+ * pairs in report order: the wave cell, then the 相依 format, self edge,
+ * unknown lanes and edges into a later wave. The later-wave check is skipped
+ * when either wave is itself in error.
+ */
+function waveRowErrors(id, waveCell, deps, waveLanes) {
+    const out = [];
+    if (!WAVE_RE.test(waveCell))
+        out.push([FANOUT_CODES.waveNotInteger, `波次 cell is "${waveCell}" — must be a positive integer`]);
+    if (deps === DEPS_NONE)
+        return out;
+    const entries = deps.split(LIST_SEPARATOR_RE);
+    if (entries.some((e) => !LANE_ID_RE.test(e))) {
+        out.push([FANOUT_CODES.depsNotLaneList, `相依 cell "${deps}" is not 無 or a comma-separated list of lane names — notes go in 範圍切線`]);
+        return out;
+    }
+    if (entries.includes(id))
+        out.push([FANOUT_CODES.depsSelf, "相依 cell names the lane itself"]);
+    const others = entries.filter((e) => e !== id);
+    for (const e of others.filter((x) => !waveLanes.has(x))) {
+        out.push([FANOUT_CODES.depsLaneUnknown, `相依 cell names "${e}", which is not a lane of a Lanes table with 波次 in this manifest`]);
+    }
+    const own = WAVE_RE.test(waveCell) ? Number(waveCell) : undefined;
+    for (const e of others) {
+        const theirs = waveLanes.get(e);
+        if (own !== undefined && theirs !== undefined && theirs > own) {
+            out.push([FANOUT_CODES.depsLaterWave, `相依 cell names "${e}", which is in a later wave (${theirs} > ${own})`]);
+        }
+    }
+    return out;
 }
 function parsePins(sections, m, known) {
     const errors = m.errors;
@@ -1025,6 +1196,79 @@ function lookupLane(m, laneId) {
         return { ok: false, errors: fatal };
     return { ok: true, lane };
 }
+// --- ticket files ------------------------------------------------------------
+/** Ticket ids of a `票` cell: split on `,` `，` `、`, trimmed, empty parts dropped, order kept. */
+export function ticketIds(cell) {
+    return cell
+        .split(/[,，、]/)
+        .map((t) => t.trim())
+        .filter((t) => t !== "");
+}
+/** `abs` relative to `primary` with `/` separators ("." for primary itself). */
+function relToPrimary(primary, abs) {
+    return path.relative(primary, abs).split(path.sep).join("/") || ".";
+}
+/** Top-level `*.md` files of `dir` except any-case `README.md`, sorted; [] when unreadable. */
+function ticketDirFiles(dir) {
+    try {
+        return fs
+            .readdirSync(dir)
+            .filter((name) => name.endsWith(".md") && name.toLowerCase() !== "readme.md")
+            .filter((name) => isRegularFile(path.join(dir, name)))
+            .sort();
+    }
+    catch {
+        return [];
+    }
+}
+/**
+ * Look up each ticket id in primary's ticket directory (`ticketDir`, default
+ * docs/tickets): the top-level ticket files whose `id` field is byte-equal to
+ * it. Every absent, duplicated or unparsable ticket is reported, with paths
+ * relative to primary. Read-only.
+ */
+export function lookupTicketFiles(primary, ids) {
+    const dir = resolveTicketDir(primary);
+    const shownDir = relToPrimary(primary, dir);
+    const parsed = [];
+    for (const name of ticketDirFiles(dir)) {
+        let text;
+        try {
+            text = fs.readFileSync(path.join(dir, name), "utf8");
+        }
+        catch {
+            continue;
+        }
+        parsed.push({ file: relToPrimary(primary, path.join(dir, name)), result: parseTicketFile(text) });
+    }
+    const errors = [];
+    const tickets = [];
+    for (const id of ids) {
+        const hits = parsed.filter((p) => p.result.fields.id === id);
+        if (hits.length === 0) {
+            errors.push(inputErr(FANOUT_CODES.ticketFileAbsent, `ticket ${id}: no ticket file under ${shownDir} has id ${id}`));
+        }
+        else if (hits.length > 1) {
+            errors.push(inputErr(FANOUT_CODES.ticketFileDuplicate, `ticket ${id}: more than one ticket file under ${shownDir} has id ${id} (${hits.map((h) => h.file).join(", ")})`));
+        }
+        else if (hits[0].result.problems.length > 0) {
+            errors.push(inputErr(FANOUT_CODES.ticketFileInvalid, `ticket ${id}: ticket file ${hits[0].file} does not parse: ${hits[0].result.problems[0]}`));
+        }
+        else {
+            const { fields, scenarios } = hits[0].result;
+            const title = fields.title;
+            const allowed = fields["allowed paths"];
+            tickets.push({
+                id,
+                title: typeof title === "string" ? title : "",
+                file: hits[0].file,
+                scenarioIds: scenarios.map((s) => s.id),
+                allowedPaths: Array.isArray(allowed) ? allowed : [],
+            });
+        }
+    }
+    return errors.length > 0 ? { ok: false, errors } : { ok: true, tickets };
+}
 /** render warning: primary's config cannot be used, so the addendum pointer is dropped. */
 export const CONFIG_UNREADABLE_WARN = (configError) => `WARN  CONFIG_UNREADABLE: laneProtocolAddendum could not be read (${configError}) — the prompt points only at docs/lane-protocol.md`;
 // 64 MiB: `git ls-tree -r` lists every path at base (for the owned-token
@@ -1161,6 +1405,30 @@ function resolveLanePointer(primary, installRoot, errors, warnings) {
     return { generic, addendum };
 }
 /**
+ * The batch `<一句話>` (ticket titles joined by `；`) and reading entries
+ * (`<file>的 ## Scenarios（<ids>）`, one per ticket) from the lane's ticket
+ * files, or undefined with the problems pushed to `errors`. With no primary,
+ * PRIMARY_NOT_FOUND is already reported and no lookup runs.
+ */
+function batchSummaryAndReading(lane, primary, errors) {
+    const ids = ticketIds(lane.ticket);
+    if (ids.length === 0) {
+        errors.push(inputErr(FANOUT_CODES.ticketCellEmpty, `lane ${lane.lane}: 票 cell names no ticket`));
+        return undefined;
+    }
+    if (primary === undefined)
+        return undefined;
+    const found = lookupTicketFiles(primary, ids);
+    if (!found.ok) {
+        errors.push(...found.errors);
+        return undefined;
+    }
+    return {
+        summary: found.tickets.map((t) => t.title).join("；"),
+        reading: found.tickets.map((t) => `${t.file}的 ## Scenarios（${t.scenarioIds.join("、")}）`),
+    };
+}
+/**
  * Render the §3b dispatch prompt for one dispatchable lane. Every field comes
  * from a stated source (spec "Render field sources"); an absent source is an
  * error, never a default. If the lane itself cannot be read (not found,
@@ -1190,12 +1458,16 @@ export function renderPrompt(m, laneId, opts) {
     }
     // Pins: manifest-wide pins errors + errors attributed to this lane.
     errors.push(...m.errors.filter((e) => e.scope === "pins" && (e.lanes === undefined || e.lanes.includes(laneId))));
-    const summary = opts.summary?.trim() ? opts.summary : undefined;
-    if (summary === undefined)
-        errors.push(inputErr(FANOUT_CODES.summaryAbsent, "--summary \"<text>\" is required (the 3b <一句話>)"));
-    const reading = (opts.reading ?? []).filter((r) => r.trim() !== "");
-    if (reading.length === 0)
-        errors.push(inputErr(FANOUT_CODES.readingAbsent, "at least one --reading \"<text>\" is required (3b <計劃的必讀章節> + <票面 row>)"));
+    let summary;
+    let reading = [];
+    if (!opts.batch) {
+        summary = opts.summary?.trim() ? opts.summary : undefined;
+        if (summary === undefined)
+            errors.push(inputErr(FANOUT_CODES.summaryAbsent, "--summary \"<text>\" is required (the 3b <一句話>)"));
+        reading = (opts.reading ?? []).filter((r) => r.trim() !== "");
+        if (reading.length === 0)
+            errors.push(inputErr(FANOUT_CODES.readingAbsent, "at least one --reading \"<text>\" is required (3b <計劃的必讀章節> + <票面 row>)"));
+    }
     // Mailbox root: a non-blank --mailbox-root wins and is used byte-verbatim
     // (never resolved). Otherwise the manifest header, resolved against primary
     // below. A blank flag falls through to the header. (E248)
@@ -1252,6 +1524,12 @@ export function renderPrompt(m, laneId, opts) {
         pointer = resolveLanePointer(primary, opts.installRoot ?? DEFAULT_INSTALL_ROOT, errors, warnings);
     }
     let template = opts.template ?? PROMPT_TEMPLATE_3B;
+    if (opts.batch) {
+        template = batchTemplate(template, errors);
+        const fromTickets = batchSummaryAndReading(lane, primary, errors);
+        summary = fromTickets?.summary;
+        reading = fromTickets?.reading ?? [];
+    }
     if (pointer !== undefined) {
         const replaced = replaceLanePointer(template, LANE_PROTOCOL_POINTER_TWO_LAYER);
         if (replaced === undefined) {
@@ -2015,12 +2293,20 @@ export function runValidate(args) {
     };
 }
 export function runRender(args) {
-    const p = parseArgs(args, ["--summary", "--reading", "--mailbox-root", "--primary", "--base"]);
+    const batchCount = args.filter((a) => a === BATCH_FLAG).length;
+    if (batchCount > 1)
+        return usageResult(`flag ${BATCH_FLAG} given more than once`);
+    const p = parseArgs(args.filter((a) => a !== BATCH_FLAG), ["--summary", "--reading", "--mailbox-root", "--primary", "--base"]);
     if (typeof p === "string")
         return usageResult(p);
     if (p.positional.length !== 2)
         return usageResult("render takes <manifest> <lane>");
+    if (batchCount === 1 && (p.flags.has("--summary") || p.flags.has("--reading"))) {
+        return usageResult("render --batch takes no --summary or --reading (both come from the lane's ticket files)");
+    }
     const opts = { reading: p.flags.get("--reading") ?? [] };
+    if (batchCount === 1)
+        opts.batch = true;
     for (const [flag, key] of [
         ["--summary", "summary"],
         ["--mailbox-root", "mailboxRoot"],
