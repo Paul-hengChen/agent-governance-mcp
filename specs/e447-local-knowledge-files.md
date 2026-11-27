@@ -17,6 +17,8 @@ Ticket: `docs/backlog.md` row E447 (human rulings R1–R4, 2026-11-23, taken as 
 
 **Human ruling 2026-11-26 (cut approval in the lane session): O1 (a), O2 (a), O3 (a); D1–D10 stand as written.**
 
+**Human ruling 2026-11-27 (lane session): the post-approval Copy amendment to DOC-INST-5 (leading ". With" instead of " With", so the appended sentence no longer runs on from the existing cell) is accepted — the human typed "ok, 同意".**
+
 The ticket leaves (i) and (ii) to the cut. (iii) is an ambiguity found while writing the scenarios: read literally, "the existing refuse-on-differing-content rule applies to the rest" refuses every lane-changed seeded file, because its primary copy always exists and differs. **The Acceptance Criteria, Copy / Strings and tasks below are written for the recommended option of each; a different ruling changes the items named in its "changes if not recommended" line.**
 
 ### O1 — needs human ruling: opt-in flag and `.current/.config.json` key
