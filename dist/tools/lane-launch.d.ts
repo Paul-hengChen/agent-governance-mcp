@@ -27,6 +27,10 @@ export declare const HOST_SIGNALS: {
     readonly unknown: "Unknown command";
 };
 export type HostSignal = keyof typeof HOST_SIGNALS;
+export declare const TRUST_KEY = "hasTrustDialogAccepted";
+export declare const FALLBACK_SETTING = "fallbackModel";
+export declare const AUTOCONTINUE_SETTING = "autoContinueAtUsageLimit";
+export declare const MANAGED_SETTINGS_FILE = "/Library/Application Support/ClaudeCode/managed-settings.json";
 export type SignalCounts = Record<HostSignal, number>;
 export type FinishedHow = "lane report" | "batch stop" | "finish record";
 export declare const OUT: {
@@ -37,6 +41,10 @@ export declare const OUT: {
     refusedSameWave: (lane: string, dep: string, wave: number) => string;
     refusedInvalid: (code: string, message: string) => string;
     refusedBusy: (pid: number) => string;
+    refusedIterm: string;
+    refusedTrust: string;
+    refusedAutocontinue: (file: string) => string;
+    refusedFallback: (file: string) => string;
     started: (lane: string, id: string) => string;
     queued: (lane: string, limit: number) => string;
     waiting: (lane: string, dep: string, why: string) => string;
@@ -231,4 +239,16 @@ export type StartOutcome = {
 export declare function startSession(driver: WindowDriver, clock: Clock, windowId: string, prompt: string): Promise<StartOutcome>;
 /** Argv for the real `agc feature start` runner, spawned with process.execPath from primary. */
 export declare function featureStartArgv(installRoot: string, req: FeatureStartRequest): string[];
+/** Host-phase refusal reasons, in order: iTerm2, trust, each autoContinue file, each fallbackModel file. */
+export declare function hostRefusals(ctx: {
+    primary: string;
+    laneWorktrees: string[];
+}, deps: Pick<LaunchDeps, "itermInstalled" | "host">): string[];
+/** Runs one AppleScript program given as lines; `args` reach its `on run argv` handler. Returns stdout. */
+export type OsascriptRunner = (scriptLines: string[], args: string[]) => string;
+export declare const runOsascript: OsascriptRunner;
+/** The iTerm2 session opener over osascript argv. */
+export declare function createItermDriver(run?: OsascriptRunner): WindowDriver;
+/** True on macOS when iTerm.app is in /Applications or ~/Applications. */
+export declare function itermInstalled(home?: string): boolean;
 //# sourceMappingURL=lane-launch.d.ts.map

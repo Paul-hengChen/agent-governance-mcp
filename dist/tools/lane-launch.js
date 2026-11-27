@@ -4,7 +4,9 @@
 // dependencies, and keeps a launch state in the git common dir. It only reads
 // the manifest; it never writes a tracked path or anything under a lane worktree.
 // Why: specs/e443b-lane-launcher-architecture.md
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { loadConfig, resolveTicketDir } from "./config.js";
 import { FANOUT_CODES, lanesSectionsWithoutWave, lookupTicketFiles, parseManifest, renderPrompt, resolveMailboxHeader, resolveWorktree, ticketIds, validateManifest, } from "./fanout-manifest.js";
@@ -35,6 +37,10 @@ export const HOST_SIGNALS = {
     enter: "Press enter to continue",
     unknown: "Unknown command",
 };
+export const TRUST_KEY = "hasTrustDialogAccepted";
+export const FALLBACK_SETTING = "fallbackModel";
+export const AUTOCONTINUE_SETTING = "autoContinueAtUsageLimit";
+export const MANAGED_SETTINGS_FILE = "/Library/Application Support/ClaudeCode/managed-settings.json";
 /** Statuses that hold a parallel-limit slot. */
 const SLOT_STATUSES = new Set(["running", "paused-weekly", "paused-stopped"]);
 /** Statuses a run resumes in a new window. */
@@ -47,6 +53,10 @@ export const OUT = {
     refusedSameWave: (lane, dep, wave) => `lane ${lane} depends on ${dep} in the same wave ${wave}; move ${lane} to a later wave`,
     refusedInvalid: (code, message) => `the manifest does not validate: ${code} ${message}`,
     refusedBusy: (pid) => `another lane-launch run is active (pid ${pid}); stop it first`,
+    refusedIterm: "iTerm2 is not installed; only iTerm2 is supported",
+    refusedTrust: 'the primary checkout has no trust entry of its own in ~/.claude.json; run claude once in the primary checkout and choose "Yes, I trust this folder"',
+    refusedAutocontinue: (file) => `${file} sets autoContinueAtUsageLimit; remove it (a project or local settings file that sets it turns automatic continue off)`,
+    refusedFallback: (file) => `${file} sets fallbackModel; remove it (a lane never switches its role's model)`,
     started: (lane, id) => `started ${lane} — window ${id}`,
     queued: (lane, limit) => `queued ${lane} — parallel limit ${limit}`,
     waiting: (lane, dep, why) => `waiting ${lane} — depends on ${dep}: ${why}`,
@@ -518,6 +528,14 @@ export async function runLaneLaunch(ctx, deps) {
     const text = fs.readFileSync(ctx.manifestPath, "utf8");
     const config = loadConfig(ctx.primary);
     const refusals = manifestRefusals(text, config);
+    const m = parseManifest(text);
+    if (refusals.length === 0) {
+        const laneWorktrees = m.dispatchable.flatMap((l) => {
+            const wt = resolveWorktree(l.worktree, ctx.primary);
+            return wt.ok && isDir(wt.path) ? [wt.path] : [];
+        });
+        refusals.push(...hostRefusals({ primary: ctx.primary, laneWorktrees }, deps));
+    }
     if (refusals.length > 0) {
         for (const r of refusals)
             deps.err(OUT.refused(r));
@@ -535,7 +553,7 @@ export async function runLaneLaunch(ctx, deps) {
             deps.err(OUT.refused(read.error));
             return 1;
         }
-        return await new LaunchRun(ctx, deps, config, parseManifest(text), read.state, files.state).run();
+        return await new LaunchRun(ctx, deps, config, m, read.state, files.state).run();
     }
     finally {
         lock.release();
@@ -607,5 +625,92 @@ export async function startSession(driver, clock, windowId, prompt) {
 /** Argv for the real `agc feature start` runner, spawned with process.execPath from primary. */
 export function featureStartArgv(installRoot, req) {
     return [path.join(installRoot, "bin", "agc-init.mjs"), "feature", "start", req.slug, "--base", req.base, "--path", req.worktree];
+}
+// --- §K host pre-checks and the iTerm2 driver ---------------------------------
+/** A JSON object file, or undefined when it is absent or does not parse (the CLI itself rejects a bad settings file). */
+function readJsonObject(file) {
+    try {
+        const v = JSON.parse(fs.readFileSync(file, "utf8"));
+        return isObj(v) ? v : undefined;
+    }
+    catch {
+        return undefined;
+    }
+}
+const projectSettingsFiles = (dir) => [path.join(dir, ".claude", "settings.json"), path.join(dir, ".claude", "settings.local.json")];
+function hasTrustEntry(claudeJson, primary) {
+    const projects = readJsonObject(claudeJson)?.projects;
+    if (!isObj(projects))
+        return false;
+    return [primary, realOr(primary)].some((key) => {
+        const entry = Object.hasOwn(projects, key) ? projects[key] : undefined;
+        return isObj(entry) && entry[TRUST_KEY] === true;
+    });
+}
+function fallbackSet(file) {
+    const settings = readJsonObject(file);
+    if (settings === undefined || !Object.hasOwn(settings, FALLBACK_SETTING))
+        return false;
+    const v = settings[FALLBACK_SETTING];
+    return !(v === null || v === "" || (Array.isArray(v) && v.length === 0));
+}
+/** Host-phase refusal reasons, in order: iTerm2, trust, each autoContinue file, each fallbackModel file. */
+export function hostRefusals(ctx, deps) {
+    const out = [];
+    if (!deps.itermInstalled())
+        out.push(OUT.refusedIterm);
+    if (!hasTrustEntry(deps.host.claudeJson, ctx.primary))
+        out.push(OUT.refusedTrust);
+    const dirs = [...new Set([ctx.primary, ...ctx.laneWorktrees])];
+    const projectFiles = dirs.flatMap(projectSettingsFiles);
+    for (const file of projectFiles) {
+        const settings = readJsonObject(file);
+        if (settings !== undefined && Object.hasOwn(settings, AUTOCONTINUE_SETTING))
+            out.push(OUT.refusedAutocontinue(file));
+    }
+    let dropIns = [];
+    try {
+        dropIns = fs.readdirSync(deps.host.managedDropInDir).filter((n) => n.endsWith(".json")).sort();
+    }
+    catch { /* no drop-in dir */ }
+    const anyFiles = [deps.host.userSettings, deps.host.managedSettings, ...dropIns.map((n) => path.join(deps.host.managedDropInDir, n)), ...projectFiles];
+    for (const file of anyFiles)
+        if (fallbackSet(file))
+            out.push(OUT.refusedFallback(file));
+    return out;
+}
+export const runOsascript = (scriptLines, args) => execFileSync("osascript", [...scriptLines.flatMap((l) => ["-e", l]), ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+// Fixed programs: every text arrives through argv, never through a script line.
+const WINDOW_BY_ID = "(first window whose id is ((item 1 of argv) as integer))";
+const OSA_OPEN = [
+    "on run argv", 'tell application "iTerm"', "set w to (create window with default profile)",
+    "tell current session of w to write text (item 1 of argv)", "return (id of w) as text", "end tell", "end run",
+];
+const OSA_CONTENTS = ["on run argv", `tell application "iTerm" to return contents of current session of ${WINDOW_BY_ID}`, "end run"];
+const OSA_WRITE = [
+    "on run argv", 'tell application "iTerm"', `tell current session of ${WINDOW_BY_ID}`,
+    'if (item 3 of argv) is "1" then', "write text (item 2 of argv)", "else", "write text (item 2 of argv) newline NO", "end if",
+    "end tell", "end tell", "end run",
+];
+const OSA_EXISTS = ["on run argv", `tell application "iTerm" to return (exists ${WINDOW_BY_ID}) as text`, "end run"];
+/** iTerm2 window ids are integers; anything else never reaches osascript. */
+function windowArg(windowId) {
+    if (!/^\d+$/.test(windowId))
+        throw new Error(`not an iTerm2 window id: ${windowId}`);
+    return windowId;
+}
+/** The iTerm2 session opener over osascript argv. */
+export function createItermDriver(run = runOsascript) {
+    return {
+        open: async (command) => windowArg(run(OSA_OPEN, [command]).trim()),
+        contents: async (windowId) => run(OSA_CONTENTS, [windowArg(windowId)]).replace(/\n$/, ""),
+        writeText: async (windowId, text, newline) => { run(OSA_WRITE, [windowArg(windowId), text, newline ? "1" : "0"]); },
+        exists: async (windowId) => run(OSA_EXISTS, [windowArg(windowId)]).trim() === "true",
+    };
+}
+/** True on macOS when iTerm.app is in /Applications or ~/Applications. */
+export function itermInstalled(home = os.homedir()) {
+    return process.platform === "darwin" &&
+        [path.join("/Applications", "iTerm.app"), path.join(home, "Applications", "iTerm.app")].some(isDir);
 }
 //# sourceMappingURL=lane-launch.js.map
