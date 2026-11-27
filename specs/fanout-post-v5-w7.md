@@ -2,7 +2,7 @@
 base: 46e974d    integration branch: integ/post-v5-w7
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（人類 2026-11-27），待派工。**
+**狀態：已結案 2026-11-27。** e443a 以 `--no-ff` 合進 `integ/post-v5-w7`（merge `755c08c`，零衝突），merge-invariants PASS；派工 base `990084f`（清單 PR #206）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17（`gates/`、`tools/handoff-orchestrator.ts` 無差異，`test/e35-pipeline-order.test.mjs` 8/8）、`check:bookkeeping` exit 0。lane 層 CI：e443a run 45952928486 @ `0b72c81` 綠。Roll-up：e443a 5 個 task、hop 4/14、review 退回 0、證據 5/5。E443a done-mark（not yet released）；E443b 留待下一波。例外：無。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out 下一波」，2026-11-27；候選照佇列順序 E443（第 255 號列）、E420（第 256 號列），整合者提五題，人類答「approve」）：E443 拆成 E443a、E443b 兩張、分兩波；本波只有一條 lane e443a 做 E443a；E443b 下一波；E420 本波不列。票面以 `specs/ticket-cut-e443.md`（Stage 0 切票檔，與本清單一起核准）的 NEW-1（E443a）為準，`docs/backlog.md` 的 E443a 列由整合者照切票檔寫入。本波不發版。
 
@@ -99,3 +99,20 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-27 | 整合者 | e443a cut 預審（to-integrator#1，spec @ `3021407`）`close`（to-lane#1）：範圍＝切票檔 NEW-1 範圍 1–6 加切票檔 Q4 (a)；5 個 task（qa T-E443A-01；sr 02 波次欄、03 render --batch、04 `waves` 比對與新模組 `tools/fanout-waves.ts`、05 SOP 兩段），A1-1..A1-12 皆有實作 task，每個 sr task 在 `task_size` 內；整合者在 lane 重跑 `check --cut`：18 token、0 越界，唯一 FAIL 為 APPROVAL_HUMAN（預期）；PM probe（base 全套 4842/4844、0 fail）re-pin 4 檔 e423、e428、e292、e296 皆在擁有欄，擁有欄外的 e285、e430 預期原封不動綠；不走 architect、hop 估 4–5；cut 由 lane 呈人類核准 | e443a 信箱 to-integrator#1、to-lane#1 |
 | 2026-11-27 | 人類 | 在 e443a 的 session 親手核准 cut（spec @ `3021407`，無選項、無 needs human ruling 項）；coordinator 在 pm tuple 寫入 `cut_approved: true`，派 qa-engineer（opus）做 T-E443A-01。只影響本 lane，寫在核准的 cut 裡 | e443a lane session；`specs/e443a-manifest-waves.md` @ `3021407`、`.current/e443a/handoff.md`（`cut_approved: true`）；e443a 信箱 to-integrator#2 |
 | 2026-11-27 | 整合者 | e443a 收工報告（to-integrator#6）核對通過並 `close`（to-lane#2）：`feat/e443a-manifest-waves` @ `0b72c81`（8 commit），`fanout check --base main` 46 檔 0 越界，證據 `review_reports/review_T-E443A-01.md` APPROVED（covers T-E443A-01..05）與 `qa_reports/review_T-E443A-01..05.md` PASS，worktree 重 build 後乾淨，無 pending-tickets，共用生成物未動；lane 層 CI run 45952928486 @ `0b72c81` 綠。sr 的判斷點（非批次 render 用法錯誤訊息隨 USAGE_LINES 換新行）裁判接受；reviewer recommended 兩項（`WAVE_RE`／`LIST_SEPARATOR_RE` 重複定義可改共用；7 個 comment-length advisory）列入結案報告、不開票 | e443a 信箱 to-integrator#6、to-lane#2；CI run 45952928486 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 990084f
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v5-w7 @ 289cb65）
+- lane-status：primary（main ← integ/post-v5-w7 @ 289cb65）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
+### 已結案
+- e443a（E443a）PASS，merge `755c08c`；以本波 PR 合進 `main`。lane 紀錄在 `.current/history/2026-11/e443a/`；沒有未配號的新發現。裁判的 recommended 兩項（`WAVE_RE`／`LIST_SEPARATOR_RE` 重複定義可改共用、7 個 comment-length advisory）記在 Decisions 表，optional 兩項（`fanout-waves.ts` 用字面 `MANIFEST_UNREADABLE`、`--batch` 接受的位置比 spec 寬）列在結案報告，都不開票。
+- 上線後觀察（人類 R5，非驗收）：E443b 上線後第一次真的 lane 撞到用量上限時，記錄主 session 自動接續後是否照 Crash-Resume 重派中斷的 subagent、pin 是否保留，寫回 `specs/e443-phase0-host-check.md`。
+### 待人類決定
+- 要不要發 v5.x：E424、E425、E427、E430、E449、E426、E428、E446、E447、E443a 都已完成，合進 `main` 後尚未發版。
+- 下一波要不要開：佇列尚未完成的是 E443b（依賴 E443a，合進 `main` 後即滿足；範圍與切票檔 Q1–Q3 的裁定在 `specs/ticket-cut-e443.md` 與 `docs/backlog.md` 的 E443b 列）與 E420（新鏈上仍沒有結案的 design-armed feature）。
+### 進行中的背景工作
+無
