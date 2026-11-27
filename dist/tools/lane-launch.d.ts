@@ -17,6 +17,7 @@ export declare const READY_POLL_MS = 1000;
 export declare const READY_SETTLE_MS = 6000;
 export declare const UNKNOWN_CHECK_MS = 5000;
 export declare const RESEND_GAP_MS = 10000;
+export declare const WAKE_LINE = "\u984D\u5EA6\u5DF2\u6062\u5FA9\uFF1A\u5148 tw_get_state\uFF0C\u7167 Crash-Resume \u6D41\u7A0B\u6838\u5C0D\u5F8C\u5F9E\u4E2D\u65B7\u8655\u63A5\u7E8C\u3002";
 /** The one table of host line prefixes the launcher matches in a window. */
 export declare const HOST_SIGNALS: {
     readonly weekly: "You've hit your weekly limit";
@@ -44,6 +45,12 @@ export declare const OUT: {
     laterWave: (n: number, m: number) => string;
     exit: (n: number) => string;
     startFailed: (lane: string, why: string) => string;
+    resumed: (lane: string, id: string) => string;
+    woken: (lane: string, id: string) => string;
+    entered: (lane: string) => string;
+    pausedWeekly: (lane: string) => string;
+    pausedStopped: (lane: string) => string;
+    windowGone: (lane: string) => string;
 };
 export interface LaneLaunchRecord {
     status: LaunchStatus;

@@ -26,6 +26,7 @@ export const READY_POLL_MS = 1_000;
 export const READY_SETTLE_MS = 6_000;
 export const UNKNOWN_CHECK_MS = 5_000;
 export const RESEND_GAP_MS = 10_000;
+export const WAKE_LINE = "額度已恢復：先 tw_get_state，照 Crash-Resume 流程核對後從中斷處接續。";
 /** The one table of host line prefixes the launcher matches in a window. */
 export const HOST_SIGNALS = {
     weekly: "You've hit your weekly limit",
@@ -36,6 +37,8 @@ export const HOST_SIGNALS = {
 };
 /** Statuses that hold a parallel-limit slot. */
 const SLOT_STATUSES = new Set(["running", "paused-weekly", "paused-stopped"]);
+/** Statuses a run resumes in a new window. */
+const RESUME_STATUSES = new Set(["window-gone", "start-failed"]);
 export const OUT = {
     refused: (reason) => `lane-launch: refused — ${reason}`,
     refusedNoWave: "the manifest has no 波次 column; add it at Stage 1 or start the lanes by hand",
@@ -52,6 +55,12 @@ export const OUT = {
     laterWave: (n, m) => `wave ${n} waits until every lane of wave ${m} is finished`,
     exit: (n) => `lane-launch: no lane of wave ${n} is running — exiting`,
     startFailed: (lane, why) => `start failed ${lane} — ${why}`,
+    resumed: (lane, id) => `resumed ${lane} — window ${id} (its window was gone)`,
+    woken: (lane, id) => `woken ${lane} — window ${id}`,
+    entered: (lane) => `entered ${lane} — Press enter to continue`,
+    pausedWeekly: (lane) => `paused ${lane} — weekly limit, no automatic wake`,
+    pausedStopped: (lane) => `paused ${lane} — automatic continue stopped; re-run the launcher after the limit resets`,
+    windowGone: (lane) => `window gone ${lane} — not finished; the next run resumes it`,
 };
 export function launchLimit(config) {
     return config.laneLaunchLimit ?? DEFAULT_LANE_LAUNCH_LIMIT;
@@ -326,18 +335,59 @@ class LaunchRun {
     isFinished(lane) {
         return this.records[lane.lane]?.status === "finished" || this.probe(lane).finished !== undefined;
     }
-    /** One look at a recorded lane holding a slot: finished frees it; unsettled tickets raise the report floor. */
-    observe(lane) {
+    /**
+     * One look at a recorded lane: finished frees it; unsettled tickets raise the report floor; a slot holder
+     * whose window is gone becomes window-gone; a running lane's new signals pause it or get an Enter.
+     */
+    async observe(lane) {
         const rec = this.records[lane.lane];
-        if (rec === undefined || !SLOT_STATUSES.has(rec.status))
+        if (rec === undefined || rec.status === "finished")
             return;
         const p = this.probe(lane);
         if (p.finished !== undefined) {
             this.update(lane.lane, { status: "finished" });
-            this.deps.out(OUT.finished(lane.lane, p.finished));
+            return this.deps.out(OUT.finished(lane.lane, p.finished));
         }
-        else if (!p.settled && p.reportCount > rec.reportFloor)
+        if (!p.settled && p.reportCount > rec.reportFloor)
             this.update(lane.lane, { reportFloor: p.reportCount });
+        if (!SLOT_STATUSES.has(rec.status))
+            return;
+        // A failed probe is not a closed window: only a definite false marks it gone.
+        if (!(await this.deps.driver.exists(rec.windowId).catch(() => true))) {
+            this.update(lane.lane, { status: "window-gone" });
+            return this.deps.out(OUT.windowGone(lane.lane));
+        }
+        if (rec.status !== "running")
+            return;
+        let contents;
+        try {
+            contents = await this.deps.driver.contents(rec.windowId);
+        }
+        catch {
+            return;
+        }
+        const s = newSignals(contents, rec.signals);
+        if (s.stopped) {
+            this.update(lane.lane, { status: "paused-stopped" });
+            this.deps.out(OUT.pausedStopped(lane.lane));
+        }
+        else if (s.weekly) {
+            this.update(lane.lane, { status: "paused-weekly" });
+            this.deps.out(OUT.pausedWeekly(lane.lane));
+        }
+        else if (s.enter) {
+            this.update(lane.lane, { signals: await sendEnter(this.deps.driver, rec.windowId) });
+            this.deps.out(OUT.entered(lane.lane));
+        }
+    }
+    /** The wake line into a paused-stopped lane's own window (observe just saw it exists); a weekly pause is never woken. */
+    async wake(lane) {
+        const rec = this.records[lane.lane];
+        if (rec?.status !== "paused-stopped")
+            return;
+        const signals = await sendText(this.deps.driver, this.deps.clock, rec.windowId, WAKE_LINE);
+        this.update(lane.lane, { status: "running", signals, reportFloor: this.probe(lane).reportCount });
+        this.deps.out(OUT.woken(lane.lane, rec.windowId));
     }
     slotsOpen(wave) {
         return this.limit - this.m.dispatchable.filter((l) => l.wave === wave && SLOT_STATUSES.has(this.records[l.lane]?.status ?? "finished")).length;
@@ -397,25 +447,46 @@ class LaunchRun {
             if (!fsr.ok)
                 return this.deps.out(OUT.notStarted(lane.lane, `agc feature start failed: ${fsr.firstLine}`));
         }
-        const windowId = await this.deps.driver.open(launchCommand(wt.path, lane.lane));
+        await this.session(lane, wave, baseSha, wt.path, r.prompt, OUT.started);
+    }
+    /** A window-gone or start-failed lane in a new window: the recorded baseSha renders the same prompt; no feature start. */
+    async resume(lane, rec) {
+        const r = renderPrompt(this.m, lane.lane, { batch: true, base: rec.baseSha, primary: this.ctx.primary });
+        const wt = resolveWorktree(lane.worktree, this.ctx.primary);
+        if (!r.ok || !wt.ok)
+            return this.deps.out(OUT.notStarted(lane.lane, `render failed: ${!r.ok ? r.errors[0]?.code : wt.ok ? "" : wt.code}`));
+        await this.session(lane, rec.wave, rec.baseSha, wt.path, r.prompt, OUT.resumed);
+    }
+    /** Opens the window, records `running` at once, then startSession; a failure records start-failed and frees the slot. */
+    async session(lane, wave, baseSha, worktree, prompt, line) {
+        const windowId = await this.deps.driver.open(launchCommand(worktree, lane.lane));
         this.records[lane.lane] = { status: "running", wave, windowId, baseSha, signals: zeroSignals(), reportFloor: this.probe(lane).reportCount, updatedAt: "" };
         this.update(lane.lane, {});
-        const s = await startSession(this.deps.driver, this.deps.clock, windowId, r.prompt);
+        const s = await startSession(this.deps.driver, this.deps.clock, windowId, prompt);
         if (!s.ok) {
             this.update(lane.lane, { status: "start-failed", reason: s.why });
             return this.deps.out(OUT.startFailed(lane.lane, s.why));
         }
         this.update(lane.lane, { signals: s.signals });
-        this.deps.out(OUT.started(lane.lane, windowId));
+        this.deps.out(line(lane.lane, windowId));
     }
+    /** Resumes and new starts in queue order while a slot is open; a lane finished while queued is dropped. */
     async fill(queue, wave) {
-        while (queue.length > 0 && this.slotsOpen(wave) > 0)
-            await this.start(queue.shift(), wave);
+        while (queue.length > 0 && this.slotsOpen(wave) > 0) {
+            const lane = queue.shift();
+            const rec = this.records[lane.lane];
+            if (rec === undefined)
+                await this.start(lane, wave);
+            else if (RESUME_STATUSES.has(rec.status))
+                await this.resume(lane, rec);
+        }
     }
     async run() {
         const lanes = this.m.dispatchable;
         for (const lane of lanes)
-            this.observe(lane);
+            await this.observe(lane);
+        for (const lane of lanes)
+            await this.wake(lane);
         const waves = [...new Set(lanes.map((l) => l.wave ?? 0))].sort((a, b) => a - b);
         const wave = waves.find((w) => lanes.some((l) => l.wave === w && !this.isFinished(l)));
         if (wave === undefined) {
@@ -425,7 +496,8 @@ class LaunchRun {
         for (const w of waves)
             if (w > wave)
                 this.deps.out(OUT.laterWave(w, wave));
-        const queue = this.plan(wave);
+        const resumable = lanes.filter((l) => l.wave === wave && RESUME_STATUSES.has(this.records[l.lane]?.status ?? "finished"));
+        const queue = [...resumable, ...this.plan(wave)];
         await this.fill(queue, wave);
         for (const l of queue)
             this.deps.out(OUT.queued(l.lane, this.limit));
@@ -434,7 +506,7 @@ class LaunchRun {
             await this.deps.clock.sleep(POLL_INTERVAL_MS);
             for (const lane of lanes)
                 if (lane.wave === wave)
-                    this.observe(lane);
+                    await this.observe(lane);
             await this.fill(queue, wave);
         }
         this.deps.out(OUT.exit(wave));
