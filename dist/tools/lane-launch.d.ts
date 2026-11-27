@@ -1,5 +1,5 @@
 import { type WorkspaceConfig } from "./config.js";
-import { type Manifest } from "./fanout-manifest.js";
+import { type DispatchableLane, type Manifest } from "./fanout-manifest.js";
 import type { LaneAncestryResult } from "./join-precondition.js";
 export declare const DEFAULT_LANE_LAUNCH_LIMIT = 3;
 export declare const LAUNCH_STATE_FILE = "agc-lane-launch.json";
@@ -147,6 +147,47 @@ export declare function sameWaveDependencies(m: Manifest): {
 }[];
 /** Manifest-phase refusal reasons, in order: no-wave, each validation error, no-human, tier, each same-wave pair. */
 export declare function manifestRefusals(text: string, config: WorkspaceConfig): string[];
-/** Refusals, lock, launch state. Returns 0, or 1 on a refusal. */
+export interface MailboxMessage {
+    headers: Record<string, string>;
+    body: string;
+}
+/** `--- msg` blocks: header closes at the first bare `---`, first key wins; body runs to the next `--- msg` line. */
+export declare function parseMailboxMessages(text: string): MailboxMessage[];
+export declare function isLaneReport(msg: MailboxMessage): boolean;
+export declare function laneTicketStatuses(worktree: string, ticketDirRel: string, ids: string[]): Map<string, string | undefined>;
+export declare function ticketsSettled(statuses: Map<string, string | undefined>): boolean;
+export declare function hasFinishRecord(primary: string, names: string[]): boolean;
+export interface FinishedProbe {
+    finished: FinishedHow | undefined;
+    reportCount: number;
+    settled: boolean;
+}
+export declare function probeFinished(input: {
+    primary: string;
+    lane: DispatchableLane;
+    worktree: string;
+    mailboxFile: string | undefined;
+    ticketDirRel: string;
+    reportFloor: number;
+}): FinishedProbe;
+export type DepCheck = {
+    met: true;
+} | {
+    met: false;
+    why: string;
+};
+export declare function dependencyMet(input: {
+    primary: string;
+    dep: DispatchableLane;
+    startRef: string;
+    knowledgeLocal: boolean;
+    git: GitRunner;
+    ancestry: AncestryFn;
+}): DepCheck;
+/** The manifest's `base:` for the lowest 波次, `main` for any later one. */
+export declare function startRefFor(m: Manifest, wave: number): string;
+export declare function shellQuote(s: string): string;
+export declare function launchCommand(worktree: string, lane: string): string;
+/** Whole run: refusals, lock, launch state, then the wave. Returns 0, or 1 on a refusal; a clock error propagates. */
 export declare function runLaneLaunch(ctx: LaunchContext, deps: LaunchDeps): Promise<number>;
 //# sourceMappingURL=lane-launch.d.ts.map

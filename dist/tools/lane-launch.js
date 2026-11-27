@@ -6,8 +6,10 @@
 // Why: specs/e443b-lane-launcher-architecture.md
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadConfig } from "./config.js";
-import { lanesSectionsWithoutWave, validateManifest } from "./fanout-manifest.js";
+import { loadConfig, resolveTicketDir } from "./config.js";
+import { FANOUT_CODES, lanesSectionsWithoutWave, lookupTicketFiles, parseManifest, renderPrompt, resolveMailboxHeader, resolveWorktree, ticketIds, validateManifest, } from "./fanout-manifest.js";
+import { HISTORY_BUCKET_RE, resolveLaneName } from "./lane-paths.js";
+import { parseTicketFile } from "./ticket-file.js";
 // --- §A constants, output lines, launch-state shape --------------------------
 export const DEFAULT_LANE_LAUNCH_LIMIT = 3;
 export const LAUNCH_STATE_FILE = "agc-lane-launch.json";
@@ -25,6 +27,8 @@ export const HOST_SIGNALS = {
     enter: "Press enter to continue",
     unknown: "Unknown command",
 };
+/** Statuses that hold a parallel-limit slot. */
+const SLOT_STATUSES = new Set(["running", "paused-weekly", "paused-stopped"]);
 export const OUT = {
     refused: (reason) => `lane-launch: refused — ${reason}`,
     refusedNoWave: "the manifest has no 波次 column; add it at Stage 1 or start the lanes by hand",
@@ -157,7 +161,280 @@ export function manifestRefusals(text, config) {
     out.push(...sameWaveDependencies(manifest).map((p) => OUT.refusedSameWave(p.dependent, p.dependedOn, p.wave)));
     return out;
 }
-/** Refusals, lock, launch state. Returns 0, or 1 on a refusal. */
+/** `--- msg` blocks: header closes at the first bare `---`, first key wins; body runs to the next `--- msg` line. */
+export function parseMailboxMessages(text) {
+    const out = [];
+    let cur;
+    const flush = () => { if (cur)
+        out.push({ headers: cur.headers, body: cur.body.join("\n") }); };
+    for (const line of text.split(/\r?\n/)) {
+        if (/^--- msg(?:[ \t].*)?$/.test(line)) {
+            flush();
+            cur = { headers: Object.create(null), body: [], inHeader: true };
+            continue;
+        }
+        if (!cur)
+            continue;
+        if (!cur.inHeader) {
+            cur.body.push(line);
+            continue;
+        }
+        if (line === "---") {
+            cur.inHeader = false;
+            continue;
+        }
+        const h = /^([a-z]+):\s?(.*)$/.exec(line);
+        if (h && !Object.hasOwn(cur.headers, h[1]))
+            cur.headers[h[1]] = h[2];
+    }
+    flush();
+    return out;
+}
+const isReport = (msg) => msg.headers.type?.trim() === "report";
+export function isLaneReport(msg) {
+    return isReport(msg) && (msg.body.split("\n").find((l) => l.trim() !== "") ?? "").startsWith("## Lane report:");
+}
+export function laneTicketStatuses(worktree, ticketDirRel, ids) {
+    const found = new Map();
+    const dir = path.join(worktree, ticketDirRel);
+    let names = [];
+    try {
+        names = fs.readdirSync(dir).filter((n) => n.endsWith(".md") && n.toLowerCase() !== "readme.md");
+    }
+    catch { /* no worktree yet */ }
+    for (const name of names) {
+        let fields;
+        try {
+            fields = parseTicketFile(fs.readFileSync(path.join(dir, name), "utf8")).fields;
+        }
+        catch {
+            continue;
+        }
+        if (typeof fields.id === "string" && typeof fields.status === "string")
+            found.set(fields.id, fields.status);
+    }
+    return new Map(ids.map((id) => [id, found.get(id)]));
+}
+export function ticketsSettled(statuses) {
+    const all = [...statuses.values()];
+    const stopped = (s) => s !== undefined && /^stopped\s+—\s+\S/.test(s);
+    return all.length > 0 && all.every((s) => s === "done" || stopped(s)) && all.some(stopped);
+}
+export function hasFinishRecord(primary, names) {
+    const root = path.join(primary, ".current", "history");
+    let buckets = [];
+    try {
+        buckets = fs.readdirSync(root).filter((b) => HISTORY_BUCKET_RE.test(b));
+    }
+    catch {
+        return false;
+    }
+    return buckets.some((b) => names.some((n) => isDir(path.join(root, b, n))));
+}
+/** The lane id and the name `agc feature finish` derives from the branch slug. */
+const recordNames = (lane) => [lane.lane, resolveLaneName(lane.branch.replace(/^feat\//, ""))];
+export function probeFinished(input) {
+    let text = "";
+    try {
+        if (input.mailboxFile !== undefined)
+            text = fs.readFileSync(input.mailboxFile, "utf8");
+    }
+    catch { /* no messages yet */ }
+    const reports = parseMailboxMessages(text).filter(isReport);
+    const settled = input.worktree !== "" && ticketsSettled(laneTicketStatuses(input.worktree, input.ticketDirRel, ticketIds(input.lane.ticket)));
+    let finished;
+    if (reports.some(isLaneReport))
+        finished = "lane report";
+    else if (settled && reports.length > input.reportFloor)
+        finished = "batch stop";
+    else if (hasFinishRecord(input.primary, recordNames(input.lane)))
+        finished = "finish record";
+    return { finished, reportCount: reports.length, settled };
+}
+export function dependencyMet(input) {
+    const { primary, dep, startRef } = input;
+    const recorded = hasFinishRecord(primary, recordNames(dep));
+    if (input.knowledgeLocal)
+        return recorded ? { met: true } : { met: false, why: `agc feature finish --shipped has not run for ${dep.lane}` };
+    if (input.git(["show-ref", "--verify", "--quiet", `refs/heads/${dep.branch}`], primary).status !== 0) {
+        return recorded ? { met: true } : { met: false, why: `branch ${dep.branch} is gone and ${dep.lane} has no finish record` };
+    }
+    const r = input.ancestry([dep.branch], primary, startRef)[0];
+    if (r?.isAncestor)
+        return { met: true };
+    if (r?.error !== undefined)
+        return { met: false, why: `git: ${firstLine(r.error)}` };
+    return { met: false, why: `branch ${dep.branch} is not an ancestor of ${startRef}` };
+}
+/** The manifest's `base:` for the lowest 波次, `main` for any later one. */
+export function startRefFor(m, wave) {
+    const lowest = Math.min(...m.dispatchable.map((l) => l.wave ?? Infinity));
+    return wave === lowest && m.base !== undefined ? m.base : "main";
+}
+// --- §F the run ---------------------------------------------------------------
+export function shellQuote(s) {
+    return `'${s.replace(/'/g, "'\\''")}'`;
+}
+export function launchCommand(worktree, lane) {
+    return `cd ${shellQuote(worktree)} && claude --permission-mode bypassPermissions -n ${lane}`;
+}
+const zeroSignals = () => ({ weekly: 0, continuing: 0, stopped: 0, enter: 0, unknown: 0 });
+class LaunchRun {
+    ctx;
+    deps;
+    config;
+    m;
+    state;
+    stateFile;
+    records;
+    limit;
+    ticketDirRel;
+    mailboxRoot;
+    constructor(ctx, deps, config, m, state, stateFile) {
+        this.ctx = ctx;
+        this.deps = deps;
+        this.config = config;
+        this.m = m;
+        this.state = state;
+        this.stateFile = stateFile;
+        this.records = (state.manifests[ctx.manifestKey] ??= { lanes: {} }).lanes;
+        this.limit = launchLimit(config);
+        this.ticketDirRel = path.relative(ctx.primary, resolveTicketDir(ctx.primary));
+        const mb = m.mailbox !== undefined ? resolveMailboxHeader(m.mailbox, ctx.primary) : undefined;
+        this.mailboxRoot = mb?.ok ? mb.path : undefined;
+    }
+    update(lane, patch) {
+        Object.assign(this.records[lane], patch, { updatedAt: new Date(this.deps.clock.now()).toISOString() });
+        writeLaunchState(this.stateFile, this.state, this.deps.clock.now(), this.deps.pid);
+    }
+    probe(lane) {
+        const wt = resolveWorktree(lane.worktree, this.ctx.primary);
+        return probeFinished({
+            primary: this.ctx.primary, lane, worktree: wt.ok ? wt.path : "", ticketDirRel: this.ticketDirRel,
+            mailboxFile: this.mailboxRoot && path.join(this.mailboxRoot, lane.lane, "to-integrator.md"),
+            reportFloor: this.records[lane.lane]?.reportFloor ?? 0,
+        });
+    }
+    isFinished(lane) {
+        return this.records[lane.lane]?.status === "finished" || this.probe(lane).finished !== undefined;
+    }
+    /** One look at a recorded lane holding a slot: finished frees it; unsettled tickets raise the report floor. */
+    observe(lane) {
+        const rec = this.records[lane.lane];
+        if (rec === undefined || !SLOT_STATUSES.has(rec.status))
+            return;
+        const p = this.probe(lane);
+        if (p.finished !== undefined) {
+            this.update(lane.lane, { status: "finished" });
+            this.deps.out(OUT.finished(lane.lane, p.finished));
+        }
+        else if (!p.settled && p.reportCount > rec.reportFloor)
+            this.update(lane.lane, { reportFloor: p.reportCount });
+    }
+    slotsOpen(wave) {
+        return this.limit - this.m.dispatchable.filter((l) => l.wave === wave && SLOT_STATUSES.has(this.records[l.lane]?.status ?? "finished")).length;
+    }
+    /** New lanes of `wave` that may start: no record, not finished, every dependency met, batch lanes only. */
+    plan(wave) {
+        const startRef = startRefFor(this.m, wave);
+        const queue = [];
+        for (const lane of this.m.dispatchable.filter((l) => l.wave === wave)) {
+            if (this.records[lane.lane] !== undefined || this.isFinished(lane))
+                continue;
+            let met = true;
+            for (const id of lane.depLanes ?? []) {
+                const dep = this.m.dispatchable.find((d) => d.lane === id);
+                if (dep === undefined)
+                    continue;
+                const c = dependencyMet({ primary: this.ctx.primary, dep, startRef, knowledgeLocal: this.config.knowledge === "local", git: this.deps.git, ancestry: this.deps.ancestry });
+                if (!c.met) {
+                    this.deps.out(OUT.waiting(lane.lane, id, c.why));
+                    met = false;
+                }
+            }
+            if (!met)
+                continue;
+            if (lane.approval === "human") {
+                this.deps.out(OUT.notStarted(lane.lane, "approval is human"));
+                continue;
+            }
+            const absent = ticketIds(lane.ticket).find((id) => {
+                const r = lookupTicketFiles(this.ctx.primary, [id]);
+                return !r.ok && r.errors.some((e) => e.code === FANOUT_CODES.ticketFileAbsent);
+            });
+            if (absent !== undefined) {
+                this.deps.out(OUT.notStarted(lane.lane, `no ticket file for ${absent}`));
+                continue;
+            }
+            queue.push(lane);
+        }
+        return queue;
+    }
+    worktreeListed(worktree) {
+        const r = this.deps.git(["worktree", "list", "--porcelain"], this.ctx.primary);
+        const want = realOr(worktree);
+        return r.stdout.split("\n").some((l) => l.startsWith("worktree ") && realOr(l.slice("worktree ".length)) === want);
+    }
+    async send(windowId, text) {
+        await this.deps.driver.writeText(windowId, text, false);
+        await this.deps.clock.sleep(SEND_GAP_MS);
+        await this.deps.driver.writeText(windowId, "", true);
+    }
+    async start(lane, wave) {
+        const { primary } = this.ctx;
+        const startRef = startRefFor(this.m, wave);
+        const sha = this.deps.git(["rev-parse", "--verify", "--quiet", `${startRef}^{commit}`], primary);
+        const baseSha = sha.status === 0 && sha.stdout.trim() !== "" ? sha.stdout.trim() : startRef;
+        const r = renderPrompt(this.m, lane.lane, { batch: true, base: baseSha, primary });
+        const wt = resolveWorktree(lane.worktree, primary);
+        if (!r.ok || !wt.ok)
+            return this.deps.out(OUT.notStarted(lane.lane, `render failed: ${!r.ok ? r.errors[0]?.code : wt.ok ? "" : wt.code}`));
+        if (!this.worktreeListed(wt.path)) {
+            const fsr = this.deps.featureStart({ primary, slug: lane.branch.replace(/^feat\//, ""), base: startRef, worktree: wt.path });
+            if (!fsr.ok)
+                return this.deps.out(OUT.notStarted(lane.lane, `agc feature start failed: ${fsr.firstLine}`));
+        }
+        const windowId = await this.deps.driver.open(launchCommand(wt.path, lane.lane));
+        this.records[lane.lane] = { status: "running", wave, windowId, baseSha, signals: zeroSignals(), reportFloor: this.probe(lane).reportCount, updatedAt: "" };
+        this.update(lane.lane, {});
+        await this.send(windowId, SLASH_LINE);
+        await this.send(windowId, r.prompt);
+        this.deps.out(OUT.started(lane.lane, windowId));
+    }
+    async fill(queue, wave) {
+        while (queue.length > 0 && this.slotsOpen(wave) > 0)
+            await this.start(queue.shift(), wave);
+    }
+    async run() {
+        const lanes = this.m.dispatchable;
+        for (const lane of lanes)
+            this.observe(lane);
+        const waves = [...new Set(lanes.map((l) => l.wave ?? 0))].sort((a, b) => a - b);
+        const wave = waves.find((w) => lanes.some((l) => l.wave === w && !this.isFinished(l)));
+        if (wave === undefined) {
+            this.deps.out(OUT.exit(waves.at(-1) ?? 0));
+            return 0;
+        }
+        for (const w of waves)
+            if (w > wave)
+                this.deps.out(OUT.laterWave(w, wave));
+        const queue = this.plan(wave);
+        await this.fill(queue, wave);
+        for (const l of queue)
+            this.deps.out(OUT.queued(l.lane, this.limit));
+        const running = () => lanes.some((l) => l.wave === wave && this.records[l.lane]?.status === "running");
+        while (running()) {
+            await this.deps.clock.sleep(POLL_INTERVAL_MS);
+            for (const lane of lanes)
+                if (lane.wave === wave)
+                    this.observe(lane);
+            await this.fill(queue, wave);
+        }
+        this.deps.out(OUT.exit(wave));
+        return 0;
+    }
+}
+/** Whole run: refusals, lock, launch state, then the wave. Returns 0, or 1 on a refusal; a clock error propagates. */
 export async function runLaneLaunch(ctx, deps) {
     const text = fs.readFileSync(ctx.manifestPath, "utf8");
     const config = loadConfig(ctx.primary);
@@ -179,7 +456,7 @@ export async function runLaneLaunch(ctx, deps) {
             deps.err(OUT.refused(read.error));
             return 1;
         }
-        return 0;
+        return await new LaunchRun(ctx, deps, config, parseManifest(text), read.state, files.state).run();
     }
     finally {
         lock.release();
