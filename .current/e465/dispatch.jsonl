@@ -5,3 +5,7 @@
 {"ts":"2026-11-27T16:39:43.473Z","feature":"e465-launcher-wave-done","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-27T16:45:19.246Z","feature":"e465-launcher-wave-done","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-27T16:47:40.058Z","feature":"e465-launcher-wave-done","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T16:52:48.507Z","feature":"e465-launcher-wave-done","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T16:53:21.919Z","feature":"e465-launcher-wave-done","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T16:53:59.236Z","feature":"e465-launcher-wave-done","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T16:57:40.851Z","feature":"e465-launcher-wave-done","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
