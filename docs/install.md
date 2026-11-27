@@ -346,7 +346,7 @@ If (2) produces no output:
 
 In Claude Code, MCP prompts are namespaced slash commands:
 
-All 13 registered prompts (`tools/registry.ts` → `PROMPT_REGISTRY`):
+All 14 registered prompts (`tools/registry.ts` → `PROMPT_REGISTRY`):
 
 - `/mcp__agent-governance-mcp__teamwork` — Coordinator (auto-routes to specialists)
 - `/mcp__agent-governance-mcp__teamwork-lite` — Coordinator (lite): solo-dev direct execution
