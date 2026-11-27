@@ -11,6 +11,7 @@ import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as path from "node:path";
 import * as os from "node:os";
+import { ghVersionProblem } from "./gh-compat.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PHASE_OF = { s: "start", p: "prepare", u: "publish", r: "record", c: "close-out" };
@@ -84,6 +85,7 @@ export const ALLOWED = Object.freeze([
   rule("git", "fetch", true, "fetch origin; recorded, not run, under --dry-run", exact("origin")),
   ...reads("git", ["diff", "log", "status", "show", "ls-tree", "ls-files", "rev-parse", "rev-list", "describe", "ls-remote"]),
   ...reads("gh", ["auth status", "release view", "pr view", "run list", "run view"]),
+  rule("gh", "--version", false, "--version, no other argument (read-only)", exact()),
   rule("gh", "pr create", true, "pr create --base main", (a) => a.includes("--base") && a[a.indexOf("--base") + 1] === "main"),
   rule("gh", "pr merge", true, "pr merge <n> --auto --merge", exact(/^\d+$/, "--auto", "--merge")),
   rule("gh", "release create", true, "release create vX.Y.Z", (a) => TAG.test(a[1] ?? "")),
@@ -102,7 +104,8 @@ export const ALLOWED = Object.freeze([
 const REFUSED_VERBS = new Set(["reset", "rebase", "clean", "checkout", "stash", "update-ref", "merge"]);
 const REFUSED_FLAGS = new Set(["-f", "-D", "-d", "--delete", "--squash", "--rebase", "--admin", "--amend"]);
 const VALUE_FLAGS = new Set(["-m", "-F", "--title", "--body", "--notes"]);
-const splitVerb = (cmd, args) => (cmd === "gh" ? [`${args[0]} ${args[1]}`, args.slice(1)]
+// gh verbs are two words, except the one-word `--version`, whose match sees no further argument.
+const splitVerb = (cmd, args) => (cmd === "gh" ? (args[0] === "--version" ? [args[0], args] : [`${args[0]} ${args[1]}`, args.slice(1)])
   : cmd === "git" && args[0] === "-c" ? [args[1] === "pull.rebase=false" ? args[2] : null, args.slice(2)] : [args[0], args]);
 const ruleFor = (cmd, args) => ALLOWED.find((r) => r.cmd === cmd && r.verb === splitVerb(cmd, args)[0]);
 export function isAllowed(cmd, args, { branch } = {}) {
@@ -315,7 +318,11 @@ async function preInputs(ctx) {
   if (opts.tickets === undefined && existsSync(path.join(root, "docs/backlog.md"))) throw usage("--tickets is required while docs/backlog.md exists (pass none when the feature has no row)");
   Object.assign(ctx, { state, message });
 }
+// The installed gh must be new enough before any other gh call, then authenticated.
 function preGh(ctx) {
+  const version = ctx.runner.read("gh", ["--version"], { step: "pre-2" });
+  const problem = ghVersionProblem(version);
+  if (problem) throw new ReleaseStop("GH_UNAVAILABLE", problem);
   const res = ctx.runner.read("gh", ["auth", "status"], { step: "pre-2" });
   if (res.status !== 0) throw new ReleaseStop("GH_UNAVAILABLE", `gh auth status exited ${res.status} — ${lastLine(res.stderr) || "gh unavailable"}`);
 }
