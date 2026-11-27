@@ -10,6 +10,13 @@ export type LaunchStatus = (typeof LAUNCH_STATUSES)[number];
 export declare const POLL_INTERVAL_MS = 15000;
 export declare const SLASH_LINE = "/mcp__agent-governance-mcp__teamwork";
 export declare const SEND_GAP_MS = 500;
+export declare const READY_MARKER = "permissions on";
+export declare const RESEND_BOUND = 3;
+export declare const READY_TIMEOUT_MS = 120000;
+export declare const READY_POLL_MS = 1000;
+export declare const READY_SETTLE_MS = 6000;
+export declare const UNKNOWN_CHECK_MS = 5000;
+export declare const RESEND_GAP_MS = 10000;
 /** The one table of host line prefixes the launcher matches in a window. */
 export declare const HOST_SIGNALS: {
     readonly weekly: "You've hit your weekly limit";
@@ -36,6 +43,7 @@ export declare const OUT: {
     finished: (lane: string, how: FinishedHow) => string;
     laterWave: (n: number, m: number) => string;
     exit: (n: number) => string;
+    startFailed: (lane: string, why: string) => string;
 };
 export interface LaneLaunchRecord {
     status: LaunchStatus;
@@ -190,4 +198,30 @@ export declare function shellQuote(s: string): string;
 export declare function launchCommand(worktree: string, lane: string): string;
 /** Whole run: refusals, lock, launch state, then the wave. Returns 0, or 1 on a refusal; a clock error propagates. */
 export declare function runLaneLaunch(ctx: LaunchContext, deps: LaunchDeps): Promise<number>;
+/** Lines of a window's text, leading whitespace and UI glyphs (box drawing, bullets) stripped. */
+export declare function signalLines(contents: string): string[];
+export declare function signalCounts(contents: string): SignalCounts;
+export interface NewSignals {
+    weekly: boolean;
+    stopped: boolean;
+    enter: boolean;
+    unknown: boolean;
+}
+/** A signal is new when its count is above `baseline`; a new weekly line counts only with no `continuing` line after the last weekly line. */
+export declare function newSignals(contents: string, baseline: SignalCounts): NewSignals;
+/** Phase 0 send method: text with newline NO, 0.5 s, then an empty write text. Returns the counts read just before (the new baseline). */
+export declare function sendText(driver: WindowDriver, clock: Clock, windowId: string, text: string): Promise<SignalCounts>;
+/** One empty write text; returns the new baseline. */
+export declare function sendEnter(driver: WindowDriver, windowId: string): Promise<SignalCounts>;
+export type StartOutcome = {
+    ok: true;
+    signals: SignalCounts;
+} | {
+    ok: false;
+    why: string;
+};
+/** Ready wait, settle, slash line (resent on a new `Unknown command`, at most RESEND_BOUND times), then the prompt in one send. */
+export declare function startSession(driver: WindowDriver, clock: Clock, windowId: string, prompt: string): Promise<StartOutcome>;
+/** Argv for the real `agc feature start` runner, spawned with process.execPath from primary. */
+export declare function featureStartArgv(installRoot: string, req: FeatureStartRequest): string[];
 //# sourceMappingURL=lane-launch.d.ts.map

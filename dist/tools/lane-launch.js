@@ -19,6 +19,13 @@ export const LAUNCH_STATUSES = ["running", "paused-weekly", "paused-stopped", "f
 export const POLL_INTERVAL_MS = 15_000;
 export const SLASH_LINE = "/mcp__agent-governance-mcp__teamwork";
 export const SEND_GAP_MS = 500;
+export const READY_MARKER = "permissions on";
+export const RESEND_BOUND = 3;
+export const READY_TIMEOUT_MS = 120_000;
+export const READY_POLL_MS = 1_000;
+export const READY_SETTLE_MS = 6_000;
+export const UNKNOWN_CHECK_MS = 5_000;
+export const RESEND_GAP_MS = 10_000;
 /** The one table of host line prefixes the launcher matches in a window. */
 export const HOST_SIGNALS = {
     weekly: "You've hit your weekly limit",
@@ -44,6 +51,7 @@ export const OUT = {
     finished: (lane, how) => `finished ${lane} — ${how}`,
     laterWave: (n, m) => `wave ${n} waits until every lane of wave ${m} is finished`,
     exit: (n) => `lane-launch: no lane of wave ${n} is running — exiting`,
+    startFailed: (lane, why) => `start failed ${lane} — ${why}`,
 };
 export function launchLimit(config) {
     return config.laneLaunchLimit ?? DEFAULT_LANE_LAUNCH_LIMIT;
@@ -375,11 +383,6 @@ class LaunchRun {
         const want = realOr(worktree);
         return r.stdout.split("\n").some((l) => l.startsWith("worktree ") && realOr(l.slice("worktree ".length)) === want);
     }
-    async send(windowId, text) {
-        await this.deps.driver.writeText(windowId, text, false);
-        await this.deps.clock.sleep(SEND_GAP_MS);
-        await this.deps.driver.writeText(windowId, "", true);
-    }
     async start(lane, wave) {
         const { primary } = this.ctx;
         const startRef = startRefFor(this.m, wave);
@@ -397,8 +400,12 @@ class LaunchRun {
         const windowId = await this.deps.driver.open(launchCommand(wt.path, lane.lane));
         this.records[lane.lane] = { status: "running", wave, windowId, baseSha, signals: zeroSignals(), reportFloor: this.probe(lane).reportCount, updatedAt: "" };
         this.update(lane.lane, {});
-        await this.send(windowId, SLASH_LINE);
-        await this.send(windowId, r.prompt);
+        const s = await startSession(this.deps.driver, this.deps.clock, windowId, r.prompt);
+        if (!s.ok) {
+            this.update(lane.lane, { status: "start-failed", reason: s.why });
+            return this.deps.out(OUT.startFailed(lane.lane, s.why));
+        }
+        this.update(lane.lane, { signals: s.signals });
         this.deps.out(OUT.started(lane.lane, windowId));
     }
     async fill(queue, wave) {
@@ -461,5 +468,72 @@ export async function runLaneLaunch(ctx, deps) {
     finally {
         lock.release();
     }
+}
+// --- §G window sends and lane start ------------------------------------------
+/** Lines of a window's text, leading whitespace and UI glyphs (box drawing, bullets) stripped. */
+export function signalLines(contents) {
+    return contents.split(/\r?\n/).map((l) => l.replace(/^[^\p{L}\p{N}]+/u, ""));
+}
+const SIGNAL_KEYS = Object.keys(HOST_SIGNALS);
+const signalOf = (line) => SIGNAL_KEYS.find((k) => line.startsWith(HOST_SIGNALS[k]));
+export function signalCounts(contents) {
+    const counts = zeroSignals();
+    for (const line of signalLines(contents)) {
+        const k = signalOf(line);
+        if (k !== undefined)
+            counts[k]++;
+    }
+    return counts;
+}
+/** A signal is new when its count is above `baseline`; a new weekly line counts only with no `continuing` line after the last weekly line. */
+export function newSignals(contents, baseline) {
+    const now = signalCounts(contents);
+    const kinds = signalLines(contents).map(signalOf);
+    const lastWeekly = kinds.lastIndexOf("weekly");
+    const above = (k) => now[k] > baseline[k];
+    return {
+        weekly: above("weekly") && !kinds.slice(lastWeekly + 1).includes("continuing"),
+        stopped: above("stopped"), enter: above("enter"), unknown: above("unknown"),
+    };
+}
+/** Phase 0 send method: text with newline NO, 0.5 s, then an empty write text. Returns the counts read just before (the new baseline). */
+export async function sendText(driver, clock, windowId, text) {
+    const before = signalCounts(await driver.contents(windowId));
+    await driver.writeText(windowId, text, false);
+    await clock.sleep(SEND_GAP_MS);
+    await driver.writeText(windowId, "", true);
+    return before;
+}
+/** One empty write text; returns the new baseline. */
+export async function sendEnter(driver, windowId) {
+    const before = signalCounts(await driver.contents(windowId));
+    await driver.writeText(windowId, "", true);
+    return before;
+}
+/** Ready wait, settle, slash line (resent on a new `Unknown command`, at most RESEND_BOUND times), then the prompt in one send. */
+export async function startSession(driver, clock, windowId, prompt) {
+    const deadline = clock.now() + READY_TIMEOUT_MS;
+    const read = () => driver.contents(windowId).catch(() => "");
+    while (!(await read()).includes(READY_MARKER)) {
+        if (clock.now() >= deadline)
+            return { ok: false, why: `not ready after ${READY_TIMEOUT_MS / 1000} s` };
+        await clock.sleep(READY_POLL_MS);
+    }
+    await clock.sleep(READY_SETTLE_MS);
+    let baseline = await sendText(driver, clock, windowId, SLASH_LINE);
+    for (let resends = 0;; resends++) {
+        await clock.sleep(UNKNOWN_CHECK_MS);
+        if (!newSignals(await read(), baseline).unknown)
+            break;
+        if (resends === RESEND_BOUND)
+            return { ok: false, why: `Unknown command after ${RESEND_BOUND} resends` };
+        await clock.sleep(RESEND_GAP_MS - UNKNOWN_CHECK_MS);
+        baseline = await sendText(driver, clock, windowId, SLASH_LINE);
+    }
+    return { ok: true, signals: await sendText(driver, clock, windowId, prompt) };
+}
+/** Argv for the real `agc feature start` runner, spawned with process.execPath from primary. */
+export function featureStartArgv(installRoot, req) {
+    return [path.join(installRoot, "bin", "agc-init.mjs"), "feature", "start", req.slug, "--base", req.base, "--path", req.worktree];
 }
 //# sourceMappingURL=lane-launch.js.map
