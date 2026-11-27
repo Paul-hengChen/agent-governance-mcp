@@ -97,3 +97,7 @@ Full suite (judge run, HEAD db6e693): `node scripts/test-lock.mjs -- npm test` �
 ## Verdict
 
 CHANGES_REQUESTED. R1 and R2 are scenario defects (12 strings no Copy row lists; untested sr-added behaviours, some of which decide new behaviour), and R3 and R4 are implementation defects (a wrong path fact in `docs/install.md`; a `--shipped` re-run that cannot finish on its own after a late failure). Route to pm (Copy rows plus scenarios, with the human's consent as for DOC-INST-5), then qa (tests and expected-red), then sr (R3, R4 and any reworded strings).
+
+## Round 2 — APPROVED — by code-reviewer
+
+Round 2 (task T-E447-10) supersedes the round-1 verdict above. R1–R4 are resolved, AC1–AC20 pass, and the full suite is 4834 / 0 / 2 of 4836. The round-2 report is `review_reports/review_T-E447-10.md`, which covers T-E447-01..10.
