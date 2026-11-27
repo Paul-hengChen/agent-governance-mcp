@@ -15,7 +15,7 @@ test/e463-release-gh-checks.test.mjs | E463-AC4 close-out merge wait (13a-6): a 
 test/e463-release-gh-checks.test.mjs | E463-AC5 the wait between attempts is AGC_RELEASE_GH_RETRY_SECONDS when a number >= 0, else 10s, as milliseconds through deps.sleep
 # module not found: scripts/gh-compat.mjs (T-E463-03) does not exist yet — GH_LOOKUP_ATTEMPTS / GH_LOOKUP_RETRY_SECONDS / MIN_GH_VERSION / pure functions
 test/e463-release-gh-checks.test.mjs | E463-AC5 the helper exports GH_LOOKUP_ATTEMPTS (3) and GH_LOOKUP_RETRY_SECONDS (10)
-test/e463-release-gh-checks.test.mjs | E464-AC6 scripts/gh-compat.mjs exports the constants and pure functions, imports no child_process; gh --version is an allowed read; verify-release.mjs is unchanged
+test/e463-release-gh-checks.test.mjs | E464-AC6 scripts/gh-compat.mjs exports the constants and pure functions, imports no child_process; gh --version is an allowed read; verify-release.mjs does not import the helper
 # docs/release-cd.md has neither doc.gh_min nor doc.lookup_retry yet (T-E463-06)
 test/e463-release-gh-checks.test.mjs | E463-AC6 docs/release-cd.md Manual fallback states doc.lookup_retry verbatim, after doc.gh_min
 test/e463-release-gh-checks.test.mjs | E464-AC1 docs/release-cd.md Manual fallback states doc.gh_min verbatim and its version equals MIN_GH_VERSION

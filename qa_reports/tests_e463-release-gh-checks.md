@@ -28,11 +28,11 @@ All tests are in `test/e463-release-gh-checks.test.mjs`; run one AC with
 | E464-AC3 | `E464-AC3 gh 2.39.2 stops every phase 14 stop.gh_too_old with no child call after gh --version` |
 | E464-AC4 | `E464-AC4 gh --version failing, unspawnable, or printing no version stops 14 with its own string` (exit 1, spawn error, exit 1 empty stderr, `gh version DEV`, empty stdout; all four phases) |
 | E464-AC5 | `E464-AC5 versions compare numerically per component; the first gh version X.Y.Z on the output is the one parsed` |
-| E464-AC6 | `E464-AC6 scripts/gh-compat.mjs exports the constants and pure functions, imports no child_process; gh --version is an allowed read; verify-release.mjs is unchanged` |
+| E464-AC6 | `E464-AC6 scripts/gh-compat.mjs exports the constants and pure functions, imports no child_process; gh --version is an allowed read; verify-release.mjs does not import the helper` |
 | X-AC1 (static half) | `X-AC1 no exit class is added or changed: ...` (EXIT_CLASSES, GH_UNAVAILABLE phases, viewPr argv literal). The `git diff --name-only` half and the three forbidden-file runs are command proofs the judge runs. |
 | X-AC2 | command proof: `node scripts/test-lock.mjs -- npm test` on a clean worktree (run by qa at hand-off, again by sr and the judge) |
 
-Command-only scenarios (no test): the X-AC1 `git diff --name-only e3a3db6...HEAD -- <forbidden paths>` proof and the X-AC2 suite proof.
+Command-only scenarios (no test): the E464-AC6 byte-identity clause of `scripts/verify-release.mjs`, the X-AC1 `git diff --name-only e3a3db6...HEAD -- <forbidden paths>` proof and the X-AC2 suite proof.
 
 ## Re-pins done (T-E463-02), no assertion loosened
 
@@ -71,5 +71,6 @@ Green now (behaviour exists, kept as regression pins): E463-AC1 (2 tests), E463-
 
 ## CI Runnability
 
-Headless; no network, no real `gh`. `E464-AC6`'s byte-identity check reads base `e3a3db6` through `git show`, guarded by
-`git rev-parse --verify`, and is skipped loudly when the sha is absent (shallow clone).
+Headless; no network, no real `gh`. No test reads repository history (`test/render-structure.test.mjs` forbids it), so the E464-AC6 clause
+"`scripts/verify-release.mjs` is byte-identical to the base" is a command proof for the judge (the X-AC1 `git diff` line);
+the test asserts only that `verify-release.mjs` does not import the helper.
