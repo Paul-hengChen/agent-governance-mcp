@@ -8,12 +8,15 @@ export interface LaneAncestryResult {
     error?: string;
 }
 /**
- * For each branch, runs `git merge-base --is-ancestor <branch> HEAD` with
+ * For each branch, runs `git merge-base --is-ancestor <branch> <ref>` with
  * `cwd` pinned to `repoRoot`. Never throws: a clean "not merged yet" (git
- * exit 1) is `{ isAncestor: false }`; any other failure (unknown branch, git
- * unavailable, corrupt repo) is `{ isAncestor: false, error }`, never `true`.
+ * exit 1) is `{ isAncestor: false }`; any other failure (unknown branch or
+ * ref, git unavailable, corrupt repo) is `{ isAncestor: false, error }`,
+ * never `true`. `ref` is required for TypeScript callers. A JavaScript caller
+ * written before the parameter existed passes two arguments: at run time a
+ * missing `ref` compares with HEAD, so its output does not change.
  */
-export declare function checkLaneAncestry(branches: string[], repoRoot: string): LaneAncestryResult[];
+export declare function checkLaneAncestry(branches: string[], repoRoot: string, ref: string): LaneAncestryResult[];
 /** The only membership finding possible: this workspace's own actual
  * `active_feature` is absent from EVERY row declared in
  * `.current/feature-split.md`. Names the full declared set alongside the

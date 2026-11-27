@@ -21,6 +21,7 @@ export interface WorkspaceConfig {
     laneProtocolAddendum?: string;
     sisterRepos?: SisterRepo[];
     ticketDir?: string;
+    laneLaunchLimit?: number;
 }
 export interface SisterRepo {
     name: string;

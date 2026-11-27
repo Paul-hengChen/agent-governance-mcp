@@ -193,6 +193,8 @@ A `docs/backlog.md` row that cites a `qa_reports/`/`review_reports/` evidence fi
 
 ## Crash-Resume Protocol<!-- origin:start --> (v3.53.0)<!-- origin:end -->
 
+**Usage limit**: a usage-limit or rate-limit error is not tool unavailability: never take the `tw_switch_role` Fallback, end the session, switch the model or run the role in-context. After automatic continue, re-dispatch the cut-off subagent once with the same pin via this protocol; on a second failure, checkpoint, record the pause reason and stop. Only a human `dispatch_pins` changes a model.
+
 Constitution §3 requires "on crash/failure, still call `tw_update_state` with the failure summary" —
 but an externally-killed subagent (session/usage-limit kill, host crash) cannot honor that; it dies
 mid-task with NO failure record. BOTH the **Crash detection** row (same-session trigger) and the

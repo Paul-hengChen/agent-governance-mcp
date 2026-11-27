@@ -74,6 +74,7 @@ tools/skill-frontmatter.ts  parses recommended_model out of role SOP frontmatter
 tools/storage.ts          HandoffStorage interface + getActiveStorage()/setActiveStorage()
 tools/storage-sqlite.ts   SQLite implementation of HandoffStorage (HTTP mode)
 tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
+tools/lane-launch.ts      lane launcher core: waves, parallel limit, iTerm2 windows, usage-limit pauses (scripts/lane-launch.mjs)
 tools/ticket-file.ts      ticket-file parser + checker core (scripts/check-tickets.mjs)
 tools/transitions.ts      ALLOWED_TRANSITIONS + round caps (REVIEW_ROUND_CAP=4, VISUAL_ROUND_CAP=6, SR_RETURN_CAP=2)
 tools/exemptions.ts       per-gate exemption resolution (E24)
@@ -118,8 +119,7 @@ prompts/skill-manifest.ts ordered coordinator SOP segments (coord-*.md), host-ta
 prompts/partials-manifest.ts  shared prompt partials (content/partial-*.md)
 prompts/coordinator.ts       coordinator role (prompt id is "teamwork" for backwards compat)
 prompts/coordinator-lite.ts  coordinator-lite role (prompt id "teamwork-lite", v3.6.0)
-prompts/{pm,architect,researcher,design-auditor,sr-engineer,code-reviewer,
-         qa-engineer,doc-writer,release-engineer,integrator,spec-workshop}.ts   the other eleven role prompts
+prompts/{pm,architect,researcher,design-auditor,sr-engineer,code-reviewer,qa-engineer,doc-writer,release-engineer,integrator,spec-workshop}.ts   the other eleven role prompts
 bin/agc-init.mjs          `agc init` / `agc check` — workspace scaffold + adapter stamps
 bin/agent-governance-context.mjs  SessionStart hook helper (emits additionalContext; imports manifest for composition)
 bin/agent-governance-usage-hook.mjs  PostToolUse token-usage sidecar hook (opt-in)

@@ -374,8 +374,9 @@ test("AC4: parseable handoff with no active_feature recorded degrades honestly",
 test("AC5: exported function signatures (emitted .d.ts) take no second workspace-path argument", () => {
   assert.match(
     DTS,
-    /export declare function checkLaneAncestry\(branches: string\[\], repoRoot: string\): LaneAncestryResult\[\];/,
-    "checkLaneAncestry must take exactly (branches, repoRoot) — no additional workspace-path arg",
+    // E443b re-pin: the launcher compares with a wave's start ref, so a required `ref` joins (still no workspace path).
+    /export declare function checkLaneAncestry\(branches: string\[\], repoRoot: string, ref: string\): LaneAncestryResult\[\];/,
+    "checkLaneAncestry must take exactly (branches, repoRoot, ref) — no additional workspace-path arg",
   );
   assert.match(
     DTS,
