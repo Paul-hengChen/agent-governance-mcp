@@ -52,9 +52,11 @@ const NO_HANDOFF =
 // A. Prompt registration
 // ---------------------------------------------------------------------------
 
-test("AC1: PROMPT_REGISTRY has 13 entries, spec-workshop last, the first 12 untouched in order", () => {
+test("AC1: PROMPT_REGISTRY has 14 entries, spec-workshop thirteenth (conductor appended after it), the first 12 untouched in order", () => {
   // WHY: the thirteenth prompt must be an append — a reorder would change every adopter's prompt list.
-  assert.equal(PROMPT_REGISTRY.length, 13);
+  // Re-pinned by E466 (specs/e466-conductor.md S1): the conductor prompt is appended after spec-workshop.
+  assert.equal(PROMPT_REGISTRY.length, 14);
+  assert.equal(PROMPT_REGISTRY[13].name, "conductor", "the conductor prompt follows spec-workshop");
   assert.deepEqual(
     PROMPT_REGISTRY.slice(0, 12).map((e) => e.name),
     ["sr-engineer", "researcher", "pm", "qa-engineer", "teamwork", "teamwork-lite", "architect", "design-auditor", "code-reviewer", "doc-writer", "release-engineer", "integrator"],

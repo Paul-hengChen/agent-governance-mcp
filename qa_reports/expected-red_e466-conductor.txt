@@ -1,0 +1,35 @@
+# e466-conductor — red tests written by qa-engineer before sr-engineer builds (T-E466-01..05).
+# New files: test/e466-prompt.test.mjs (S1, S2, S7), test/e466-integrator-sop.test.mjs (S8),
+# test/e466-window-state.test.mjs (S3, S4), test/e466-wave-done.test.mjs (S5, S6); stand-ins in test/fixtures/e466/.
+# Re-pinned owned tests (spec Probe table, round 3): e178a AC3/AC5, e423 AC1, e428 AC6/AC12, e443b A2-19, skill-frontmatter count.
+# S9 is device-or-person: no test (checklist qa_reports/manual-verification_e466-conductor.md).
+
+# S1: PROMPT_REGISTRY has 13 entries (no conductor entry yet); prompts/conductor.ts does not exist.
+test/e466-prompt.test.mjs | S1: the prompt list holds fourteen prompts with conductor appended last, and tw_switch_role rejects conductor as a role
+# S2, S7: content/skill-conductor.md does not exist yet (sop.conductor not written).
+test/e466-prompt.test.mjs | S2: the composed conductor prompt states the loop (fan-out <record> first, 接手 <manifest> + wave later, notify and stop after the last wave, never another manifest) and the SOP has no tw_update_state
+test/e466-prompt.test.mjs | S7: the conductor SOP wakes the paused integrator and paused-stopped lanes after its own automatic continue, and paused-weekly lanes only after the human says the weekly limit reset
+
+# S8: content/skill-integrator.md still carries the "Re-run it at two moments: …" sentence (integrator.relaunch not in place).
+test/e466-integrator-sop.test.mjs | S8: the integrator SOP reports wave-done to the conductor's mailbox at the waveDoneAt moment, carries pr-open waiting lanes itself, and no longer re-runs the launcher after a usage limit resets
+
+# S3, S4: module not found — dist/tools/conductor.js (tools/conductor.ts, runConductorCli) and scripts/conductor.mjs not built yet.
+test/e466-window-state.test.mjs | S3: open --manifest <m> --wave 2 opens one window, sends the integrator prompt line then 接手 <manifest>，開始第 2 波次 with the launcher's send method and records the window id; close sends /exit to that window only
+test/e466-window-state.test.mjs | S4: a fresh conductor reads the same manifest, wave, window id and step from agc-conductor.json in the git common dir, which is not tracked; an unparseable state is refused, not overwritten
+
+# S5, S6: module not found — dist/tools/conductor.js (wave-done, check) not built yet.
+test/e466-wave-done.test.mjs | S5: a wave-done report with an unmet fact keeps the integrator and replies naming it; with every fact met (merged, or open under pr-open) the integrator is closed, finished lane windows closed, the next wave's integrator opened; after the last wave nothing opens
+test/e466-wave-done.test.mjs | S6: when the integrator window no longer exists and no wave-done report arrived, check reports integrator gone with its wave and opens no window
+
+# Re-pin (S1 count 13 -> 14): PROMPT_REGISTRY still has 13 entries, tail spec-workshop; CLAUDE.md still says 13 / Thirteen / the other eleven / the other 12.
+test/e178a-integrator-role.test.mjs | AC3: `integrator` MCP prompt registered as PROMPT_REGISTRY entry 12 (13th is spec-workshop, e423; 14th is conductor, e466); prompts/integrator.ts matches the pm.ts pattern
+test/e178a-integrator-role.test.mjs | AC5: prompt count synced 13 -> 14 in CLAUDE.md; integrator, spec-workshop and conductor listed; AGENTS.md carries no prompt count
+test/e423-spec-workshop.test.mjs | AC1: PROMPT_REGISTRY has 14 entries, spec-workshop thirteenth (conductor appended after it), the first 12 untouched in order
+# Re-pin (S2 skill file added): content/ holds 13 skill-*.md files; 14 expected once content/skill-conductor.md exists.
+test/skill-frontmatter.test.mjs | every content/skill-*.md carries a valid recommended_model frontmatter
+
+# Re-pin (S8): the frozen integrator base sha256 now includes integrator.relaunch in place; the current file still has the old sentence.
+test/e428-tracker-mirror.test.mjs | AC6: integrator `## Tracker items` (C-IN1) sits after the Stage 6 *Your own commits* paragraph and before `## Git operations`; nothing else moves
+test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the four files holds no URL, repo-only path, bare ticket id, version label, quoted error code or vendor name
+# Re-pin (S8): sop.launcher now carries integrator.relaunch in place of the two-moments sentence; the Render line still has the old text.
+test/e443b-served-text.test.mjs | A2-19: content/skill-integrator.md names the launcher's re-run moment after the merge (the usage-limit moment moved to the conductor); Work overview, Lifecycle and Stage 3 say it replaces hand-opened sessions and a refused wave stays hand-started

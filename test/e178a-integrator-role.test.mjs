@@ -160,8 +160,9 @@ const FROZEN_FIRST_11_PROMPTS = [
   },
 ];
 
-test("AC3: `integrator` MCP prompt registered as PROMPT_REGISTRY entry 12 (13th is spec-workshop, e423); prompts/integrator.ts matches the pm.ts pattern", () => {
-  assert.equal(PROMPT_REGISTRY.length, 13, "PROMPT_REGISTRY must have exactly 13 entries");
+test("AC3: `integrator` MCP prompt registered as PROMPT_REGISTRY entry 12 (13th is spec-workshop, e423; 14th is conductor, e466); prompts/integrator.ts matches the pm.ts pattern", () => {
+  // Re-pinned by E466 (specs/e466-conductor.md S1): the conductor prompt is appended as the fourteenth entry.
+  assert.equal(PROMPT_REGISTRY.length, 14, "PROMPT_REGISTRY must have exactly 14 entries");
   const integrator = PROMPT_REGISTRY[11];
   assert.deepEqual(integrator, {
     name: "integrator",
@@ -169,7 +170,8 @@ test("AC3: `integrator` MCP prompt registered as PROMPT_REGISTRY entry 12 (13th 
     skillFile: "skill-integrator.md",
     arguments: PROMPT_REGISTRY[0].arguments,
   });
-  assert.equal(PROMPT_REGISTRY.at(-1).name, "spec-workshop", "the tail entry is spec-workshop (e423)");
+  assert.equal(PROMPT_REGISTRY[12].name, "spec-workshop", "entry 13 is spec-workshop (e423)");
+  assert.equal(PROMPT_REGISTRY.at(-1).name, "conductor", "the tail entry is conductor (e466)");
 
   // First 11 entries match the frozen pre-refactor order and content
   // (name/description/skillFile) directly — a strictly stronger,
@@ -205,15 +207,16 @@ test("AC4: D11 holds — tools/role.ts and tools/transitions.ts contain no menti
   }
 });
 
-test("AC5: prompt count synced 12 -> 13 in CLAUDE.md; integrator and spec-workshop listed; AGENTS.md carries no prompt count", () => {
-  const countMatches = (CLAUDE_MD.match(/13 registered role prompts|Thirteen prompts are registered/g) || []).length;
-  assert.equal(countMatches, 2, "CLAUDE.md must carry both the '13 registered role prompts' and 'Thirteen prompts are registered' sentences");
+test("AC5: prompt count synced 13 -> 14 in CLAUDE.md; integrator, spec-workshop and conductor listed; AGENTS.md carries no prompt count", () => {
+  // Re-pinned by E466 (specs/e466-conductor.md claude.lines): was 12 -> 13 with "the other eleven" / "the other 12".
+  const countMatches = (CLAUDE_MD.match(/14 registered role prompts|Fourteen prompts are registered/g) || []).length;
+  assert.equal(countMatches, 2, "CLAUDE.md must carry both the '14 registered role prompts' and 'Fourteen prompts are registered' sentences");
   assert.ok(CLAUDE_MD.includes("`integrator`"), "CLAUDE.md's prompt list must include integrator");
   assert.ok(CLAUDE_MD.includes("`spec-workshop`"), "CLAUDE.md's prompt list must include spec-workshop (e423)");
-  assert.ok(CLAUDE_MD.includes("the other eleven"), "the per-role sentence must read 'the other eleven' (was 'the other ten')");
-  assert.ok(CLAUDE_MD.includes("the other 12 role SOPs"), "the content/skill-*.md layout line must read 'the other 12 role SOPs' (was 11)");
-  assert.ok(!/\b1[12] registered role prompts\b|\b(?:Eleven|Twelve) prompts are registered\b/.test(CLAUDE_MD), "no stale 11/12 prompt-count sentence may remain");
-
+  assert.ok(CLAUDE_MD.includes("`conductor`"), "CLAUDE.md's prompt list must include conductor (e466)");
+  assert.ok(CLAUDE_MD.includes("the other twelve"), "the per-role sentence must read 'the other twelve' (was 'the other eleven')");
+  assert.ok(CLAUDE_MD.includes("the other 13 role SOPs"), "the content/skill-*.md layout line must read 'the other 13 role SOPs' (was 12)");
+  assert.ok(!/\b1[123] registered role prompts\b|\b(?:Eleven|Twelve|Thirteen) prompts are registered\b/.test(CLAUDE_MD), "no stale 11/12/13 prompt-count sentence may remain");
   // AGENTS.md carries no prompt count at base (per spec); it stays that way here
   assert.ok(!/\bregistered role prompts\b|\bprompts are registered\b/.test(AGENTS_MD), "AGENTS.md must carry no prompt-count sentence");
 });
@@ -428,7 +431,7 @@ test("AC16: interim `.claude/commands/integrator.md` retired; nothing tracked un
   assert.equal(lsFiles.trim(), "", "git ls-files .claude must be empty");
 });
 
-test("AC17: rendered skill-integrator.md is well-formed (SOP body present, zero glue findings); skill-file count updated to 13", async () => {
+test("AC17: rendered skill-integrator.md is well-formed (SOP body present, zero glue findings); skill-file count updated to 14", async () => {
   const ws = mkWorkspace();
   let text;
   try {
@@ -461,7 +464,7 @@ test("AC17: rendered skill-integrator.md is well-formed (SOP body present, zero 
   }
   assert.deepEqual(findings, [], "content/skill-integrator.md must carry zero asymmetric rationale spans (glue-free)");
 
-  // The skill-file count assertion (12 -> 13, e423) is updated, per Q6's qa-only grant.
+  // The skill-file count assertion (12 -> 13, e423; 13 -> 14, e466) is updated, per Q6's qa-only grant.
   const skillFrontmatterTestSrc = fs.readFileSync(path.join(ROOT, "test", "skill-frontmatter.test.mjs"), "utf-8");
-  assert.match(skillFrontmatterTestSrc, /assert\.equal\(files\.length,\s*13,/, "test/skill-frontmatter.test.mjs must assert 13 skill files");
+  assert.match(skillFrontmatterTestSrc, /assert\.equal\(files\.length,\s*14,/, "test/skill-frontmatter.test.mjs must assert 14 skill files");
 });
