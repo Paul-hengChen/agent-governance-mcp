@@ -262,12 +262,15 @@ test("AC12: integrator Stage 2 carries the wave-table exception with both Decisi
   const para = INTEG.split("\n").filter((l) => l.includes("**Wave table approved in `spec-workshop`**"));
   assert.equal(para.length, 1, "exception sits on exactly one line");
   const l = para[0];
-  assert.ok(l.includes("**Wave table approved in `spec-workshop`** — a stated exception to Constitution §3.1's rule that only a directly witnessed approval counts:"));
-  assert.ok(l.includes("converted from a committed `spec-workshop` wave table"));
-  assert.ok(l.includes("changes none of the approved tickets, their grouping or their order, and leaves no open choice, Stage 2 does not halt"));
+  // Re-pinned by E443a (specs/e443a-manifest-waves.md, SOP_STAGE2_WAVES): the exception is now decided by the
+  // `fanout.mjs waves` comparison instead of "the conversion changes nothing"; the Decisions rows and the halt stay.
+  assert.ok(l.includes("**Wave table approved in `spec-workshop`** — a stated exception to Constitution §3.1's rule that only a directly witnessed approval counts. "));
+  assert.ok(l.includes("When the manifest was built from a committed `spec-workshop` wave table and carries the `波次` column, run `node <agc install>/scripts/fanout.mjs waves <manifest> <wave-table file>`."));
+  assert.ok(l.includes("On a pass (exit 0), Stage 2 does not halt"));
   assert.ok(l.includes("`人類`") && l.includes("the wave-table file and its commit sha"));
-  assert.ok(l.includes("`整合者`") && l.includes("the conversion changed nothing"));
-  assert.ok(l.includes("Any change to the approved tickets, their grouping or their order, or any open choice, halts here as above."));
+  assert.ok(l.includes("`整合者`") && l.includes("whose `內容` is the reason line the command printed, starting `自動：只改順序或分組 — `"));
+  assert.ok(l.includes("On a failure (non-zero exit), on a manifest without the `波次` column, or with any open choice, halt here as above and name each condition the command reported."));
+  assert.ok(!l.includes("the conversion changed nothing"), "the old 整合者 row wording is gone");
   // pre-existing Stage 2 sentences remain on the same line
   assert.ok(l.includes("Without the human's explicit yes in this session, do not enter stage 3."));
   assert.ok(l.includes("When Stage 0 ran, present the cut file with the manifest; one approval covers both."));

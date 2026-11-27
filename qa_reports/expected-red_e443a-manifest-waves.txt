@@ -1,0 +1,41 @@
+# Expected-red manifest — e443a-manifest-waves (qa-engineer, T-E443A-01, 2026-11-27)
+# Format: <relative test file path> | <exact top-level test name>. Every entry is red at the qa hand-off and must
+# be green after sr-engineer's build (T-E443A-02..05). Any other red test is not expected.
+# Build gate: no compile/type error anywhere — every red below is a failed assertion against the unbuilt interface.
+
+# T-E443A-02 (I1): a Lanes table with 波次 is not yet a dispatchable header shape (rows stay provisional), and
+# validate does not yet check 波次 / 相依, so no WAVE_* / DEPS_* row error exists.
+test/e443a-wave-columns.test.mjs | A1-1: a Lanes table with 波次 (shapes 3 and 4) validates, checks clean, and parses wave and depLanes
+test/e443a-wave-columns.test.mjs | A1-2: a bad 波次 or 相依 cell exits 2 with exactly one lane-attributed row error naming the cell
+
+# T-E443A-04 (I4, uses I1 + I2): `fanout.mjs waves` does not exist yet (generic USAGE, exit 2).
+test/e443a-wave-compare.test.mjs | A1-4: a manifest that serialises or groups the approved tickets passes with the reason line last
+test/e443a-wave-compare.test.mjs | A1-5: a manifest that drops the approved dependency C→A exits 1 with DEPENDENCY_DROPPED
+test/e443a-wave-compare.test.mjs | A1-6: a manifest that adds, removes or double-lists a ticket exits 1 naming it
+test/e443a-wave-compare.test.mjs | A1-7: an owned path outside the lane's allowed paths exits 1; bookkeeping never fails; a missing ticket file exits 2
+test/e443a-wave-compare.test.mjs | smoke: waves input errors exit 2 with their codes; ticketDir from primary's config is honoured
+
+# T-E443A-03 (I2, I3): render has no --batch flag yet ("unknown flag --batch") and no ticket-file lookup.
+test/e443a-batch-render.test.mjs | A1-9: render --batch exits 0 and the prompt ends with BATCH_CLOSING_LINE, never the wait-for-typing sentence
+test/e443a-batch-render.test.mjs | A1-10: render --batch takes the summary and reading list from the lane's ticket files
+test/e443a-batch-render.test.mjs | A1-11: render --batch puts BATCH_FIRST_STEP_LINE after the reading line, drops feature start / EnterWorktree, keeps the two-layer pointer
+test/e443a-batch-render.test.mjs | smoke: batch render lookup errors — empty 票 cell, duplicate and invalid ticket files, all collected
+
+# T-E443A-05: content/skill-integrator.md does not carry SOP_STAGE1_WAVES / SOP_STAGE2_WAVES yet.
+test/e443a-integrator-sop.test.mjs | A1-8: integrator SOP carries SOP_STAGE1_WAVES on Stage 1 step 6 and SOP_STAGE2_WAVES in place of the old Stage 2 exception
+
+# Re-pin (T-E443A-05): AC12 now pins SOP_STAGE2_WAVES; the SOP still holds the old "conversion changed nothing" text.
+test/e423-spec-workshop.test.mjs | AC12: integrator Stage 2 carries the wave-table exception with both Decisions rows and the halt rule
+
+# Re-pin (T-E443A-05): the integrator base sha256 now includes the two E443a strings (81ea9cf3…), so the unedited
+# SOP hashes to the old base (bebdd0e8…) and both readers of baseOf(IN_FILE) fail.
+test/e428-tracker-mirror.test.mjs | AC6: integrator `## Tracker items` (C-IN1) sits after the Stage 6 *Your own commits* paragraph and before `## Git operations`; nothing else moves
+test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the four files holds no URL, repo-only path, bare ticket id, version label, quoted error code or vendor name
+
+# Re-pin (T-E443A-05): Stage 1 step 6 must end with the sister-repo copy followed by SOP_STAGE1_WAVES.
+test/e292-integrator-sop.test.mjs | AC-E292-9 sop.stage1-ext is appended to Stage 1 step 6
+
+# Re-pin (T-E443A-04): the generic usage gains the `waves` continuation line, 5 -> 6.
+test/e296-manifest-tier.test.mjs | AC12: usage has the fourth `check --cut` line; the wrapper header lists it; check <manifest> <lane> is unchanged
+# Re-pin (T-E443A-04), not in the spec's Test impact list (found by qa's grep): the same 5 -> 6 count, in 擁有.
+test/e322-owners.test.mjs | AC-E322-9 generic usage lists owners; owners usage unchanged; read-only
