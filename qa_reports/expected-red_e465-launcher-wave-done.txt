@@ -1,0 +1,30 @@
+# e465-launcher-wave-done — red tests written by qa-engineer before sr-engineer builds (T-E465-01..03).
+# Red files: test/e465-config.test.mjs, test/e465-dependency.test.mjs, test/e465-window.test.mjs (all import fine; red on assertions).
+# S4's two tests in test/e465-dependency.test.mjs are GREEN now (today's merged rule exists) and are not listed.
+
+# S1: tools/config.ts does not export resolveWaveDoneAt yet (TypeError / typeof undefined).
+test/e465-config.test.mjs | S1: loadConfig surfaces waveDoneAt only as merged or pr-open and fills no default; the resolver defaults to merged
+test/e465-config.test.mjs | S1: any other waveDoneAt value is reported by name and resolves to merged, never a config error
+# S1: the launcher prints no wavedone.invalid line on standard error yet.
+test/e465-config.test.mjs | S1: the launcher names an unusable waveDoneAt once on standard error and runs on with merged, exit code unaffected
+# S7: docs/config.md has no waveDoneAt section yet.
+test/e465-config.test.mjs | S7: docs/config.md documents waveDoneAt with both values and the default, right after the laneLaunchLimit section
+# S7: LANE_LAUNCH_USAGE and the scripts/lane-launch.mjs header still carry the old usage text.
+test/e465-config.test.mjs | S7: the launcher's usage line and script header name --wake-weekly and --close-finished
+# S7: exit 2 already holds; red only because the printed usage line is the old one.
+test/e465-config.test.mjs | S7: an unknown option, a missing manifest or two manifests still print the usage line and exit 2
+
+# S2: waveDoneAt pr-open is not read yet — a shipped (branch gone + finish record) or unmerged dependency is met / gets the old reason.
+test/e465-dependency.test.mjs | S2: pr-open, A shipped but its pull request not merged — D starts, C waits naming A's work as not merged into main
+test/e465-dependency.test.mjs | S2: pr-open, A's branch still exists but is not merged — C waits with the not-merged reason
+test/e465-dependency.test.mjs | S2: pr-open, A's branch is gone and the launcher never recorded a tip — a finish record alone does not meet the dependency
+test/e465-dependency.test.mjs | S2: pr-open with knowledge local — the finish record is still required, and the merged check applies too
+# S3: red at its S2 precondition (C starts on the first run because pr-open is not read; no recorded tip exists).
+test/e465-dependency.test.mjs | S3: after the pull request carrying A merges into main, a re-run starts C from main and does not start D again
+
+# S5 / S6: runLaneLaunchCli rejects --wake-weekly / --close-finished as usage errors (exit 2).
+test/e465-window.test.mjs | S5: without --wake-weekly a paused-weekly lane is not woken; with it the wake line goes into the same window and the lane is running
+test/e465-window.test.mjs | S6: --close-finished sends /exit to the finished lane's window only, keeps stopped lanes' windows, records it closed
+test/e465-window.test.mjs | S6: a finished lane whose worktree is gone (agc feature finish --shipped ran) gets /exit; a stopped lane keeps its window
+test/e465-window.test.mjs | S6: a --close-finished run starts nothing even when a lane of the next wave is startable, and exits 0
+test/e465-window.test.mjs | S6: given --wake-weekly and --close-finished together, the close-only rule wins — nothing is woken or started

@@ -259,6 +259,34 @@ Semantics:
 
 ---
 
+### `waveDoneAt` — when a wave counts as done (optional)
+
+Says when a wave of a fan-out manifest counts as done: once its pull request has merged, or as soon as it is open. A repo whose pull requests wait for a human review or a manual merge sets `"pr-open"`, so the next wave does not wait for the merge.
+
+```json
+{
+  "waveDoneAt": "pr-open"
+}
+```
+
+| Value | A wave is done when |
+|---|---|
+| absent (or not usable) | its pull request has merged (the default, `"merged"`) |
+| `"merged"` | its pull request has merged |
+| `"pr-open"` | its pull request is open |
+
+Semantics:
+
+- **Optional.** `"merged"` or `"pr-open"`. The lane launcher names any other value in a line on its standard error and uses `"merged"`; it is never an error.
+- **Dependencies under `"pr-open"`.** The next wave can start while the previous wave's pull request is still open, so the lane launcher starts a lane that depends on a lane of an earlier wave only once that lane's work has merged into the ref the dependent lane starts from (the manifest's `base:` for the first wave, `main` for a later one). Until then it lists the lane as waiting and names the work not yet merged; re-run it after the merge to start the lane. A lane that depends on nothing starts at once, and a lane already started is never started again.
+- **A deleted branch under `"pr-open"`.** Once `agc feature finish --shipped` has deleted the depended-on lane's branch, the launcher checks the branch tip it recorded while the branch existed; a finish record alone does not count. A lane the launcher never saw (started by hand) has no recorded tip, so its dependents keep waiting: start them by hand once the work has merged.
+- **Dependencies under `"merged"`.** Unchanged: the next wave starts only after the previous wave's pull request has merged, so a deleted branch with a finish record counts as merged.
+- **Where the default is applied.** `loadConfig` surfaces the value verbatim as `WorkspaceConfig.waveDoneAt` only when it is `"merged"` or `"pr-open"`; a separate resolver applies the default.
+- **Who reads it.** The lane launcher, from the primary checkout's `.current/.config.json`.
+- **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists.
+
+---
+
 ## `.current/const-*.md` — constitution override
 
 > ⚠️ **Changed in v3.44.0.** There is no longer a single `content/constitution.md`, so **`.current/constitution.md` is not read by anything** — dropping that file has no effect and produces no error. If you set one up before v3.44.0, migrate it to per-fragment overrides as below.

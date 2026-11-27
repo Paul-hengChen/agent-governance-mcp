@@ -102,6 +102,10 @@ export interface WorkspaceConfig {
   // Lane launcher parallel limit (scripts/lane-launch.mjs). Surfaced only when
   // a positive integer; no default here — the launcher applies its own (3).
   laneLaunchLimit?: number;
+  // When a fan-out wave counts as done (lane launcher). Surfaced only when
+  // exactly "merged" or "pr-open"; no default here — resolveWaveDoneAt
+  // applies "merged" and reports an unusable value.
+  waveDoneAt?: WaveDoneAt;
 }
 
 // One sisterRepos entry. `path` is relative to the repo root; `backlog` and
@@ -117,6 +121,10 @@ export interface SisterRepo {
 export type WorkspaceArtifactsMode = "local" | "repo";
 
 export type WorkspaceKnowledgeMode = "local" | "repo";
+
+export type WaveDoneAt = "merged" | "pr-open";
+export const DEFAULT_WAVE_DONE_AT: WaveDoneAt = "merged";
+const isWaveDoneAt = (v: unknown): v is WaveDoneAt => v === "merged" || v === "pr-open";
 
 // Result of parseNodeModulesLinks for an array value: the valid entries,
 // normalized and deduplicated in list order, plus every rejected raw entry.
@@ -244,6 +252,8 @@ interface ConfigCacheEntry {
   config: WorkspaceConfig;
   mtimeMs: number | null;
   error: string | null;
+  // Present only when the file sets waveDoneAt to an unusable value.
+  waveDoneAtRejected?: { value: unknown };
 }
 
 const configCache = new Map<string, ConfigCacheEntry>();
@@ -468,12 +478,19 @@ function loadConfigEntry(workspacePath: string): ConfigCacheEntry {
   if (typeof laneLaunchLimit === "number" && Number.isInteger(laneLaunchLimit) && laneLaunchLimit > 0) {
     result.laneLaunchLimit = laneLaunchLimit;
   }
+  const payload = migration.payload;
+  let waveDoneAtRejected: { value: unknown } | undefined;
+  if (Object.hasOwn(payload, "waveDoneAt")) {
+    if (isWaveDoneAt(payload.waveDoneAt)) result.waveDoneAt = payload.waveDoneAt;
+    else waveDoneAtRejected = { value: payload.waveDoneAt };
+  }
   // Cache under the pre-read mtime. If the migration heal-on-read above
   // rewrote the file, the recorded mtime is already stale — the NEXT call's
   // stat will mismatch and trigger one redundant (but correct) re-read,
   // which is preferable to racing a post-write re-stat against concurrent
   // writers/deleters.
   const entry: ConfigCacheEntry = { config: result, mtimeMs: currentMtime, error: null };
+  if (waveDoneAtRejected !== undefined) entry.waveDoneAtRejected = waveDoneAtRejected;
   configCache.set(workspacePath, entry);
   return entry;
 }
@@ -518,6 +535,17 @@ export function resolveTaskPaths(workspacePath: string): string[] {
 /** Absolute ticket-file directory: the configured `ticketDir` or the default. */
 export function resolveTicketDir(workspacePath: string): string {
   return path.join(workspacePath, loadConfig(workspacePath).ticketDir ?? DEFAULT_TICKET_DIR);
+}
+
+/**
+ * Effective `waveDoneAt`: the configured value, or "merged" when the key is
+ * absent or unusable. `rejected` is present (the configured value verbatim)
+ * only when the key is present but unusable, so the caller can name it.
+ */
+export function resolveWaveDoneAt(workspacePath: string): { waveDoneAt: WaveDoneAt; rejected?: unknown } {
+  const entry = loadConfigEntry(workspacePath);
+  const waveDoneAt = entry.config.waveDoneAt ?? DEFAULT_WAVE_DONE_AT;
+  return entry.waveDoneAtRejected === undefined ? { waveDoneAt } : { waveDoneAt, rejected: entry.waveDoneAtRejected.value };
 }
 
 /**
