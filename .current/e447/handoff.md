@@ -2,7 +2,7 @@
 schema_version: 17
 active_feature: "e447-local-knowledge-files"
 status: "In_Progress"
-last_updated: "2026-11-27T02:21:58.790Z"
+last_updated: "2026-11-27T02:24:16.527Z"
 last_agent: "pm"
 prd_path: "specs/e447-local-knowledge-files.md"
 scope_decision: "single-feature"
@@ -15,7 +15,7 @@ dispatch_pins:
   qa-engineer: "opus"
 evidence_schema: 3
 next_role: "qa-engineer"
-dispatched_at: "2026-11-27T02:21:58.790Z"
+dispatched_at: "2026-11-27T02:24:16.527Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 review_round: 0
@@ -31,12 +31,13 @@ visual_rounds_total: 0
 
 ## Pending & Handoff Notes
 - pm: Amendment A1 to specs/e447-local-knowledge-files.md after code-reviewer round 1 (review_reports/review_T-E447-01.md); every amended/added item tagged [A1]; O1-O3 (a), D1-D10, DOC-INST-5 consent unchanged
-- R1: 12 new Copy rows (all kept verbatim as built, no rewording) + 2 reused-template rows (e447.finish-backlog-missing, e447.finish-pending-malformed) + e447.reseed-not-knowledge placeholder <rel> -> <operand> (matches built output, no code change)
-- R2: AC13 (finish, no seed record), AC14 (--shipped lane-changed backlog + findings; both-changed refusal), AC16 (finish refusals i-iv), AC17 (reseed i-vi), AC18 (init unsafe ticketDir), AC19 (check --cut malformed primary config / manifest outside lane); behaviour kept as built
+- integrator pre-review of A1 @ 43eefbe folded in: e447.finish-pending-malformed is now a NEW mode-on wording (needs human consent): 'agc feature finish <verb>: .current/<lane>/pending-tickets.md in the lane worktree has <n> problem(s) — fix them in that file in the lane worktree (it is never committed in this mode) and re-run (nothing applied, nothing removed):' + problem lines; mode-off message byte-identical (AC10 unchanged)
+- R1: 12 new Copy rows (all kept verbatim as built) + 1 reused-template row (e447.finish-backlog-missing) + 1 new mode-on wording (e447.finish-pending-malformed) + e447.reseed-not-knowledge placeholder <rel> -> <operand> (matches built output, no code change)
+- R2: AC13 (finish, no seed record), AC14 (--shipped lane-changed backlog + findings; both-changed refusal), AC16 (finish refusals i-iv; (iv) now red until the mode-on wording ships), AC17 (reseed i-vi), AC18 (init unsafe ticketDir), AC19 (check --cut malformed primary config / manifest outside lane); behaviour kept as built
 - R3: AC20 (docs/install.md --shipped bullet names specs/archive/<ticket-id>/); R4: D11 (finish composes the final backlog, writes lane copy first then primary) + AC15 (re-run after late failure exits 0, allocates nothing)
-- AC10 wording amended to the observable check --cut contract (reviewer judgement item 2); O4 (D9 lane-config short-circuit) needs human ruling, recommended (a) = not taken
-- HUMAN CONSENT NEEDED before qa: Amendment A1 + O4 ruling; coordinator attests in its chat (pm did not set cut_approved)
-- tasks: T-E447-08 qa (AC13-AC20 tests, expected-red: AC15 + AC20) -> T-E447-09 sr (D11, R3; O4 (b) only: tools/fanout-manifest.ts + dist) -> T-E447-10 code-reviewer
+- AC10 wording amended to the observable check --cut contract (reviewer judgement item 2); O4 (D9 lane-config short-circuit) needs human ruling, recommended (a) = not taken (integrator agrees)
+- HUMAN CONSENT NEEDED before qa: Amendment A1 (incl. the new mode-on wording) + O4 ruling; coordinator attests in its chat (pm did not set cut_approved)
+- ledger rows edited in place (unchecked): T-E447-08 expected-red now AC15, AC16 (iv), AC20; T-E447-09 adds the mode-on e447.finish-pending-malformed branch, size ~35 -> ~45 lines (~55 with O4 (b)); T-E447-10 unchanged; no new task
 - hop estimate: pm 7 -> qa 8 -> sr 9 -> code-reviewer 10 of 14; no content/** change, so no golden or context-budget cap moves
 - check --cut at A1: exit 1, unchanged from the cut (APPROVAL_HUMAN + the same 14 OUT tokens)
 
