@@ -2432,6 +2432,9 @@ function planKnowledgeHarvest({ knowledge, repoRoot, lanePath, lanePaths, ticket
 function applyKnowledgeHarvest(h) {
   for (const c of h.copies) {
     try {
+      // D11: a backlog with numbered rows goes to the lane copy first, so a
+      // re-run finds the primary copy identical to it or still seeded.
+      if (c.laneAbs) writeViaRename(c.laneAbs, c.bytes, path.dirname(c.laneAbs));
       writeViaRename(c.dstAbs, c.bytes, path.dirname(c.dstAbs));
     } catch (err) {
       throw new FeatureError(
@@ -2457,7 +2460,9 @@ function applyKnowledgeHarvest(h) {
 // both git-ignored, so a worktree-only pending file (`findings`) is numbered
 // into the primary checkout's untracked docs/backlog.md, never committed. When
 // this run's harvest brings the lane's own backlog back to the same path, the
-// rows are appended to that copy. Read-only; null with nothing to number.
+// final backlog (lane bytes + numbered rows) replaces that copy's bytes, and
+// the harvest writes it to the lane copy and then to primary (D11). Writes
+// nothing; null with nothing to number.
 async function planKnowledgeNumbering({ findings, harvest, repoRoot, lanePath, lane, verb }) {
   if (!findings) return null;
   const backlogAbs = path.join(repoRoot, BACKLOG_REL);
@@ -2467,8 +2472,16 @@ async function planKnowledgeNumbering({ findings, harvest, repoRoot, lanePath, l
     alloc, repoRoot, pendingText: findings.bytes.toString("utf-8"), revLabel: "the lane worktree",
     base: "the primary checkout", lane, pendingRel: findings.pendingRel, verb,
     backlogBlob: laneBacklog ? laneBacklog.bytes.toString("utf-8") : readFileOrNull(backlogAbs),
+    knowledgeLocal: true,
   });
-  return plan && { alloc, plan, lane, backlogAbs, pendingAbs: path.join(lanePath, findings.pendingRel) };
+  if (plan && laneBacklog && plan.allocated.length > 0) {
+    laneBacklog.bytes = Buffer.from(plan.newBacklogText, "utf-8");
+    laneBacklog.laneAbs = path.join(lanePath, ...laneBacklog.rel.split("/"));
+  }
+  return plan && {
+    alloc, plan, lane, backlogAbs, pendingAbs: path.join(lanePath, findings.pendingRel),
+    backlogViaHarvest: Boolean(laneBacklog),
+  };
 }
 
 // After the knowledge harvest, before the lane's .current/<lane>/ goes into
@@ -2478,7 +2491,7 @@ function applyKnowledgeNumbering(n) {
   const { alloc, plan, lane } = n;
   printSkipped(lane, plan.skipped);
   const ids = plan.allocated.map((t) => t.id);
-  if (ids.length > 0) atomicWriteFile(n.backlogAbs, plan.newBacklogText);
+  if (ids.length > 0 && !n.backlogViaHarvest) atomicWriteFile(n.backlogAbs, plan.newBacklogText);
   atomicWriteFile(n.pendingAbs, newPendingText(alloc, plan));
   if (ids.length > 0) {
     // Copy / Strings e447.finish-numbered.
@@ -3069,7 +3082,10 @@ function readBlob(cwd, rev, rel) {
 // verbatim.
 // `backlogBlob`, when given, replaces the --base read (E447: the primary
 // checkout's untracked backlog; `base` then only labels messages).
-function planPendingApply({ alloc, repoRoot, pendingText, revLabel, base, lane, pendingRel, verb, backlogBlob: given }) {
+// `knowledgeLocal` selects the mode-on malformed-block wording.
+function planPendingApply({
+  alloc, repoRoot, pendingText, revLabel, base, lane, pendingRel, verb, backlogBlob: given, knowledgeLocal = false,
+}) {
   const backlogBlob = given !== undefined ? given : readBlob(repoRoot, base, BACKLOG_REL);
   const backlogText = backlogBlob ?? "";
   const prov = alloc.findAppliedProvenance(backlogText, lane);
@@ -3077,9 +3093,13 @@ function planPendingApply({ alloc, repoRoot, pendingText, revLabel, base, lane, 
     appliedLaneLocalIds: new Set(prov.keys()),
   });
   if (parsed.errors.length > 0) {
+    // Copy / Strings e447.finish-pending-malformed (mode on); mode off unchanged.
+    const where = knowledgeLocal
+      ? `in ${revLabel} has ${parsed.errors.length} problem(s) — fix them in that file in the lane worktree ` +
+        `(it is never committed in this mode) and re-run`
+      : `on ${revLabel} has ${parsed.errors.length} problem(s) — fix them on the lane branch and re-run`;
     throw new FeatureError(
-      `agc feature finish ${verb}: ${pendingRel} on ${revLabel} has ${parsed.errors.length} ` +
-        `problem(s) — fix them on the lane branch and re-run (nothing applied, nothing removed):\n` +
+      `agc feature finish ${verb}: ${pendingRel} ${where} (nothing applied, nothing removed):\n` +
         parsed.errors.map((e) => `  ${e}`).join("\n")
     );
   }
