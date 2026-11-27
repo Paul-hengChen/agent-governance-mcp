@@ -2,7 +2,7 @@
 base: a2f1062    integration branch: integ/post-v5-e463
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（2026-11-27），派工中。**
+**狀態：已結案 2026-11-27。** e463 以 `--no-ff` 合進 `integ/post-v5-e463`（merge `9b9e9e2`，零衝突），merge-invariants PASS；派工 base `e3a3db6`（清單 PR #209）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`check:bookkeeping` exit 0。lane 層 CI：e463 run 45969838889 @ `3c4b533` 綠。Roll-up：e463 6 個 task、hop 6/14、review 退回 0、sr 退回 1/2、證據 6/6。E463、E464 done-mark（not yet released）。例外：無。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out 下一波：E463 + E464」，2026-11-27）：E463、E464 合成一個 feature（人類裁定 2026-11-27，`docs/backlog.md` 兩列開頭的 BATCHED 註記，PR #208），本波只有一條 lane e463 同時做兩張票；E420、E443b 不列（E443b 另有 session 在做，可能同時跑另一波、共用 `../agent-governance-mcp-lanes/_mailbox`）。共用的 gh helper 放 `scripts/`、不放 `tools/`。本波不發版。
 
@@ -85,3 +85,24 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-27 | 整合者 | Stage 1：一條 lane e463；wave id 取 `post-v5-e463` 避開 E443b 可能用的 `post-v5-w8`；release 腳本與 doc 的讀者 13 檔進擁有欄；與 E443b 切票檔重疊的讀者 6 檔列禁止；`content/**`、`CLAUDE.md`、`tools/config.ts`、`docs/lane-protocol.md`、`docs/config.md` 與共用生成物列禁止 | 本檔 |
 | 2026-11-27 | 人類 | Q1 (a)：E463 查詢失敗與 E464 `gh` 版本太舊都停在既有 exit 14 `GH_UNAVAILABLE`、detail 帶 `gh` 錯誤或已裝與需要的版本，不新增 exit class，SOP 與 `test/release-staging.test.mjs` 不動；Q2：`architect=opus`（預估不走）；pins `pm=opus`、`qa-engineer=sonnet`、`sr-engineer=opus`、`code-reviewer=opus`；`approval` = `human`；本波不發版；lane brief 禁止 `--amend`、報告前查證據的絕對路徑 | 整合者 session（integrator prompt「fan-out 下一波：E463 + E464」；答「Q1 (a), Q2 用 opus」） |
 | 2026-11-27 | 人類 | 核准本清單：一條 lane e463（E463、E464，`approval` = `human`）；wave id `post-v5-e463`；release 腳本與 doc 的讀者 13 檔進擁有欄；與 E443b 重疊的讀者 6 檔、E443b 範圍與共用生成物列禁止；pins 照 Dispatch pins 段 | 整合者 session（「approve」） |
+| 2026-11-27 | 整合者 | 清單 PR #209 合進 `main`（merge `e3a3db6`，PR 必要檢查綠），派工 base = `e3a3db6`；派工前核對在該 sha 重做通過（`agc check` exit 0、只有 primary worktree、`feat/e463-*` 與 `integ/post-v5-e463` 都不存在、`_mailbox/` 原為空、擁有與禁止欄點名的既有路徑都在、新檔路徑都還不存在、`cutApprovalAutoTier.manifest` 為 true、`validate` exit 0）；建 `_mailbox/e463/`，開信箱監看（只點名 e463 的 `to-integrator.md`，baseline e463=0）與 lane-status 監看，render e463 的 prompt（信箱用絕對路徑） | 本檔 |
+| 2026-11-27 | 整合者 | e463 cut 預審（to-integrator#1，spec @ `eae38b2`）`close`（to-lane#1）：6 個 task（qa T-E463-01 新測試、02 三個 harness 回 `gh --version`；sr 03 新 helper `scripts/gh-compat.mjs`、04 E464 phase 起頭檢查、05 E463 `viewPr`、06 文件），每個 AC 都有實作 task、每個 sr task 在 `task_size` 內；最低 `gh` 2.40.0（整合者查 v2.40.0 release notes：`run list` 依 commit 篩選）；重試 3 次、間隔 10 秒、可用環境變數縮短；`verify-release.mjs` 不改（發版流程內 phase 起頭先擋），e158／e320／e326 不必 re-pin；整合者重跑 `check --cut`：8 token、0 越界，唯一 FAIL 為 APPROVAL_HUMAN（預期）；禁止欄 6 檔只有 release-staging 釘 SOP 的 exit 14 列文字，本 cut 不動 SOP；條件：第一次在有改動的 HEAD 跑全套時，擁有欄外的紅檔先寄信給整合者；hop 估 5（含一輪審查 7）；cut 由 lane 呈人類核准 | e463 信箱 to-integrator#1、to-lane#1 |
+| 2026-11-27 | 人類 | 在 e463 的 session 親手核准 cut（spec @ `eae38b2`，無選項、無 needs human ruling 項）；coordinator 在 pm tuple 寫入 `cut_approved: true`，派 qa-engineer（sonnet）做 T-E463-01／02。只影響本 lane，寫在核准的 cut 裡 | e463 lane session；`specs/e463-release-gh-checks.md` @ `eae38b2`、`.current/e463/handoff.md`（`cut_approved: true`）；e463 信箱 to-integrator#2 |
+| 2026-11-27 | 整合者 | e463 收工報告（to-integrator#6）核對通過並 `close`（to-lane#2）：`feat/e463-release-gh-checks` @ `3c4b533`（14 commit），`fanout check --base main` 21 檔 0 越界，證據 `review_reports/review_T-E463-01.md` APPROVED（covers T-E463-01..06）與 `qa_reports/review_T-E463-01..06.md`，worktree 乾淨，無 pending-tickets，共用生成物未動，證據無絕對路徑；lane 層 CI run 45969838889 @ `3c4b533` 綠。sr 退回 qa 一次（e394 的 helper import 衝突，qa re-pin、AC-S9 只放行 `./gh-compat.mjs`，裁判認定不是放寬）。reviewer recommended（新測試檔頭註解 15 行）與 optional（幾行 `//` 註解超過 80 欄）列入結案報告、不開票 | e463 信箱 to-integrator#6、to-lane#2；CI run 45969838889 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ a06cc92
+- 目標分支對 origin：一致
+- git status：1 項： M specs/fanout-post-v5-w8.md
+- worktree：primary（main ← integ/post-v5-e463 @ 1f9480c）；../agent-governance-mcp-lanes/e443b（feat/e443b-lane-launcher） ［別的清單］
+- lane-status：primary（main ← integ/post-v5-e463 @ 1f9480c）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，dirty
+### 已結案
+- e463（E463、E464）PASS，merge `9b9e9e2`；以本波 PR 合進 `main`。lane 紀錄在 `.current/history/2026-11/e463/`；沒有未配號的新發現。裁判的 recommended（新測試檔 `test/e463-release-gh-checks.test.mjs` 檔頭註解 15 行）與 optional（`scripts/gh-compat.mjs`、`scripts/release.mjs` 幾行 `//` 註解超過 80 欄）列在結案報告，不開票。
+- 本波與 E443b 的第 8 波（`specs/fanout-post-v5-w8.md`）同時進行、共用 primary：上方事實裡的 `specs/fanout-post-v5-w8.md` 未 commit 修改與 `e443b` worktree 屬於第 8 波，不是本波留下的；第 8 波往前走後 `handoff --check` 對這兩項報 `DIFF` 是預期的。
+- 上線後觀察（非驗收）：發版 workflow 的 runner 上 `gh` 版本未知；合進 `main` 後，下一次發版每個 phase 起頭會把 `gh --version` 印進 run log，第一次跑時確認它不低於 2.40.0。
+### 待人類決定
+- 要不要發 v5.x：E424、E425、E427、E430、E449、E426、E428、E446、E447、E443a、E463、E464 都已完成，合進 `main` 後尚未發版（E443b 的第 8 波另行結案）。
+### 進行中的背景工作
+無
