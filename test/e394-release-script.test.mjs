@@ -50,6 +50,8 @@ const log = (l) => fs.appendFileSync(L, l + "\\n");
 const git = (args, cwd) => cp.execFileSync("git", args, { cwd, encoding: "utf8", env: process.env }).trim();
 const flag = (n) => a[a.indexOf(n) + 1];
 const k = a.slice(0, 2).join(" ");
+// E463/E464: every phase asks for the gh version first; the shim answers with the minimum supported version.
+if (a[0] === "--version") { process.stdout.write("gh version 2.40.0 (2023-12-07)\\nhttps://github.com/cli/cli/releases/tag/v2.40.0\\n"); process.exit(0); }
 if (k === "auth status") { if (st.authFail) { console.error("not logged in"); process.exit(1); } process.exit(0); }
 if (k === "pr view") {
   const pr = st.prs[a[2]];
@@ -125,6 +127,8 @@ function buildTemplate({ baseVersion, version, spec, baseline }) {
   put(".current/lane1/handoff.md", "---\nlast_agent: qa-engineer\nstatus: PASS\n---\n# Handoff\n\n## Pending & Handoff Notes\n- QA PASS\n");
   put(".current/lane1/events.jsonl", "{\"n\":1}\n");
   put("scripts/release.mjs", fs.readFileSync(SCRIPT, "utf-8"));
+  // E463: release.mjs imports its one allowed sibling, the gh compatibility helper; a real-child run needs it beside the script.
+  put("scripts/gh-compat.mjs", fs.readFileSync(path.join(REPO, "scripts", "gh-compat.mjs"), "utf-8"));
   for (const s of ["scripts/check-version.mjs", "scripts/check-bookkeeping.mjs", "scripts/verify-release.mjs", "bin/agc-init.mjs"]) put(s, STUB);
   if (baseline) put("qa_reports/archive/old/review_T-OLD-01.md", "old\n");
   if (spec) put("specs/feat.md", "# feat\n");
@@ -443,7 +447,7 @@ const ALLOW = [
   /^git add -- \S/, /^git add --update -- \S/, /^git commit -F \S/, /^git commit -m \S/, /^git tag -a v\d+\.\d+\.\d+ -m \S/, /^git push -u origin release\/\S+$/,
   /^git push origin v\d+\.\d+\.\d+$/, /^git switch -c release\/\S+$/, /^git switch main$/, /^git branch -d release\/\S+$/,
   /^git -c pull\.rebase=false pull --ff-only$/, /^git (fetch|diff|log|status|show|ls-tree|ls-files|rev-parse|rev-list|describe|ls-remote)( |$)/,
-  /^gh auth status$/, /^gh release view /, /^gh pr create /, /^gh pr merge \d+ --auto --merge$/, /^gh pr view /, /^gh run (list|view)/, /^gh release create /,
+  /^gh --version$/, /^gh auth status$/, /^gh release view /, /^gh pr create /, /^gh pr merge \d+ --auto --merge$/, /^gh pr view /, /^gh run (list|view)/, /^gh release create /,
   /^node (scripts\/(check-version|verify-release|check-bookkeeping)\.mjs|bin\/agc-init\.mjs)/,
 ];
 const FORBIDDEN = [
@@ -807,7 +811,9 @@ test("AC-S8 the closing write must be on disk before anything is committed", () 
 
 test("AC-S9 absorbed checks are delegated", async () => {
   const src = fs.readFileSync(SCRIPT, "utf-8");
-  assert.ok(!/^import .*from "\.\.?\//m.test(src) && !/import\("\.\.?\//.test(src) && !/from "\.\/(check|verify)/.test(src), "release.mjs imports none of the three scripts");
+  // E463: the one relative import release.mjs may have is the gh compatibility helper; every other relative import (check-*, verify-*, anything else) stays refused.
+  const relImports = [...src.matchAll(/^import .*from "(\.\.?\/[^"]*)"/gm)].map((m) => m[1]);
+  assert.ok(relImports.every((i) => i === "./gh-compat.mjs") && !/import\("\.\.?\//.test(src) && !/from "\.\/(check|verify)/.test(src), "release.mjs imports none of the three scripts (only ./gh-compat.mjs is admitted)");
   const fx = mkFixture();
   await prepared(fx);
   await runMain(fx, ["publish", "--version", fx.version]);
