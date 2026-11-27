@@ -268,6 +268,7 @@ export const USAGE = [
     "       node scripts/fanout.mjs render <manifest> <lane> (--summary <text> --reading <text>... | --batch) [--mailbox-root <dir>] [--primary <path>] [--base <sha>]",
     "       node scripts/fanout.mjs check <manifest> <lane> [--base <ref>] [--repo <dir>]",
     "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
+    "       node scripts/fanout.mjs waves <manifest> <wave-table> [--primary <path>]",
     usageContinuation(OWNERS_USAGE),
     usageContinuation(HANDOFF_USAGE),
 ].join("\n");
@@ -634,6 +635,25 @@ function parseLanes(sections, m) {
         }
     }
     return new Set(seen.keys());
+}
+/**
+ * Lanes sections whose table has a `lane` header but no `波次` column.
+ *
+ * Covers provisional tables too. Sections without a readable table are left
+ * out: parseManifest already reports them. Returns the heading line and its
+ * 1-based line number, in manifest order.
+ */
+export function lanesSectionsWithoutWave(text) {
+    return splitSections(splitLines(text))
+        .filter((s) => s.name.startsWith("Lanes"))
+        .filter((s) => {
+        const table = firstTable(s);
+        if (table.length === 0)
+            return false;
+        const { header } = tableRows(table);
+        return header[0] === "lane" && lanesShape(header)?.wave === undefined;
+    })
+        .map((s) => ({ heading: s.heading, line: s.line }));
 }
 /**
  * The shape of a dispatchable Lanes header, or undefined when it is not one.

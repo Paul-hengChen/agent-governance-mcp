@@ -239,6 +239,17 @@ export declare function unquotedPaths(cell: string): string[];
  * part is left out of the structured result rather than guessed at.
  */
 export declare function parseManifest(text: string): Manifest;
+/**
+ * Lanes sections whose table has a `lane` header but no `波次` column.
+ *
+ * Covers provisional tables too. Sections without a readable table are left
+ * out: parseManifest already reports them. Returns the heading line and its
+ * 1-based line number, in manifest order.
+ */
+export declare function lanesSectionsWithoutWave(text: string): {
+    heading: string;
+    line: number;
+}[];
 /** Name of the handoff section a closed manifest must carry. */
 export declare const HANDOFF_SECTION = "\u63A5\u624B\u6B65\u9A5F";
 /** Sub-items (`### ` headings) every handoff section must hold, each exactly once with a non-empty body; their order is not checked. */
