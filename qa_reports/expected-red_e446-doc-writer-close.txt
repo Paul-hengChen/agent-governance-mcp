@@ -1,0 +1,25 @@
+# e446-doc-writer-close — intentional reds left by qa-engineer (T-E446-01).
+# Every entry below goes green once sr-engineer lands T-E446-02 (C-DW1/C-DW2/C-DW3 in
+# content/skill-doc-writer.md) and T-E446-03 (C-RT1 in tools/role.ts + rebuilt dist/tools/role.*).
+# Verified in a scratch copy with the spec Copy blocks applied and dist rebuilt: all green.
+
+# T-E446-02: content/skill-doc-writer.md still carries the base close (line 15 tells callers to
+# write state under the upstream agent_id; line 32 sends CHANGELOG gaps to pending_notes; line 36
+# is a tw_update_state(...) call). Red reason: the raw file and both served texts contain
+# `tw_update_state(`, `pending_notes`, `<upstream-caller>` and `next_role`.
+test/e446-doc-writer-close.test.mjs | AC1: no line of the doc-writer SOP instructs a state write (raw file and both served texts); the only tw_update_state mentions are the two prohibitions
+# T-E446-02: line 15 is not yet C-DW1 ("line 15 is C-DW1 byte-for-byte").
+test/e446-doc-writer-close.test.mjs | AC2: the Side-channel constraint line is exactly C-DW1, keeps the e437 anchor once, cites no tools/transitions.ts, and names the commit and the final reply
+# T-E446-02: line 32 is not yet C-DW2 ("line 32 is C-DW2 byte-for-byte").
+test/e446-doc-writer-close.test.mjs | AC3: the step-4 CHANGELOG.md bullet is exactly C-DW2 and sends gaps to the final reply, not pending_notes
+# T-E446-02: line 36 is not yet C-DW3 ("line 36 is C-DW3 byte-for-byte").
+test/e446-doc-writer-close.test.mjs | AC4: SOP step 6 is exactly C-DW3 (commit + Output rule line, no state write) and the Output rule line is byte-identical to base
+# T-E446-02: no line differs from the frozen base yet ("the lines that differ from base are exactly 15, 32 and 36").
+test/e446-doc-writer-close.test.mjs | AC8: every line changed in skill-doc-writer.md is shippable text (no URL, repo-only path, bare ticket id, version label, or backtick error code)
+
+# T-E446-03: tools/role.ts still carries the five base comment lines ("six C-RT1 lines present
+# contiguously, once"); dist/tools/role.js is not rebuilt yet.
+test/e446-doc-writer-close.test.mjs | AC7: the ROLE_SKILL_MAP comment above "doc-writer" is exactly the six C-RT1 lines, in tools/role.ts and in the rebuilt dist/tools/role.js
+# T-E446-03: re-pinned to the six C-RT1 lines; tools/role.ts still has the five base lines
+# ("six comment lines present contiguously").
+test/e408-core-task-alias-tail.test.mjs | AC6 (E435): role.ts comment reflects transitions.ts (release-engineer opens on the judge's code-reviewer:PASS); map still carries doc-writer and release-engineer

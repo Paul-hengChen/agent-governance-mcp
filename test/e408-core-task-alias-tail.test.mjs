@@ -94,14 +94,16 @@ test("AC5: lite template line 9 ends with the forbid + tier sentences; no server
 test("AC6 (E435): role.ts comment reflects transitions.ts (release-engineer opens on the judge's code-reviewer:PASS); map still carries doc-writer and release-engineer", () => {
   const src = read("tools", "role.ts");
   // E435: one chain, code-reviewer is its closing judge, so the comment names that edge only.
+  // E446 re-pin: doc-writer closes without a state write, so the comment no longer says callers write on its behalf.
   const want = [
     "  // Post-chain roles. doc-writer is intentionally absent from tools/transitions.ts",
-    "  // AgentName + ALLOWED_TRANSITIONS: callers set agent_id to the upstream chain role",
-    '  // when invoking tw_update_state on its behalf (skill-doc-writer.md "Side-channel',
-    '  // constraint" clause). release-engineer is in AgentName and opens on the',
-    "  // code-reviewer:PASS -> release-engineer:In_Progress edge there (the chain's judge).",
+    "  // AgentName + ALLOWED_TRANSITIONS: it runs after code-reviewer:PASS, never calls",
+    "  // tw_update_state, and records its doc updates in its commit and final reply",
+    '  // (skill-doc-writer.md "Side-channel constraint" clause). release-engineer is in',
+    "  // AgentName and opens on the code-reviewer:PASS -> release-engineer:In_Progress",
+    "  // edge there (the chain's judge).",
   ];
-  assert.ok(src.includes(want.join("\n")), "five comment lines present contiguously");
+  assert.ok(src.includes(want.join("\n")), "six comment lines present contiguously");
   assert.ok(!src.includes("qa-engineer:PASS"), "E435: the removed qa-engineer:PASS edge is not named");
   assert.ok(!src.includes('skill-release-engineer.md "Side-channel'), "stale release-engineer pointer gone");
   assert.ok(!src.includes("integrator"), "e178a AC4: no integrator in role.ts");
