@@ -61,7 +61,8 @@ test("AC-E349-2: addendum heading list unchanged; the nine §5 bullets follow th
 
   const FANOUT = "- `fanout.mjs` 在本 repo 用 `node scripts/fanout.mjs …` 呼叫，例如 cut 預審之後跑 `node scripts/fanout.mjs check --cut specs/fanout-<id>.md <lane> specs/<feature>.md`。";
   // E425 re-pin: the integrator SOP now calls batch-summary, so the §5 tool line names it last.
-  const TOOLS = "- 整合者 SOP 與 coordinator 呼叫的其他 agc 工具，在本 repo 一樣用 repo 相對路徑：`node scripts/mailbox-watch.mjs`、`node scripts/lane-status.mjs`、`node scripts/merge-invariants.mjs`、`node scripts/test-lock.mjs`（全套一律 `node scripts/test-lock.mjs -- npm test`）、`node scripts/feature-rollup.mjs`、`node scripts/batch-summary.mjs`。";
+  // E443b re-pin: the integrator SOP now runs the lane launcher, so the line names it last (Copy add.tools).
+  const TOOLS = "- 整合者 SOP 與 coordinator 呼叫的其他 agc 工具，在本 repo 一樣用 repo 相對路徑：`node scripts/mailbox-watch.mjs`、`node scripts/lane-status.mjs`、`node scripts/merge-invariants.mjs`、`node scripts/test-lock.mjs`（全套一律 `node scripts/test-lock.mjs -- npm test`）、`node scripts/feature-rollup.mjs`、`node scripts/batch-summary.mjs`、`node scripts/lane-launch.mjs`。";
   const CI = "- 整合者 SOP 的「repo 的 CI 檢查」在本 repo 是 `node scripts/verify-release.mjs --ci-check --sha <sha>`（只在本 repo 能用：它從自己的位置找 repo）。";
   const BOOK = "- 整合者 5c 的記帳檢查是 `npm run check:bookkeeping`：記帳 commit 前跑、要 exit 0；它也透過測試檔在 `npm test` 裡，PR 的 CI 會再跑一次。";
   const f = addLines.indexOf(FANOUT);

@@ -22,15 +22,19 @@ export interface LaneAncestryResult {
 }
 
 /**
- * For each branch, runs `git merge-base --is-ancestor <branch> HEAD` with
+ * For each branch, runs `git merge-base --is-ancestor <branch> <ref>` with
  * `cwd` pinned to `repoRoot`. Never throws: a clean "not merged yet" (git
- * exit 1) is `{ isAncestor: false }`; any other failure (unknown branch, git
- * unavailable, corrupt repo) is `{ isAncestor: false, error }`, never `true`.
+ * exit 1) is `{ isAncestor: false }`; any other failure (unknown branch or
+ * ref, git unavailable, corrupt repo) is `{ isAncestor: false, error }`,
+ * never `true`. `ref` is required for TypeScript callers. A JavaScript caller
+ * written before the parameter existed passes two arguments: at run time a
+ * missing `ref` compares with HEAD, so its output does not change.
  */
-export function checkLaneAncestry(branches: string[], repoRoot: string): LaneAncestryResult[] {
+export function checkLaneAncestry(branches: string[], repoRoot: string, ref: string): LaneAncestryResult[] {
+  const target = (ref as string | undefined) ?? "HEAD";
   return branches.map((branch): LaneAncestryResult => {
     try {
-      execFileSync("git", ["merge-base", "--is-ancestor", branch, "HEAD"], {
+      execFileSync("git", ["merge-base", "--is-ancestor", branch, target], {
         cwd: repoRoot,
         stdio: ["ignore", "ignore", "pipe"],
       });
@@ -39,8 +43,8 @@ export function checkLaneAncestry(branches: string[], repoRoot: string): LaneAnc
       const status = (err as NodeJS.ErrnoException & { status?: number }).status;
       if (status === 1) {
         // git merge-base --is-ancestor's documented negative result: both
-        // refs resolved fine, `branch` is simply not an ancestor of HEAD
-        // yet. A real, clean "not merged" answer — not a failure.
+        // refs resolved fine, `branch` is simply not an ancestor of the
+        // target yet. A real, clean "not merged" answer — not a failure.
         return { branch, isAncestor: false };
       }
       // Anything else (128 for an unknown/invalid ref, ENOENT if git itself

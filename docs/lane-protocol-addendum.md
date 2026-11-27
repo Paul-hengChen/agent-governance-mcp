@@ -28,7 +28,7 @@
 ## §5 信箱
 
 - `fanout.mjs` 在本 repo 用 `node scripts/fanout.mjs …` 呼叫，例如 cut 預審之後跑 `node scripts/fanout.mjs check --cut specs/fanout-<id>.md <lane> specs/<feature>.md`。
-- 整合者 SOP 與 coordinator 呼叫的其他 agc 工具，在本 repo 一樣用 repo 相對路徑：`node scripts/mailbox-watch.mjs`、`node scripts/lane-status.mjs`、`node scripts/merge-invariants.mjs`、`node scripts/test-lock.mjs`（全套一律 `node scripts/test-lock.mjs -- npm test`）、`node scripts/feature-rollup.mjs`、`node scripts/batch-summary.mjs`。
+- 整合者 SOP 與 coordinator 呼叫的其他 agc 工具，在本 repo 一樣用 repo 相對路徑：`node scripts/mailbox-watch.mjs`、`node scripts/lane-status.mjs`、`node scripts/merge-invariants.mjs`、`node scripts/test-lock.mjs`（全套一律 `node scripts/test-lock.mjs -- npm test`）、`node scripts/feature-rollup.mjs`、`node scripts/batch-summary.mjs`、`node scripts/lane-launch.mjs`。
 - 整合者 SOP 的「repo 的 CI 檢查」在本 repo 是 `node scripts/verify-release.mjs --ci-check --sha <sha>`（只在本 repo 能用：它從自己的位置找 repo）。
 - 整合者 5c 的記帳檢查是 `npm run check:bookkeeping`：記帳 commit 前跑、要 exit 0；它也透過測試檔在 `npm test` 裡，PR 的 CI 會再跑一次。
 - 整合者 5a 的 lane 層 CI：本 repo 的 `.github/workflows/ci.yml` 在 push 到 `feat/**`（另有 `main`、`integ/**`、`release/**`）時觸發，所以整合者 push lane branch 就會跑 CI（E298）。
