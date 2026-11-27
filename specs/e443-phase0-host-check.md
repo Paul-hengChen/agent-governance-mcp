@@ -77,9 +77,58 @@
 
 本機未安裝 tmux，未測。若日後採用，對應做法為 `tmux new-session -d` + `send-keys`，結束 / 關閉辨識改查 pane 與行程；全部未驗證。
 
-## 待觀察（不在本次觸發；由人類日後在真的 lane 撞到用量上限時回報）
+## 第二段：用量上限四項（依官方文件結案，2026-11-26）
 
-1. 互動 session 在用量上限重置後，會不會自己接續。
-2. subagent dispatch 撞到上限時會怎樣（回錯誤、空回覆、或卡住）。
-3. 第三次接續之後會怎樣。
-4. 撞到上限時，畫面上可辨識的訊號是什麼（可供腳本輪詢 `contents` 比對的文字）。
+原列「待觀察、等真的 lane 撞到上限時回報」（第 5 波人類裁定 Q2 (a)）。2026-11-26 人類改裁定 (a)：以 Claude Code 官方文件作為四項的結論，只把第 2 項的實際重派行為留到第一次真的撞到上限時補驗。下列引文由 coordinator 以 `curl` 取回各頁原始 Markdown 逐字核對（同日）；本機 CLI 2.1.332，高於文件要求的 v2.1.234。
+
+| 頁面 | 網址 |
+|---|---|
+| interactive-mode，〈Wait for a usage limit to reset〉 | https://code.claude.com/docs/en/interactive-mode.md#wait-for-a-usage-limit-to-reset |
+| errors，〈You've hit your session limit〉 | https://code.claude.com/docs/en/errors.md#youve-hit-your-session-limit |
+| sub-agents，〈API errors in subagents〉 | https://code.claude.com/docs/en/sub-agents.md |
+| settings-reference，`autoContinueAtUsageLimit` | https://code.claude.com/docs/en/settings-reference.md#autocontinueatusagelimit |
+| statusline，〈Rate limit usage〉 | https://code.claude.com/docs/en/statusline.md#rate-limit-usage |
+
+### 1. 重置後會不會自己接續 —— 會
+
+- interactive-mode：「When a claude.ai usage limit stops Claude mid-task, Claude Code waits in the open session and continues the task on its own after the limit resets. Automatic continue is on by default in interactive sessions signed in with a claude.ai subscription. Requires Claude Code v2.1.234 or later.」
+- 接續方式：「Claude Code prompts Claude to pick the task up where it stopped. It doesn't resend your last message.」
+- 設定：`autoContinueAtUsageLimit`，**Default: `true`**；只從使用者設定、`--settings`、managed 設定讀取。「When none of those sets the key, a project or local settings file that sets it turns the feature off rather than being ignored.」本機使用者設定與本 repo 的 `.claude/` 設定都沒有這個 key（同日 grep）。
+- 例外，**不會**自己開始等的情況：
+  - 「A reset more than 24 hours away: a weekly limit can reset days out.」此時只在本人終端機打開一次選單（`/rate-limit-options`）。
+  - 「Background sessions and `-p` runs: the menu row isn't available.」
+  - 退出 Claude Code 後：「the wait doesn't restart when you resume the session.」
+- 電腦睡眠：睡超過約 30 分鐘且期間已重置，畫面顯示 `Your usage limit has reset` / `Press enter to continue`，要按一次 Enter；睡得較短就自己接續。
+- 接續後的任務「still asks for permissions as usual」；lane session 以 `--permission-mode bypassPermissions` 啟動（第 2 項），不受影響。
+
+### 2. subagent 派工撞到上限 —— 回錯誤或回部分輸出，不會卡住
+
+- sub-agents：subagent 的請求「count toward the same usage limits as your main conversation」。
+- 「**Foreground**: if a rate limit, overload, or server error cuts off a subagent that already produced text output, the Agent tool returns that partial output with a note that the subagent was cut off and didn't finish its task. A subagent that produced nothing, or whose only output was tool calls, fails with `Agent terminated early due to an API error`, followed by the error detail.」
+- 「**Background**: the subagent is marked failed, and the message Claude receives when it ends names the API error and includes the subagent's last output, so partial work isn't lost.」
+- 「Once the underlying API error clears, ask Claude to retry the task or resume the subagent.」
+- 文件**沒寫**：主 session 自動接續時會不會重派被中斷的 subagent。接續只是「prompts Claude to pick the task up」，所以重派與否由 coordinator 的 SOP 決定（Crash-Resume 流程）。**留待補驗**：第一次真的 lane 撞到上限時，記錄主 session 接續後是否照 Crash-Resume 流程重派、pin 是否保留。
+- 注意：同節寫明設定了 fallback model chain 時，subagent 會在模型不可用時改用 chain 裡的下一個模型繼續（報告開頭出現 `⚠ This agent switched to <model> because its earlier model could not be used.`）。這與 E443 修訂第 (4) 項「不換角色的模型」相衝；lane 不得設定 fallback model chain，或在 Phase 1 的 cut 處理。
+
+### 3. 第三次自動接續之後 —— 停止自動接續，等人
+
+- interactive-mode：「After three automatic continuations, automatic continue stops and the `Automatic continue stopped after repeated usage-limit hits` notification appears. Run `/rate-limit-options` to choose what to do next. When you send another prompt, or pick a wait from that menu, the count starts over.」
+- 對啟動器：此時視窗與 session 都還在，第 5 項的「已結束」訊號（`exit.txt`、`is processing`、`ps`）都不會出現；必須輪詢 `contents` 比對這行，標記該 lane 為 paused。送出新 prompt 會讓次數重新計算，可作為叫醒方式（是否自動叫醒由 Phase 1 的 cut 決定）。
+
+### 4. 可辨識的訊號
+
+| 時機 | 畫面文字 |
+|---|---|
+| 撞到上限 | `You've hit your session limit · resets <時間>`、`You've hit your weekly limit · resets <時間>`、`You've hit your Opus limit · resets <時間>`、`You've hit your Sonnet limit · resets <時間>` |
+| 等待中 | `Usage limit reached · limit resets <時間>`、`Continuing automatically at <時間> · Esc to cancel`（兩行後面可能另接文字） |
+| 重置時 | 第二行變成 `Continuing shortly · Esc to cancel`，對話中出現 `Usage limit reset · Continuing automatically` |
+| 三次後停止 | `Automatic continue stopped after repeated usage-limit hits` |
+| 等待被取消 | 以 `Automatic continue cancelled` 開頭的一行 |
+| 快用完前的預警 | 例如 `You've used 85% of your session limit · resets 3:45pm` |
+
+- 機器可讀的替代來源：statusline 的 `rate_limits.five_hour.resets_at`、`rate_limits.seven_day.resets_at`（Unix 秒）；「appears only for claude.ai Pro, Max, and Ultra subscribers … only after the first API response in the session」。
+- 文件沒有保證這些字串跨版本不變；啟動器比對時以前綴比對，並在 CLI 升版時重查。
+
+### 結論
+
+四項都有文件答案；E443 Phase 0 第二段除上面第 2 項的「接續後重派」補驗外結案，Phase 1 可以開 lane。Phase 1 的 cut 要處理：週上限（重置超過 24 小時）不會自己等、三次後停住的偵測與叫醒、睡眠超過 30 分鐘要按 Enter、不得設定 fallback model chain、project／local 設定不得寫 `autoContinueAtUsageLimit`。
