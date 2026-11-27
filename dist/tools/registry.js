@@ -1076,5 +1076,11 @@ export const PROMPT_REGISTRY = [
         arguments: [PROMPT_WORKSPACE_ARG],
         skillFile: "skill-spec-workshop.md",
     },
+    {
+        name: "conductor",
+        description: "Conductor — open a fresh integrator session for each wave of an approved fan-out manifest, check its wave-done report, close it. Human-started; writes no handoff state.",
+        arguments: [PROMPT_WORKSPACE_ARG],
+        skillFile: "skill-conductor.md",
+    },
 ];
 //# sourceMappingURL=registry.js.map
