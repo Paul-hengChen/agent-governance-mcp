@@ -8,31 +8,34 @@ No server change: no `tw_*` tool, gate, error code, `GATE_REGISTRY` entry (stays
 
 | file | change | task |
 |---|---|---|
-| `tools/config.ts` | modify: `WorkspaceConfig.laneLaunchLimit?: number` plus a parse filter (positive integer only, no default, no schema bump) | T-E443B-02 |
-| `tools/join-precondition.ts` | modify: `checkLaneAncestry(branches, repoRoot, ref)`; a missing `ref` at run time compares with `HEAD` | T-E443B-02 |
-| `tools/lane-launch.ts` | create: §A–§F (constants, launch state + lock, manifest refusals, finished signals, dependency + wave plan, the run loop with a basic lane start) | T-E443B-02 |
-| `tools/lane-launch.ts` | extend: §G–§K (host strings, signal matching, the send method, ready wait + `Unknown command` retry, poll / pause / Enter / wake / resume, host pre-checks, the osascript iTerm2 driver, the `feature start` runner) | T-E443B-03 |
-| `tools/lane-launch.ts` | extend: §L (CLI: argv, exit codes, `createHostDeps()`, signal-safe lock release) | T-E443B-04 |
-| `scripts/lane-launch.mjs` | create: thin CLI, real seams only | T-E443B-04 |
-| `CLAUDE.md` | modify: Layout row `claude.row` after the `tools/config.ts` row, `claude.prompts-row` joined to one line (250 lines kept) | T-E443B-04 as cut; Open Question 1 recommends T-E443B-02 |
-| `docs/lane-protocol-addendum.md` | modify: §5 tool line → Copy `add.tools` | T-E443B-04 |
-| `content/coord-03-core-fallback.md` | modify: Copy `coord03.usage-limit` at the head of the Crash-Resume Protocol section | T-E443B-05 |
-| `content/skill-integrator.md` | modify existing lines only: `sop.overview-3`, `sop.lifecycle-4`, `sop.launcher`, `sop.next-wave` | T-E443B-05 |
-| `docs/lane-protocol.md` | modify: `lp.s1-step1` in place, `lp.s3-launcher` appended | T-E443B-05 |
-| `docs/config.md` | modify: `config.section` after the `knowledge` section | T-E443B-05 |
-| `dist/tools/{lane-launch,config,join-precondition}.{js,js.map,d.ts,d.ts.map}` | rebuilt by `npm run build`, committed with each task that changes the source | T-E443B-02..04 |
-| `test/e443b-*.test.mjs`, `test/fixtures/e443b/**`, the re-pinned tests | qa-owned deliverables | T-E443B-01, T-E443B-06 |
+| `tools/config.ts` | modify: `WorkspaceConfig.laneLaunchLimit?: number` plus a parse filter (positive integer only, no default, no schema bump) | T-E443B-07 |
+| `tools/join-precondition.ts` | modify: `checkLaneAncestry(branches, repoRoot, ref)`; a missing `ref` at run time compares with `HEAD` | T-E443B-07 |
+| `tools/lane-launch.ts` | create: §A–§F (constants, launch state + lock, manifest refusals, finished signals, dependency + wave plan, the run loop with a basic lane start) | T-E443B-07 (header, §A–§C, the `runLaneLaunch` refusal / lock / state-read wrapper); T-E443B-08 (§D–§F) |
+| `tools/lane-launch.ts` | extend: §G–§K (host strings, signal matching, the send method, ready wait + `Unknown command` retry, poll / pause / Enter / wake / resume, host pre-checks, the osascript iTerm2 driver, the `feature start` runner) | T-E443B-09 (start: signals, sends, ready wait, `Unknown command` retry, `featureStartArgv`); T-E443B-10 (poll / pause / Enter / wake / resume); T-E443B-11 (host pre-checks, osascript iTerm2 driver) |
+| `tools/lane-launch.ts` | extend: §L (CLI: argv, exit codes, `createHostDeps()`, signal-safe lock release) | T-E443B-12 |
+| `scripts/lane-launch.mjs` | create: thin CLI, real seams only | T-E443B-12 |
+| `CLAUDE.md` | modify: Layout row `claude.row` after the `tools/config.ts` row, `claude.prompts-row` joined to one line (250 lines kept) | T-E443B-07 (per Open Question 1) |
+| `docs/lane-protocol-addendum.md` | modify: §5 tool line → Copy `add.tools` | T-E443B-12 |
+| `content/coord-03-core-fallback.md` | modify: Copy `coord03.usage-limit` at the head of the Crash-Resume Protocol section | T-E443B-13 |
+| `content/skill-integrator.md` | modify existing lines only: `sop.overview-3`, `sop.lifecycle-4`, `sop.launcher`, `sop.next-wave` | T-E443B-13 |
+| `docs/lane-protocol.md` | modify: `lp.s1-step1` in place, `lp.s3-launcher` appended | T-E443B-13 |
+| `docs/config.md` | modify: `config.section` after the `knowledge` section | T-E443B-13 |
+| `dist/tools/{lane-launch,config,join-precondition}.{js,js.map,d.ts,d.ts.map}` | rebuilt by `npm run build`, committed with each task that changes the source | T-E443B-07..12 |
+| `test/e443b-*.test.mjs`, `test/fixtures/e443b/**`, the re-pinned tests | qa-owned deliverables | T-E443B-01, T-E443B-14 |
 
 ### Per-task ownership and size (`task_size`: ≤ 5 files / 300 lines; generated `dist/` not counted)
 
 | task | source files | est. changed lines | sections of `tools/lane-launch.ts` | ACs |
 |---|---|---|---|---|
-| T-E443B-02 | `tools/config.ts` (+~12), `tools/join-precondition.ts` (+~10), `tools/lane-launch.ts` (+~280) | ~300 | §A–§F | A2-1..A2-6, A2-11..A2-14, A2-22, A2-23, A2-24 (config), A2-26, A2-27 |
-| T-E443B-03 | `tools/lane-launch.ts` (+~280) | ~280 | §G–§K | A2-7..A2-10, A2-15..A2-18 |
-| T-E443B-04 | `tools/lane-launch.ts` (+~60), `scripts/lane-launch.mjs` (+~15), `CLAUDE.md` (±3), `docs/lane-protocol-addendum.md` (±1) | ~80 | §L | A2-5, A2-6, A2-11, A2-12 at CLI level; A2-25 |
-| T-E443B-05 | `content/coord-03-core-fallback.md`, `content/skill-integrator.md`, `docs/lane-protocol.md`, `docs/config.md` | ~25 text lines | — | A2-19..A2-21, A2-24 (doc) |
+| T-E443B-07 | `tools/config.ts` (+10), `tools/join-precondition.ts` (+11/−7), `CLAUDE.md` (+2/−2), `tools/lane-launch.ts` (+~238) | ~270 (measured) | header, §A–§C, `runLaneLaunch` refusal / lock / state-read wrapper | A2-22, A2-23, A2-24 (config), A2-25 (`CLAUDE.md`), A2-11 / A2-12 core subtests |
+| T-E443B-08 | `tools/lane-launch.ts` (+~245) | ~245 (measured) | §D–§F (the wave run wired into the wrapper) | A2-1..A2-4, A2-13, A2-14, A2-26, A2-27 |
+| T-E443B-09 | `tools/lane-launch.ts` (+~120) | ~120 (≤ ~205 at 1.7×) | §G start constants, signal matching, `sendText` / `sendEnter`, `startSession`, start-failed, `featureStartArgv` | A2-15, A2-16, A2-17 |
+| T-E443B-10 | `tools/lane-launch.ts` (+~105) | ~105 (≤ ~180 at 1.7×) | poll / pause / Enter / window-gone, wake, resume | A2-7..A2-10 |
+| T-E443B-11 | `tools/lane-launch.ts` (+~135) | ~135 (≤ ~230 at 1.7×) | host pre-checks, `createItermDriver`, `itermInstalled` default | A2-18 |
+| T-E443B-12 | `tools/lane-launch.ts` (+~60), `scripts/lane-launch.mjs` (+~15), `docs/lane-protocol-addendum.md` (±1) | ~80 (≤ ~135 at 1.7×) | §L | A2-5, A2-6, A2-11 / A2-12 CLI-level and real-script subtests; A2-25 (addendum) |
+| T-E443B-13 | `content/coord-03-core-fallback.md`, `content/skill-integrator.md`, `docs/lane-protocol.md`, `docs/config.md` | ~25 text lines | — | A2-19..A2-21, A2-24 (doc) |
 
-T-E443B-02 sits at the budget. If sr measures it over, the split is: move §F's basic lane start (render → `feature start` → open window → two sends) into T-E443B-03 together with the A2-1/A2-2/A2-14/A2-26/A2-27 implementations that need it — that changes the task map, so sr escalates rather than splitting silently.
+Re-split by PM on 2026-11-27 (T-E443B-02..06 voided): sr built the first scheduling task in full and measured about 509 changed lines (§A–§F 477 in `tools/lane-launch.ts`) against an estimate of about 300, a ratio of about 1.7. T-E443B-07 and T-E443B-08 are sized from that measured build; §G–§K (estimated ~280, so ~476 at the same ratio) is cut into three tasks whose worst case at 1.7× stays under 300. The section boundaries above follow the measured build (it placed `HOST_SIGNALS`, `SLASH_LINE`, `SEND_GAP_MS`, `shellQuote` and `launchCommand` in §A / §F).
 
 ## Data Structures
 
@@ -51,7 +54,7 @@ Filter inside `loadConfigEntry`, after the `ticketDir` block, same comment style
 ### Constants (Copy ids in brackets; each is one exported constant)
 
 ```ts
-// §A (T-02)
+// §A (T-E443B-07)
 export const DEFAULT_LANE_LAUNCH_LIMIT = 3;                 // [cfg.default]
 export const LAUNCH_STATE_FILE = "agc-lane-launch.json";    // [launch.state-file]
 export const LAUNCH_LOCK_FILE = "agc-lane-launch.lock";     // [launch.lock-file]
@@ -60,7 +63,7 @@ export const LAUNCH_STATUSES = ["running", "paused-weekly", "paused-stopped", "f
 export type LaunchStatus = (typeof LAUNCH_STATUSES)[number];
 export const POLL_INTERVAL_MS = 15_000;
 
-// §G (T-03) — host strings, re-checked on a CLI upgrade
+// §G (T-E443B-09..11) — host strings, re-checked on a CLI upgrade
 export const SLASH_LINE = "/mcp__agent-governance-mcp__teamwork";     // [launch.slash]
 export const READY_MARKER = "permissions on";                         // [launch.ready-marker]
 export const WAKE_LINE = "額度已恢復：先 tw_get_state，照 Crash-Resume 流程核對後從中斷處接續。"; // [launch.wake]
@@ -218,7 +221,7 @@ A test whose lanes never end stops the loop by making `clock.sleep` throw a sent
 
 ## Interface Contracts
 
-### `tools/join-precondition.ts` (T-02)
+### `tools/join-precondition.ts` (T-E443B-07)
 
 ```ts
 /**
@@ -233,7 +236,7 @@ export function checkLaneAncestry(branches: string[], repoRoot: string, ref: str
 
 Body: `const target = (ref as string | undefined) ?? "HEAD";` then the existing `execFileSync("git", ["merge-base", "--is-ancestor", branch, target], { cwd: repoRoot, ... })` — the call site keeps `repoRoot` inside its parentheses (`test/e115-join-precondition.test.mjs` AC5 scans every `execFileSync(` site for it). Only `undefined` falls back; `""` is passed through and comes back as an `error` result. Emitted `.d.ts` line: `export declare function checkLaneAncestry(branches: string[], repoRoot: string, ref: string): LaneAncestryResult[];` (A2-23; T-01 re-pins e115 AC5). `scripts/join-precondition.mjs` is not edited.
 
-### §A–§F — scheduling and state (T-02)
+### §A–§F — scheduling and state (T-E443B-07, T-E443B-08)
 
 ```ts
 export function launchLimit(config: WorkspaceConfig): number;                 // config.laneLaunchLimit ?? DEFAULT_LANE_LAUNCH_LIMIT
@@ -291,10 +294,10 @@ Rules the functions implement:
   - One `out.waiting` line per unmet D.
 - **Batch-lane filter** (Decision 7, A2-13), per lane of W without a record: `approval === "human"` → `not started <lane> — approval is human`; for each id of `ticketIds(lane.ticket)`, `lookupTicketFiles(primary, [id])` failing with `FANOUT_CODES.ticketFileAbsent` → `not started <lane> — no ticket file for <id>` (first such id). These lanes get no record and still count as not finished.
 - **Slots** (Decision 12): open = `launchLimit(config)` − lanes of W with status `running`, `paused-weekly` or `paused-stopped`. Startable lanes beyond the open slots print `out.queued` once and start, in manifest order, as slots free during the poll loop.
-- **Basic start** (§F; T-03 replaces the session part with `startSession`): `baseSha` = `git rev-parse --verify --quiet <startRef>^{commit}` from primary, or the start ref itself when that fails (render then reports `BASE_INVALID`, or `feature start` reports the bad ref). Render first: `renderPrompt(m, lane, { batch: true, base: baseSha, primary })` — failure → `not started <lane> — render failed: <first error code>`, no worktree created. Then, unless the resolved worktree is listed by `git worktree list --porcelain` (realpath compared): `featureStart({ primary, slug: <branch without feat/>, base: startRef, worktree })` — failure → `not started <lane> — agc feature start failed: <firstLine>`. Then `driver.open(launchCommand(worktree, lane))`, record `running` (state written at once), the two sends, `out.started`.
+- **Basic start** (§F; T-E443B-09 replaces the session part with `startSession`): `baseSha` = `git rev-parse --verify --quiet <startRef>^{commit}` from primary, or the start ref itself when that fails (render then reports `BASE_INVALID`, or `feature start` reports the bad ref). Render first: `renderPrompt(m, lane, { batch: true, base: baseSha, primary })` — failure → `not started <lane> — render failed: <first error code>`, no worktree created. Then, unless the resolved worktree is listed by `git worktree list --porcelain` (realpath compared): `featureStart({ primary, slug: <branch without feat/>, base: startRef, worktree })` — failure → `not started <lane> — agc feature start failed: <firstLine>`. Then `driver.open(launchCommand(worktree, lane))`, record `running` (state written at once), the two sends, `out.started`.
 - **Run order** (Decision 12) — see the Sequence Diagram. The run ends with exit 0 and `out.exit` when no lane of W is `running`.
 
-### §G–§K — window driving and host (T-03)
+### §G–§K — window driving and host (T-E443B-09, T-E443B-10, T-E443B-11)
 
 ```ts
 export function shellQuote(s: string): string;
@@ -344,7 +347,7 @@ Rules:
 - **Host pre-checks** (Decision 13, A2-18): `itermInstalled()` false → `out.refused.iterm`. `~/.claude.json` (`host.claudeJson`) → `projects[<primary>]` or `projects[<realpath(primary)>]` must have `hasTrustDialogAccepted === true`, else `out.refused.trust` (absent / unparseable file refuses too). `autoContinueAtUsageLimit` present (any value) in `.claude/settings.json` or `.claude/settings.local.json` of primary or of any existing lane worktree of the manifest → one `out.refused.autocontinue` per file. `fallbackModel` set (present and not `null`, `""` or `[]`) in `host.userSettings`, `host.managedSettings`, each `host.managedDropInDir/*.json` (sorted), or the project / local settings of primary or an existing lane worktree → one `out.refused.fallback` per file. `<file>` is the absolute path checked. An absent file is "not set"; an unparseable settings file is "not set" (the CLI itself rejects it).
 - **iTerm2 driver**: four fixed AppleScript programs, each `on run argv … end run`: open (`create window with default profile`, `write text (item 1 of argv)` to its current session, return `id of` the window as text), contents (`contents of current session of (first window whose id is (item 1 of argv as integer))`), write (`write text (item 2 of argv)` with `newline NO` unless `item 3 of argv` is `"1"`), exists (`exists (first window whose id is …)` → `"true"`/`"false"`). The default runner is `execFileSync("osascript", [...lines.flatMap(l => ["-e", l]), ...args])`. `itermInstalled` default: `process.platform === "darwin"` and `/Applications/iTerm.app` or `~/Applications/iTerm.app` exists.
 
-### §L — CLI (T-04)
+### §L — CLI (T-E443B-12)
 
 ```ts
 export const LANE_LAUNCH_USAGE = "usage: node scripts/lane-launch.mjs <manifest>";

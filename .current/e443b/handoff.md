@@ -1,13 +1,11 @@
 ---
 schema_version: 17
 active_feature: "e443b-lane-launcher"
-status: "Blocked"
-last_updated: "2026-11-27T09:03:07.669Z"
-blocking_reason: "Task T-E443B-02 oversized: the full build measures about 509 changed lines against the 300-line task_size budget. The architecture estimated about 300. Stopped per the dispatch brief instead of splitting on my own. Nothing committed; the worktree is clean at d7b4bcb."
-last_agent: "sr-engineer"
+status: "In_Progress"
+last_updated: "2026-11-27T09:07:55.547Z"
+last_agent: "pm"
 scope_decision: "single-feature"
 scope_decision_why: "Manifest specs/fanout-post-v5-w8.md: one lane, one feature, one cut (E443b = ticket-cut NEW-2 scope 1-14, A2-1..A2-21, plus the manifest scope cut: G1 (b), required ref parameter, addendum line, budget re-baseline). Not design-armed."
-cut_approved: true
 external_refs:
   - ref: "https://code.claude.com/docs/en/settings-reference.md#fallbackmodel"
     state: "fetched"
@@ -28,13 +26,13 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "opus"
 evidence_schema: 3
-next_role: "pm"
-dispatched_at: "2026-11-27T09:03:07.669Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-11-27T09:07:55.547Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 review_round: 0
 visual_round: 0
-hop_count: 4
+hop_count: 5
 review_rounds_total: 0
 visual_rounds_total: 0
 ---
@@ -44,11 +42,14 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Task T-E443B-02 oversized — recommend PM split
-- sr-engineer measured it by building it in full: tools/lane-launch.ts §A–§F = 477 lines (already compact), tools/config.ts +10, tools/join-precondition.ts +11/-7, CLAUDE.md +2/-2 = about 509 changed lines (dist not counted) vs the 300 budget. Per section of lane-launch.ts: header+imports 18, §A constants/OUT/state types/seams/launchLimit/resolveLaunchContext 116, §B state read/write + lock 58, §C manifest refusals 21, §D mailbox/tickets/finished probe 69, §E dependencies + start ref 24, §F run loop (LaunchRun class + runLaneLaunch) 171. The architecture's fallback (move §F's basic lane start to T-03) saves only about 60 lines, so it does not fix this.
-- Measured build verified before revert: npm run build had zero errors. Green: A2-1, A2-2, A2-3, A2-4, A2-13, A2-14, A2-22, A2-23, A2-26, A2-27 (10), plus the core subtests of A2-11/A2-12, and e115 AC5. All 147 tests in the reader files are green: e115, e123b9, e132, e395, e436, e391, config-cache, drift-baseline, config-versioning, e289. Still red: A2-5 and A2-6 (whole test) plus the CLI and real-script subtests of A2-11/A2-12 need runLaneLaunchCli + scripts/lane-launch.mjs (§L, T-04); A2-24 needs the docs/config.md section (T-05); A2-25 needs the addendum line (T-04); the T-03 and T-05 tests as planned. Correction to the brief: A2-5/A2-6 cannot turn green in T-02, because they call runLaneLaunchCli.
-- Suggested split (PM decides): T-02a = tools/config.ts + tools/join-precondition.ts + the CLAUDE.md rows + lane-launch.ts header/§A/§B/§C + the runLaneLaunch refusal/lock wrapper (about 270 lines; turns green A2-23, the A2-24 config part, e115 AC5, and the A2-22 + A2-11/A2-12 core refusal subtests if the wrapper is included). T-02b = §D/§E/§F (about 245 lines; A2-1..A2-4, A2-13, A2-14, A2-26, A2-27). Risk: T-03 (§G–§K, estimated at about 280) is probably also over budget at the same estimate-to-actual ratio (about 1.7x), so re-measure it before dispatch.
-- The measured code is kept outside the repo for reuse by the next sr: <scratchpad>/e443b-t02-measured/lane-launch.ts and config-ancestry-claude.patch (git apply). The worktree was reverted to a clean d7b4bcb: no source, dist or state was committed by this hop.
+- PM re-split of the sr task map for task_size (≤ 5 files / 300 lines per sr task, dist not counted). No change to scope, files, Decisions, Copy or acceptance text. Nothing committed.
+- Voided: T-E443B-02 (measured ~509 lines), T-E443B-03 (§G–§K re-estimated ~476 at the 1.7x ratio), T-E443B-04, T-E443B-05, T-E443B-06 (their depends_on named voided ids, and tw_add_task appends, so they had to be re-cut after the new sr tasks to keep ledger order). Added: T-E443B-07..14. Kept: T-E443B-01.
+- Chain: T-E443B-01 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → T-E443B-14 (qa close). Sizes: 07 ~270 (measured: config +10, join-precondition +11/-7, CLAUDE.md +2/-2, lane-launch header + §A–§C + runLaneLaunch refusal/lock/state-read wrapper ~238); 08 ~245 (measured §D–§F, the wave run wired into the wrapper); 09 ~120 (≤ ~205 at 1.7x); 10 ~105 (≤ ~180); 11 ~135 (≤ ~230); 12 ~80 (≤ ~135); 13 ~25 text lines. CLAUDE.md Layout row stays in the first sr task (T-E443B-07) so e395 is green at every task boundary.
+- AC → task map: A2-22, A2-23, A2-24 (config), A2-25 (CLAUDE.md), A2-11/A2-12 core (runLaneLaunch) subtests, e115 AC5 → T-E443B-07; A2-1..A2-4, A2-13, A2-14, A2-26, A2-27 → T-E443B-08; A2-15, A2-16, A2-17 → T-E443B-09 (featureStartArgv lands here, the rest of A2-15 is §F in 08); A2-7..A2-10 → T-E443B-10; A2-18 → T-E443B-11; A2-5, A2-6, the CLI-level and real-script subtests of A2-11/A2-12, A2-25 (addendum) → T-E443B-12; A2-19..A2-21, A2-24 (docs/config.md) → T-E443B-13. Every A2-1..A2-27 maps to an implementing task.
+- Updated: specs/e443b-lane-launcher.md (Routing task map line; Probe rows naming T-E443B-06 now T-E443B-14; the ## Cut row names no task id and is unchanged) and specs/e443b-lane-launcher-architecture.md (Affected Files task column, per-task ownership table, the old fallback paragraph replaced by a re-split note, section headings §A–§F / §G–§K / §L and two constant comments renamed to the new ids; Decisions and Open Questions untouched).
+- node scripts/fanout.mjs check --cut specs/fanout-post-v5-w8.md e443b specs/e443b-lane-launcher.md → exit 0 (1 ticket, 31 tokens, 0 out of bounds).
+- For qa-engineer: the expected-red manifest and qa_reports/tests_e443b-lane-launcher.md still name T-E443B-02..06 in comment/attribution lines; those are qa-owned text, not entries, so refresh the attributions at your next touch if you want them current. For sr (T-E443B-07/08): reuse the measured build saved outside the repo in the sr scratch copy (e443b-t02-measured/lane-launch.ts and config-ancestry-claude.patch); in T-E443B-07 runLaneLaunch ends after the refusal / lock / state read and T-E443B-08 adds the wave run.
+- Not setting cut_approved (Task-dispatched); the coordinator attests after the human approves the re-split.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
