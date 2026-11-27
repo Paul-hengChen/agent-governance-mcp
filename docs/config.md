@@ -233,6 +233,30 @@ Semantics:
 - **Switching back.** `agc init --knowledge=repo` records `"repo"` and leaves the exclude rules in place (as `--artifacts=repo` does); a flag-less re-run keeps the declared value.
 - **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists.
 
+### `laneLaunchLimit` — lane launcher parallel limit (optional)
+
+The lane launcher (`node <agc install>/scripts/lane-launch.mjs <manifest>`) starts the lanes of one wave of a fan-out manifest, each in its own terminal window. This key caps how many of its lanes are open at once; lanes over the limit queue and start as others finish.
+
+```json
+{
+  "laneLaunchLimit": 2
+}
+```
+
+| Value | Lanes open at once |
+|---|---|
+| absent (or not usable) | `3` (the default) |
+| `2` | `2` |
+
+Semantics:
+
+- **Optional.** A positive integer. Any other value (zero, negative, fractional, not a number) is dropped silently and the default applies; it is never an error.
+- **What counts as open.** A lane counts from the moment the launcher starts it until its final report reaches the mailbox (its lane report, or the report it sends after a batch stop; a progress report does not count) or its window is gone; a paused lane still counts.
+- **Where the default is applied.** `loadConfig` surfaces the value verbatim as `WorkspaceConfig.laneLaunchLimit` only when it is usable; the launcher applies the default of 3 itself.
+- **Who reads it.** Only the lane launcher, from the primary checkout's `.current/.config.json`.
+- **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists.
+- **Known limitation: an abandoned lane releases its dependents.** `agc feature finish --abandoned` also leaves a finish record, and with `"knowledge": "local"` (or once the lane's branch is gone) the launcher takes that record as the depended-on lane being finished, although nothing merged. Before you re-run the launcher after abandoning a lane, re-plan the lanes that depend on it.
+
 ---
 
 ## `.current/const-*.md` — constitution override

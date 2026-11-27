@@ -10,7 +10,7 @@
 
 ## 1. 開工
 
-1. **建 worktree —— 在任何 `tw_*` 呼叫之前**：
+1. **建 worktree —— 在任何 `tw_*` 呼叫之前**（由啟動器開出的批次 lane 例外：worktree 已建好、session 就開在裡面，跳過建立與切換，只做本步的 *確認位置*；啟動器見 §3 *批次 lane*）：
    ```bash
    cd <primary> && agc feature start <ticket-slug> --base <base> --path <worktree>
    ```
@@ -57,7 +57,7 @@
 
 本小節是批次 lane 的唯一規則來源。它指名覆寫四處，只對批次 lane 生效，其餘 lane 照舊：本節第一條的「一律等人類在你這個 session 親手打字」、§5 規則 2 *cut 預審* 的「只有條件不成立……才把 cut 呈給人類」、憲法 §3.1 Cut-Approval Gate 的「人類在對話中核准 cut 之後」，以及 §3.1 Manifest tier 的「HALT exactly as today」。
 
-- **什麼是批次 lane**：三項都成立——(a) lane 從已核准的波次表（fan-out 清單）啟動：清單的 Decisions 表有 `人類` 列、Lanes 表有這條 lane；(b) 這條 lane 的每張票都是票檔（格式見 agc 的 `docs/ticket-format.md`）；(c) 這條 lane 在 Lanes 表的 `approval` 欄不是 `human`。
+- **什麼是批次 lane**：三項都成立——(a) lane 從已核准的波次表（fan-out 清單）啟動：清單的 Decisions 表有 `人類` 列、Lanes 表有這條 lane；(b) 這條 lane 的每張票都是票檔（格式見 agc 的 `docs/ticket-format.md`）；(c) 這條 lane 在 Lanes 表的 `approval` 欄不是 `human`。批次 lane 由整合者跑 agc 的啟動器（`node <agc 安裝位置>/scripts/lane-launch.mjs <清單>`）開出 session，不由人類貼派工 prompt；啟動器拒絕的波次照舊由人類開。
 - **不等打字核准**：批次 lane 從不等人類打字。cut 只能由憲法 §3.1 manifest tier 自動核准；manifest tier 的條件不成立，就停票（見下），不呈給人類、不等，也不寫 `cut_approved`。政策裁決、lease override、hop 或輪數上限用完也一樣：凡是要人類決定的事，一律停票。
 - **只在兩種情況停票**：(1) 情境本身有問題：互相矛盾、漏了會改變行為的情況、做不出來，或需要修改、刪除一條既有情境；(2) 工作需要票沒授權的東西：允許路徑以外的檔案、schema 變更、對外合約，或上一條任何要人類決定的事。其餘都由做事的角色自己決定並記錄（記在哪裡見票檔格式的 *Batch summary*），不停。
 - **情境只能追加**：開工後情境只能照票檔格式追加在 `## Added during build`，不能修改或刪除。

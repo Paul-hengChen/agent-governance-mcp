@@ -58,3 +58,12 @@ test/e425-stop-ticket-batch.test.mjs | AC1: lane protocol holds C-LP1, C-LP2 and
 
 # T-E443B-14 (qa close): golden re-capture, budget cap re-baseline, e428 sha256 re-pin, full suite. No entry here:
 # those tests are green today and go red only when T-E443B-13 lands the served text (see the tests report).
+
+# T-E443B-13 (sr-engineer): left red by the served text this task lands; re-captured / re-pinned by qa in T-E443B-14.
+# Budget cap: +100 tok in the teamwork bundle (20005 vs 19905), the measured growth the cut planned for.
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19905 ~tok)
+# Compose golden: coord-03 gains the usage-limit paragraph.
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+# e428 sha256 pin of content/skill-integrator.md (the four edited lines change the base hash).
+test/e428-tracker-mirror.test.mjs | AC6: integrator `## Tracker items` (C-IN1) sits after the Stage 6 *Your own commits* paragraph and before `## Git operations`; nothing else moves
+test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the four files holds no URL, repo-only path, bare ticket id, version label, quoted error code or vendor name
