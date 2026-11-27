@@ -87,3 +87,19 @@ E465：照下表寫法，0 個既有測試紅（另有 `test/e326-empty-branch-r
 | 2026-11-28 | 整合者 | 接受機械性越界：qa 照 qa SOP 與 `docs/ticket-format.md`（*Filling in the test name later*）把 `docs/tickets/E465.md` 7 行 `Verification: automated test` 改成具名測試（@ `45ba4e0c`），只限原地改那 7 行；第 2 波 e466 同樣適用於 `docs/tickets/E466.md` 的 Verification 行 | e465 信箱 to-integrator#4、to-lane#3 |
 | 2026-11-28 | 整合者 | e465 收工回報（to-integrator#5）核對通過並 `close`（to-lane#4）：`feat/e465-launcher-wave-done` @ `c7a4cd9`（5 commit）；`fanout check --base main` 31 檔、唯一越界為上一列接受的票檔 Verification 行；證據 `review_reports/review_T-E465-01.md` APPROVED（covers T-E465-01..07），`qa_reports/review_T-E465-01..07.md` 最新皆 PASS；worktree 乾淨；無 pending-tickets；lane 層 CI run 46038044739 @ `c7a4cd9` 綠。裁判 optional 三項（送 `/exit` 失敗時無提示；選項重複給是用法錯誤；branch tip 只在 finished 轉換與相依檢查時記錄，fail-safe 且已寫進 `docs/config.md`）列在結案報告，不開票 | e465 信箱 to-integrator#5、to-lane#4；`review_reports/review_T-E465-01.md` |
 | 2026-11-28 | 整合者 | 5b：`integ/conductor` 自 `main` @ `812f63e` 開，`--no-ff` 合進 e465（merge `9d2e940`，零衝突、沒有需審的解衝突），merge-invariants PASS；build 無 `dist/` 差異、audit exit 0、`agc check` exit 0；5c：E465 done-mark（`docs/backlog.md` E465 列） | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 812f63e
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/conductor @ f6b31e7）
+- lane-status：primary（main ← integ/conductor @ f6b31e7）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
+### 已結案
+- 第 1 波：e465（E465）PASS，merge `9d2e940`；以本波 PR 合進 `main`。lane 紀錄在 `.current/history/2026-11/e465/`；沒有未配號的新發現。裁判 optional 三項記在 Decisions 表，不開票。
+- 第 2 波 e466（E466）尚未開始：本波 PR 合併、本機 `main` pull 之後，由整合者建 `_mailbox/e466/`、開監看，再重跑 `node scripts/lane-launch.mjs specs/fanout-conductor.md`（已核准清單的較後 `波次`，不是下一波）。e466 跑到 PASS 後停在 S9 人工驗收，人類驗收完才合併。
+### 待人類決定
+- 要不要發 v5.x：E465 合併後尚未發版；整合者建議等第 2 波 E466 合併後再一起決定。
+### 進行中的背景工作
+無
