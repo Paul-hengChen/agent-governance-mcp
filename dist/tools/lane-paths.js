@@ -8,11 +8,13 @@
 // Why: specs/e260b-rationale.md (this file's section)
 import * as fs from "fs";
 import * as path from "path";
-// The registry: exactly 8 entries, 1 required, 7 optional. `.config.json`,
+// The registry: exactly 9 entries, 1 required, 8 optional. `.config.json`,
 // exemptions.json and feature-split.md are deliberately NOT lane files.
 // Every file inside `.current/<lane>/` must be registered here, or the
 // lane->flat runner refuses the whole lane. Per-entry notes (pendingTickets,
 // tasks, baseSha): specs/e260b-rationale.md, this file's section. (E123)
+// knowledgeSeed: the lane's knowledge-file snapshot record (`"knowledge":
+// "local"` only); it never had a flat location.
 export const LANE_FILES = [
     { key: "handoff", filename: "handoff.md", required: true },
     { key: "telemetry", filename: "telemetry.jsonl", required: false },
@@ -22,6 +24,7 @@ export const LANE_FILES = [
     { key: "pendingTickets", filename: "pending-tickets.md", required: false },
     { key: "tasks", filename: "tasks.md", required: false, noFlatCounterpart: true },
     { key: "baseSha", filename: "base-sha", required: false },
+    { key: "knowledgeSeed", filename: "knowledge-seed.json", required: false, noFlatCounterpart: true },
 ];
 // Registry key -> LanePaths field (resolveLanePaths' shape). Keys only, never
 // filenames (AC15 is about filenames). Typed as a total Record over
@@ -36,6 +39,7 @@ const LANE_PATH_FIELD = {
     pendingTickets: "pendingTicketsPath",
     tasks: "tasksPath",
     baseSha: "baseShaPath",
+    knowledgeSeed: "knowledgeSeedPath",
 };
 // Look up one registry entry by key. enumerateLaneSidecarSources below
 // derives a sidecar's filename from it; the lane-paths/dispatch-log tests

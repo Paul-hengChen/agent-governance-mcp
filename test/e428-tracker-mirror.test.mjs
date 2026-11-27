@@ -167,7 +167,7 @@ function swapBack(text, now, was, label) {
 }
 const BASE = {
   [SW_FILE]: { sha: "e8f7ee8c360cc9686e850a1b3c8f3debbe12512a87aee5e836c6d6174f8e08b9", revert: (t) => swapBack(removeInsert(t, C_SW2, "C-SW2"), C_SW1, OLD_SW_SENTENCE, "C-SW1") },
-  [IN_FILE]: { sha: "6e1a994b4036fbefef62629f7514cf5ee8106e9041b70853a1bce39040a8bf60", revert: (t) => removeInsert(t, C_IN1, "C-IN1") },
+  [IN_FILE]: { sha: "bebdd0e874912302b06f2ae81812aa924b1089f21a3a1b0767e2b078f6f58d06", revert: (t) => removeInsert(t, C_IN1, "C-IN1") },
   [CO_FILE]: { sha: "ad94413ccc8443ac135e29c19455df534139c94e31fc181cbe3d5ba65a745511", revert: (t) => removeInsert(t, C_CO1, "C-CO1") },
   [TF_FILE]: { sha: "2321639c08c98cd5023d6f16bb51396a74c5d1d28200e8f37be12121a3f04407", revert: (t) => removeInsert(t, C_TF1, "C-TF1") },
 };

@@ -16,6 +16,7 @@ export interface WorkspaceConfig {
     cutApprovalAutoTier?: CutApprovalAutoTier;
     staleDispatchNotifyFile?: string;
     artifacts?: WorkspaceArtifactsMode;
+    knowledge?: WorkspaceKnowledgeMode;
     nodeModulesLinks?: string[];
     laneProtocolAddendum?: string;
     sisterRepos?: SisterRepo[];
@@ -29,6 +30,7 @@ export interface SisterRepo {
     contracts?: string[];
 }
 export type WorkspaceArtifactsMode = "local" | "repo";
+export type WorkspaceKnowledgeMode = "local" | "repo";
 export interface NodeModulesLinksParse {
     links: string[];
     rejected: unknown[];

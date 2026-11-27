@@ -65,6 +65,7 @@ export declare const FANOUT_CODES: {
     readonly approvalValueUnknown: "APPROVAL_VALUE_UNKNOWN";
     readonly approvalHuman: "APPROVAL_HUMAN";
     readonly decisionsHumanRowAbsent: "DECISIONS_HUMAN_ROW_ABSENT";
+    readonly manifestChanged: "MANIFEST_CHANGED";
     readonly cutSectionAbsent: "CUT_SECTION_ABSENT";
     readonly cutSectionDuplicate: "CUT_SECTION_DUPLICATE";
     readonly cutTableAbsent: "CUT_TABLE_ABSENT";
@@ -494,7 +495,7 @@ export interface CutCheckReport {
         count: number;
         latest?: string;
     };
-    /** APPROVAL_HUMAN / DECISIONS_HUMAN_ROW_ABSENT, in that order, only when failing. */
+    /** APPROVAL_HUMAN / DECISIONS_HUMAN_ROW_ABSENT, in that order, only when failing, then any caller-supplied failure (MANIFEST_CHANGED). */
     failures: FanoutError[];
     output: string;
     exitCode: 0 | 1;
@@ -546,7 +547,7 @@ export declare function isCutTokenInBounds(token: string, lane: DispatchableLane
  * row, plus the two manifest-side facts the manifest tier needs (`approval`
  * not human, at least one 人類 Decisions row). Pure: no fs, no git.
  */
-export declare function checkCut(m: Manifest, laneId: string, specText: string): CutCheckResult;
+export declare function checkCut(m: Manifest, laneId: string, specText: string, extraFailures?: FanoutError[]): CutCheckResult;
 export interface OwnersHit {
     path: string;
     /** Owning lanes in table order; `token` undefined = implicit bookkeeping. */
@@ -611,6 +612,21 @@ export declare function runCheck(args: string[]): CliResult;
  * manifest error. Reads only; git is run read-only.
  */
 export declare function runOwners(args: string[]): CliResult;
-/** `check --cut <manifest> <lane> <spec>`: file reads only — no git, no writes. */
+/**
+ * The MANIFEST_CHANGED failure for check --cut, or undefined. It applies only
+ * when `cwd` is inside a linked worktree whose primary checkout sets
+ * `"knowledge": "local"`: the manifest then lives untracked in the lane as a
+ * copy taken at lane start, so it is compared byte for byte with the same
+ * repo-relative path in the primary checkout, and a missing primary copy
+ * counts as changed. A `.git` directory or no `.git` at all (not a linked
+ * worktree) means no git command and no further read. A manifest outside the
+ * lane worktree is not compared.
+ */
+export declare function manifestChangedFailure(manifestFile: string, cwd?: string): FanoutError | undefined;
+/**
+ * `check --cut <manifest> <lane> <spec>`: no writes. Outside a linked
+ * worktree it reads only the two files and runs no git; inside one it may
+ * add the MANIFEST_CHANGED comparison (manifestChangedFailure).
+ */
 export declare function runCheckCut(args: string[]): CliResult;
 //# sourceMappingURL=fanout-manifest.d.ts.map

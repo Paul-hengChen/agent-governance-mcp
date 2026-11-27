@@ -163,6 +163,9 @@ export const FANOUT_CODES = {
   // check --cut manifest-side failures (exit 1, reported as FAIL lines).
   approvalHuman: "APPROVAL_HUMAN",
   decisionsHumanRowAbsent: "DECISIONS_HUMAN_ROW_ABSENT",
+  // Only in a lane of a workspace whose primary config sets
+  // "knowledge": "local": the lane's manifest copy differs from primary's.
+  manifestChanged: "MANIFEST_CHANGED",
   // check --cut spec-side format errors (exit 2): the `## Cut` table.
   cutSectionAbsent: "CUT_SECTION_ABSENT",
   cutSectionDuplicate: "CUT_SECTION_DUPLICATE",
@@ -1858,7 +1861,7 @@ export interface CutCheckReport {
   out: CutOut[];
   approval: "human" | undefined;
   humanDecisions: { count: number; latest?: string };
-  /** APPROVAL_HUMAN / DECISIONS_HUMAN_ROW_ABSENT, in that order, only when failing. */
+  /** APPROVAL_HUMAN / DECISIONS_HUMAN_ROW_ABSENT, in that order, only when failing, then any caller-supplied failure (MANIFEST_CHANGED). */
   failures: FanoutError[];
   output: string;
   exitCode: 0 | 1;
@@ -2113,7 +2116,7 @@ export function isCutTokenInBounds(token: string, lane: DispatchableLane): boole
  * row, plus the two manifest-side facts the manifest tier needs (`approval`
  * not human, at least one 人類 Decisions row). Pure: no fs, no git.
  */
-export function checkCut(m: Manifest, laneId: string, specText: string): CutCheckResult {
+export function checkCut(m: Manifest, laneId: string, specText: string, extraFailures: FanoutError[] = []): CutCheckResult {
   const found = lookupLane(m, laneId);
   if (!found.ok) return { ok: false, errors: found.errors };
   const lane = found.lane;
@@ -2156,6 +2159,7 @@ export function checkCut(m: Manifest, laneId: string, specText: string): CutChec
       message: "the ## Decisions table has no 人類 row — the manifest is not human-approved",
     });
   }
+  failures.push(...extraFailures);
 
   const lines = [
     ownedLine(lane),
@@ -2498,7 +2502,68 @@ export function runOwners(args: string[]): CliResult {
   return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
 }
 
-/** `check --cut <manifest> <lane> <spec>`: file reads only — no git, no writes. */
+/** Nearest directory at or above `dir` holding a `.git` entry, and whether that entry is a file. Stats only. */
+function findGitEntry(dir: string): { root: string; isFile: boolean } | undefined {
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    try {
+      return { root: d, isFile: fs.statSync(path.join(d, ".git")).isFile() };
+    } catch {
+      // no .git entry here
+    }
+    if (path.dirname(d) === d) return undefined;
+  }
+}
+
+/**
+ * True when `"knowledge": "local"` is set in the checkout's config. The file
+ * is read raw (no loadConfig, which may rewrite it); anything unreadable or
+ * malformed counts as not set.
+ */
+function knowledgeLocalIn(checkout: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(path.join(checkout, ".current", ".config.json"), "utf8"));
+    return typeof parsed === "object" && parsed !== null && (parsed as { knowledge?: unknown }).knowledge === "local";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The MANIFEST_CHANGED failure for check --cut, or undefined. It applies only
+ * when `cwd` is inside a linked worktree whose primary checkout sets
+ * `"knowledge": "local"`: the manifest then lives untracked in the lane as a
+ * copy taken at lane start, so it is compared byte for byte with the same
+ * repo-relative path in the primary checkout, and a missing primary copy
+ * counts as changed. A `.git` directory or no `.git` at all (not a linked
+ * worktree) means no git command and no further read. A manifest outside the
+ * lane worktree is not compared.
+ */
+export function manifestChangedFailure(manifestFile: string, cwd: string = process.cwd()): FanoutError | undefined {
+  const entry = findGitEntry(cwd);
+  if (entry === undefined || !entry.isFile) return undefined;
+  const primary = resolvePrimary(cwd);
+  if (primary === undefined) return undefined;
+  const laneRoot = realOrResolved(entry.root);
+  const primaryRoot = realOrResolved(primary);
+  if (laneRoot === primaryRoot || !knowledgeLocalIn(primaryRoot)) return undefined;
+  const abs = path.resolve(cwd, manifestFile);
+  const rel = path.relative(laneRoot, path.join(realOrResolved(path.dirname(abs)), path.basename(abs)));
+  if (rel === "" || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) return undefined;
+  let same: boolean;
+  try {
+    same = fs.readFileSync(abs).equals(fs.readFileSync(path.join(primaryRoot, rel)));
+  } catch {
+    same = false;
+  }
+  if (same) return undefined;
+  return { code: FANOUT_CODES.manifestChanged, scope: "input", message: "manifest changed since lane start — re-seed" };
+}
+
+/**
+ * `check --cut <manifest> <lane> <spec>`: no writes. Outside a linked
+ * worktree it reads only the two files and runs no git; inside one it may
+ * add the MANIFEST_CHANGED comparison (manifestChangedFailure).
+ */
 export function runCheckCut(args: string[]): CliResult {
   const p = parseArgs(args, []);
   if (typeof p === "string") return usageResult(p);
@@ -2508,7 +2573,8 @@ export function runCheckCut(args: string[]): CliResult {
   if ("error" in r) return fail([r.error]);
   const spec = readSpec(specFile);
   if ("error" in spec) return fail([spec.error]);
-  const res = checkCut(parseManifest(r.text), lane, spec.text);
+  const changed = manifestChangedFailure(file);
+  const res = checkCut(parseManifest(r.text), lane, spec.text, changed ? [changed] : []);
   if (!res.ok) return fail(res.errors);
   return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
 }
