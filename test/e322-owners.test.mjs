@@ -238,7 +238,7 @@ test("AC-E322-9 generic usage lists owners; owners usage unchanged; read-only", 
   const g = cli([]);
   assert.equal(g.status, 2);
   const cont = g.stderr.split("\n").filter((l) => l.startsWith("       node scripts/fanout.mjs"));
-  assert.equal(cont.length, 5);
+  assert.equal(cont.length, 6, "five continuation lines plus the waves line (E443a re-pin)");
   assert.equal(cont.filter((l) => l === `       ${OWNERS_USAGE.slice("usage: ".length)}`).length, 1, "generic usage lists the owners form once");
   const unk = cli(["nonsense"]);
   assert.equal(unk.stderr, g.stderr);

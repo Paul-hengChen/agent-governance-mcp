@@ -1,0 +1,12 @@
+{"ts":"2026-11-27T04:12:53.041Z","feature":"e443a-manifest-waves","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T04:46:26.388Z","feature":"e443a-manifest-waves","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T05:32:42.399Z","feature":"e443a-manifest-waves","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T05:33:10.640Z","feature":"e443a-manifest-waves","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T05:45:47.353Z","feature":"e443a-manifest-waves","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T05:56:58.654Z","feature":"e443a-manifest-waves","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T06:04:05.783Z","feature":"e443a-manifest-waves","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T06:08:53.521Z","feature":"e443a-manifest-waves","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T06:17:04.320Z","feature":"e443a-manifest-waves","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T06:17:49.385Z","feature":"e443a-manifest-waves","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T06:19:30.524Z","feature":"e443a-manifest-waves","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T06:34:38.204Z","feature":"e443a-manifest-waves","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

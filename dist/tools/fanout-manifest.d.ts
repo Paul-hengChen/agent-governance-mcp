@@ -10,6 +10,11 @@ export declare const APPROVAL_COLUMN: "approval";
  * else is a row error: a misspelt `human` must never read as "not human".
  */
 export declare const APPROVAL_VALUES: readonly ["human", "—", ""];
+/**
+ * Optional wave header cell of a dispatchable `## Lanes…` table, right after
+ * `相依` and before `approval`. While present, `相依` is a checked lane list.
+ */
+export declare const WAVE_COLUMN: "\u6CE2\u6B21";
 /** Exact header of a spec's `## Cut` table (= skill-pm's inline cut table header). */
 export declare const CUT_HEADER: readonly ["id", "desc", "depends_on", "est. files", "touches", "design-link"];
 /** `touches` value for a ticket that writes only governance bookkeeping. */
@@ -38,6 +43,10 @@ export declare const LANE_PROTOCOL_POINTER = "\u5148\u5B8C\u6574\u8B80 docs/lane
  * template whose wording drifted can never silently drop the addendum. (E343)
  */
 export declare function replaceLanePointer(template: string, replacement: string): string | undefined;
+/** Batch first step: the launcher already opened the session in the worktree; confirm it. */
+export declare const BATCH_FIRST_STEP_LINE = "worktree \u5DF2\u5EFA\u597D\uFF0C\u9019\u500B session \u5C31\u958B\u5728\u88E1\u9762\uFF1B\u5148\u7528\u5169\u6B21\u5404\u81EA\u7368\u7ACB\u7684 Bash \u547C\u53EB\u8DD1 `pwd` \u8207 `git branch --show-current`\uFF0C\u78BA\u8A8D\u524D\u8005\u662F <worktree>\u3001\u5F8C\u8005\u662F <branch>\uFF0C\u4E0D\u7B26\u5C31\u505C\u4E0B\u4F86\u56DE\u5831\u3002";
+/** Batch closing line: nobody types approvals in a batch lane, so a human ruling stops the ticket. */
+export declare const BATCH_CLOSING_LINE = "\u9700\u8981\u4EBA\u985E\u88C1\u5B9A\u7684\u4E8B\u4E00\u5F8B\u505C\u7968\uFF1A\u7167 lane \u898F\u5247\u7684\u300C\u6279\u6B21 lane\u300D\u628A\u554F\u984C\u5BEB\u9032\u7968\u6A94\u7684 `## Open question`\u3001\u56DE\u5831\u6574\u5408\u8005\uFF0C\u4E0D\u7B49\u6253\u5B57\u6838\u51C6\u3002";
 /**
  * Error codes of this CLI whose spec names would otherwise read as absence /
  * mismatch conditions. These are CLI codes, not tw_update_state gate codes, so
@@ -63,6 +72,16 @@ export declare const FANOUT_CODES: {
     readonly worktreeTilde: "WORKTREE_TILDE";
     readonly mailboxTilde: "MAILBOX_TILDE";
     readonly approvalValueUnknown: "APPROVAL_VALUE_UNKNOWN";
+    readonly waveNotInteger: "WAVE_NOT_INTEGER";
+    readonly depsNotLaneList: "DEPS_NOT_LANE_LIST";
+    readonly depsSelf: "DEPS_SELF";
+    readonly depsLaneUnknown: "DEPS_LANE_UNKNOWN";
+    readonly depsLaterWave: "DEPS_LATER_WAVE";
+    readonly ticketFileAbsent: "TICKET_FILE_ABSENT";
+    readonly ticketFileDuplicate: "TICKET_FILE_DUPLICATE";
+    readonly ticketFileInvalid: "TICKET_FILE_INVALID";
+    readonly ticketCellEmpty: "TICKET_CELL_EMPTY";
+    readonly templateBatchLineAbsent: "TEMPLATE_BATCH_LINE_ABSENT";
     readonly approvalHuman: "APPROVAL_HUMAN";
     readonly decisionsHumanRowAbsent: "DECISIONS_HUMAN_ROW_ABSENT";
     readonly manifestChanged: "MANIFEST_CHANGED";
@@ -146,6 +165,10 @@ export interface DispatchableLane {
      * for `—`, empty, or an 8-column table. Read only by check --cut.
      */
     approval: "human" | undefined;
+    /** `波次` cell as a number; absent for a row of a table without `波次`. */
+    wave?: number;
+    /** Lane ids of the `相依` cell (`無` = []); absent for a row of a table without `波次`. */
+    depLanes?: string[];
 }
 export interface ProvisionalLane {
     lane: string;
@@ -216,6 +239,17 @@ export declare function unquotedPaths(cell: string): string[];
  * part is left out of the structured result rather than guessed at.
  */
 export declare function parseManifest(text: string): Manifest;
+/**
+ * Lanes sections whose table has a `lane` header but no `波次` column.
+ *
+ * Covers provisional tables too. Sections without a readable table are left
+ * out: parseManifest already reports them. Returns the heading line and its
+ * 1-based line number, in manifest order.
+ */
+export declare function lanesSectionsWithoutWave(text: string): {
+    heading: string;
+    line: number;
+}[];
 /** Name of the handoff section a closed manifest must carry. */
 export declare const HANDOFF_SECTION = "\u63A5\u624B\u6B65\u9A5F";
 /** Sub-items (`### ` headings) every handoff section must hold, each exactly once with a non-empty body; their order is not checked. */
@@ -314,6 +348,32 @@ export declare function validateManifest(text: string): {
     manifest: Manifest;
     errors: FanoutError[];
 };
+/** Ticket ids of a `票` cell: split on `,` `，` `、`, trimmed, empty parts dropped, order kept. */
+export declare function ticketIds(cell: string): string[];
+/** One ticket file matched by its `id` field. */
+export interface TicketFileInfo {
+    id: string;
+    title: string;
+    /** Path relative to primary, `/`-separated. */
+    file: string;
+    /** Every scenario id in file order, `## Added during build` ones included. */
+    scenarioIds: string[];
+    allowedPaths: string[];
+}
+export type TicketLookup = {
+    ok: true;
+    tickets: TicketFileInfo[];
+} | {
+    ok: false;
+    errors: FanoutError[];
+};
+/**
+ * Look up each ticket id in primary's ticket directory (`ticketDir`, default
+ * docs/tickets): the top-level ticket files whose `id` field is byte-equal to
+ * it. Every absent, duplicated or unparsable ticket is reported, with paths
+ * relative to primary. Read-only.
+ */
+export declare function lookupTicketFiles(primary: string, ids: string[]): TicketLookup;
 export interface RenderOptions {
     summary?: string;
     reading?: string[];
@@ -333,6 +393,12 @@ export interface RenderOptions {
      * the default is PROMPT_TEMPLATE_3B.
      */
     template?: string;
+    /**
+     * Batch prompt: the summary and reading list come from the lane's ticket
+     * files (summary / reading are then ignored), and the template's first-step
+     * line and closing sentence are replaced by the batch lines.
+     */
+    batch?: boolean;
 }
 /** `warnings`: non-fatal lines for stderr (render still succeeds); present only when non-empty. */
 export type RenderResult = {
