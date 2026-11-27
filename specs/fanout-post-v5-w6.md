@@ -2,7 +2,7 @@
 base: 991c84f    integration branch: integ/post-v5-w6
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准，派工中（2026-11-26）。**
+**狀態：已結案 2026-11-27。** e447 與 e446 依序 `--no-ff` 合進 `integ/post-v5-w6`（merge `9393830`、`8106e92`，皆零衝突），merge-invariants 兩次 PASS；派工 base `07a6d47`（清單 PR #203），開整合分支時 `main` 已前進到 `842c874`（PR #204，關 E177c，與兩條 lane 無交集）；merge 後 `npm run build` 無 `dist/` 差異、`npm audit --audit-level=high` exit 0、`agc check` exit 0、`GATE_REGISTRY` 33／pipeline 17、`check:bookkeeping` exit 0。lane 層 CI：e446 run 45810071302 @ `71c57f1`、e447 run 45932710279 @ `4dcbbec`，皆綠。Roll-up：e446 3 個 task、hop 4/14、review 退回 0、證據 3/3；e447 10 個 task、hop 10/14、review 退回 1、證據 10/10。E446、E447 done-mark；E443 Phase 0 第二段（人類裁定 (a)）寫入 `specs/e443-phase0-host-check.md`。例外：e447 sr 用了一次 `git commit --amend`（未 push、已記）；e447 收工時一份證據檔含暫存目錄絕對路徑，CI 紅後以新 commit 修正。本波以一個 PR 合進 `main`，不發版。
 
 範圍由人類指定（integrator prompt「fan-out 下一波」，2026-11-26；候選照佇列順序 E443、E420、E446、E447，整合者提五題，人類答「照建議，Q1–Q5 都同意」）：兩條 lane，e446 做 E446、e447 做 E447，各一次 cut；E443 與 E420 本波不列。票面以 `docs/backlog.md` 的 E446、E447 列為準；佇列 `docs/v4.0.0-new-tickets.md` 第 257、258 號列。兩張票都不屬 v5.0.0 里程碑。本波不發版。
 
@@ -137,19 +137,16 @@ E447 的讀者測試合計 111 個檔。
 ## 接手步驟
 （事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
 ### 核對 primary
-- 目標分支：main @ 07a6d47
+- 目標分支：main @ 842c874
 - 目標分支對 origin：一致
-- git status：1 項： M specs/e443-phase0-host-check.md
-- worktree：primary（main）；../agent-governance-mcp-lanes/e446（feat/e446-doc-writer-close）；../agent-governance-mcp-lanes/e447（feat/e447-local-knowledge-files）
-- lane-status：primary（main）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，dirty；e446（feat/e446-doc-writer-close）e446-doc-writer-close／PASS／code-reviewer，hop 4，commits 8，clean；e447（feat/e447-local-knowledge-files）e447-local-knowledge-files／In_Progress／qa-engineer，hop 4，commits 17，clean
+- git status：乾淨
+- worktree：primary（main ← integ/post-v5-w6 @ d72d406）
+- lane-status：primary（main ← integ/post-v5-w6 @ d72d406）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，clean
 ### 已結案
-- 監看因兩小時沒有新信、沒有狀態變化而停止（2026-11-26 16:28 UTC；最後一封信 e447 to-integrator#13 14:30、最後一次狀態變化 14:29）。本清單的修改（Decisions 列與本段）留在 primary、未 commit；`specs/e443-phase0-host-check.md` 的第二段（人類裁定 (a)）也未 commit，兩者都在結案記帳時 commit 進 `integ/post-v5-w6`。
-- e446（E446）：收工報告已核對通過並 `close`（HEAD `71c57f1`、`check` 0 越界、證據 3/3、lane 層 CI run 45810071302 綠、hop 4/14、review 退回 0）；等合併，合併順序在 e447 之後。
-- e447（E447）：T-E447-01..07 中 qa 與五個 sr task 都已完成，T-E447-05 計畫性退回完成（全套 4815 pass／0 fail／2 skipped @ `090115b`）；剩 sr 交 code-reviewer。劃歸給 e447 的無主紅檔：`test/lane-paths.test.mjs`、`test/e410-task-alias-content-tail.test.mjs`、`test/e428-tracker-mirror.test.mjs`。
+- e446（E446）PASS，merge `8106e92`；e447（E447）PASS，merge `9393830`；以本波 PR 合進 `main`。lane 紀錄在 `.current/history/2026-11/e446/`、`.current/history/2026-11/e447/`；兩條 lane 都沒有未配號的新發現。波次報告不開票的意見（e446 三則、e447 四則）與疑慮記在 Decisions 表。
+- E443 Phase 0 第二段以官方文件結案（人類裁定 (a)），只剩「撞到上限、主 session 接續後是否重派中斷的 subagent」一項，待第一次真的撞到上限時補驗；紀錄 `specs/e443-phase0-host-check.md`。
 ### 待人類決定
-- 在 e447 的 session 回覆 DOC-INST-5 的標點修正（核准後由 coordinator 改的 spec Copy，spec @ `0c62a05`）：同意 → sr 補句點、記進 spec 後交 code-reviewer；不同意 → 照原 Copy、列收工報告已知瑕疵。e447 在等這一句。
-- 要不要發 v5.x：E424、E425、E427、E430、E449、E426、E428 已在 `main`、未發版；本波合併後再加 E446、E447。
+- 要不要發 v5.x：E424、E425、E427、E430、E449、E426、E428、E446、E447 都已完成，合進 `main` 後尚未發版。
+- 下一波要不要開、開哪些票：佇列尚未完成的是 E443（前提已成立，Phase 1 可以開 lane）與 E420（新鏈上仍沒有結案的 design-armed feature）。
 ### 進行中的背景工作
-- 未 push 的 commit：feat/e447-local-knowledge-files 17
-- 信箱：e446 to-integrator 5／to-lane 2；e447 to-integrator 13／to-lane 8
-- watch baseline：node scripts/mailbox-watch.mjs ../agent-governance-mcp-lanes/_mailbox/e446/to-integrator.md ../agent-governance-mcp-lanes/_mailbox/e447/to-integrator.md --baseline e446=5,e447=13
+無
