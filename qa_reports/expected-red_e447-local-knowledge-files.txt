@@ -112,3 +112,10 @@ test/e447-lane-seed-finish.test.mjs | AC16 (iv): a malformed pending block in th
 # R3 not fixed yet (T-E447-09): docs/install.md's knowledge-mode --shipped bullet still says "does not go to
 # `specs/abandoned/`" instead of `specs/archive/<ticket-id>/`.
 test/e447-served-text.test.mjs | AC20: docs/install.md's knowledge-mode --shipped bullet says specs/ does not go to specs/archive/<ticket-id>/ and never names specs/abandoned/; the section's other lines unchanged
+#
+# NOT expected reds, NOT listed as entries (comment only, qa T-E447-08 full suite 2026-11-27 at 229e022):
+# test/check-md-tables.test.mjs "AC7 (real corpus …)" and "CQ-9 (real corpus …)" are red because the A1
+# amendment (43eefbe) left a blank line at specs/e447-local-knowledge-files.md:264 that splits the Tasks
+# table from its T-E447-08..10 rows (265-267): "table block split from its header by the blank line".
+# A spec format defect, not a test or code defect. Fix owner: pm / lane coordinator (delete that one blank
+# line; no content change). No test edit needed; both go green once the table is joined.

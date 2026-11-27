@@ -213,3 +213,5 @@ Every other round-2 test is green against the current code: it pins behaviour sr
 ### Counts (round 2)
 
 19 new tests: 3 red (all in the manifest's round-2 section) and 16 green. The five `test/e447-*` files: 45 tests, 42 pass, 3 fail (exactly the three above).
+
+Full suite (`node scripts/test-lock.mjs -- npm test`, 2026-11-27, clean tree at 229e022): 4836 tests, 4829 pass / 5 fail / 2 skipped. Round-1 baseline was 4815 pass / 0 fail / 2 skipped of 4817, so +19 tests and +16 pass. The 5 reds are the 3 expected reds above plus 2 off the manifest, both in `test/check-md-tables.test.mjs` (`AC7 (real corpus …)` and `CQ-9 (real corpus …)`). Neither is a test or code defect: the A1 spec commit 43eefbe left a blank line at `specs/e447-local-knowledge-files.md:264` that splits the Tasks table from its T-E447-08..10 rows, and the real-corpus table check reports "table block split from its header". The fix belongs to pm / the lane coordinator: delete that one blank line, with no content change. It is recorded as a comment in the manifest, not as an entry.
