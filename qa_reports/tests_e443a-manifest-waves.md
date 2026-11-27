@@ -82,4 +82,11 @@ repo (A1-1 check). No human interaction.
 
 ## Suite result (after the test commit, clean tree)
 
-See the section appended after the full run.
+Command: `node scripts/test-lock.mjs -- npm test` on commit 4195a61 with a clean tree.
+
+- node --test counters (subtests included): 4907 tests, 4841 pass, 64 fail, 2 skipped, 0 cancelled (exit 1).
+- Top-level failing tests: 18, and each one is on `qa_reports/expected-red_e443a-manifest-waves.txt` (the 18
+  entries). Nothing off the manifest is red. The other 46 fail counts are subtests of those 18.
+- A1-3 is green, as expected (regression guard).
+- Base for comparison (spec Dependencies): 4842/4844 pass, 0 fail, 2 skipped. Six base tests are red now because
+  this lane re-pinned them (e292, e296, e322, e423, e428 ×2). No base test became red for any other reason.
