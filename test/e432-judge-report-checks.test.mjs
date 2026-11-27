@@ -412,7 +412,7 @@ function releaseFixture(handoff) {
 async function runRelease(root, argv) {
   const out = [];
   const err = [];
-  const spawn = (bin, args, opts) => (bin === "gh" ? { status: 0, stdout: "", stderr: "" } : spawnSync(bin, args, opts));
+  const spawn = (bin, args, opts) => (bin === "gh" ? { status: 0, stdout: args[0] === "--version" ? "gh version 2.40.0 (2023-12-07)\n" : "", stderr: "" } : spawnSync(bin, args, opts));
   const code = await REL.main(argv, {
     root, spawn, out: (s) => out.push(s), err: (s) => err.push(s), sleep: async () => {},
     env: { ...process.env, AGC_RELEASE_STOP_FILE: path.join(root, "..", "stop.txt") },

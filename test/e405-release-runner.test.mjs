@@ -108,6 +108,8 @@ function mkSpawn(fx) {
     const cfg = fx.cfg, res = (o) => ({ status: 0, stdout: "", stderr: "", ...o });
     if (bin === "gh") {
       const k = argv.slice(0, 2).join(" ");
+      // E463/E464: the phase-start `gh --version` check; answered without a ghLog entry (ghLog holds mutating calls only).
+      if (k === "--version") return res({ stdout: "gh version 2.40.0 (2023-12-07)\nhttps://github.com/cli/cli/releases/tag/v2.40.0\n" });
       if (k === "auth status") return cfg.authFail ? res({ status: 1, stderr: "not logged in" }) : res({});
       if (k === "pr view") { const pr = fx.ghPrs[argv[2]]; return pr ? res({ stdout: JSON.stringify(pr) }) : res({ status: 1, stderr: "no pull requests found" }); }
       if (k === "release view") return res({ status: 1, stderr: "release not found" });
