@@ -1,9 +1,10 @@
 ---
 schema_version: 17
 active_feature: "e443b-lane-launcher"
-status: "In_Progress"
-last_updated: "2026-11-27T08:56:32.903Z"
-last_agent: "qa-engineer"
+status: "Blocked"
+last_updated: "2026-11-27T09:03:07.669Z"
+blocking_reason: "Task T-E443B-02 oversized: the full build measures about 509 changed lines against the 300-line task_size budget. The architecture estimated about 300. Stopped per the dispatch brief instead of splitting on my own. Nothing committed; the worktree is clean at d7b4bcb."
+last_agent: "sr-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "Manifest specs/fanout-post-v5-w8.md: one lane, one feature, one cut (E443b = ticket-cut NEW-2 scope 1-14, A2-1..A2-21, plus the manifest scope cut: G1 (b), required ref parameter, addendum line, budget re-baseline). Not design-armed."
 cut_approved: true
@@ -27,13 +28,13 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "opus"
 evidence_schema: 3
-next_role: "sr-engineer"
-dispatched_at: "2026-11-27T08:56:32.903Z"
+next_role: "pm"
+dispatched_at: "2026-11-27T09:03:07.669Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 review_round: 0
 visual_round: 0
-hop_count: 3
+hop_count: 4
 review_rounds_total: 0
 visual_rounds_total: 0
 ---
@@ -43,11 +44,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- qa-engineer: e443b-lane-launcher tests ready (T-E443B-01) — 30 red; report qa_reports/tests_e443b-lane-launcher.md. Test files: test/e443b-scheduling.test.mjs (A2-1..A2-6, A2-11..A2-14, A2-22, A2-26, A2-27), test/e443b-window.test.mjs (A2-7..A2-10, A2-15..A2-18), test/e443b-config-ancestry.test.mjs (A2-23, A2-24), test/e443b-served-text.test.mjs (A2-19..A2-21, A2-25); stand-ins in test/fixtures/e443b/harness.mjs, ticket fixtures test/fixtures/e443b/tickets/*.md. Re-pinned: e115 AC5, e349 AC-E349-2, e425 AC1. Deferred to T-E443B-06: e428 sha256, compose golden, context-budget cap.
-- Expected-red: qa_reports/expected-red_e443b-lane-launcher.txt — 27 scenario tests + 3 re-pins = 30; no compile error anywhere (lane-launch.js imported lazily per test).
-- Full suite (node scripts/test-lock.mjs -- npm test, clean tree at b4f2885): 4934 tests, 4902 pass, 30 fail = exactly the manifest, 2 skipped; no forbidden-column test red.
-- Interface details sr must match are listed under ## Open Interface Details (poll = clock.sleep(15000); empty write = writeText(id, "", true); featureStart request shape; host refusal <file> = absolute path; StopRun from clock must propagate). Tests were validated once against a throwaway scratch reference implementation (57/57 green, 16/16 seeded defects caught); nothing of it was committed.
-- HEAD 3fd50da (commits: tests 1st, checkpoint, suite-result report).
+- Task T-E443B-02 oversized — recommend PM split
+- sr-engineer measured it by building it in full: tools/lane-launch.ts §A–§F = 477 lines (already compact), tools/config.ts +10, tools/join-precondition.ts +11/-7, CLAUDE.md +2/-2 = about 509 changed lines (dist not counted) vs the 300 budget. Per section of lane-launch.ts: header+imports 18, §A constants/OUT/state types/seams/launchLimit/resolveLaunchContext 116, §B state read/write + lock 58, §C manifest refusals 21, §D mailbox/tickets/finished probe 69, §E dependencies + start ref 24, §F run loop (LaunchRun class + runLaneLaunch) 171. The architecture's fallback (move §F's basic lane start to T-03) saves only about 60 lines, so it does not fix this.
+- Measured build verified before revert: npm run build had zero errors. Green: A2-1, A2-2, A2-3, A2-4, A2-13, A2-14, A2-22, A2-23, A2-26, A2-27 (10), plus the core subtests of A2-11/A2-12, and e115 AC5. All 147 tests in the reader files are green: e115, e123b9, e132, e395, e436, e391, config-cache, drift-baseline, config-versioning, e289. Still red: A2-5 and A2-6 (whole test) plus the CLI and real-script subtests of A2-11/A2-12 need runLaneLaunchCli + scripts/lane-launch.mjs (§L, T-04); A2-24 needs the docs/config.md section (T-05); A2-25 needs the addendum line (T-04); the T-03 and T-05 tests as planned. Correction to the brief: A2-5/A2-6 cannot turn green in T-02, because they call runLaneLaunchCli.
+- Suggested split (PM decides): T-02a = tools/config.ts + tools/join-precondition.ts + the CLAUDE.md rows + lane-launch.ts header/§A/§B/§C + the runLaneLaunch refusal/lock wrapper (about 270 lines; turns green A2-23, the A2-24 config part, e115 AC5, and the A2-22 + A2-11/A2-12 core refusal subtests if the wrapper is included). T-02b = §D/§E/§F (about 245 lines; A2-1..A2-4, A2-13, A2-14, A2-26, A2-27). Risk: T-03 (§G–§K, estimated at about 280) is probably also over budget at the same estimate-to-actual ratio (about 1.7x), so re-measure it before dispatch.
+- The measured code is kept outside the repo for reuse by the next sr: <scratchpad>/e443b-t02-measured/lane-launch.ts and config-ancestry-claude.patch (git apply). The worktree was reverted to a clean d7b4bcb: no source, dist or state was committed by this hop.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
