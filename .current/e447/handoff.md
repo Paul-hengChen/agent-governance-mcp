@@ -2,8 +2,8 @@
 schema_version: 17
 active_feature: "e447-local-knowledge-files"
 status: "In_Progress"
-last_updated: "2026-11-26T14:29:35.391Z"
-last_agent: "qa-engineer"
+last_updated: "2026-11-27T02:07:36.210Z"
+last_agent: "sr-engineer"
 prd_path: "specs/e447-local-knowledge-files.md"
 scope_decision: "single-feature"
 scope_decision_why: "One ticket (E447), one cut per specs/fanout-post-v5-w6.md; five sr tasks inside one feature (A1 config+init, A2a start/reseed, A2b finish/numbering, B1 check --cut + SOP texts, B2 docs) after the integrator's task_size pre-review; no architect (data model and module boundaries fixed in the spec)."
@@ -15,13 +15,13 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "opus"
 evidence_schema: 3
-next_role: "sr-engineer"
-dispatched_at: "2026-11-26T14:29:35.391Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-11-27T02:07:36.210Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 review_round: 0
 visual_round: 0
-hop_count: 4
+hop_count: 5
 review_rounds_total: 0
 visual_rounds_total: 0
 sr_return_count: 1
@@ -32,12 +32,14 @@ sr_return_count: 1
 - (none)
 
 ## Pending & Handoff Notes
-- qa-engineer: T-E447-05 done (commit 090115b) — planned sr->qa return, not a test defect; report qa_reports/tests_e447-local-knowledge-files.md section T-E447-05 (per-hunk explanation)
-- Goldens re-captured with scripts/capture-constitution-golden.mjs: exactly 7 moved, 1 hunk each — six constitution/hook goldens +1 line == const-08 line 6 (C-C08K) after the Batch-lane line; skill-coordinator-monolith 1 line == coord-03 bookkeeping line + C-CO3K (289 chars). build-lite-* and hook-lite byte-unchanged. C-IN-R4 reaches no golden.
-- context-budget caps: 9407->9541 (+134, C-C08K 536 chars), 19699->19905 (+206 = C-C08K 134 + C-CO3K 72.25), 7495->7629 (+134, chain fragment on both arms; design-only saving stays 1912). E447 re-baseline comments added.
-- Re-pins: lane-paths REG1 9 entries / 8 optional / + knowledge-seed.json (title changed accordingly); e410 AC2 const-08 alias row 6->7, count 12->13; e428 BASE[IN_FILE].sha -> bebdd0e8...f58d06 (value only, per integrator ruling). Expected-red manifest marked FULLY RESOLVED (REG1 entry updated to its new title).
-- Full suite (node scripts/test-lock.mjs -- npm test, clean tree after 090115b): 4817 tests, 4815 pass / 0 fail / 2 skipped (base 07a6d47 4789/0/2 of 4791; +26 e447 tests). Build clean (0 TS errors, pretest build). Machine loaded: test/e394-release-script.test.mjs ran ~7 min (one test 210s) but passed.
-- next: sr-engineer adds the DOC-INST-5 period ('. With') to docs/install.md per the amended spec, then hands to code-reviewer.
+- sr-engineer: implementation complete for T-E447-02/03/06/04/07; qa re-pins T-E447-05 @ 090115b; DOC-INST-5 period @ 7cdc9f7 per human consent 2026-11-27; ready for review
+- Commits: T-02 18ffb6f, T-03 112957a, T-06 208b793, T-04 26bb196, T-07 6534c9e + 7cdc9f7 (docs/install.md (iii) eject row: 'skipped with a note With' -> 'skipped with a note. With', one character, matches the amended DOC-INST-5 Copy); qa T-05 090115b.
+- Checks this hop: node --test e447-served-text + e453/e433/e351/e425/e383/e290/e108/e289 (10 files): 128/128 pass; npm run build 0 TS errors; npm audit --audit-level=high exit 0 (1 low + 6 moderate, pre-existing, no dependency change). Full suite not rerun (one-character docs change, targeted readers green); last full run qa @ 090115b 4815 pass / 0 fail / 2 skipped of 4817.
+- Untested behaviour (T-02, init): agc init refuses (exit 2) --knowledge=local when the configured ticketDir has a gitignore-unsafe segment (mirrors the workspace-segment refusal).
+- Untested behaviour (T-03, start/reseed): start warns and seeds nothing when .current/<lane>/knowledge-seed.json would not be git-ignored in the lane; start warns on a per-file copy failure and on a seeding failure; reseed refuses a path not git-ignored in the lane (tracked, or no rule), a path that is not a file in the primary checkout, and an unreadable seed record; reseed with no operand is a usage error (exit 2); a lane-absent, unrecorded file is seeded fresh by reseed.
+- Untested behaviour (T-06, finish): malformed seed record at finish refuses; no seed record = every lane knowledge file counts as created; blocking non-dir ancestor at dst refuses; lane dangling symlink / non-ignored untracked file skipped; --shipped with a lane-changed docs/backlog.md appends rows to the lane copy (a re-run after a late failure then refuses it as both-changed); malformed pending blocks in mode on refuse; absent backlog with blocks to number refuses; finish usage wording (no Copy row).
+- Untested behaviour (T-04, check --cut): malformed/unreadable primary config counts as mode off; manifest path outside the lane worktree is not compared; submodule-style .git file (primary == this worktree) skipped; mode-off in a linked worktree still runs one git worktree list and reads the primary config (D9's 'no git' holds only outside a linked worktree).
+- Not pinned by qa (qa report lines 69, 71): the <rel> echoed by reseed's not-knowledge refusal; the AC2 (c) tracked-path display line.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
