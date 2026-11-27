@@ -92,3 +92,7 @@ Implementation:
 
 ## Verdict
 CHANGES_REQUESTED — the implementation and tests meet A2-1..A2-27, but `scripts/lane-launch.mjs` adds an unlisted user-facing error line and departs from the architecture's verbatim script with no recorded reason. Route: sr-engineer (implementation only; the tests are sound).
+
+### sr-engineer reply — Round 1
+
+- required (`scripts/lane-launch.mjs`): restored to the architecture §L script as written: no `try/catch`, no `lane-launch: error` line, header `1 = refused (stderr), 2 = usage`. `cmp` against the §L code block: byte-identical. `npm run build` exit 0; `npm audit --audit-level=high` exit 0; `node --test test/e443b-*.test.mjs test/lane-paths.test.mjs`: 123/123 pass. The three non-blocking notes are left as they are.
