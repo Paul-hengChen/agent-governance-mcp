@@ -11,7 +11,7 @@ import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ghVersionProblem } from "./gh-compat.mjs";
+import { GH_LOOKUP_ATTEMPTS, GH_LOOKUP_RETRY_SECONDS, ghVersionProblem, isPrNotFound } from "./gh-compat.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PHASE_OF = { s: "start", p: "prepare", u: "publish", r: "record", c: "close-out" };
@@ -334,12 +334,27 @@ function requireBranch(ctx, allowed, want) {
   if (!allowed(branch, head)) throw new ReleaseStop("WRONG_BRANCH", `on ${branch} at ${head}, expected ${want}`);
   return { branch, head };
 }
-// `how` is "deferred" when the view observes this phase's own merge; null
-// then also means a dry-run, which never ran the view.
-function viewPr(ctx, branch, step = "pre-3", how = "read") {
-  const res = ctx.runner[how]("gh", ["pr", "view", branch, "--json", "number,state,mergeable,mergeStateStatus,statusCheckRollup,mergeCommit,headRefOid"], { step });
-  if (res === null || res.status !== 0) return null;
-  try { return JSON.parse(res.stdout); } catch { throw new ReleaseStop("INTERNAL", `gh pr view ${branch} printed non-JSON output`); }
+// The injected sleep when a test passes one, else a real timer.
+const sleepOf = (ctx) => ctx.deps.sleep ?? ((ms) => new Promise((done) => setTimeout(done, ms)));
+// The pull request for `branch`, or null when gh reports none. `how` is
+// "deferred" when the view observes this phase's own merge; null then also
+// means a dry-run, which never ran the view. Any other failed view is retried,
+// then stops GH_UNAVAILABLE: a failed lookup is never read as no pull request.
+async function viewPr(ctx, branch, step = "pre-3", how = "read") {
+  const wait = envSeconds(ctx.deps.env ?? process.env, "AGC_RELEASE_GH_RETRY_SECONDS", GH_LOOKUP_RETRY_SECONDS);
+  for (let attempt = 1; ; attempt++) {
+    const res = ctx.runner[how]("gh", ["pr", "view", branch, "--json", "number,state,mergeable,mergeStateStatus,statusCheckRollup,mergeCommit,headRefOid"], { step });
+    if (res === null) return null;
+    if (res.status === 0) {
+      try { return JSON.parse(res.stdout); } catch { throw new ReleaseStop("INTERNAL", `gh pr view ${branch} printed non-JSON output`); }
+    }
+    if (isPrNotFound(res.stderr)) return null;
+    if (attempt >= GH_LOOKUP_ATTEMPTS) {
+      throw new ReleaseStop("GH_UNAVAILABLE", `gh pr view ${branch} failed ${attempt} times (last: exit ${res.status} — ${lastLine(res.stderr) || "no output"}) — a failed lookup, not a missing pull request; re-run ${ctx.opts.phase} once gh answers`);
+    }
+    ctx.out(`release: [${step}] gh pr view ${branch} failed (exit ${res.status}); attempt ${attempt} of ${GH_LOOKUP_ATTEMPTS}, retrying in ${wait}s\n`);
+    await sleepOf(ctx)(wait * 1000);
+  }
 }
 // Every entry `git status` reports, as { path, untracked }; entries are
 // "XY path\0", and a rename or copy adds "origin\0" after it. XY `??` is untracked.
@@ -374,15 +389,15 @@ function prePrepare(ctx) {
   const unrelated = checkScope(ctx.statusPaths);
   if (unrelated) throw new ReleaseStop("UNRELATED_CHANGES", unrelated);
 }
-function prePublish(ctx) {
-  const rel = `release/v${ctx.opts.version}`, pr = viewPr(ctx, rel);
+async function prePublish(ctx) {
+  const rel = `release/v${ctx.opts.version}`, pr = await viewPr(ctx, rel);
   if (!pr || pr.state === "CLOSED") throw new ReleaseStop("PR_CANNOT_MERGE", `no open or merged pull request for ${rel}${pr ? ` (#${pr.number} is CLOSED)` : ""}`);
   if (pr.state === "OPEN") requireBranch(ctx, (b, h) => b === rel && h === pr.headRefOid, `${rel} at ${pr.headRefOid}`);
   else requireBranch(ctx, (b) => b === "main" || b === rel, `main or ${rel}`);
   ctx.pr = pr;
 }
-function preCloseOut(ctx) {
-  const rel = `release/v${ctx.opts.version}-bookkeeping`, pr = viewPr(ctx, rel);
+async function preCloseOut(ctx) {
+  const rel = `release/v${ctx.opts.version}-bookkeeping`, pr = await viewPr(ctx, rel);
   if (pr?.state === "CLOSED") throw new ReleaseStop("PR_CANNOT_MERGE", `bookkeeping pull request #${pr.number} is CLOSED`);
   requireBranch(ctx, (b) => b === "main" || (pr !== null && b === rel), pr ? `main or ${rel}` : "main");
   ctx.pr = pr;
@@ -863,7 +878,7 @@ function failedAt(ctx, what, res, step) {
 }
 
 // Commit, push and pull request; each one is skipped when a re-run finds it already done.
-function step8aCommitPushPr(ctx) {
+async function step8aCommitPushPr(ctx) {
   const { runner: r, opts } = ctx, v = opts.version, rel = `release/v${v}`;
   if (ctx.commitMade) ctx.out(`release: [8a-4] commit skipped — HEAD is already the v${v} release commit\n`);
   else {
@@ -879,7 +894,7 @@ function step8aCommitPushPr(ctx) {
     const res = r.mutate("git", ["push", "-u", "origin", rel], { step: "8a-5" });
     if (res.status !== 0) throw new ReleaseStop("PUSH_REJECTED", failedAt(ctx, `git push -u origin ${rel}`, res, "8a-5"));
   }
-  const pr = viewPr(ctx, rel, "8a-6");
+  const pr = await viewPr(ctx, rel, "8a-6");
   if (pr?.state === "OPEN") {
     ctx.out(`release: [8a-6] pull request #${pr.number} for ${rel} is already open\n`);
     ctx.okSuffix = ` — pull request #${pr.number}`;
@@ -889,7 +904,7 @@ function step8aCommitPushPr(ctx) {
   const res = r.mutate("gh", ["pr", "create", "--base", "main", "--head", rel, "--title", title, "--body", ctx.changelogEntry], { step: "8a-6" });
   if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "gh pr create", res, "8a-6"));
   if (r.dryRun) return;
-  const number = /\/pull\/(\d+)\s*$/.exec(res.stdout.trim())?.[1] ?? viewPr(ctx, rel, "8a-6")?.number;
+  const number = /\/pull\/(\d+)\s*$/.exec(res.stdout.trim())?.[1] ?? (await viewPr(ctx, rel, "8a-6"))?.number;
   ctx.okSuffix = ` — pull request #${number ?? "?"}`;
 }
 
@@ -968,17 +983,17 @@ function releaseText(ctx, commit, step) {
 // Polls until the pull request is MERGED; a dry-run records one poll and
 // carries a placeholder merge commit forward.
 async function waitMerged(ctx, rel, pr, step) {
-  const env = ctx.deps.env ?? process.env, sleep = ctx.deps.sleep ?? ((ms) => new Promise((done) => setTimeout(done, ms)));
+  const env = ctx.deps.env ?? process.env, sleep = sleepOf(ctx);
   const budget = envSeconds(env, "AGC_RELEASE_MERGE_WAIT_SECONDS", 900), poll = Math.max(1, envSeconds(env, "AGC_RELEASE_POLL_SECONDS", 15));
   const deadline = Date.now() + budget * 1000;
   for (;;) {
-    const seen = viewPr(ctx, rel, step, "deferred");
+    const seen = await viewPr(ctx, rel, step, "deferred");
     if (ctx.runner.dryRun) return { ...pr, state: "MERGED", mergeCommit: { oid: "<merge-commit>" } };
     if (seen && classifyPr(seen) === "MERGED") return seen;
     const why = seen && cannotMergeReason(seen);
     if (why) throw new ReleaseStop("PR_CANNOT_MERGE", `${why} while waiting for the merge — never update the branch or merge with --admin`);
     const left = deadline - Date.now();
-    if (left <= 0) throw new ReleaseStop("MERGE_WAIT_TIMEOUT", `#${pr.number} not merged within ${budget}s (AGC_RELEASE_MERGE_WAIT_SECONDS)${seen ? "" : "; the last gh pr view failed"} — re-run ${ctx.opts.phase} to keep waiting`);
+    if (left <= 0) throw new ReleaseStop("MERGE_WAIT_TIMEOUT", `#${pr.number} not merged within ${budget}s (AGC_RELEASE_MERGE_WAIT_SECONDS)${seen ? "" : "; the last gh pr view found no pull request"} — re-run ${ctx.opts.phase} to keep waiting`);
     ctx.out(`release: [${step}] #${pr.number} not merged yet; polling again in ${Math.round(Math.min(poll * 1000, left) / 1000)}s\n`);
     await sleep(Math.min(poll * 1000, left));
   }
@@ -1176,7 +1191,7 @@ async function openBookkeepingPr(ctx, bk) {
   const made = r.mutate("gh", ["pr", "create", "--base", "main", "--head", bk, "--title", title, "--body", body], { step: "13a-5" });
   if (made.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "gh pr create", made, "13a-5"));
   const number = /\/pull\/(\d+)\s*$/.exec(made.stdout.trim())?.[1];
-  const pr = viewPr(ctx, bk, "13a-5", "deferred") ?? { number: number === undefined ? undefined : Number(number), state: "OPEN" };
+  const pr = (await viewPr(ctx, bk, "13a-5", "deferred")) ?? { number: number === undefined ? undefined : Number(number), state: "OPEN" };
   if (!r.dryRun && pr.number === undefined) throw new ReleaseStop("INTERNAL", `gh pr create for ${bk} reported no pull request number`);
   return pr;
 }
