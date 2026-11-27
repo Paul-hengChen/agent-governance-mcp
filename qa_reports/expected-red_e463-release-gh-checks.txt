@@ -1,0 +1,26 @@
+# e463-release-gh-checks — intentional reds left by qa-engineer (T-E463-01).
+# Every entry is red because the behaviour it pins is not built yet; sr-engineer (T-E463-03..06) turns them green.
+# Not listed (green now, pin existing behaviour): E463-AC1 (two tests), E463-AC4 dry-run deferred lookup, X-AC1.
+# lookup retry not built: a failed gh pr view is still read as no pull request (viewPr returns null), so the stop is PR_CANNOT_MERGE / MERGE_WAIT_TIMEOUT or the phase proceeds to gh pr create instead of exit 14 stop.lookup_failed
+test/e463-release-gh-checks.test.mjs | E463-AC2 every lookup fails: publish makes 3 pr view calls, sleeps twice, stops 14 stop.lookup_failed and goes no further
+test/e463-release-gh-checks.test.mjs | E463-AC2 every lookup fails: publish --dry-run makes 3 pr view calls, sleeps twice, stops 14 stop.lookup_failed and goes no further
+test/e463-release-gh-checks.test.mjs | E463-AC3 1 failed lookup(s) then success: publish proceeds as if the first lookup had succeeded
+test/e463-release-gh-checks.test.mjs | E463-AC3 2 failed lookup(s) then success: publish proceeds as if the first lookup had succeeded
+test/e463-release-gh-checks.test.mjs | E463-AC4 close-out pre-check: a failed lookup of the bookkeeping branch retries 3 times then stops 14
+test/e463-release-gh-checks.test.mjs | E463-AC4 prepare step 8a-6 lookup before gh pr create: 3 attempts then stop 14, no pull request created
+test/e463-release-gh-checks.test.mjs | E463-AC4 prepare step 8a-6 lookup after gh pr create: 3 attempts then stop 14
+test/e463-release-gh-checks.test.mjs | E463-AC4 close-out step 13a-5 lookup after gh pr create: 3 attempts then stop 14
+test/e463-release-gh-checks.test.mjs | E463-AC4 publish merge wait (8c-2): a failed lookup after the merge request retries 3 times then stops 14
+test/e463-release-gh-checks.test.mjs | E463-AC4 close-out merge wait (13a-6): a failed lookup after the merge request retries 3 times then stops 14
+test/e463-release-gh-checks.test.mjs | E463-AC5 the wait between attempts is AGC_RELEASE_GH_RETRY_SECONDS when a number >= 0, else 10s, as milliseconds through deps.sleep
+# module not found: scripts/gh-compat.mjs (T-E463-03) does not exist yet — GH_LOOKUP_ATTEMPTS / GH_LOOKUP_RETRY_SECONDS / MIN_GH_VERSION / pure functions
+test/e463-release-gh-checks.test.mjs | E463-AC5 the helper exports GH_LOOKUP_ATTEMPTS (3) and GH_LOOKUP_RETRY_SECONDS (10)
+test/e463-release-gh-checks.test.mjs | E464-AC6 scripts/gh-compat.mjs exports the constants and pure functions, imports no child_process; gh --version is an allowed read; verify-release.mjs is unchanged
+# docs/release-cd.md has neither doc.gh_min nor doc.lookup_retry yet (T-E463-06)
+test/e463-release-gh-checks.test.mjs | E463-AC6 docs/release-cd.md Manual fallback states doc.lookup_retry verbatim, after doc.gh_min
+test/e463-release-gh-checks.test.mjs | E464-AC1 docs/release-cd.md Manual fallback states doc.gh_min verbatim and its version equals MIN_GH_VERSION
+# phase-start gh --version check not built: preGh calls only gh auth status, ALLOWED has no gh --version rule (T-E463-04)
+test/e463-release-gh-checks.test.mjs | E464-AC2 each of start, prepare, publish, close-out runs `gh --version` first and once, before gh auth status (with and without --dry-run); record makes no gh call
+test/e463-release-gh-checks.test.mjs | E464-AC3 gh 2.39.2 stops every phase 14 stop.gh_too_old with no child call after gh --version
+test/e463-release-gh-checks.test.mjs | E464-AC4 gh --version failing, unspawnable, or printing no version stops 14 with its own string
+test/e463-release-gh-checks.test.mjs | E464-AC5 versions compare numerically per component; the first `gh version X.Y.Z` on the output is the one parsed

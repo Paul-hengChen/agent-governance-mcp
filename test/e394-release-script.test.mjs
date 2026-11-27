@@ -50,6 +50,8 @@ const log = (l) => fs.appendFileSync(L, l + "\\n");
 const git = (args, cwd) => cp.execFileSync("git", args, { cwd, encoding: "utf8", env: process.env }).trim();
 const flag = (n) => a[a.indexOf(n) + 1];
 const k = a.slice(0, 2).join(" ");
+// E463/E464: every phase asks for the gh version first; the shim answers with the minimum supported version.
+if (a[0] === "--version") { process.stdout.write("gh version 2.40.0 (2023-12-07)\\nhttps://github.com/cli/cli/releases/tag/v2.40.0\\n"); process.exit(0); }
 if (k === "auth status") { if (st.authFail) { console.error("not logged in"); process.exit(1); } process.exit(0); }
 if (k === "pr view") {
   const pr = st.prs[a[2]];
@@ -443,7 +445,7 @@ const ALLOW = [
   /^git add -- \S/, /^git add --update -- \S/, /^git commit -F \S/, /^git commit -m \S/, /^git tag -a v\d+\.\d+\.\d+ -m \S/, /^git push -u origin release\/\S+$/,
   /^git push origin v\d+\.\d+\.\d+$/, /^git switch -c release\/\S+$/, /^git switch main$/, /^git branch -d release\/\S+$/,
   /^git -c pull\.rebase=false pull --ff-only$/, /^git (fetch|diff|log|status|show|ls-tree|ls-files|rev-parse|rev-list|describe|ls-remote)( |$)/,
-  /^gh auth status$/, /^gh release view /, /^gh pr create /, /^gh pr merge \d+ --auto --merge$/, /^gh pr view /, /^gh run (list|view)/, /^gh release create /,
+  /^gh --version$/, /^gh auth status$/, /^gh release view /, /^gh pr create /, /^gh pr merge \d+ --auto --merge$/, /^gh pr view /, /^gh run (list|view)/, /^gh release create /,
   /^node (scripts\/(check-version|verify-release|check-bookkeeping)\.mjs|bin\/agc-init\.mjs)/,
 ];
 const FORBIDDEN = [
