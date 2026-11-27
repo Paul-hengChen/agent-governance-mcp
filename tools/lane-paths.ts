@@ -24,11 +24,13 @@ export interface LaneFileEntry {
   readonly noFlatCounterpart?: true;
 }
 
-// The registry: exactly 8 entries, 1 required, 7 optional. `.config.json`,
+// The registry: exactly 9 entries, 1 required, 8 optional. `.config.json`,
 // exemptions.json and feature-split.md are deliberately NOT lane files.
 // Every file inside `.current/<lane>/` must be registered here, or the
 // lane->flat runner refuses the whole lane. Per-entry notes (pendingTickets,
 // tasks, baseSha): specs/e260b-rationale.md, this file's section. (E123)
+// knowledgeSeed: the lane's knowledge-file snapshot record (`"knowledge":
+// "local"` only); it never had a flat location.
 export const LANE_FILES = [
   { key: "handoff", filename: "handoff.md", required: true },
   { key: "telemetry", filename: "telemetry.jsonl", required: false },
@@ -38,6 +40,7 @@ export const LANE_FILES = [
   { key: "pendingTickets", filename: "pending-tickets.md", required: false },
   { key: "tasks", filename: "tasks.md", required: false, noFlatCounterpart: true },
   { key: "baseSha", filename: "base-sha", required: false },
+  { key: "knowledgeSeed", filename: "knowledge-seed.json", required: false, noFlatCounterpart: true },
 ] as const satisfies ReadonlyArray<LaneFileEntry>;
 
 export type LaneFileKey = (typeof LANE_FILES)[number]["key"];
@@ -51,6 +54,7 @@ export interface LanePaths {
   pendingTicketsPath: string;
   tasksPath: string;
   baseShaPath: string;
+  knowledgeSeedPath: string;
 }
 
 // Registry key -> LanePaths field (resolveLanePaths' shape). Keys only, never
@@ -66,6 +70,7 @@ const LANE_PATH_FIELD: Record<LaneFileKey, keyof LanePaths> = {
   pendingTickets: "pendingTicketsPath",
   tasks: "tasksPath",
   baseSha: "baseShaPath",
+  knowledgeSeed: "knowledgeSeedPath",
 };
 
 // Look up one registry entry by key. enumerateLaneSidecarSources below

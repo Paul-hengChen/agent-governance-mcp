@@ -105,17 +105,17 @@ test(
 // three added; e179 AC1, e125a AC1, e125b AC11).
 // ============================================================================
 
-test("REG1: LANE_FILES has exactly 8 entries — 1 required (handoff) + 7 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks/baseSha)", () => {
-  assert.equal(LANE_FILES.length, 8, "LANE_FILES must have exactly 8 entries (e125b spec AC11 added baseSha)");
+test("REG1: LANE_FILES has exactly 9 entries — 1 required (handoff) + 8 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks/baseSha/knowledgeSeed)", () => {
+  assert.equal(LANE_FILES.length, 9, "LANE_FILES must have exactly 9 entries (e125b spec AC11 added baseSha; E447 D4 added knowledgeSeed)");
   const required = LANE_FILES.filter((f) => f.required);
   const optional = LANE_FILES.filter((f) => !f.required);
   assert.equal(required.length, 1, "exactly 1 required entry");
-  assert.equal(optional.length, 7, "exactly 7 optional entries");
+  assert.equal(optional.length, 8, "exactly 8 optional entries");
   assert.equal(required[0].key, "handoff", "the sole required entry must be handoff.md");
   assert.deepEqual(
     LANE_FILES.map((f) => f.filename).sort(),
-    ["base-sha", "dispatch.jsonl", "handoff.md", "metrics.jsonl", "pending-tickets.md", "tasks.md", "telemetry.jsonl", "usage.jsonl"],
-    "LANE_FILES must name exactly today's 8 .current/ filenames — no more, no fewer",
+    ["base-sha", "dispatch.jsonl", "handoff.md", "knowledge-seed.json", "metrics.jsonl", "pending-tickets.md", "tasks.md", "telemetry.jsonl", "usage.jsonl"],
+    "LANE_FILES must name exactly today's 9 .current/ filenames — no more, no fewer",
   );
   const tasksEntry = LANE_FILES.find((f) => f.key === "tasks");
   assert.ok(tasksEntry, "LANE_FILES must carry a 'tasks' entry (e125a spec AC1)");

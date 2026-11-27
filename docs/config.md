@@ -209,6 +209,30 @@ Semantics:
 - **Where the default is applied.** `loadConfig` surfaces the value verbatim as `WorkspaceConfig.ticketDir` only when it is usable; `resolveTicketDir(workspacePath)` in `tools/config.ts` returns the configured directory, or `docs/tickets`, joined to the workspace path.
 - **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists.
 
+### `knowledge` — keep knowledge files out of git too (optional)
+
+Records whether the knowledge files — `specs/`, `design/`, `research/`, the ticket directory (`ticketDir` above) and `docs/backlog.md` — also stay out of git, so a team repo carries no agc file at all. Written by `agc init --knowledge=local|repo` (see [docs/install.md](install.md#keeping-knowledge-files-out-of-git-too-agc-init---knowledgelocalrepo)).
+
+```json
+{
+  "artifacts": "local",
+  "knowledge": "local"
+}
+```
+
+| Value | Meaning |
+|---|---|
+| `"local"` | `agc init` writes root-anchored exclude rules (prefixed in a subdirectory workspace) to the repo's shared `.git/info/exclude` for `specs/`, `design/`, `research/`, the ticket directory and `docs/backlog.md`, plus `AGENTS.md` / `.antigravityrules` only when agc creates them (a file your team already has gets no rule). |
+| `"repo"` or absent | Today's behaviour: the knowledge files are tracked like any other file. |
+
+Semantics:
+
+- **Needs `"artifacts": "local"`.** Each lane's seed record lives in the git-ignored `.current/`, so `agc init --knowledge=local` with any other artifacts mode exits 2 and writes nothing.
+- **Who reads it.** `agc init`, `agc feature start`, `agc feature reseed`, `agc feature finish` and `fanout.mjs check --cut` read the key raw from the primary checkout's `.current/.config.json`. With the key absent or `"repo"`, none of them does anything new.
+- **Lanes see a snapshot.** `agc feature start` copies the primary checkout's untracked knowledge files into the new lane and records each file's content hash in `.current/<lane>/knowledge-seed.json`. A later edit in the primary checkout reaches a running lane only through `agc feature reseed`; `agc feature finish` copies back only the files the lane created or changed.
+- **Switching back.** `agc init --knowledge=repo` records `"repo"` and leaves the exclude rules in place (as `--artifacts=repo` does); a flag-less re-run keeps the declared value.
+- **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists.
+
 ---
 
 ## `.current/const-*.md` — constitution override
