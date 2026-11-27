@@ -89,3 +89,14 @@ unowned / forbidden pins.
 
 All new tests run headlessly under `npm test`: no iTerm2, `gh`, network or real launcher; temp git repos under
 `os.tmpdir()`, removed in `after()`. S1 spawns `dist/index.js` over stdio (as e423 AC2 does).
+
+## Round 2 (re-entry after code-reviewer round 1 F1) — no test change
+
+Decision: confirm the PM decision, no new or updated test for T-E466-12 (`install.count`, `arch.count`, `arch.list`).
+- The three strings are prose count facts in `docs/install.md` and the `docs/architecture.md` Layer 1 box; code-reviewer
+  reads them against Copy / Strings. A byte-pin test for two copy lines would add no contract beyond the cut table.
+- Checked that no resident test pins the old `13 registered prompts` text in either file (grep over `test/`:
+  `e178a` AC5 pins CLAUDE.md / AGENTS.md only; `e443b` pins the CLAUDE.md layout row only), so the edit turns nothing red.
+- `test/e457-doc-numbers.test.mjs` and `test/e433-test-first-rules.test.mjs` keep guarding the other docs/architecture.md
+  numbers (17 steps, 33 gates); T-E466-12 must leave them green.
+- `qa_reports/expected-red_e466-conductor.txt` unchanged (no new red).
