@@ -103,3 +103,21 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-27 | 整合者 | 照常設規則把無主紅檔 `test/lane-paths.test.mjs` 劃給 e443b（to-lane#5）：只有 CALLERS2 allow-list 紅，原因是新的 `tools/lane-launch.ts` 唯讀 import `lane-paths`；base 上全套 0 fail，lane @ `356a008` 實跑這一項紅；不在禁止欄；落在擁有欄「其他只因本 lane 而紅的測試」那一格；cut 已核准、PM 不重入，不另起 manifest tier 核准。qa 在 allow-list 加一列並附群組註解 | e443b 信箱 to-integrator#18、to-lane#5 |
 | 2026-11-27 | 整合者 | e443b 收工回報（to-integrator#22）核對通過並 `close`（to-lane#6）：`feat/e443b-lane-launcher` @ `d05b68b`（41 commit），`fanout check --base main` 58 檔，唯一不在擁有欄的 `test/lane-paths.test.mjs` 已由 to-lane#5 劃入；證據 `review_reports/review_T-E443B-01.md` 第 2 輪 APPROVED（covers T-E443B-01、07..14），`qa_reports/review_T-E443B-01.md`、`-07..-14.md` 最新皆 PASS；worktree 乾淨；無 pending-tickets；共用生成物（coord-03 golden、teamwork 上限 20005）屬本 lane；lane 層 CI run 45980942656 @ `d05b68b` 綠。裁判 recommended 一項（`fill()` 的 doc comment 與啟動前未再檢查已結束 lane 不一致）、optional 兩項（叫醒時 iTerm2 失敗終止整輪、鎖檔微秒級讀到空檔）列在結案報告，不開票。round 1 退件的錯誤字串，源於 lane 在 to-integrator#5 摘要多列了一句、架構原文沒有；整合者 close 時依原文，未察覺摘要差異 | e443b 信箱 to-integrator#22、to-lane#6；`review_reports/review_T-E443B-01.md` |
 | 2026-11-27 | 整合者 | 5b：`integ/post-v5-w8` 自 `main` @ `df48c92`（含 E463 波 PR #211）開，`--no-ff` 合進 e443b（merge `7ba1cd8`，零衝突、沒有需審的解衝突），merge-invariants PASS；build 無 `dist/` 差異、audit exit 0、`agc check` exit 0；5c：E443b done-mark（backlog 列與佇列 255b 列），`check:bookkeeping` exit 0；roll-up e443b 9 task、hop 12/14、review_round 0（退回 1 次）、證據 9/9 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ df48c92
+- 目標分支對 origin：一致
+- git status：1 項：?? docs/discussions/
+- worktree：primary（main ← integ/post-v5-w8 @ 741f18d）
+- lane-status：primary（main ← integ/post-v5-w8 @ 741f18d）release-cd-v5.0.0-r2／In_Progress／release-engineer，hop 5，commits 0，dirty
+### 已結案
+- e443b（E443b）PASS，merge `7ba1cd8`；以本波 PR 合進 `main`。lane 紀錄在 `.current/history/2026-11/e443b/`；沒有未配號的新發現。裁判的 recommended 一項（`fill()` 的 doc comment）與 optional 兩項（叫醒時 iTerm2 失敗終止整輪、鎖檔讀到空檔的微秒級競態）記在 Decisions 表，不開票。
+- 上線後觀察（人類 R5，非驗收）：第一次真的 lane 撞到用量上限時，記錄主 session 自動接續後是否照 Crash-Resume 重派中斷的 subagent、pin 是否保留，寫回 `specs/e443-phase0-host-check.md`；第一次實際啟動時由整合者看著多行 prompt 送出（spec 的 *Known unverified*）。
+### 待人類決定
+- 要不要發 v5.x：E424、E425、E427、E430、E449、E426、E428、E446、E447、E443a、E463、E464、E443b 都已完成，合進 `main` 後尚未發版。
+- 下一波要不要開：佇列上唯一未完成的是 E420（新鏈上仍沒有結案的 design-armed feature）。
+- primary 上未追蹤的 `docs/discussions/2026-11-27-integrator-session-rotation.md` 不是本波產生的（`agc feature finish` 也提出警告），本波沒有動它；它的去留由人類決定。
+### 進行中的背景工作
+無
