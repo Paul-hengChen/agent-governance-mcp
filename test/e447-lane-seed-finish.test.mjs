@@ -365,3 +365,242 @@ test("AC8: finish --abandoned harvests design/z.md to design/abandoned/e9/z.md, 
   assert.equal(gitCode(repo, ["show-ref", "--verify", "--quiet", "refs/heads/feat/e9-x"]), 0, "--abandoned keeps the branch");
   assert.equal(porcelain(repo), "");
 });
+
+// ============================================================================
+// [A1] T-E447-08: AC13-AC16 (spec amendment A1, review round 1 R2 / R4). Same fixtures as above.
+// "Nothing removed" = worktree and branch kept, every primary file outside .git/ (knowledge files,
+// backlog, tasks.md, .current/) and every lane file unchanged, and no commit added.
+// ============================================================================
+
+const harvestLinesOf = (stdout) =>
+  outLines(stdout).filter((l) => l.startsWith("agc feature finish — harvested knowledge file "));
+const NUMBERED_PREFIX = "agc feature finish — appended ";
+const UNCHANGED_FRAGMENT = "seeded knowledge file(s) unchanged in the lane";
+const REFUSE_HEADER = (verb) =>
+  `agc feature finish ${verb}: harvest destination already exists in the primary checkout and differs (nothing moved):\n`;
+
+function captureState(repo, lane) {
+  return {
+    primary: snapshotTree(repo),
+    lane: snapshotTree(lane),
+    head: git(repo, ["rev-parse", "HEAD"]),
+    log: git(repo, ["log", "--all", "--format=%H"]),
+  };
+}
+function assertNothingRemoved(repo, lane, before, why) {
+  assert.ok(fs.existsSync(lane), `${why}: worktree kept`);
+  assert.equal(gitCode(repo, ["show-ref", "--verify", "--quiet", "refs/heads/feat/e9-x"]), 0, `${why}: branch kept`);
+  assert.deepEqual(snapshotTree(repo), before.primary, `${why}: primary files unchanged`);
+  assert.deepEqual(snapshotTree(lane), before.lane, `${why}: lane files unchanged`);
+  assert.equal(git(repo, ["rev-parse", "HEAD"]), before.head, `${why}: HEAD unchanged`);
+  assert.equal(git(repo, ["log", "--all", "--format=%H"]), before.log, `${why}: no commit added`);
+}
+
+// AC13 [A1] (R2 a): without a seed record finish cannot tell seeded from created, so every untracked,
+// git-ignored lane knowledge file counts as created. WHY: a lane started before the mode was on (or
+// whose seeding warned) must neither lose its new files nor silently overwrite a primary copy it
+// never saw: with no seeded bytes there is no safe overwrite, so a differing file is refused.
+test("AC13: no seed record -> lane knowledge files count as created: absent copied, identical skipped and uncounted, differing refused with nothing removed; no unchanged line", () => {
+  // Copy / skip half.
+  {
+    const repo = makeModeOnRepo();
+    const { lane, seedPath } = startOk(repo);
+    fs.rmSync(seedPath);
+    writeFile(path.join(lane, "design", "new.md"), "# new in a record-less lane\n");
+    const newBytes = read(path.join(lane, "design", "new.md"));
+
+    const res = feature(repo, ["finish", "e9", "--shipped"]);
+    assert.equal(res.status, 0, res.stdout + res.stderr);
+    assert.ok(read(path.join(repo, "design", "new.md")).equals(newBytes), "the absent file is copied to the same path");
+    assert.deepEqual(
+      harvestLinesOf(res.stdout),
+      [harvestLine("design/new.md", "design/new.md")],
+      `only the absent file is harvested; byte-identical copies are not:\n${res.stdout}`
+    );
+    assert.ok(!res.stdout.includes(UNCHANGED_FRAGMENT), `no e447.finish-unchanged line without a record:\n${res.stdout}`);
+    for (const [rel, body] of Object.entries(FIVE)) {
+      assert.equal(fs.readFileSync(path.join(repo, rel), "utf-8"), body, `${rel} untouched in the primary`);
+    }
+    assert.equal(fs.existsSync(lane), false, "worktree removed");
+  }
+  // Refusal half: a lane file that differs from its primary copy has no seeded bytes to overwrite.
+  {
+    const repo = makeModeOnRepo();
+    const { lane, seedPath } = startOk(repo);
+    fs.rmSync(seedPath);
+    fs.appendFileSync(path.join(lane, "specs", "s1.md"), "lane edit with no record\n");
+    writeFile(path.join(lane, "design", "new.md"), "# new\n");
+    const before = captureState(repo, lane);
+
+    const res = feature(repo, ["finish", "e9", "--shipped"]);
+    assert.notEqual(res.status, 0, res.stdout + res.stderr);
+    assert.ok(res.stderr.includes(REFUSE_HEADER("--shipped")), res.stderr);
+    assert.ok(
+      outLines(res.stderr).some((l) => l.startsWith("  ") && l.endsWith("specs/s1.md")),
+      `the refusal names specs/s1.md:\n${res.stderr}`
+    );
+    assertNothingRemoved(repo, lane, before, "AC13 refusal");
+  }
+});
+
+// AC14 [A1] (R2 b): a lane that changed its seeded backlog AND has findings to number. WHY: the lane's
+// backlog edit and its numbered findings must both reach the primary checkout, numbered above the
+// lane backlog's own max (else ids collide with the lane's rows); when the primary backlog moved too,
+// the both-sides refusal must win before any id is allocated.
+const LANE_ROW = "| E15 | row the lane added to its seeded backlog | P2 | open |\n";
+
+test("AC14 numbered: lane-changed backlog + one pending block, primary backlog still seeded -> primary = lane backlog + one numbered row (E16), uncommitted, harvest + numbered lines", () => {
+  const repo = makeModeOnRepo();
+  const { lane } = startOk(repo);
+  fs.appendFileSync(path.join(lane, "docs", "backlog.md"), LANE_ROW);
+  const laneBacklog = fs.readFileSync(path.join(lane, "docs", "backlog.md"), "utf-8");
+  writeFile(path.join(lane, ".current", "e9", "pending-tickets.md"), PENDING);
+  const logBefore = git(repo, ["log", "--all", "--format=%H"]);
+
+  const res = feature(repo, ["finish", "e9", "--shipped"]);
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  const primary = fs.readFileSync(path.join(repo, "docs", "backlog.md"), "utf-8");
+  assert.ok(primary.startsWith(laneBacklog), `the primary backlog starts with the lane's bytes:\n${primary}`);
+  const tail = primary.slice(laneBacklog.length).split("\n").filter((l) => l !== "");
+  assert.equal(tail.length, 1, `exactly one row follows the lane's backlog:\n${primary}`);
+  assert.match(tail[0], /^\| E16 \|/, "next id above the lane backlog's max (E15)");
+  assert.ok(tail[0].includes("(filed by lane `e9` as `L1`)"), tail[0]);
+  const out = outLines(res.stdout);
+  assert.ok(out.includes(harvestLine("docs/backlog.md", "docs/backlog.md")), res.stdout);
+  assert.ok(out.includes(numberedLine("E16")), res.stdout);
+  assert.equal(porcelain(repo), "", "uncommitted and invisible to git");
+  assert.equal(git(repo, ["log", "--all", "--format=%H"]), logBefore, "no commit");
+});
+
+test("AC14 both changed: the primary backlog also changed after start -> e180 refusal naming docs/backlog.md, nothing numbered, nothing removed", () => {
+  const repo = makeModeOnRepo();
+  const { lane } = startOk(repo);
+  fs.appendFileSync(path.join(lane, "docs", "backlog.md"), LANE_ROW);
+  writeFile(path.join(lane, ".current", "e9", "pending-tickets.md"), PENDING);
+  fs.appendFileSync(path.join(repo, "docs", "backlog.md"), "| E20 | added in primary after start | P2 | open |\n");
+  const before = captureState(repo, lane);
+
+  const res = feature(repo, ["finish", "e9", "--shipped"]);
+  assert.notEqual(res.status, 0, res.stdout + res.stderr);
+  assert.ok(res.stderr.includes(REFUSE_HEADER("--shipped")), res.stderr);
+  assert.ok(
+    outLines(res.stderr).some((l) => l.startsWith("  ") && l.endsWith("docs/backlog.md")),
+    `the refusal names docs/backlog.md:\n${res.stderr}`
+  );
+  assert.ok(!res.stdout.includes(NUMBERED_PREFIX), `nothing numbered:\n${res.stdout}`);
+  assertNothingRemoved(repo, lane, before, "AC14 both changed");
+});
+
+// AC15 [A1] (R4, D11): "re-running finish is safe" must hold for the AC14 lane too. WHY: after a late
+// failure (here `git worktree remove` refused by an untracked, non-ignored file) the operator's only
+// expected action is to clear the cause and re-run; the re-run must finish without a hand edit and
+// without numbering the finding a second time, leaving the backlog exactly as the first run left it.
+test("AC15: AC14 lane + forced late failure, blocker removed, re-run -> exit 0, no numbered line, primary backlog byte-identical to after the first run, worktree removed", () => {
+  const repo = makeModeOnRepo();
+  const { lane } = startOk(repo);
+  fs.appendFileSync(path.join(lane, "docs", "backlog.md"), LANE_ROW);
+  const laneBacklog = fs.readFileSync(path.join(lane, "docs", "backlog.md"), "utf-8");
+  writeFile(path.join(lane, ".current", "e9", "pending-tickets.md"), PENDING);
+  writeFile(path.join(lane, "blocker.txt"), "x\n");
+
+  const first = feature(repo, ["finish", "e9", "--shipped"]);
+  assert.notEqual(first.status, 0, "fixture sanity: the forced late failure");
+  assert.ok(outLines(first.stdout).includes(numberedLine("E16")), `fixture sanity: the first run numbered:\n${first.stdout}`);
+  const afterFirst = read(path.join(repo, "docs", "backlog.md"));
+  const afterFirstText = afterFirst.toString("utf-8");
+  assert.ok(afterFirstText.startsWith(laneBacklog), afterFirstText);
+  assert.equal(
+    afterFirstText.slice(laneBacklog.length).split("\n").filter((l) => l !== "").length,
+    1,
+    `after the first run: the lane's backlog plus exactly one numbered row:\n${afterFirstText}`
+  );
+  fs.rmSync(path.join(lane, "blocker.txt"));
+
+  const rerun = feature(repo, ["finish", "e9", "--shipped"]);
+  assert.equal(rerun.status, 0, `the re-run completes with no hand edit:\n${rerun.stdout}${rerun.stderr}`);
+  assert.ok(!rerun.stdout.includes(NUMBERED_PREFIX), `the re-run allocates nothing:\n${rerun.stdout}`);
+  assert.ok(read(path.join(repo, "docs", "backlog.md")).equals(afterFirst), "backlog byte-identical to after the first run");
+  assert.equal(fs.existsSync(lane), false, "worktree removed");
+});
+
+// AC16 [A1] (R2 c): mode-on finish refusals. WHY: each is detected before any mutation, so the
+// operator can fix the cause and re-run; a half-done finish would strand files or lose findings.
+test("AC16 (i): a malformed knowledge-seed.json (not JSON, or no files object) -> exit 1, e447.finish-seed-unreadable, nothing removed (--shipped and --abandoned)", () => {
+  for (const verb of ["--shipped", "--abandoned"]) {
+    for (const [label, bytes] of [["not JSON", "{ not json"], ["no files object", '{"version":1}\n']]) {
+      const why = `${verb}, ${label}`;
+      const repo = makeModeOnRepo();
+      const { lane, seedPath } = startOk(repo);
+      writeFile(seedPath, bytes);
+      writeFile(path.join(lane, "design", "new.md"), "# new\n");
+      const before = captureState(repo, lane);
+
+      const res = feature(repo, ["finish", "e9", verb]);
+      assert.equal(res.status, 1, `${why}: ${res.stdout}${res.stderr}`);
+      const re = new RegExp(
+        `^agc feature finish ${verb}: cannot read \\.current/e9/knowledge-seed\\.json \\(.+\\) — nothing removed$`,
+        "m"
+      );
+      assert.match(res.stderr, re, why);
+      assertNothingRemoved(repo, lane, before, why);
+    }
+  }
+});
+
+test("AC16 (ii): lane-created design/new/x.md while the primary has a regular file at design/new -> exit 1, e180 refusal naming the primary design/new, nothing removed", () => {
+  const repo = makeModeOnRepo();
+  const { lane } = startOk(repo);
+  writeFile(path.join(repo, "design", "new"), "a regular file where the lane needs a directory\n");
+  writeFile(path.join(lane, "design", "new", "x.md"), "# x\n");
+  const before = captureState(repo, lane);
+
+  const res = feature(repo, ["finish", "e9", "--shipped"]);
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  assert.ok(res.stderr.includes(REFUSE_HEADER("--shipped")), res.stderr);
+  assert.ok(
+    outLines(res.stderr).some((l) => l.startsWith("  ") && l.endsWith("design/new")),
+    `the refusal names the primary design/new:\n${res.stderr}`
+  );
+  assertNothingRemoved(repo, lane, before, "AC16 (ii)");
+});
+
+test("AC16 (iii): one pending block and no docs/backlog.md in the primary (none harvested) -> exit 1, e447.finish-backlog-missing, nothing removed", () => {
+  const knowledge = { ...FIVE };
+  delete knowledge["docs/backlog.md"];
+  const repo = makeModeOnRepo({ knowledge });
+  const { lane } = startOk(repo);
+  assert.equal(fs.existsSync(path.join(lane, "docs", "backlog.md")), false, "fixture sanity: no backlog in the lane");
+  writeFile(path.join(lane, ".current", "e9", "pending-tickets.md"), PENDING);
+  const before = captureState(repo, lane);
+
+  const res = feature(repo, ["finish", "e9", "--shipped"]);
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  assert.ok(
+    outLines(res.stderr).includes(
+      "agc feature finish --shipped: docs/backlog.md not found on the primary checkout — cannot allocate ids for " +
+        ".current/e9/pending-tickets.md (nothing applied, nothing removed)"
+    ),
+    res.stderr
+  );
+  assertNothingRemoved(repo, lane, before, "AC16 (iii)");
+});
+
+test("AC16 (iv): a malformed pending block in the worktree's pending-tickets.md -> exit 1, the mode-on e447.finish-pending-malformed wording, nothing removed", () => {
+  const repo = makeModeOnRepo();
+  const { lane } = startOk(repo);
+  writeFile(path.join(lane, ".current", "e9", "pending-tickets.md"), "```pending-ticket\nnot: [a mapping\n```\n");
+  const before = captureState(repo, lane);
+
+  const res = feature(repo, ["finish", "e9", "--shipped"]);
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  const err = outLines(res.stderr);
+  const header =
+    "agc feature finish --shipped: .current/e9/pending-tickets.md in the lane worktree has 1 problem(s) — " +
+    "fix them in that file in the lane worktree (it is never committed in this mode) and re-run " +
+    "(nothing applied, nothing removed):";
+  const i = err.indexOf(header);
+  assert.ok(i >= 0, `mode-on wording expected:\n${res.stderr}`);
+  assert.ok(err[i + 1].startsWith("  pending-ticket block #1"), `one indented problem line follows:\n${res.stderr}`);
+  assert.ok(!res.stderr.includes("fix them on the lane branch"), "never the mode-off wording in this mode");
+  assertNothingRemoved(repo, lane, before, "AC16 (iv)");
+});

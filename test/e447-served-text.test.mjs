@@ -200,3 +200,36 @@ test("AC12: docs/config.md has exactly one knowledge section after ticketDir; do
     }
   }
 });
+
+// ============================================================================
+// AC20 [A1] (T-E447-08, review round 1 R3): the install doc's `--shipped` bullet under "With
+// `"knowledge": "local"`" names the destination specs/ would have had with the mode off
+// (`specs/archive/<ticket-id>/`), never `specs/abandoned/` (the --abandoned destination). WHY: an
+// adopter reading the bullet must be pointed at the directory that really changes behaviour.
+// The section's other lines are frozen below as they stand (R3 changes one bullet only); the bullet
+// itself is wording-free (DOC-INST-4: facts fixed), so only its facts are asserted.
+// ============================================================================
+
+const KNOWLEDGE_FINISH_HEAD =
+  "- **With `\"knowledge\": \"local\"`** — finish compares the lane's untracked knowledge files with `.current/<lane>/knowledge-seed.json`, before it removes anything:";
+const KNOWLEDGE_FINISH_OTHER = [
+  "  - Seeded copies the lane did not change are discarded, so a newer primary copy (for example a backlog row added after the lane started) is kept. A seeded file the lane deleted stays in the primary checkout.",
+  "  - **Both sides changed.** When the primary copy was edited too, finish refuses with the harvest-destination line naming that path, and nothing is removed or changed.",
+  "  - `--abandoned` copies created or changed knowledge files to `<dir>/abandoned/<ticket-id>/<path>` instead (`design/abandoned/<ticket-id>/…`; `docs/backlog.md` goes to `docs/abandoned/<ticket-id>/backlog.md`), never committed.",
+  "  - **Numbering.** The lane's `.current/<lane>/pending-tickets.md` is never committed in this mode, so on both paths finish numbers its findings straight from the worktree and appends the new rows to the primary checkout's untracked `docs/backlog.md`, without a commit.",
+];
+
+test("AC20: docs/install.md's knowledge-mode --shipped bullet says specs/ does not go to specs/archive/<ticket-id>/ and never names specs/abandoned/; the section's other lines unchanged", () => {
+  const lines = read("docs/install.md").split("\n");
+  const heads = lines.flatMap((l, i) => (l === KNOWLEDGE_FINISH_HEAD ? [i] : []));
+  assert.equal(heads.length, 1, "the finish section's knowledge bullet appears once");
+  const h = heads[0];
+  const section = [];
+  for (let i = h + 1; i < lines.length && lines[i].startsWith("  - "); i++) section.push(lines[i]);
+  const shipped = section.filter((l) => l.startsWith("  - `--shipped` "));
+  assert.equal(shipped.length, 1, `one --shipped bullet:\n${section.join("\n")}`);
+  assert.ok(shipped[0].includes("`specs/archive/<ticket-id>/`"), `names specs/archive/<ticket-id>/:\n${shipped[0]}`);
+  assert.ok(!shipped[0].includes("specs/abandoned/"), `never specs/abandoned/:\n${shipped[0]}`);
+  assert.equal(section[0], shipped[0], "the --shipped bullet stays first");
+  assert.deepEqual(section.slice(1), KNOWLEDGE_FINISH_OTHER, "every other line of the section byte-unchanged");
+});

@@ -151,3 +151,65 @@ Each cap gets an `E447 re-baseline` history comment in the file's existing conve
 ### Result
 
 The 8 affected files (`node --test` on the five re-pinned files plus `compose-equivalence`, `skill-manifest`, `e90-golden-capture-completeness`, `e447-served-text`): 181 tests, 181 pass. All 15 reds from the T-E447-07 full suite are now green; the expected-red manifest is marked fully resolved.
+
+## T-E447-08 — round 2 tests after cut amendment A1 (qa-engineer, 2026-11-27)
+
+Inputs: `specs/e447-local-knowledge-files.md` (A1 approved by the human 2026-11-27 with O4 (a); every `[A1]` item, AC13–AC20, D11, the A1 Copy rows), `review_reports/review_T-E447-01.md` (R1–R4). Placement branch: dispatch brief `Test-file placement` — added to the existing `test/e447-*.test.mjs` files by area; no new file, no test outside `test/e447-*` edited, round-1 tests unchanged (the only edit to existing test code is an additive `tracked` option on `makeModeOnRepo` in `test/e447-cut-reseed.test.mjs`).
+
+### Scenario → Test Map (round 2)
+
+| scenario | test file | exact test name |
+|---|---|---|
+| AC13 | `test/e447-lane-seed-finish.test.mjs` | `AC13: no seed record -> lane knowledge files count as created: absent copied, identical skipped and uncounted, differing refused with nothing removed; no unchanged line` |
+| AC14 numbered | `test/e447-lane-seed-finish.test.mjs` | `AC14 numbered: lane-changed backlog + one pending block, primary backlog still seeded -> primary = lane backlog + one numbered row (E16), uncommitted, harvest + numbered lines` |
+| AC14 both changed | `test/e447-lane-seed-finish.test.mjs` | `AC14 both changed: the primary backlog also changed after start -> e180 refusal naming docs/backlog.md, nothing numbered, nothing removed` |
+| AC15 | `test/e447-lane-seed-finish.test.mjs` | `AC15: AC14 lane + forced late failure, blocker removed, re-run -> exit 0, no numbered line, primary backlog byte-identical to after the first run, worktree removed` |
+| AC16 (i) | `test/e447-lane-seed-finish.test.mjs` | `AC16 (i): a malformed knowledge-seed.json (not JSON, or no files object) -> exit 1, e447.finish-seed-unreadable, nothing removed (--shipped and --abandoned)` |
+| AC16 (ii) | `test/e447-lane-seed-finish.test.mjs` | `AC16 (ii): lane-created design/new/x.md while the primary has a regular file at design/new -> exit 1, e180 refusal naming the primary design/new, nothing removed` |
+| AC16 (iii) | `test/e447-lane-seed-finish.test.mjs` | `AC16 (iii): one pending block and no docs/backlog.md in the primary (none harvested) -> exit 1, e447.finish-backlog-missing, nothing removed` |
+| AC16 (iv) | `test/e447-lane-seed-finish.test.mjs` | `AC16 (iv): a malformed pending block in the worktree's pending-tickets.md -> exit 1, the mode-on e447.finish-pending-malformed wording, nothing removed` |
+| AC17 (i) | `test/e447-cut-reseed.test.mjs` | `AC17 (i): reseed of a knowledge path tracked in the lane -> exit 1, e447.reseed-not-ignored, lane knowledge files and record unchanged` |
+| AC17 (ii) | `test/e447-cut-reseed.test.mjs` | `AC17 (ii): reseed of a path absent in the primary checkout, or a directory there -> exit 1, e447.reseed-not-primary-file, nothing changed` |
+| AC17 (iii) | `test/e447-cut-reseed.test.mjs` | `AC17 (iii): reseed with a malformed seed record -> exit 1, e447.reseed-seed-unreadable, nothing changed` |
+| AC17 (iv) | `test/e447-cut-reseed.test.mjs` | `AC17 (iv): reseed with no operand -> exit 2, e447.reseed-no-operand, nothing changed` |
+| AC17 (v) | `test/e447-cut-reseed.test.mjs` | `AC17 (v): two operands, one refused -> exit 1, neither copied, the record byte-unchanged (either order)` |
+| AC17 (vi) | `test/e447-cut-reseed.test.mjs` | `AC17 (vi): a primary file absent in the lane and absent from the record -> copied, the record gains its hash, e447.reseed-ok, exit 0` |
+| AC18 | `test/e447-init-knowledge.test.mjs` | `AC18: ticketDir "work/tick*ts" -> init --knowledge=local --artifacts=local exits 2 with e447.init-ticketdir-unsafe; config, exclude and adapter files byte-unchanged` |
+| AC19 (a) | `test/e447-cut-reseed.test.mjs` | `AC19 (a): the primary .current/.config.json is not valid JSON -> counts as mode off: no MANIFEST_CHANGED, exit as today` |
+| AC19 (b) | `test/e447-cut-reseed.test.mjs` | `AC19 (b): the manifest operand resolves outside the lane worktree (the primary's copy by absolute path) -> not compared, exit as today` |
+| AC20 | `test/e447-served-text.test.mjs` | `AC20: docs/install.md's knowledge-mode --shipped bullet says specs/ does not go to specs/archive/<ticket-id>/ and never names specs/abandoned/; the section's other lines unchanged` |
+| AC10 (as amended by A1) | `test/e447-mode-off.test.mjs` | `AC10 (amended): mode off -> check --cut in a lane prints the same stdout/stderr with the same exit code as the same operands outside any worktree` |
+
+Copy rows pinned by these tests: `e447.finish-harvest`; `e447.finish-unchanged` (its absence, AC13); `e180.evidence-harvest-refuse-line` (AC13, AC14, AC16 (ii)); `e447.finish-numbered` (AC14, AC15); `e447.finish-seed-unreadable` (AC16 (i), `<error>` matched as `.+`); `e447.finish-backlog-missing` (AC16 (iii), whole line); `e447.finish-pending-malformed` (AC16 (iv): the header line verbatim plus one `  pending-ticket block #1…` problem line); `e447.reseed-not-ignored` and `e447.reseed-not-primary-file` (whole lines); `e447.reseed-seed-unreadable` (`<error>` as `.+`); `e447.reseed-no-operand`; `e447.reseed-ok`; `e447.init-ticketdir-unsafe` (whole message). Unpinned on purpose, per T-E447-08: `e447.start-copy-failed`, `e447.start-seed-failed`, `e447.finish-harvest-failed` (hard to provoke portably; the reviewer accepted them untested). Also unpinned: `e447.init-config-malformed`, `e447.usage-feature-finish` and `e447.start-seed-not-ignored`, which no AC13–AC20 scenario triggers.
+
+### AC10 as amended — how it is covered
+
+The round-1 test `AC10: mode off -> check --cut in a lane never reports MANIFEST_CHANGED; outside a worktree it runs no git command` still covers the "outside a linked worktree: no git" half (PATH shim, zero git calls). The new `AC10 (amended)` test covers the "inside one: same report, same exit code" half. In a mode-off lane (key absent, and `"repo"`) whose primary manifest copy differs, `check --cut` stdout, stderr and exit code equal those of the same operands checked in a plain non-git directory, for an in-bounds cut (exit 0) and an out-of-bounds cut (FAIL line, non-zero exit). Both tests are green. "Reads no extra file" is still not machine-checked (no portable file-access tracer), and A1 drops that clause inside a linked worktree anyway.
+
+### Open Interface Details (round 2)
+
+- **AC13 setup, "no seed record"**: a normally started mode-on lane whose `.current/e9/knowledge-seed.json` is deleted before finish; the seeded copies stay byte-identical to the primary. "Identical not counted" is asserted as: the only `harvested knowledge file` line is the absent file's, and no `seeded knowledge file(s) unchanged` line appears. The refusal half asserts a non-zero exit (as AC6 both changed), not exactly 1, because AC13 names no exit code.
+- **AC14, "lane's backlog followed by the numbered row"**: the primary text starts with the lane backlog's bytes, and the remainder holds exactly one non-empty line: `| E16 |…` with the ``(filed by lane `e9` as `L1`)`` provenance (lane row E15 → next id E16). Separator bytes beyond that are not pinned.
+- **AC15**: asserts only observables: the exit code, no `agc feature finish — appended ` line on the re-run, the primary backlog equal to the first run's bytes, and the worktree removed. The D11 mechanism (lane copy written first) is not inspected, because the lane copy goes with the worktree. The first run's numbering and its "lane backlog + exactly one row" state are asserted as fixture sanity (green today).
+- **AC16 (ii) setup**: the primary's regular file `design/new` is created after `feature start` (created before, start would seed it and the lane could not make the directory). The refusal path is matched as a `  `-indented stderr line ending in `design/new` (the e180 line prints an absolute path).
+- **AC16 (iii) setup**: the primary never had `docs/backlog.md`, so none is seeded and none can be harvested.
+- **AC16 (iv) input**: one block `not: [a mapping` (a YAML parse error); `<n>` = 1. The problem text after `  pending-ticket block #1` is not pinned (the parser's wording). The test also asserts that `fix them on the lane branch` is absent in this mode.
+- **"Nothing removed" (AC13, AC14, AC16)**: a snapshot of every primary file outside `.git/` (knowledge files, backlog, `tasks.md`, `.current/` incl. history) and of every lane file, plus worktree present, branch present, and HEAD and `git log --all` unchanged. AC16 (i) runs four lanes: {not JSON, `{"version":1}`} × {`--shipped`, `--abandoned`}, exit exactly 1 each.
+- **AC17, "nothing changed"**: the lane's files under `specs/`, `design/`, `research/` and `docs/`, plus `.current/e9/knowledge-seed.json`, byte-compared before and after. AC17 (i) uses a force-added `specs/tracked.md` whose primary working copy is then edited, so a wrongful copy would show. AC17 (ii) uses `specs/none.md` (absent) and `specs/dir` (a directory created in the primary after start). AC17 (v) runs both operand orders: the refused operand's line is printed, and the valid operand (an amended manifest) is not copied. AC17 (vi): afterwards the record deep-equals the old entries plus the new path's hash.
+- **AC18**: the config holds `ticketDir: "work/tick*ts"` before init. "Nothing created" means the whole tree outside `.git/`, and `.git/info/exclude`, are byte-unchanged. `<dir>` is asserted as `"work/tick*ts"` inside literal quotes, per the Copy row.
+- **AC19 (a)**: the primary config is truncated JSON. The test first asserts the cut is compared (exit 1) while the config is valid, then that it is not compared and exits as the same manifest checked in a plain directory. **AC19 (b)**: the operand is the absolute path of the primary's own manifest, run from the lane; the exit must equal that (amended) manifest's exit in a plain directory.
+- **AC20**: the section is located by its head bullet (frozen verbatim) and runs while lines start with `  - `. The `--shipped` bullet must contain `` `specs/archive/<ticket-id>/` `` and must not contain `specs/abandoned/`; the rest of its wording is free (DOC-INST-4). The section's other four sub-bullets are frozen verbatim as they stand at T-E447-08, which gives the "every other line byte-unchanged" property without a base-sha diff.
+
+### Red Reasons (round 2)
+
+| test | why it is red now |
+|---|---|
+| AC15 | D11 not built: the re-run exits 1 with the e180 harvest-destination refusal naming `docs/backlog.md` (the primary copy, lane bytes + E16, matches neither the lane copy nor the record) |
+| AC16 (iv) | mode on still prints the mode-off header `… pending-tickets.md on the lane worktree has 1 problem(s) — fix them on the lane branch …` |
+| AC20 | `docs/install.md` still says "does not go to `specs/abandoned/`" |
+
+Every other round-2 test is green against the current code: it pins behaviour sr built in round 1, as A1 intends. No test was red because of a test defect, and no implementation gap was found beyond the three expected reds.
+
+### Counts (round 2)
+
+19 new tests: 3 red (all in the manifest's round-2 section) and 16 green. The five `test/e447-*` files: 45 tests, 42 pass, 3 fail (exactly the three above).

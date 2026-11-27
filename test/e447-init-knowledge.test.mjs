@@ -284,3 +284,33 @@ test("Copy e447.feature-unknown: the subcommand list names reseed", () => {
   assert.equal(none.status, 2, none.stderr);
   assert.ok(none.stderr.includes("agc feature: missing subcommand (start | finish | reseed)"), none.stderr);
 });
+
+// ============================================================================
+// AC18 [A1] (T-E447-08, review round 1 R2 e): init refuses a ticketDir that cannot be written as an
+// exact exclude rule. WHY: a gitignore rule built from `work/tick*ts` would be a pattern, excluding
+// other paths the team tracks; refusing before any write keeps the repo exactly as it was.
+// ============================================================================
+
+test("AC18: ticketDir \"work/tick*ts\" -> init --knowledge=local --artifacts=local exits 2 with e447.init-ticketdir-unsafe; config, exclude and adapter files byte-unchanged", () => {
+  const repo = makeRepo();
+  writeFile(
+    path.join(repo, ".current", ".config.json"),
+    JSON.stringify({ schema_version: 2, ticketDir: "work/tick*ts" }, null, 2) + "\n"
+  );
+  const before = snapshotTree(repo);
+  const exBefore = fs.existsSync(excludePath(repo)) ? fs.readFileSync(excludePath(repo), "utf-8") : null;
+
+  const r = agc(repo, ["init", "--knowledge=local", "--artifacts=local"]);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.ok(
+    r.stderr.includes(
+      'agc init: refusing --knowledge=local — ticketDir "work/tick*ts" contains a character unsafe for a gitignore ' +
+        "exclude rule (a wildcard, a backslash, or a control character). Rename the directory, or re-run with " +
+        "--knowledge=repo."
+    ),
+    r.stderr
+  );
+  assert.deepEqual(snapshotTree(repo), before, "config byte-unchanged; no adapter or other file created");
+  const exAfter = fs.existsSync(excludePath(repo)) ? fs.readFileSync(excludePath(repo), "utf-8") : null;
+  assert.equal(exAfter, exBefore, "exclude untouched");
+});

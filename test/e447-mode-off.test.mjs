@@ -194,3 +194,62 @@ test("AC10: mode off -> check --cut in a lane never reports MANIFEST_CHANGED; ou
   assert.ok(!(out.stdout + out.stderr).includes("MANIFEST_CHANGED"));
   assert.equal(fs.existsSync(log) ? fs.readFileSync(log, "utf-8") : "", "", "no git command outside a worktree");
 });
+
+// AC10 as amended by A1 (T-E447-08; D9 as built, O4 (a)): inside a mode-off linked worktree check --cut
+// may run one `git worktree list` and read the primary config, but its observable output must be
+// today's. WHY: "same report, same exit code" is the contract adopters without the mode rely on;
+// "today" is the same operands and bytes checked in a plain directory, where no comparison can run
+// (AC10 above pins the no-git half there). Both an in-bounds cut (exit 0) and an out-of-bounds cut
+// (a FAIL line, non-zero exit) are compared, with the key absent and "repo".
+test("AC10 (amended): mode off -> check --cut in a lane prints the same stdout/stderr with the same exit code as the same operands outside any worktree", () => {
+  const MANIFEST = [
+    "# Fan-out: off wave",
+    "base: abc1234    integration branch: integ/off",
+    "mailbox: ../lanes/_mailbox",
+    "",
+    "## Lanes",
+    "| lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |",
+    "|---|---|---|---|---|---|---|---|",
+    "| e9 | E9 | feat/e9-x | ../lanes/e9 | `src/**` | 共同禁止的全部項目 | 做：E9。　不做：其他。 | 無 |",
+    "",
+    "## Decisions",
+    "| 日期 | 裁決者 | 內容 | 出處 |",
+    "|---|---|---|---|",
+    "| 2026-11-20 | 人類 | 核准 | 整合者 session |",
+    "",
+  ].join("\n");
+  const spec = (touches) =>
+    `# s\n\n## Cut\n\n| id | desc | depends_on | est. files | touches | design-link |\n|---|---|---|---|---|---|\n| T-E9-01 | x | none | 1 | \`${touches}\` | — |\n`;
+  const OPERANDS = ["specs/fanout-x.md", "e9", "specs/e9-spec.md"];
+  const cut = (cwd) => spawnSync(process.execPath, [FANOUT, "check", "--cut", ...OPERANDS], { cwd, encoding: "utf-8" });
+
+  for (const knowledge of [undefined, "repo"]) {
+    for (const touches of ["src/a.ts", "lib/outside.ts"]) {
+      const why = `knowledge=${knowledge ?? "absent"}, touches=${touches}`;
+      const repo = makeRepo();
+      const cfg = { schema_version: 2, artifacts: "local", ...(knowledge === undefined ? {} : { knowledge }) };
+      writeFile(path.join(repo, ".current", ".config.json"), JSON.stringify(cfg) + "\n");
+      fs.appendFileSync(path.join(repo, ".git", "info", "exclude"), "/.current/\n");
+      writeFile(path.join(repo, "specs", "fanout-x.md"), MANIFEST);
+      writeFile(path.join(repo, "specs", "e9-spec.md"), spec(touches));
+      git(repo, ["add", "specs"]);
+      git(repo, ["commit", "-qm", "manifest"]);
+      const lane = path.join(mkTmp("e447-off-amended-lane-"), "lane");
+      assert.equal(agc(repo, ["feature", "start", "e9-x", "--path", lane]).status, 0, why);
+      // The primary's copy then differs: the case a mode-on lane would report as MANIFEST_CHANGED.
+      fs.appendFileSync(path.join(repo, "specs", "fanout-x.md"), "| 2026-11-25 | 人類 | 追加 | 整合者 session |\n");
+
+      const plain = mkTmp("e447-off-amended-plain-");
+      writeFile(path.join(plain, "specs", "fanout-x.md"), MANIFEST);
+      writeFile(path.join(plain, "specs", "e9-spec.md"), spec(touches));
+      const today = cut(plain);
+      if (touches === "src/a.ts") assert.equal(today.status, 0, `fixture sanity (in bounds): ${why}\n${today.stdout}`);
+      else assert.notEqual(today.status, 0, `fixture sanity (out of bounds): ${why}\n${today.stdout}`);
+
+      const inLane = cut(lane);
+      assert.equal(inLane.stdout, today.stdout, `same report: ${why}`);
+      assert.equal(inLane.stderr, today.stderr, `same stderr: ${why}`);
+      assert.equal(inLane.status, today.status, `same exit code: ${why}`);
+    }
+  }
+});

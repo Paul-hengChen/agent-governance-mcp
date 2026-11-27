@@ -97,3 +97,18 @@ test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the fou
 # re-pinned title); e410 AC2 const-08 row 6 -> 7, 12 -> 13 lines; e428 BASE[IN_FILE].sha re-pinned
 # to bebdd0e874912302b06f2ae81812aa924b1089f21a3a1b0767e2b078f6f58d06. No red is left on purpose; entries are kept as
 # history (append-only), not as open reds.
+
+# ---------------------------------------------------------------------------------------------------
+# Round 2 — qa-engineer T-E447-08 (2026-11-27), after cut amendment A1 (AC13-AC20, D11). Open reds below;
+# every other T-E447-08 test (AC13, AC14 x2, AC16 (i)-(iii), AC17 (i)-(vi), AC18, AC19 (a)/(b), AC10 (amended))
+# is green against the current code: it pins behaviour sr already built.
+# D11 not built yet (T-E447-09): the first run harvests the lane backlog over the primary copy and numbers
+# into it, so the re-run finds the primary copy matching neither the lane copy nor the record and refuses
+# with the e180 harvest-destination line on docs/backlog.md.
+test/e447-lane-seed-finish.test.mjs | AC15: AC14 lane + forced late failure, blocker removed, re-run -> exit 0, no numbered line, primary backlog byte-identical to after the first run, worktree removed
+# Mode-on e447.finish-pending-malformed wording not built yet (T-E447-09): mode on still prints the mode-off
+# "... on the lane worktree has 1 problem(s) — fix them on the lane branch ..." header.
+test/e447-lane-seed-finish.test.mjs | AC16 (iv): a malformed pending block in the worktree's pending-tickets.md -> exit 1, the mode-on e447.finish-pending-malformed wording, nothing removed
+# R3 not fixed yet (T-E447-09): docs/install.md's knowledge-mode --shipped bullet still says "does not go to
+# `specs/abandoned/`" instead of `specs/archive/<ticket-id>/`.
+test/e447-served-text.test.mjs | AC20: docs/install.md's knowledge-mode --shipped bullet says specs/ does not go to specs/archive/<ticket-id>/ and never names specs/abandoned/; the section's other lines unchanged
