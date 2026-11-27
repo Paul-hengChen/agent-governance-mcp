@@ -37,6 +37,8 @@
 | R14 | 2026-11-27 | Q14 叫醒時機 | 兩個叫醒時機都交給調節器：session 上限重置後，調節器自動接續，接著叫醒暫停的 integrator 和 lane；週上限照 R13，等人類打一句話。integrator SOP 裡「用量重置後重跑啟動器」這個時機拿掉。 | E443b A2-19 的第二個重跑時機 |
 | R15 | 2026-11-27 | Q15 切票 | 切兩張票，分兩個波次。第 1 張（第 1 波次）是啟動器與設定：R5 的設定、R6 的相依規則、可叫醒 `paused-weekly`、可對指定 lane 視窗送 `/exit`。第 2 張（第 2 波次，依賴第 1 張）是調節器本身：`conductor` prompt 與 SOP、integrator 視窗的開關、狀態檔、信箱、integrator SOP 的配合修改。 | — |
 | R16 | 2026-11-27 | Q16 真機驗收 | 第 2 張票的最後一個情境是真的跑一份至少 2 個波次的 manifest，由人親眼確認，驗證方式是 `device-or-person`；這張票跑到 PASS 後停下，人驗收完才合併。 | — |
+| R17 | 2026-11-27 | Q17 E466 放寬兩個測試 | E466 的 `allowed paths` 加上 `test/e423-spec-workshop.test.mjs` 與 `test/e428-tracker-mirror.test.mjs`。依據：integrator 派的 probe 實測，S1（14 個 prompt）讓 e423 的 registry 長度檢查變紅，S8（改 integrator SOP）讓 e428 的 sha256 檢查變紅，換寫法都避不開。 | — |
+| R18 | 2026-11-27 | Q18 `CLAUDE.md` 行數 | E466 的 Context 加一句：`CLAUDE.md` 維持目前行數，新增的列以合併既有續行抵銷；不把 `test/e432-judge-report-checks.test.mjs`、`test/e436-stale-handoff-paths.test.mjs` 加進允許清單。依據：probe 驗證淨行數 0 時兩者全綠。 | — |
 
 ## 討論中
 
@@ -61,3 +63,4 @@
 | date | decided by | content | source |
 |---|---|---|---|
 | 2026-11-27 | human | 核准票檔 E465、E466 與上方波次表（第 1 波次 E465；第 2 波次 E466，依賴 E465） | spec-workshop session（「approve」） |
+| 2026-11-27 | human | 確認 R17、R18 為人類裁定，核准修改後的 E466 票檔（`allowed paths` 加 e423、e428 兩個測試；Context 加 `CLAUDE.md` 行數限制）；E465 與波次表不變 | spec-workshop session（「是」「approve」） |
