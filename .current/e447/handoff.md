@@ -1,9 +1,10 @@
 ---
 schema_version: 17
 active_feature: "e447-local-knowledge-files"
-status: "In_Progress"
-last_updated: "2026-11-27T02:07:36.210Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-11-27T02:16:50.139Z"
+blocking_reason: "Scenario defects (12 user-facing strings with no Copy row; sr-added behaviours with no scenario or test) plus 2 implementation defects (a wrong specs/archive fact in docs/install.md:235; a finish --shipped re-run after a late failure that cannot complete on its own when the lane changed docs/backlog.md)"
+last_agent: "code-reviewer"
 prd_path: "specs/e447-local-knowledge-files.md"
 scope_decision: "single-feature"
 scope_decision_why: "One ticket (E447), one cut per specs/fanout-post-v5-w6.md; five sr tasks inside one feature (A1 config+init, A2a start/reseed, A2b finish/numbering, B1 check --cut + SOP texts, B2 docs) after the integrator's task_size pre-review; no architect (data model and module boundaries fixed in the spec)."
@@ -15,14 +16,15 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "opus"
 evidence_schema: 3
-next_role: "code-reviewer"
-dispatched_at: "2026-11-27T02:07:36.210Z"
+next_role: "pm"
+dispatched_at: "2026-11-27T02:16:50.139Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 5
-review_rounds_total: 0
+hop_count: 6
+review_rounds_total: 1
 visual_rounds_total: 0
 sr_return_count: 1
 ---
@@ -32,14 +34,11 @@ sr_return_count: 1
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: implementation complete for T-E447-02/03/06/04/07; qa re-pins T-E447-05 @ 090115b; DOC-INST-5 period @ 7cdc9f7 per human consent 2026-11-27; ready for review
-- Commits: T-02 18ffb6f, T-03 112957a, T-06 208b793, T-04 26bb196, T-07 6534c9e + 7cdc9f7 (docs/install.md (iii) eject row: 'skipped with a note With' -> 'skipped with a note. With', one character, matches the amended DOC-INST-5 Copy); qa T-05 090115b.
-- Checks this hop: node --test e447-served-text + e453/e433/e351/e425/e383/e290/e108/e289 (10 files): 128/128 pass; npm run build 0 TS errors; npm audit --audit-level=high exit 0 (1 low + 6 moderate, pre-existing, no dependency change). Full suite not rerun (one-character docs change, targeted readers green); last full run qa @ 090115b 4815 pass / 0 fail / 2 skipped of 4817.
-- Untested behaviour (T-02, init): agc init refuses (exit 2) --knowledge=local when the configured ticketDir has a gitignore-unsafe segment (mirrors the workspace-segment refusal).
-- Untested behaviour (T-03, start/reseed): start warns and seeds nothing when .current/<lane>/knowledge-seed.json would not be git-ignored in the lane; start warns on a per-file copy failure and on a seeding failure; reseed refuses a path not git-ignored in the lane (tracked, or no rule), a path that is not a file in the primary checkout, and an unreadable seed record; reseed with no operand is a usage error (exit 2); a lane-absent, unrecorded file is seeded fresh by reseed.
-- Untested behaviour (T-06, finish): malformed seed record at finish refuses; no seed record = every lane knowledge file counts as created; blocking non-dir ancestor at dst refuses; lane dangling symlink / non-ignored untracked file skipped; --shipped with a lane-changed docs/backlog.md appends rows to the lane copy (a re-run after a late failure then refuses it as both-changed); malformed pending blocks in mode on refuse; absent backlog with blocks to number refuses; finish usage wording (no Copy row).
-- Untested behaviour (T-04, check --cut): malformed/unreadable primary config counts as mode off; manifest path outside the lane worktree is not compared; submodule-style .git file (primary == this worktree) skipped; mode-off in a linked worktree still runs one git worktree list and reads the primary config (D9's 'no git' holds only outside a linked worktree).
-- Not pinned by qa (qa report lines 69, 71): the <rel> echoed by reseed's not-knowledge refusal; the AC2 (c) tracked-path display line.
+- code-reviewer: scenario defect — 12 user-facing strings with no Copy row, and sr-added behaviours with no scenario or test (R1, R2); implementation defects R3 (docs/install.md:235 specs/abandoned -> specs/archive/<ticket-id>/) and R4 (a finish --shipped re-run after a late failure cannot complete when the lane changed docs/backlog.md)
+- review_report: review_reports/review_T-E447-01.md
+- route: pm (Copy rows + scenarios, human consent for the post-approval amendment) -> qa (tests + expected-red) -> sr (R3, R4, any reworded strings) -> code-reviewer
+- accepted, not required: judgement item (2) D9 — in a mode-off linked worktree check --cut runs one git worktree list and reads the primary config, but its output is unchanged; recommended: short-circuit on the lane's own copied .current/.config.json first
+- optional: reseed not-knowledge refusal echoes the operand as typed, not the repo-relative <rel>; optional untested: start per-file copy-failure and seeding-failure warnings, the submodule .git skip
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
