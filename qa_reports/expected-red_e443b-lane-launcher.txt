@@ -74,3 +74,10 @@ test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the fou
 # now carries the re-pinned title); e428 BASE[IN_FILE].sha re-pinned to
 # 908fa6a0938ed5bb4eb38ea4b74285b1a5306a996f6d1e450be05f199a5d917f. No red is left on purpose; entries are kept as
 # history (append-only), not as open reds.
+
+# qa-engineer T-E443B-14 full suite (2026-11-27, at e1e51d5): RE-OPENED with one red the PM probe did not list.
+# The CALLERS2 allow-list of lane-paths importers does not name the new tools/lane-launch.ts. The architecture spec
+# sanctions that import (tools/lane-paths.ts is imported read-only), so this is a stale test pin (test defect), not an
+# implementation defect. test/lane-paths.test.mjs is not in the lane's owned cell by name, so the re-pin waits
+# for the integrator to confirm ownership.
+test/lane-paths.test.mjs | CALLERS2 (allow-list): grep -rln "lane-paths" tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned F0 + L1-L3 importer set — a NEW unlisted importer still fails this

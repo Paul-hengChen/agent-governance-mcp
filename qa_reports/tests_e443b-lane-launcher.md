@@ -174,3 +174,18 @@ The three re-pins deferred above, done after T-E443B-13 landed the served text (
 `test/skill-manifest.test.mjs` is not edited: t-golden-byte-identity goes green from the re-capture alone.
 Targeted check: `context-budget`, `e428-tracker-mirror`, `skill-manifest`, `e90-golden-capture-completeness`,
 `compose-equivalence`: 113 tests, 113 pass. `qa_reports/expected-red_e443b-lane-launcher.txt` is marked fully resolved.
+
+### T-E443B-14 full suite
+
+`node scripts/test-lock.mjs -- npm test` on a clean tree at `e1e51d5` (Node 22): 4970 tests, **4967 pass, 1 fail**,
+2 skipped, 0 cancelled (exit 1).
+
+The one red is `test/lane-paths.test.mjs` "CALLERS2 (allow-list): …". Its `SANCTIONED_LANE_PATHS_IMPORTERS` list
+does not name `tools/lane-launch.ts`, the new module that imports `./lane-paths.js`. Classification: **test defect**
+(a stale allow-list pin), not an implementation defect. `specs/e443b-lane-launcher-architecture.md` says
+`tools/lane-paths.ts` is "imported read-only, never edited", so the import is sanctioned. The PM probe table did not
+list this test, and the earlier full suite ran before `tools/lane-launch.ts` existed, so nobody caught it until now.
+The fix is one allow-list entry plus a group comment citing the e443b architecture spec. It is not applied here.
+`test/lane-paths.test.mjs` is not in the lane's owned cell by name, and the manifest's catch-all ("other tests red
+only because of this lane, listed by the PM probe, confirmed by the integrator") needs integrator confirmation
+first. Every other test is green, including all forbidden-column invariants.
