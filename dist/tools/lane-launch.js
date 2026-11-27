@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadConfig, resolveTicketDir } from "./config.js";
+import { loadConfig, resolveTicketDir, resolveWaveDoneAt } from "./config.js";
 import { FANOUT_CODES, lanesSectionsWithoutWave, lookupTicketFiles, parseManifest, renderPrompt, resolveMailboxHeader, resolveWorktree, ticketIds, validateManifest, } from "./fanout-manifest.js";
 import { checkLaneAncestry } from "./join-precondition.js";
 import { HISTORY_BUCKET_RE, resolveLaneName } from "./lane-paths.js";
@@ -30,6 +30,7 @@ export const READY_POLL_MS = 1_000;
 export const READY_SETTLE_MS = 6_000;
 export const UNKNOWN_CHECK_MS = 5_000;
 export const RESEND_GAP_MS = 10_000;
+export const EXIT_LINE = "/exit";
 export const WAKE_LINE = "額度已恢復：先 tw_get_state，照 Crash-Resume 流程核對後從中斷處接續。";
 /** The one table of host line prefixes the launcher matches in a window. */
 export const HOST_SIGNALS = {
@@ -73,6 +74,10 @@ export const OUT = {
     pausedWeekly: (lane) => `paused ${lane} — weekly limit, no automatic wake`,
     pausedStopped: (lane) => `paused ${lane} — automatic continue stopped; re-run the launcher after the limit resets`,
     windowGone: (lane) => `window gone ${lane} — not finished; the next run resumes it`,
+    waveDoneInvalid: (value) => `lane-launch: waveDoneAt ${JSON.stringify(value)} is neither "merged" nor "pr-open"; using "merged"`,
+    depNotMerged: (dep, startRef) => `${dep}'s work has not merged into ${startRef}`,
+    depNoTip: (dep, branch, startRef) => `branch ${branch} is gone and the launcher recorded no tip for ${dep}, so it cannot tell whether ${dep}'s work has merged into ${startRef}`,
+    closed: (lane, id) => `closed ${lane} — window ${id}`,
 };
 export function launchLimit(config) {
     return config.laneLaunchLimit ?? DEFAULT_LANE_LAUNCH_LIMIT;
@@ -115,7 +120,8 @@ function isRecord(v) {
     const signals = v.signals;
     return LAUNCH_STATUSES.includes(v.status) && typeof v.wave === "number" && typeof v.windowId === "string" &&
         typeof v.baseSha === "string" && typeof v.reportFloor === "number" && typeof v.updatedAt === "string" &&
-        (v.reason === undefined || typeof v.reason === "string") &&
+        (v.reason === undefined || typeof v.reason === "string") && (v.tip === undefined || typeof v.tip === "string") &&
+        (v.windowClosed === undefined || typeof v.windowClosed === "boolean") &&
         Object.keys(HOST_SIGNALS).every((k) => typeof signals[k] === "number");
 }
 export function readLaunchState(file) {
@@ -244,10 +250,13 @@ export function laneTicketStatuses(worktree, ticketDirRel, ids) {
     }
     return new Map(ids.map((id) => [id, found.get(id)]));
 }
+const isStopped = (s) => s !== undefined && /^stopped\s+—\s+\S/.test(s);
 export function ticketsSettled(statuses) {
     const all = [...statuses.values()];
-    const stopped = (s) => s !== undefined && /^stopped\s+—\s+\S/.test(s);
-    return all.length > 0 && all.every((s) => s === "done" || stopped(s)) && all.some(stopped);
+    return all.length > 0 && all.every((s) => s === "done" || isStopped(s)) && all.some(isStopped);
+}
+export function anyTicketStopped(statuses) {
+    return [...statuses.values()].some(isStopped);
 }
 export function hasFinishRecord(primary, names) {
     const root = path.join(primary, ".current", "history");
@@ -280,20 +289,36 @@ export function probeFinished(input) {
         finished = "finish record";
     return { finished, reportCount: reports.length, settled };
 }
+/** The full sha of `branch`, or undefined when the branch does not exist. */
+export function branchTip(primary, branch, git) {
+    const r = git(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}^{commit}`], primary);
+    const sha = r.stdout.trim();
+    return r.status === 0 && sha !== "" ? sha : undefined;
+}
+/**
+ * `merged` (default): a gone branch with a finish record counts as merged. `pr-open`: the dependency's work
+ * (its branch, or once gone the `recordedTip`) must be an ancestor of `startRef`; a finish record alone never counts.
+ */
 export function dependencyMet(input) {
     const { primary, dep, startRef } = input;
+    const prOpen = input.waveDoneAt === "pr-open";
     const recorded = hasFinishRecord(primary, recordNames(dep));
-    if (input.knowledgeLocal)
-        return recorded ? { met: true } : { met: false, why: `agc feature finish --shipped has not run for ${dep.lane}` };
-    if (input.git(["show-ref", "--verify", "--quiet", `refs/heads/${dep.branch}`], primary).status !== 0) {
+    if (input.knowledgeLocal && !recorded)
+        return { met: false, why: `agc feature finish --shipped has not run for ${dep.lane}` };
+    if (input.knowledgeLocal && !prOpen)
+        return { met: true };
+    const exists = input.git(["show-ref", "--verify", "--quiet", `refs/heads/${dep.branch}`], primary).status === 0;
+    if (!exists && !prOpen) {
         return recorded ? { met: true } : { met: false, why: `branch ${dep.branch} is gone and ${dep.lane} has no finish record` };
     }
-    const r = input.ancestry([dep.branch], primary, startRef)[0];
+    if (!exists && input.recordedTip === undefined)
+        return { met: false, why: OUT.depNoTip(dep.lane, dep.branch, startRef) };
+    const r = input.ancestry([exists ? dep.branch : input.recordedTip], primary, startRef)[0];
     if (r?.isAncestor)
         return { met: true };
     if (r?.error !== undefined)
         return { met: false, why: `git: ${firstLine(r.error)}` };
-    return { met: false, why: `branch ${dep.branch} is not an ancestor of ${startRef}` };
+    return { met: false, why: prOpen ? OUT.depNotMerged(dep.lane, startRef) : `branch ${dep.branch} is not an ancestor of ${startRef}` };
 }
 /** The manifest's `base:` for the lowest 波次, `main` for any later one. */
 export function startRefFor(m, wave) {
@@ -315,17 +340,21 @@ class LaunchRun {
     m;
     state;
     stateFile;
+    waveDoneAt;
+    opts;
     records;
     limit;
     ticketDirRel;
     mailboxRoot;
-    constructor(ctx, deps, config, m, state, stateFile) {
+    constructor(ctx, deps, config, m, state, stateFile, waveDoneAt, opts) {
         this.ctx = ctx;
         this.deps = deps;
         this.config = config;
         this.m = m;
         this.state = state;
         this.stateFile = stateFile;
+        this.waveDoneAt = waveDoneAt;
+        this.opts = opts;
         this.records = (state.manifests[ctx.manifestKey] ??= { lanes: {} }).lanes;
         this.limit = launchLimit(config);
         this.ticketDirRel = path.relative(ctx.primary, resolveTicketDir(ctx.primary));
@@ -335,6 +364,15 @@ class LaunchRun {
     update(lane, patch) {
         Object.assign(this.records[lane], patch, { updatedAt: new Date(this.deps.clock.now()).toISOString() });
         writeLaunchState(this.stateFile, this.state, this.deps.clock.now(), this.deps.pid);
+    }
+    /** Records the lane's branch tip while the branch exists; a lane without a launch record is left alone. */
+    recordTip(lane) {
+        const rec = this.records[lane.lane];
+        if (rec === undefined)
+            return;
+        const tip = branchTip(this.ctx.primary, lane.branch, this.deps.git);
+        if (tip !== undefined && tip !== rec.tip)
+            this.update(lane.lane, { tip });
     }
     probe(lane) {
         const wt = resolveWorktree(lane.worktree, this.ctx.primary);
@@ -358,6 +396,7 @@ class LaunchRun {
         const p = this.probe(lane);
         if (p.finished !== undefined) {
             this.update(lane.lane, { status: "finished" });
+            this.recordTip(lane);
             return this.deps.out(OUT.finished(lane.lane, p.finished));
         }
         if (!p.settled && p.reportCount > rec.reportFloor)
@@ -392,10 +431,10 @@ class LaunchRun {
             this.deps.out(OUT.entered(lane.lane));
         }
     }
-    /** The wake line into a paused-stopped lane's own window (observe just saw it exists); a weekly pause is never woken. */
+    /** The wake line into a paused lane's own window (observe just saw it exists); a weekly pause only with the weekly-wake option. */
     async wake(lane) {
         const rec = this.records[lane.lane];
-        if (rec?.status !== "paused-stopped")
+        if (rec?.status !== "paused-stopped" && !(rec?.status === "paused-weekly" && this.opts.wakeWeekly === true))
             return;
         const signals = await sendText(this.deps.driver, this.deps.clock, rec.windowId, WAKE_LINE);
         this.update(lane.lane, { status: "running", signals, reportFloor: this.probe(lane).reportCount });
@@ -416,7 +455,11 @@ class LaunchRun {
                 const dep = this.m.dispatchable.find((d) => d.lane === id);
                 if (dep === undefined)
                     continue;
-                const c = dependencyMet({ primary: this.ctx.primary, dep, startRef, knowledgeLocal: this.config.knowledge === "local", git: this.deps.git, ancestry: this.deps.ancestry });
+                this.recordTip(dep);
+                const c = dependencyMet({
+                    primary: this.ctx.primary, dep, startRef, knowledgeLocal: this.config.knowledge === "local", git: this.deps.git,
+                    ancestry: this.deps.ancestry, waveDoneAt: this.waveDoneAt, recordedTip: this.records[dep.lane]?.tip,
+                });
                 if (!c.met) {
                     this.deps.out(OUT.waiting(lane.lane, id, c.why));
                     met = false;
@@ -493,10 +536,33 @@ class LaunchRun {
                 await this.resume(lane, rec);
         }
     }
+    /** A finished lane with no `stopped — …` ticket (none when its worktree is gone) gets `/exit` once. */
+    async close(lane) {
+        const rec = this.records[lane.lane];
+        if (rec?.status !== "finished" || rec.windowClosed === true)
+            return;
+        const wt = resolveWorktree(lane.worktree, this.ctx.primary);
+        const stopped = wt.ok && isDir(wt.path) && anyTicketStopped(laneTicketStatuses(wt.path, this.ticketDirRel, ticketIds(lane.ticket)));
+        if (stopped)
+            return;
+        try {
+            await sendText(this.deps.driver, this.deps.clock, rec.windowId, EXIT_LINE);
+        }
+        catch {
+            return;
+        }
+        this.update(lane.lane, { windowClosed: true });
+        this.deps.out(OUT.closed(lane.lane, rec.windowId));
+    }
     async run() {
         const lanes = this.m.dispatchable;
         for (const lane of lanes)
             await this.observe(lane);
+        if (this.opts.closeFinished === true) {
+            for (const lane of lanes)
+                await this.close(lane);
+            return 0;
+        }
         for (const lane of lanes)
             await this.wake(lane);
         const waves = [...new Set(lanes.map((l) => l.wave ?? 0))].sort((a, b) => a - b);
@@ -526,9 +592,12 @@ class LaunchRun {
     }
 }
 /** Whole run: refusals, lock, launch state, then the wave. Returns 0, or 1 on a refusal; a clock error propagates. */
-export async function runLaneLaunch(ctx, deps) {
+export async function runLaneLaunch(ctx, deps, opts = {}) {
     const text = fs.readFileSync(ctx.manifestPath, "utf8");
     const config = loadConfig(ctx.primary);
+    const waveDone = resolveWaveDoneAt(ctx.primary);
+    if (Object.hasOwn(waveDone, "rejected"))
+        deps.err(OUT.waveDoneInvalid(waveDone.rejected));
     const refusals = manifestRefusals(text, config);
     const m = parseManifest(text);
     if (refusals.length === 0) {
@@ -555,7 +624,7 @@ export async function runLaneLaunch(ctx, deps) {
             deps.err(OUT.refused(read.error));
             return 1;
         }
-        return await new LaunchRun(ctx, deps, config, m, read.state, files.state).run();
+        return await new LaunchRun(ctx, deps, config, m, read.state, files.state, waveDone.waveDoneAt, opts).run();
     }
     finally {
         lock.release();
@@ -716,7 +785,18 @@ export function itermInstalled(home = os.homedir()) {
         [path.join("/Applications", "iTerm.app"), path.join(home, "Applications", "iTerm.app")].some(isDir);
 }
 // --- §L CLI -------------------------------------------------------------------
-export const LANE_LAUNCH_USAGE = "usage: node scripts/lane-launch.mjs <manifest>";
+export const LANE_LAUNCH_USAGE = "usage: node scripts/lane-launch.mjs <manifest> [--wake-weekly] [--close-finished]";
+export const WAKE_WEEKLY_FLAG = "--wake-weekly";
+export const CLOSE_FINISHED_FLAG = "--close-finished";
+/** One manifest plus each option at most once, options after the manifest; anything else is undefined. */
+export function parseLaneLaunchArgv(argv) {
+    const [manifest, ...rest] = argv;
+    if (manifest === undefined || manifest.startsWith("-") || new Set(rest).size !== rest.length)
+        return undefined;
+    if (!rest.every((a) => a === WAKE_WEEKLY_FLAG || a === CLOSE_FINISHED_FLAG))
+        return undefined;
+    return { manifest, opts: { wakeWeekly: rest.includes(WAKE_WEEKLY_FLAG), closeFinished: rest.includes(CLOSE_FINISHED_FLAG) } };
+}
 const INSTALL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 function pidAlive(pid) {
     try {
@@ -757,11 +837,12 @@ export function createHostDeps() {
 }
 /** argv → exit code 0 / 1 / 2. While a run is active, SIGINT / SIGTERM release its lock and exit 130 / 143. */
 export async function runLaneLaunchCli(argv, deps) {
-    const manifest = argv[0];
-    if (argv.length !== 1 || manifest === undefined || manifest.startsWith("-")) {
+    const parsed = parseLaneLaunchArgv(argv);
+    if (parsed === undefined) {
         deps.err(LANE_LAUNCH_USAGE);
         return 2;
     }
+    const { manifest, opts } = parsed;
     try {
         fs.readFileSync(manifest);
     }
@@ -786,7 +867,7 @@ export async function runLaneLaunchCli(argv, deps) {
     process.on("SIGINT", onInt);
     process.on("SIGTERM", onTerm);
     try {
-        return await runLaneLaunch(ctx, deps);
+        return await runLaneLaunch(ctx, deps, opts);
     }
     finally {
         process.off("SIGINT", onInt);

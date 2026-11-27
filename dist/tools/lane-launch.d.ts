@@ -1,4 +1,4 @@
-import { type WorkspaceConfig } from "./config.js";
+import { type WaveDoneAt, type WorkspaceConfig } from "./config.js";
 import { type DispatchableLane, type Manifest } from "./fanout-manifest.js";
 import { type LaneAncestryResult } from "./join-precondition.js";
 export declare const DEFAULT_LANE_LAUNCH_LIMIT = 3;
@@ -17,6 +17,7 @@ export declare const READY_POLL_MS = 1000;
 export declare const READY_SETTLE_MS = 6000;
 export declare const UNKNOWN_CHECK_MS = 5000;
 export declare const RESEND_GAP_MS = 10000;
+export declare const EXIT_LINE = "/exit";
 export declare const WAKE_LINE = "\u984D\u5EA6\u5DF2\u6062\u5FA9\uFF1A\u5148 tw_get_state\uFF0C\u7167 Crash-Resume \u6D41\u7A0B\u6838\u5C0D\u5F8C\u5F9E\u4E2D\u65B7\u8655\u63A5\u7E8C\u3002";
 /** The one table of host line prefixes the launcher matches in a window. */
 export declare const HOST_SIGNALS: {
@@ -59,6 +60,10 @@ export declare const OUT: {
     pausedWeekly: (lane: string) => string;
     pausedStopped: (lane: string) => string;
     windowGone: (lane: string) => string;
+    waveDoneInvalid: (value: unknown) => string;
+    depNotMerged: (dep: string, startRef: string) => string;
+    depNoTip: (dep: string, branch: string, startRef: string) => string;
+    closed: (lane: string, id: string) => string;
 };
 export interface LaneLaunchRecord {
     status: LaunchStatus;
@@ -73,6 +78,10 @@ export interface LaneLaunchRecord {
     reportFloor: number;
     /** `start-failed` only: why the start failed. */
     reason?: string;
+    /** Tip of the lane's branch last seen while the branch existed (the `pr-open` dependency check once it is gone). */
+    tip?: string;
+    /** True once a close-finished run sent `/exit` into the window. */
+    windowClosed?: boolean;
     updatedAt: string;
 }
 export interface ManifestLaunchState {
@@ -138,6 +147,11 @@ export interface LaunchContext {
     primary: string;
     gitCommonDir: string;
 }
+/** `wakeWeekly`: the wake pass also wakes paused-weekly lanes. `closeFinished`: the run is the close pass alone. */
+export interface LaunchOptions {
+    wakeWeekly?: boolean;
+    closeFinished?: boolean;
+}
 export declare function launchLimit(config: WorkspaceConfig): number;
 export declare function resolveLaunchContext(manifestPath: string, git: GitRunner): LaunchContext | {
     error: string;
@@ -179,6 +193,7 @@ export declare function parseMailboxMessages(text: string): MailboxMessage[];
 export declare function isLaneReport(msg: MailboxMessage): boolean;
 export declare function laneTicketStatuses(worktree: string, ticketDirRel: string, ids: string[]): Map<string, string | undefined>;
 export declare function ticketsSettled(statuses: Map<string, string | undefined>): boolean;
+export declare function anyTicketStopped(statuses: Map<string, string | undefined>): boolean;
 export declare function hasFinishRecord(primary: string, names: string[]): boolean;
 export interface FinishedProbe {
     finished: FinishedHow | undefined;
@@ -199,6 +214,12 @@ export type DepCheck = {
     met: false;
     why: string;
 };
+/** The full sha of `branch`, or undefined when the branch does not exist. */
+export declare function branchTip(primary: string, branch: string, git: GitRunner): string | undefined;
+/**
+ * `merged` (default): a gone branch with a finish record counts as merged. `pr-open`: the dependency's work
+ * (its branch, or once gone the `recordedTip`) must be an ancestor of `startRef`; a finish record alone never counts.
+ */
 export declare function dependencyMet(input: {
     primary: string;
     dep: DispatchableLane;
@@ -206,13 +227,15 @@ export declare function dependencyMet(input: {
     knowledgeLocal: boolean;
     git: GitRunner;
     ancestry: AncestryFn;
+    waveDoneAt?: WaveDoneAt;
+    recordedTip?: string;
 }): DepCheck;
 /** The manifest's `base:` for the lowest 波次, `main` for any later one. */
 export declare function startRefFor(m: Manifest, wave: number): string;
 export declare function shellQuote(s: string): string;
 export declare function launchCommand(worktree: string, lane: string): string;
 /** Whole run: refusals, lock, launch state, then the wave. Returns 0, or 1 on a refusal; a clock error propagates. */
-export declare function runLaneLaunch(ctx: LaunchContext, deps: LaunchDeps): Promise<number>;
+export declare function runLaneLaunch(ctx: LaunchContext, deps: LaunchDeps, opts?: LaunchOptions): Promise<number>;
 /** Lines of a window's text, leading whitespace and UI glyphs (box drawing, bullets) stripped. */
 export declare function signalLines(contents: string): string[];
 export declare function signalCounts(contents: string): SignalCounts;
@@ -251,7 +274,14 @@ export declare const runOsascript: OsascriptRunner;
 export declare function createItermDriver(run?: OsascriptRunner): WindowDriver;
 /** True on macOS when iTerm.app is in /Applications or ~/Applications. */
 export declare function itermInstalled(home?: string): boolean;
-export declare const LANE_LAUNCH_USAGE = "usage: node scripts/lane-launch.mjs <manifest>";
+export declare const LANE_LAUNCH_USAGE = "usage: node scripts/lane-launch.mjs <manifest> [--wake-weekly] [--close-finished]";
+export declare const WAKE_WEEKLY_FLAG = "--wake-weekly";
+export declare const CLOSE_FINISHED_FLAG = "--close-finished";
+/** One manifest plus each option at most once, options after the manifest; anything else is undefined. */
+export declare function parseLaneLaunchArgv(argv: string[]): {
+    manifest: string;
+    opts: LaunchOptions;
+} | undefined;
 /** Real seams: iTerm2 driver, host paths under os.homedir(), feature-start runner, real clock, git, checkLaneAncestry, process pid and streams. */
 export declare function createHostDeps(): LaunchDeps;
 /** argv → exit code 0 / 1 / 2. While a run is active, SIGINT / SIGTERM release its lock and exit 130 / 143. */
