@@ -55,16 +55,16 @@ pointed at an empty temp dir so even a faulty build could only refuse on the tru
 
 | test | change | turns green with |
 |---|---|---|
-| `test/e115-join-precondition.test.mjs` AC5 | `.d.ts` regex now `checkLaneAncestry(branches: string[], repoRoot: string, ref: string)` | T-E443B-02 |
-| `test/e349-integrator-repo-facts.test.mjs` AC-E349-2 | `TOOLS` literal = Copy `add.tools` | T-E443B-04 |
-| `test/e425-stop-ticket-batch.test.mjs` AC1 | frozen C-LP2: first bullet ends with Copy `lp.s3-launcher` (appended, no space) | T-E443B-05 |
+| `test/e115-join-precondition.test.mjs` AC5 | `.d.ts` regex now `checkLaneAncestry(branches: string[], repoRoot: string, ref: string)` | T-E443B-07 |
+| `test/e349-integrator-repo-facts.test.mjs` AC-E349-2 | `TOOLS` literal = Copy `add.tools` | T-E443B-12 |
+| `test/e425-stop-ticket-batch.test.mjs` AC1 | frozen C-LP2: first bullet ends with Copy `lp.s3-launcher` (appended, no space) | T-E443B-13 |
 
-## Deferred to T-E443B-06
+## Deferred to T-E443B-14
 
 - `test/e428-tracker-mirror.test.mjs` AC6 / AC12 sha256 of `content/skill-integrator.md` (re-pin after the last text edit).
 - `test/fixtures/compose-golden/skill-coordinator-monolith.txt` re-capture (turns `test/skill-manifest.test.mjs` t-golden-byte-identity green).
 - `test/context-budget.test.mjs` teamwork coordinator bundle cap re-baseline (+~100 tok, with a history comment).
-These are green today (no served text changed yet) and go red only when T-E443B-05 lands; not in the manifest now.
+These are green today (no served text changed yet) and go red only when T-E443B-13 lands; not in the manifest now.
 
 ## Open Interface Details
 
@@ -86,7 +86,7 @@ These are green today (no served text changed yet) and go red only when T-E443B-
   only for a parent directory does not count.
 - **A2-17 resend spacing**: asserted as at least 10 s of fake time between consecutive slash sends (Decision 10).
 - **A2-24 doc section**: Copy `config.section` verbatim and contiguous; extra lines after it inside the same section
-  (the T-E443B-05 known-limitation sentence) are allowed, no other heading, no bare ticket id.
+  (the T-E443B-13 known-limitation sentence) are allowed, no other heading, no bare ticket id.
 - **Usage error spawn case** lives under A2-12 (exit 2: no argument, unreadable manifest path); the stderr must carry
   `usage: node scripts/lane-launch.mjs <manifest>` (architecture Open Question 3, closed as written).
 
@@ -94,12 +94,16 @@ These are green today (no served text changed yet) and go red only when T-E443B-
 
 All 27 scenario tests are red now; see `qa_reports/expected-red_e443b-lane-launcher.txt` for the list.
 
-- A2-1..A2-18, A2-22, A2-26, A2-27: `Cannot find module …/dist/tools/lane-launch.js` (module not built; T-E443B-02/03/04).
-- A2-23: the emitted `.d.ts` still has the two-parameter `checkLaneAncestry` (T-E443B-02).
-- A2-24: `loadConfig` drops `laneLaunchLimit` (`undefined !== 2`) (T-E443B-02); the docs part waits for T-E443B-05.
-- A2-19, A2-20, A2-21: served text not edited yet (T-E443B-05).
-- A2-25: `CLAUDE.md` row / prompts row (T-E443B-02) and the addendum tool line (T-E443B-04) not edited yet.
-- e115 AC5, e349 AC-E349-2, e425 AC1: re-pinned to text the implementing tasks have not written yet.
+- A2-1..A2-18, A2-22, A2-26, A2-27: `Cannot find module …/dist/tools/lane-launch.js` (module not built). Green with:
+  A2-22 T-E443B-07; A2-1..A2-4, A2-13, A2-14, A2-26, A2-27 T-E443B-08; A2-15..A2-17 T-E443B-09; A2-7..A2-10
+  T-E443B-10; A2-18 T-E443B-11; A2-5, A2-6 T-E443B-12; A2-11, A2-12 core subtests T-E443B-07, CLI-level and
+  real-script subtests T-E443B-12 (the test is green after T-E443B-12).
+- A2-23: the emitted `.d.ts` still has the two-parameter `checkLaneAncestry` (T-E443B-07).
+- A2-24: `loadConfig` drops `laneLaunchLimit` (`undefined !== 2`) (T-E443B-07); the docs part waits for T-E443B-13.
+- A2-19, A2-20, A2-21: served text not edited yet (T-E443B-13).
+- A2-25: `CLAUDE.md` row / prompts row (T-E443B-07) and the addendum tool line (T-E443B-12) not edited yet.
+- e115 AC5, e349 AC-E349-2, e425 AC1: re-pinned to text the implementing tasks have not written yet (T-E443B-07,
+  T-E443B-12, T-E443B-13 respectively).
 
 ## Oracle check (not committed)
 
@@ -145,3 +149,14 @@ The 30 failures are exactly the 30 entries of `qa_reports/expected-red_e443b-lan
 the 27 scenario tests (A2-1..A2-27) and the three re-pins (e115 AC5, e349 AC-E349-2, e425 AC1). Every other test
 is as it was before this change; no forbidden-column test went red (`test/e408-*`, `e403`, `e443a-integrator-sop`,
 `e433`, `e436`, `e395`, `e391`, `e432`, `config-cache`, `drift-baseline`, `config-versioning` are all green).
+
+## Re-split re-entry (2026-11-27)
+
+The PM re-split voided T-E443B-02..06 and cut T-E443B-07..14 (`.current/e443b/tasks.md`). Task-id attributions in
+this report and in `qa_reports/expected-red_e443b-lane-launcher.txt` now name the new ids (the manifest is grouped
+by the task that turns each test green); no test, test name or manifest entry changed. Red set re-checked by
+running the four `test/e443b-*.test.mjs` files plus `test/e115-join-precondition.test.mjs`,
+`test/e349-integrator-repo-facts.test.mjs` and `test/e425-stop-ticket-batch.test.mjs` (no full suite this pass;
+T-E443B-14 runs it): `node --test` on Node 22 at `8f30894` (tests and dist unchanged since
+`b4f2885`): 67 tests, 37 pass, **30 fail**, exit 1. The 30 failing top-level tests are exactly the 30 manifest entries
+(name-for-name), and every other test in those seven files is green.

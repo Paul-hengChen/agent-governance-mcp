@@ -2,46 +2,59 @@
 # Feature-scoped: append, never overwrite (sr-engineer appends any red it leaves itself).
 # No compile error anywhere: the new tests import dist/tools/lane-launch.js lazily inside each test, so a missing
 # module turns each test red on its own ("Cannot find module .../dist/tools/lane-launch.js"); every other file loads.
+# Task attributions follow the 2026-11-27 PM re-split (.current/e443b/tasks.md): T-E443B-02..06 voided, replaced by
+# T-E443B-07..14. Each group names the task that turns its tests green; a test that spans two tasks turns green
+# with the later one and is grouped there. Entries unchanged since T-E443B-01.
 
-# tools/lane-launch.ts / dist/tools/lane-launch.js not built yet (T-E443B-02 §A–§F; CLI and scripts/lane-launch.mjs T-E443B-04)
+# T-E443B-07: config, ancestry, CLAUDE.md row, launcher foundation (§A-§C, refusal / lock wrapper)
+test/e443b-scheduling.test.mjs | A2-22: a 相依 cell naming a lane of the same 波次 refuses the run, naming both lanes and the wave
+test/e443b-config-ancestry.test.mjs | A2-23: checkLaneAncestry takes (branches, repoRoot, ref): compares with ref; a two-argument caller still compares with HEAD
+# e115 AC5 (re-pinned): the emitted .d.ts still has the two-parameter checkLaneAncestry
+test/e115-join-precondition.test.mjs | AC5: exported function signatures (emitted .d.ts) take no second workspace-path argument
+
+# T-E443B-08: scheduling (§D finished signals with the report floor, §E dependency met, §F run loop)
 test/e443b-scheduling.test.mjs | A2-1: a wave of four lanes under laneLaunchLimit 2 never has more than two running and starts all four
 test/e443b-scheduling.test.mjs | A2-2: with no laneLaunchLimit key a wave of five lanes runs at most three at once
 test/e443b-scheduling.test.mjs | A2-3: a lane whose depended-on lane is not merged is not started and is listed as waiting on it
 test/e443b-scheduling.test.mjs | A2-4: with knowledge local a merged depended-on lane without a finish record keeps its dependent waiting
-test/e443b-scheduling.test.mjs | A2-14: after wave 1 finished and merged, wave 2 lanes whose depended-on lanes are met start from main; an unmet one waits
-test/e443b-scheduling.test.mjs | A2-5: a second run starts no running or finished lane again and the launch-state file stays untracked
-test/e443b-scheduling.test.mjs | A2-6: no launcher run, a refusal included, changes the manifest's bytes
-test/e443b-scheduling.test.mjs | A2-11: no 人類 Decisions row, or cutApprovalAutoTier.manifest not true, refuses, names the reason, exits non-zero and starts nothing
-test/e443b-scheduling.test.mjs | A2-12: a manifest with no 波次 column is refused with the reason and a non-zero exit
-test/e443b-scheduling.test.mjs | A2-22: a 相依 cell naming a lane of the same 波次 refuses the run, naming both lanes and the wave
 test/e443b-scheduling.test.mjs | A2-13: a lane with approval human or a ticket without a ticket file is not started and listed; the others start
+test/e443b-scheduling.test.mjs | A2-14: after wave 1 finished and merged, wave 2 lanes whose depended-on lanes are met start from main; an unmet one waits
 test/e443b-scheduling.test.mjs | A2-26: progress reports never finish a lane: it stays running, keeps its slot and the queued lane waits
 test/e443b-scheduling.test.mjs | A2-27: a lane report, or a report while every ticket is done or stopped (one stopped), finishes the lane and frees its slot
 
-# tools/lane-launch.ts window driving / host checks not built yet (T-E443B-03 §G–§K, on top of T-E443B-02)
+# T-E443B-09: lane start (signals, sends, ready wait, Unknown command resend, feature-start argv)
+test/e443b-window.test.mjs | A2-15: a new lane gets one agc feature start and its session opens in the new worktree; an existing worktree is reused
+test/e443b-window.test.mjs | A2-16: the CLI starts with no prompt; the slash line, then the render --batch output in one write text, each followed by an empty write text
+test/e443b-window.test.mjs | A2-17: Unknown command after the slash line is resent at most 3 times, then the lane is start-failed and frees its slot
+
+# T-E443B-10: poll, pause, Enter, wake and resume
 test/e443b-window.test.mjs | A2-7: a weekly-limit line with no Continuing automatically at after it pauses the lane as paused-weekly, never woken; others continue
 test/e443b-window.test.mjs | A2-8: Automatic continue stopped marks paused-stopped; the next run sends the wake line into the same window only
 test/e443b-window.test.mjs | A2-9: Press enter to continue gets one empty write text from the launcher and the lane stays running
 test/e443b-window.test.mjs | A2-10: a lane whose window closed is not finished and is resumed in a new window in the same worktree
-test/e443b-window.test.mjs | A2-15: a new lane gets one agc feature start and its session opens in the new worktree; an existing worktree is reused
-test/e443b-window.test.mjs | A2-16: the CLI starts with no prompt; the slash line, then the render --batch output in one write text, each followed by an empty write text
-test/e443b-window.test.mjs | A2-17: Unknown command after the slash line is resent at most 3 times, then the lane is start-failed and frees its slot
+
+# T-E443B-11: host pre-checks and the iTerm2 driver
 test/e443b-window.test.mjs | A2-18: no trust entry, no iTerm2, autoContinueAtUsageLimit in project/local settings, or fallbackModel anywhere refuses, naming the cause
 
-# checkLaneAncestry has no ref parameter yet; loadConfig drops laneLaunchLimit; docs/config.md has no laneLaunchLimit section (T-E443B-02, T-E443B-05)
-test/e443b-config-ancestry.test.mjs | A2-23: checkLaneAncestry takes (branches, repoRoot, ref): compares with ref; a two-argument caller still compares with HEAD
-test/e443b-config-ancestry.test.mjs | A2-24: loadConfig surfaces laneLaunchLimit only as a positive integer, no default, schema 2; docs/config.md has its one section
+# T-E443B-12: CLI (runLaneLaunchCli, scripts/lane-launch.mjs) and the addendum §5 tool line.
+# A2-11 / A2-12: core (runLaneLaunch) subtests need T-E443B-07; the CLI-level and real-script subtests need T-E443B-12.
+# A2-25: CLAUDE.md part needs T-E443B-07; the addendum part needs T-E443B-12.
+test/e443b-scheduling.test.mjs | A2-5: a second run starts no running or finished lane again and the launch-state file stays untracked
+test/e443b-scheduling.test.mjs | A2-6: no launcher run, a refusal included, changes the manifest's bytes
+test/e443b-scheduling.test.mjs | A2-11: no 人類 Decisions row, or cutApprovalAutoTier.manifest not true, refuses, names the reason, exits non-zero and starts nothing
+test/e443b-scheduling.test.mjs | A2-12: a manifest with no 波次 column is refused with the reason and a non-zero exit
+test/e443b-served-text.test.mjs | A2-25: CLAUDE.md keeps 250 lines with the lane-launch Layout row after tools/config.ts and a one-line prompts row; the addendum §5 tool line ends with lane-launch
+# e349 AC-E349-2 (re-pinned): the addendum §5 tool line does not name node scripts/lane-launch.mjs yet
+test/e349-integrator-repo-facts.test.mjs | AC-E349-2: addendum heading list unchanged; the nine §5 bullets follow the fanout line in order; §7 unchanged; every called tool has its repo-relative call
 
-# Served / repo text not edited yet: content/skill-integrator.md, content/coord-03-core-fallback.md, docs/lane-protocol.md (T-E443B-05); CLAUDE.md (T-E443B-02), docs/lane-protocol-addendum.md (T-E443B-04)
+# T-E443B-13: served and doc text (content/skill-integrator.md, content/coord-03-core-fallback.md, docs/lane-protocol.md, docs/config.md)
+# A2-24: config part needs T-E443B-07; the docs/config.md part needs T-E443B-13.
 test/e443b-served-text.test.mjs | A2-19: content/skill-integrator.md names the launcher's two re-run moments; Work overview, Lifecycle and Stage 3 say it replaces hand-opened sessions and a refused wave stays hand-started
 test/e443b-served-text.test.mjs | A2-20: the composed coordinator SOP opens the Crash-Resume Protocol with the usage-limit line (no fallback, no model switch, one re-dispatch, then checkpoint and stop)
 test/e443b-served-text.test.mjs | A2-21: docs/lane-protocol.md §1 step 1 exempts a launcher-started lane (confirm location only), §1 keeps its line count, §3 批次 lane names the launcher
-test/e443b-served-text.test.mjs | A2-25: CLAUDE.md keeps 250 lines with the lane-launch Layout row after tools/config.ts and a one-line prompts row; the addendum §5 tool line ends with lane-launch
-
-# Re-pinned owned tests (spec Probe table): red until the pinned text lands
-# e115 AC5: the emitted .d.ts still has the two-parameter checkLaneAncestry (T-E443B-02)
-test/e115-join-precondition.test.mjs | AC5: exported function signatures (emitted .d.ts) take no second workspace-path argument
-# e349 AC-E349-2: the addendum §5 tool line does not name node scripts/lane-launch.mjs yet (T-E443B-04)
-test/e349-integrator-repo-facts.test.mjs | AC-E349-2: addendum heading list unchanged; the nine §5 bullets follow the fanout line in order; §7 unchanged; every called tool has its repo-relative call
-# e425 AC1: the §3 批次 lane first bullet does not end with lp.s3-launcher yet (T-E443B-05)
+test/e443b-config-ancestry.test.mjs | A2-24: loadConfig surfaces laneLaunchLimit only as a positive integer, no default, schema 2; docs/config.md has its one section
+# e425 AC1 (re-pinned): the §3 批次 lane first bullet does not end with lp.s3-launcher yet
 test/e425-stop-ticket-batch.test.mjs | AC1: lane protocol holds C-LP1, C-LP2 and C-LP3 at their places; skeleton and line 41 index kept
+
+# T-E443B-14 (qa close): golden re-capture, budget cap re-baseline, e428 sha256 re-pin, full suite. No entry here:
+# those tests are green today and go red only when T-E443B-13 lands the served text (see the tests report).
