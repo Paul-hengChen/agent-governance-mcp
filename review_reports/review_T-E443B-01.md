@@ -96,3 +96,49 @@ CHANGES_REQUESTED — the implementation and tests meet A2-1..A2-27, but `script
 ### sr-engineer reply — Round 1
 
 - required (`scripts/lane-launch.mjs`): restored to the architecture §L script as written: no `try/catch`, no `lane-launch: error` line, header `1 = refused (stderr), 2 = usage`. `cmp` against the §L code block: byte-identical. `npm run build` exit 0; `npm audit --audit-level=high` exit 0; `node --test test/e443b-*.test.mjs test/lane-paths.test.mjs`: 123/123 pass. The three non-blocking notes are left as they are.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Diff since round 1: `git diff 308c071..HEAD` at `19611b7`, outside `.current/e443b/` and the round-1 report files, is `scripts/lane-launch.mjs` alone (`git diff 25ee478..HEAD --stat`: `scripts/lane-launch.mjs`, the sr reply in this file, `.current/e443b/` state). Every round-1 finding outside that file stands as written above.
+
+Independent verification at `19611b7` (working tree differs only by this hop's `.current/e443b/` state writes), Node 22:
+- `scripts/lane-launch.mjs` vs the `specs/e443b-lane-launcher-architecture.md` §L `js` block, extracted to a scratch file: `cmp` byte-identical (516 bytes). `lane-launch: error` appears nowhere in `tools/`, `dist/`, `scripts/`, `content/`, `docs/`, `test/` or `specs/`.
+- Spawned script: no argument and `--help` print `LANE_LAUNCH_USAGE`, exit 2; a missing manifest prints `lane-launch: cannot read <manifest>: <first line>` then usage, exit 2 (the §L CLI contract rows).
+- A2-11 / A2-12 (`--test-name-pattern "^A2-1[12]:"`): 10/10 pass, including "the real script: exit 1, refusal on stderr, nothing started", "the real script" and "the real script: a usage error (no manifest argument, unreadable manifest) exits 2".
+- `node --test test/e443b-*.test.mjs test/lane-paths.test.mjs`: 123/123 pass.
+- `npm run build` exit 0; `git status --porcelain` afterwards lists only `.current/e443b/` state: no `dist/` diff.
+- `npm audit --audit-level=high` exit 0 (moderate advisories only, unchanged from base). `node bin/agc-init.mjs check` exit 0 with the same 8 comment warnings as round 1; none names `scripts/lane-launch.mjs`.
+- Full suite `node scripts/test-lock.mjs -- npm test`: 4970 tests, 4968 pass, 0 fail, 2 skipped, exit 0.
+- Information hygiene: the changed files (`scripts/lane-launch.mjs`, this report, `.current/e443b/handoff.md`, `.current/e443b/dispatch.jsonl`) hold no absolute home or temp-directory path and no local username.
+
+## Summary
+- The one change since round 1 restores `scripts/lane-launch.mjs` to the architecture §L script: no `try/catch`, no unlisted `lane-launch: error` line, header `1 = refused (stderr), 2 = usage`.
+- Nothing else in source, tests, served text or `dist/` changed.
+- The round-1 required finding is resolved; the round-1 non-blocking notes are unchanged and listed once below.
+- Verdict: APPROVED.
+
+## AC Completeness
+A2-1..A2-27 — implemented — unchanged from Round 1 (the evidence lines above still hold at `19611b7`); A2-11 / A2-12 real-script paths re-run green against the restored script.
+
+## Correctness
+No new findings. The restored script awaits `runLaneLaunchCli` and sets `process.exitCode` from its return. An unexpected throw now surfaces as Node's default unhandled-rejection output with a non-zero exit, as the architecture intends. Tests (T-E443B-01, T-E443B-14) unchanged and sound.
+
+## Quality
+The round-1 required finding is resolved (byte-identical to §L). Comment warnings: the same 8 as round 1, all kept with the reasons given there.
+
+## Architecture
+`scripts/lane-launch.mjs` now matches §L exactly; the round-1 departure is gone. No other departure.
+
+## Security
+No change since round 1; the script adds no input handling.
+
+## Performance
+No change since round 1.
+
+## Non-blocking notes (carried from Round 1, not required)
+- `recommended` — `tools/lane-launch.ts:498`: the `fill` doc comment says a lane finished while queued is dropped, but a queued lane with no record starts without a fresh `isFinished` check (`:503`).
+- `optional` — `tools/lane-launch.ts:486`, `:419`: a throw from `driver.open` or from `driver.contents` inside `wake` ends the whole run; the lock is released in `finally` and the next run reconciles.
+- `optional` — `tools/lane-launch.ts:209-215`: a lock read between another run's `wx` create and its write sees empty content and is treated as stale (microsecond window; pid-only staleness accepted by the architecture).
+
+## Verdict
+APPROVED — the only change since round 1 restores `scripts/lane-launch.mjs` byte-for-byte to architecture §L; A2-1..A2-27 pass and the full suite is green with no off-manifest red.
