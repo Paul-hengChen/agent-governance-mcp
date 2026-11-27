@@ -10,3 +10,6 @@
 {"ts":"2026-11-27T09:02:57.716Z","feature":"e443b-lane-launcher","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-27T09:03:07.671Z","feature":"e443b-lane-launcher","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-27T09:07:55.548Z","feature":"e443b-lane-launcher","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T09:09:13.740Z","feature":"e443b-lane-launcher","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T09:09:35.096Z","feature":"e443b-lane-launcher","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-27T09:10:54.327Z","feature":"e443b-lane-launcher","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
