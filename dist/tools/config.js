@@ -342,6 +342,13 @@ function loadConfigEntry(workspacePath) {
     if (isUsableTicketDir(ticketDir)) {
         result.ticketDir = ticketDir;
     }
+    // Additive-optional field (no schema_version bump). Non-fatal filter: only
+    // a positive integer is surfaced; anything else is treated as absent (the
+    // launcher's default applies), never an error.
+    const laneLaunchLimit = migration.payload.laneLaunchLimit;
+    if (typeof laneLaunchLimit === "number" && Number.isInteger(laneLaunchLimit) && laneLaunchLimit > 0) {
+        result.laneLaunchLimit = laneLaunchLimit;
+    }
     // Cache under the pre-read mtime. If the migration heal-on-read above
     // rewrote the file, the recorded mtime is already stale — the NEXT call's
     // stat will mismatch and trigger one redundant (but correct) re-read,

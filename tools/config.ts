@@ -99,6 +99,9 @@ export interface WorkspaceConfig {
   // verbatim only when usable (isUsableTicketDir); resolveTicketDir applies
   // DEFAULT_TICKET_DIR otherwise.
   ticketDir?: string;
+  // Lane launcher parallel limit (scripts/lane-launch.mjs). Surfaced only when
+  // a positive integer; no default here — the launcher applies its own (3).
+  laneLaunchLimit?: number;
 }
 
 // One sisterRepos entry. `path` is relative to the repo root; `backlog` and
@@ -457,6 +460,13 @@ function loadConfigEntry(workspacePath: string): ConfigCacheEntry {
   const ticketDir = migration.payload.ticketDir;
   if (isUsableTicketDir(ticketDir)) {
     result.ticketDir = ticketDir;
+  }
+  // Additive-optional field (no schema_version bump). Non-fatal filter: only
+  // a positive integer is surfaced; anything else is treated as absent (the
+  // launcher's default applies), never an error.
+  const laneLaunchLimit = migration.payload.laneLaunchLimit;
+  if (typeof laneLaunchLimit === "number" && Number.isInteger(laneLaunchLimit) && laneLaunchLimit > 0) {
+    result.laneLaunchLimit = laneLaunchLimit;
   }
   // Cache under the pre-read mtime. If the migration heal-on-read above
   // rewrote the file, the recorded mtime is already stale — the NEXT call's
