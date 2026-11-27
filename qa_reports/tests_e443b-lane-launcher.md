@@ -138,4 +138,10 @@ PATH (as the existing e115 / e443a suites do).
 
 ## Full suite
 
-SUITE_RESULT_PLACEHOLDER
+`node scripts/test-lock.mjs -- npm test` on a clean tree at `b4f2885` (tests committed; Node 22):
+4934 tests, **4902 pass, 30 fail**, 2 skipped, 0 cancelled (exit 1).
+
+The 30 failures are exactly the 30 entries of `qa_reports/expected-red_e443b-lane-launcher.txt` and nothing else:
+the 27 scenario tests (A2-1..A2-27) and the three re-pins (e115 AC5, e349 AC-E349-2, e425 AC1). Every other test
+is as it was before this change; no forbidden-column test went red (`test/e408-*`, `e403`, `e443a-integrator-sop`,
+`e433`, `e436`, `e395`, `e391`, `e432`, `config-cache`, `drift-baseline`, `config-versioning` are all green).
