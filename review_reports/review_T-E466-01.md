@@ -1,6 +1,6 @@
 # Review — T-E466-01
 
-covers: T-E466-01, T-E466-02, T-E466-03, T-E466-04, T-E466-05, T-E466-06, T-E466-07, T-E466-08, T-E466-09, T-E466-10, T-E466-11
+covers: T-E466-01, T-E466-02, T-E466-03, T-E466-04, T-E466-05, T-E466-06, T-E466-07, T-E466-08, T-E466-09, T-E466-10, T-E466-11, T-E466-12
 
 ## Round 1 — CHANGES_REQUESTED — by code-reviewer
 
@@ -58,3 +58,43 @@ covers: T-E466-01, T-E466-02, T-E466-03, T-E466-04, T-E466-05, T-E466-06, T-E466
 
 ### Verdict
 CHANGES_REQUESTED — the code and tests satisfy S1–S8, but the feature leaves the prompt count in `docs/install.md` (and `docs/architecture.md`) at 13 while fourteen prompts are registered, and the cut never sourced those count updates (scenario defect, pm).
+
+## Round 2 — APPROVED — by code-reviewer
+
+### Summary
+- Re-review at e9a741d6 (diff since round 1, `9dd5e0b9..e9a741d6`):
+  - PM cut amendment adding Copy / Strings `install.count`, `arch.count`, `arch.list` and task T-E466-12 (47f4c489, aa0733ca).
+  - qa's confirmation that no test changes (3b378815).
+  - sr's fix (90a08030).
+- F1 is resolved. All three strings match the cut byte for byte, and nothing else changed.
+- Full suite on the clean tree: 5016/5019 pass, 0 fail, 3 skipped. The e457 and e433 doc-number tests are green (19/19 run on their own).
+- Verdict: APPROVED.
+
+### AC Completeness
+- AC S1–S9 — unchanged from round 1 (S1–S8 implemented; S9 device-or-person with an adequate checklist).
+- Build contract Docs (amended) — implemented:
+  - `docs/install.md:349` equals `install.count`.
+  - `docs/architecture.md` Layer 1 box: the count line equals `arch.count`, and the `arch.list` line is inserted directly after the doc-writer…spec-workshop line, which is unchanged.
+  - All three box lines are 62 characters, the same width as the rest of the box.
+
+### Correctness
+- F1 (round 1) — resolved.
+  - `git diff e3a5f63b...HEAD -- docs/architecture.md` is 2 insertions and 1 deletion, all inside the Layer 1 box. That is exactly the edit the integrator accepted outside the cut (to-lane#4, recorded in the Build contract Docs bullet and T-E466-12).
+  - No other line of `docs/architecture.md` moved. The numbers e457 / e433 pin (17 steps, 33 gates) are unchanged and their tests are green.
+- `docs/tickets/E466.md` still carries only the in-place `Verification:` lines (8 changed lines).
+- No test change was needed. No resident test pins the old "13 registered prompts" text in either file (qa round 2 note; confirmed by the green suite).
+
+### Quality
+- No findings. optional: the Layer 2 header `12 tw_* MCP tools` in `docs/architecture.md` predates this lane and is out of its scope; not touched, correctly.
+
+### Architecture
+- No change since round 1; no findings.
+
+### Security
+- Doc-only change; no findings.
+
+### Performance
+- Doc-only change; no findings.
+
+### Verdict
+APPROVED — F1 is fixed exactly per the amended cut, no other line moved, and the full suite is green with every scenario S1–S8 passing (S9 left for manual verification).

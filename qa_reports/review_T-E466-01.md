@@ -44,3 +44,43 @@ suite-result: 5016/5019 passed (server-recorded from qa_suite_result; command: n
 
 Round 1 CHANGES_REQUESTED. S1–S8 tests and implementation are sound and every one is green. The full suite passes 5016/5019 (0 fail, 3 skipped). Every expected-red entry is green and nothing is red outside the manifest. dist/ matches a fresh build. All binding constraints hold. S9's checklist is adequate. Required finding F1 (scenario defect → pm): docs/install.md:349 says 'All 13 registered prompts', directly above the fourteen-bullet list this diff extends. docs/architecture.md:18 says '13 registered prompts' and is outside the allowed paths. When the 13th prompt landed, its lane updated both lines (efe3f446). This cut's Copy / Strings lists readme.count and claude.lines only. Fix: pm adds an install.count row ('All 14 registered prompts') and decides how docs/architecture.md:18 gets fixed (integrator out-of-bounds acceptance, or a post-merge fix); then sr-engineer applies it. Recommended, not blocking: add tests for the open --record → first-wave wave-done path and for wake (the reviewer's probe verified both). Optional: trim the qa test-header WHY blocks that agc check flags. Report: review_reports/review_T-E466-01.md.
 
+
+## Round 2 — APPROVED — by code-reviewer
+
+covers: T-E466-01, T-E466-02, T-E466-03, T-E466-04, T-E466-05, T-E466-06, T-E466-07, T-E466-08, T-E466-09, T-E466-10, T-E466-11, T-E466-12
+
+Suite: `node scripts/test-lock.mjs -- npm test` on the clean tree at e9a741d6 (only reviewer `.current/e466/` state uncommitted) — 5019 tests, 5016 pass, 0 fail, 3 skipped, exit 0. `dist/` unchanged by the prebuild. `test/e457-doc-numbers.test.mjs` + `test/e433-test-first-rules.test.mjs` on their own: 19 pass, 0 fail.
+
+## Expected-Red Diff
+
+Manifest `qa_reports/expected-red_e466-conductor.txt` is unchanged since round 1, 14 entries. Actual reds in the suite: none.
+
+- All 14 manifest entries (S1–S8 scenario tests and the owned re-pins in e178a AC3/AC5, e423 AC1, skill-frontmatter, e428 AC6/AC12, e443b A2-19) — red on the manifest, now green — built (dispositions as in round 1).
+- Reds off the manifest: none.
+
+## AC Execution Log
+
+- S1 — test test/e466-prompt.test.mjs — S1: the prompt list holds fourteen prompts with conductor appended last, and tw_switch_role rejects conductor as a role — ok — pass
+- S2 — test test/e466-prompt.test.mjs — S2: the composed conductor prompt states the loop (fan-out <record> first, 接手 <manifest> + wave later, notify and stop after the last wave, never another manifest) and the SOP has no tw_update_state — ok — pass
+- S3 — test test/e466-window-state.test.mjs — S3: open --manifest <m> --wave 2 opens one window, sends the integrator prompt line then 接手 <manifest>，開始第 2 波次 with the launcher's send method and records the window id; close sends /exit to that window only — ok — pass
+- S4 — test test/e466-window-state.test.mjs — S4: a fresh conductor reads the same manifest, wave, window id and step from agc-conductor.json in the git common dir, which is not tracked; an unparseable state is refused, not overwritten — ok — pass
+- S5 — test test/e466-wave-done.test.mjs — S5: a wave-done report with an unmet fact keeps the integrator and replies naming it; with every fact met (merged, or open under pr-open) the integrator is closed, finished lane windows closed, the next wave's integrator opened; after the last wave nothing opens — ok — pass
+- S6 — test test/e466-wave-done.test.mjs — S6: when the integrator window no longer exists and no wave-done report arrived, check reports integrator gone with its wave and opens no window — ok — pass
+- S7 — test test/e466-prompt.test.mjs — S7: the conductor SOP wakes the paused integrator and paused-stopped lanes after its own automatic continue, and paused-weekly lanes only after the human says the weekly limit reset — ok — pass
+- S8 — test test/e466-integrator-sop.test.mjs — S8: the integrator SOP reports wave-done to the conductor's mailbox at the waveDoneAt moment, carries pr-open waiting lanes itself, and no longer re-runs the launcher after a usage limit resets — ok — pass
+- S9 — device-or-person: watch one real two-wave run — not runnable here (needs iTerm2 and a real two-wave run); checklist qa_reports/manual-verification_e466-conductor.md adequate — manual
+## 2026-11-27T18:09:25.054Z — PASS — by code-reviewer
+
+suite-result: 5016/5019 passed (server-recorded from qa_suite_result; command: node scripts/test-lock.mjs -- npm test)
+
+Round 2 APPROVED at e9a741d6. F1 is resolved:
+- docs/install.md:349 now equals install.count.
+- The docs/architecture.md Layer 1 box carries arch.count and arch.list byte for byte, all 62 characters wide. The file's diff is only those 2+/1- lines, which is the integrator-accepted edit outside the cut (to-lane#4). The e457 / e433 numbers stay green (19/19).
+
+Full suite on the clean tree: 5016/5019 pass, 0 fail, 3 skipped. All 14 expected-red entries are green and nothing outside that list is red. dist/ matches a fresh build. S1–S8 pass. S9 is device-or-person and its checklist qa_reports/manual-verification_e466-conductor.md is adequate.
+
+Recommended: add tests for the open --record → first-wave wave-done path and for wake (verified by hand in round 1).
+Optional: trim the qa test-header WHY blocks that agc check flags; docs/architecture.md still says 12 tw_* tools in its Layer 2 header, which predates this lane.
+
+Report: review_reports/review_T-E466-01.md.
+
