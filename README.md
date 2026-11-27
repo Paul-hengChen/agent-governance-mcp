@@ -90,7 +90,7 @@ Every `tw_update_state` runs pre-flight → file lock → freshness check → a 
 
 ## Per-Role Model Routing
 
-Every role SOP declares a `recommended_model` in its YAML frontmatter — in `content/skill-<role>.md` for the thirteen single-file roles, and in `content/coord-01-core-head.md` for the coordinator (whose SOP is composed from `content/coord-01..07-*.md` per `prompts/skill-manifest.ts`). The recommendation is **advisory** — the MCP server does not control client-side inference. Honor it via Claude Code's `~/.claude/agents/*.md` (per-subagent model pinning) or manual `/model` switches; old clients that ignore the field keep working.
+Every role SOP declares a `recommended_model` in its YAML frontmatter — in `content/skill-<role>.md` for the fourteen single-file roles, and in `content/coord-01-core-head.md` for the coordinator (whose SOP is composed from `content/coord-01..07-*.md` per `prompts/skill-manifest.ts`). The recommendation is **advisory** — the MCP server does not control client-side inference. Honor it via Claude Code's `~/.claude/agents/*.md` (per-subagent model pinning) or manual `/model` switches; old clients that ignore the field keep working.
 
 | Role             | Tier   | Recommended model | Rationale                                                            |
 | ---------------- | ------ | ----------------- | -------------------------------------------------------------------- |
@@ -101,6 +101,7 @@ Every role SOP declares a `recommended_model` in its YAML frontmatter — in `co
 | sr-engineer      | high   | `opus`            | Hot path — every FAIL re-runs the whole chain; quality > cost.       |
 | integrator       | high   | `opus`            | Cross-lane fan-out and fan-in; prompt-only.                          |
 | spec-workshop    | high   | `opus`            | Rounds of rulings with the human; prompt-only.                       |
+| conductor        | high   | `opus`            | Opens a fresh integrator per wave; prompt-only.                      |
 | coordinator      | medium | `sonnet`          | Triage + routing; structured decisions but not deep reasoning.       |
 | pm               | medium | `sonnet`          | Spec drafting; structured output, bounded scope per call.            |
 | qa-engineer      | high   | `opus`            | Writes every scenario test first; sr-engineer cannot edit them.      |

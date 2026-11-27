@@ -287,6 +287,12 @@ Semantics:
 
 ---
 
+### Conductor — what it reads (no key of its own)
+
+The conductor (the `conductor` MCP prompt and `scripts/conductor.mjs`) reads `waveDoneAt` from the primary checkout's `.current/.config.json` with the same resolver as the lane launcher: before it closes an integrator, the wave's pull request must have merged (`"merged"`, the default) or be open or merged (`"pr-open"`). It keeps its own state in `agc-conductor.json` and its mailbox in the folder `agc-conductor/`, both in the directory `git rev-parse --git-common-dir` prints, so neither is ever tracked. It adds no config key and no schema version change.
+
+---
+
 ## `.current/const-*.md` — constitution override
 
 > ⚠️ **Changed in v3.44.0.** There is no longer a single `content/constitution.md`, so **`.current/constitution.md` is not read by anything** — dropping that file has no effect and produces no error. If you set one up before v3.44.0, migrate it to per-fragment overrides as below.
