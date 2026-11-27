@@ -5,16 +5,17 @@
 // the manifest; it never writes a tracked path or anything under a lane worktree.
 // Why: specs/e443b-lane-launcher-architecture.md
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadConfig, resolveTicketDir, type WorkspaceConfig } from "./config.js";
 import {
   FANOUT_CODES, lanesSectionsWithoutWave, lookupTicketFiles, parseManifest, renderPrompt, resolveMailboxHeader, resolveWorktree,
   ticketIds, validateManifest, type DispatchableLane, type Manifest,
 } from "./fanout-manifest.js";
-import type { LaneAncestryResult } from "./join-precondition.js";
+import { checkLaneAncestry, type LaneAncestryResult } from "./join-precondition.js";
 import { HISTORY_BUCKET_RE, resolveLaneName } from "./lane-paths.js";
 import { parseTicketFile } from "./ticket-file.js";
 
@@ -724,4 +725,78 @@ export function createItermDriver(run: OsascriptRunner = runOsascript): WindowDr
 export function itermInstalled(home: string = os.homedir()): boolean {
   return process.platform === "darwin" &&
     [path.join("/Applications", "iTerm.app"), path.join(home, "Applications", "iTerm.app")].some(isDir);
+}
+
+// --- §L CLI -------------------------------------------------------------------
+
+export const LANE_LAUNCH_USAGE = "usage: node scripts/lane-launch.mjs <manifest>";
+const INSTALL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+function pidAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+/** Real seams: iTerm2 driver, host paths under os.homedir(), feature-start runner, real clock, git, checkLaneAncestry, process pid and streams. */
+export function createHostDeps(): LaunchDeps {
+  const home = os.homedir();
+  return {
+    driver: createItermDriver(),
+    itermInstalled: () => itermInstalled(home),
+    host: {
+      claudeJson: path.join(home, ".claude.json"),
+      userSettings: path.join(home, ".claude", "settings.json"),
+      managedSettings: MANAGED_SETTINGS_FILE,
+      managedDropInDir: path.join(path.dirname(MANAGED_SETTINGS_FILE), "managed-settings.d"),
+    },
+    featureStart: (req) => {
+      const r = spawnSync(process.execPath, featureStartArgv(INSTALL_ROOT, req), { cwd: req.primary, encoding: "utf8" });
+      return r.status === 0 ? { ok: true } : { ok: false, firstLine: firstLine(r.stderr || r.stdout || String(r.error ?? `exit ${r.status}`)) };
+    },
+    clock: { now: () => Date.now(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
+    git: (args, cwd) => {
+      const r = spawnSync("git", args, { cwd, encoding: "utf8" });
+      return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+    },
+    ancestry: checkLaneAncestry,
+    isPidAlive: pidAlive,
+    pid: process.pid,
+    out: (line) => { process.stdout.write(`${line}\n`); },
+    err: (line) => { process.stderr.write(`${line}\n`); },
+  };
+}
+
+/** argv → exit code 0 / 1 / 2. While a run is active, SIGINT / SIGTERM release its lock and exit 130 / 143. */
+export async function runLaneLaunchCli(argv: string[], deps: LaunchDeps): Promise<number> {
+  const manifest = argv[0];
+  if (argv.length !== 1 || manifest === undefined || manifest.startsWith("-")) {
+    deps.err(LANE_LAUNCH_USAGE);
+    return 2;
+  }
+  try {
+    fs.readFileSync(manifest);
+  } catch (e) {
+    deps.err(`lane-launch: cannot read ${manifest}: ${firstLine((e as Error).message)}`);
+    deps.err(LANE_LAUNCH_USAGE);
+    return 2;
+  }
+  const ctx = resolveLaunchContext(manifest, deps.git);
+  if ("error" in ctx) {
+    deps.err(`lane-launch: ${ctx.error}`);
+    return 2;
+  }
+  const lockFile = launchStatePaths(ctx.gitCommonDir).lock;
+  const onSignal = (code: number) => (): void => {
+    if (lockPid(lockFile) === deps.pid) fs.rmSync(lockFile, { force: true });
+    process.exit(code);
+  };
+  const onInt = onSignal(130);
+  const onTerm = onSignal(143);
+  process.on("SIGINT", onInt);
+  process.on("SIGTERM", onTerm);
+  try {
+    return await runLaneLaunch(ctx, deps);
+  } finally {
+    process.off("SIGINT", onInt);
+    process.off("SIGTERM", onTerm);
+  }
 }

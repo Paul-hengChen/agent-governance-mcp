@@ -1,6 +1,6 @@
 import { type WorkspaceConfig } from "./config.js";
 import { type DispatchableLane, type Manifest } from "./fanout-manifest.js";
-import type { LaneAncestryResult } from "./join-precondition.js";
+import { type LaneAncestryResult } from "./join-precondition.js";
 export declare const DEFAULT_LANE_LAUNCH_LIMIT = 3;
 export declare const LAUNCH_STATE_FILE = "agc-lane-launch.json";
 export declare const LAUNCH_LOCK_FILE = "agc-lane-launch.lock";
@@ -251,4 +251,9 @@ export declare const runOsascript: OsascriptRunner;
 export declare function createItermDriver(run?: OsascriptRunner): WindowDriver;
 /** True on macOS when iTerm.app is in /Applications or ~/Applications. */
 export declare function itermInstalled(home?: string): boolean;
+export declare const LANE_LAUNCH_USAGE = "usage: node scripts/lane-launch.mjs <manifest>";
+/** Real seams: iTerm2 driver, host paths under os.homedir(), feature-start runner, real clock, git, checkLaneAncestry, process pid and streams. */
+export declare function createHostDeps(): LaunchDeps;
+/** argv → exit code 0 / 1 / 2. While a run is active, SIGINT / SIGTERM release its lock and exit 130 / 143. */
+export declare function runLaneLaunchCli(argv: string[], deps: LaunchDeps): Promise<number>;
 //# sourceMappingURL=lane-launch.d.ts.map
