@@ -197,3 +197,8 @@ of this lane, so no human row is needed): `test/lane-paths.test.mjs` is assigned
 `SANCTIONED_LANE_PATHS_IMPORTERS` gains `"tools/lane-launch.ts"` with a one-line group comment (it imports
 `HISTORY_BUCKET_RE` / `resolveLaneName` read-only instead of restating them; cited as `(e443b)`). No regex is copied
 anywhere. `node --test test/lane-paths.test.mjs`: 60/60 pass. The expected-red manifest is marked resolved again.
+
+### T-E443B-14 full suite (final)
+
+`node scripts/test-lock.mjs -- npm test` on a clean tree at `960ba8d` (Node 22): 4970 tests, **4968 pass, 0 fail**,
+2 skipped, 0 cancelled (exit 0). No red is left; the expected-red manifest is fully resolved.
