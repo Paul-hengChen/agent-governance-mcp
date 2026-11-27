@@ -2,7 +2,7 @@
 schema_version: 17
 active_feature: "e443a-manifest-waves"
 status: "In_Progress"
-last_updated: "2026-11-27T06:04:05.780Z"
+last_updated: "2026-11-27T06:17:04.317Z"
 last_agent: "sr-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "One ticket (E443a), one lane, one spec; the four sr tasks share tools/fanout-manifest.ts and are cut serially. No architect hop: one module extended plus one sibling module (tools/fanout-waves.ts), no data model, server or gate change."
@@ -14,8 +14,8 @@ dispatch_pins:
   code-reviewer: "opus"
   qa-engineer: "opus"
 evidence_schema: 3
-next_role: "sr-engineer"
-dispatched_at: "2026-11-27T06:04:05.780Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-11-27T06:17:04.317Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 review_round: 0
@@ -30,10 +30,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E443A-02 and T-E443A-03 built in commit e27d7a2 (tools/fanout-manifest.ts + dist + scripts/fanout.mjs header render line). T-E443A-04 (waves) and T-E443A-05 (SOP text) not started — next dispatch.
-- Built: I1 — WAVE_COLUMN, four dispatchable header shapes (lanesShape), approval read by header position, DispatchableLane.wave/depLanes (keys absent without 波次), WAVE_NOT_INTEGER + DEPS_NOT_LANE_LIST/DEPS_SELF/DEPS_LANE_UNKNOWN/DEPS_LATER_WAVE row errors via the existing row-error path (a prescan indexes every wave-table lane, row errors included). I2 — exported ticketIds(cell) and lookupTicketFiles(primary, ids) -> {ok, tickets: TicketFileInfo{id,title,file,scenarioIds,allowedPaths}} | {ok:false, errors} with TICKET_FILE_ABSENT/DUPLICATE/INVALID (for waves to reuse). I3 — RenderOptions.batch, BATCH_FIRST_STEP_LINE / BATCH_CLOSING_LINE exported, batch template derived from the template in use (TEMPLATE_BATCH_LINE_ABSENT), TICKET_CELL_EMPTY, --batch value-less flag stripped before parseArgs (twice / with --summary|--reading -> USAGE). USAGE render line replaced per USAGE_LINES (waves line left for T-04, so e296/e322 count stays 5).
-- Tests (clean tree, after commit): targeted 405 tests / 377 pass / 28 fail; every failing top-level test is on the expected-red manifest under T-E443A-04 (e443a-wave-compare A1-4..A1-7 + smoke, e296 AC12, e322 AC-E322-9: 5->6 usage count) or T-E443A-05 (e443a-integrator-sop A1-8, e423 AC12, e428 AC6+AC12, e292 AC-E292-9). Now green: e443a-wave-columns A1-1, A1-2 (A1-3 still green), e443a-batch-render A1-9, A1-10, A1-11, smoke.
-- A1-12: forbidden render readers + e285 + e430 green unmodified; git diff --exit-code vs base-sha on those files exits 0. A1-3 baseline loop diff exits 0. npm audit --audit-level=high: 0 high/critical. Full suite not run this dispatch.
+- sr-engineer: T-E443A-04 and T-E443A-05 ready for code review (T-E443A-02/03 were built earlier in e27d7a2). Commits: bffe2fb (T-04: new tools/fanout-waves.ts runWaves + dist, scripts/fanout.mjs on-demand route + header comment, USAGE waves line, small export lanesSectionsWithoutWave in tools/fanout-manifest.ts) and 171ff4d (T-05: content/skill-integrator.md, SOP_STAGE1_WAVES appended to Stage 1 step 6's line after one space, SOP_STAGE2_WAVES replacing the Stage 2 wave-table exception text to end of line; both copied byte-exact from the spec blocks by script; line count stays 269).
+- Full suite after commit (node scripts/test-lock.mjs -- npm test): 4905/4907 pass, 0 fail, 2 skipped, exit 0. The only uncommitted files during the run were .current/e443a/handoff.md and dispatch.jsonl (rewritten by the step-4a checkpoint write). Every expected-red manifest entry is now green and nothing else is red. A1-12: git diff --exit-code against base-sha on the 8 forbidden render readers + e285 + e430 exits 0; tools/fanout-manifest.ts has no --template string. A1-3: validate-baseline loop diff prints nothing. npx tsc --noEmit clean. npm audit --audit-level=high: 0 high/critical (7 low/moderate).
+- Judgment calls from the previous sr hop, for the judge: (1) the generic USAGE render line now reads per spec USAGE_LINES, so any render usage error (with or without --batch) prints the new render line; (2) the scripts/fanout.mjs header comment render line was updated per spec.
+- Judgment calls this hop (1/2): (a) waves reports manifest-side input errors (validate errors, else WAVES_COLUMN_ABSENT per Lanes section without 波次, provisional tables included), wave-table errors and PRIMARY_NOT_FOUND together in one exit-2 output; ticket files are looked up only when all of those are clean. (b) WAVE_TABLE_DUPLICATE lists every matching table's header line (the spec shows two). (c) A wave-table 'depends on' naming the row's own ticket is WAVE_TABLE_ROW_MALFORMED (spec: 'another ticket').
+- Judgment calls this hop (2/2): (d) TICKET_IN_TWO_LANES lists the lane of every occurrence, so a ticket written twice in one cell shows 'lanes la, la'. (e) The waves arg parser is local to fanout-waves.ts (--primary only; unknown flag / missing value / given twice / wrong operand count -> USAGE with the generic usage). (f) d in the ok/reason line = approved pairs kept, deduplicated per row. (g) scripts/fanout.mjs header line 3 and the exit-code line were extended to mention waves; the e285/e322 header readers stay green.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
