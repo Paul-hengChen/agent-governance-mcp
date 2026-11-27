@@ -61,9 +61,16 @@ test/e425-stop-ticket-batch.test.mjs | AC1: lane protocol holds C-LP1, C-LP2 and
 
 # T-E443B-13 (sr-engineer): left red by the served text this task lands; re-captured / re-pinned by qa in T-E443B-14.
 # Budget cap: +100 tok in the teamwork bundle (20005 vs 19905), the measured growth the cut planned for.
-test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19905 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20005 ~tok)
 # Compose golden: coord-03 gains the usage-limit paragraph.
 test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
 # e428 sha256 pin of content/skill-integrator.md (the four edited lines change the base hash).
 test/e428-tracker-mirror.test.mjs | AC6: integrator `## Tracker items` (C-IN1) sits after the Stage 6 *Your own commits* paragraph and before `## Git operations`; nothing else moves
 test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the four files holds no URL, repo-only path, bare ticket id, version label, quoted error code or vendor name
+
+# qa-engineer T-E443B-14 (2026-11-27) — MANIFEST FULLY RESOLVED: every entry above is green.
+# Coordinator monolith golden re-captured by scripts/capture-constitution-golden.mjs (only the coord-03 usage-limit
+# paragraph moved; the other 11 goldens unchanged); context-budget teamwork bundle cap 19905 -> 20005 (its entry above
+# now carries the re-pinned title); e428 BASE[IN_FILE].sha re-pinned to
+# 908fa6a0938ed5bb4eb38ea4b74285b1a5306a996f6d1e450be05f199a5d917f. No red is left on purpose; entries are kept as
+# history (append-only), not as open reds.

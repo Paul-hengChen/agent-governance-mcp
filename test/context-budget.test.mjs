@@ -616,7 +616,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 19905 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20005 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -647,7 +647,8 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // E426 re-baseline: C-CO7a, the coord-07 (ii) mini-chain ticket-file sentence (no constitution change), +39 ~tok (measured 19559); was 19520, zero headroom.
   // E428 re-baseline: C-CO1, the coord-01 tracker-number-with-ticket-file paragraph (no constitution change), +140 ~tok (measured 19699); was 19559, zero headroom.
   // E447 re-baseline: C-C08K in the constitution above (+134) plus C-CO3K, the knowledge-local sentence appended to the coord-03 bookkeeping line (+72), +206 ~tok (measured 19905); was 19699, zero headroom.
-  assert.ok(bundle <= 19905, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 19905 (AC8 design-arm floor, E447 re-baseline, zero headroom)`);
+  // E443b re-baseline: the coord-03 usage-limit sentence at the head of the Crash-Resume Protocol (a usage limit is not tool unavailability: no fallback, no model switch, one re-dispatch, then checkpoint and stop; no constitution change), +100 ~tok (measured 20005); was 19905, zero headroom.
+  assert.ok(bundle <= 20005, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 20005 (AC8 design-arm floor, E443b re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

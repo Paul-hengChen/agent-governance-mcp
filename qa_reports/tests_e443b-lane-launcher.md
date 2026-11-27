@@ -160,3 +160,17 @@ running the four `test/e443b-*.test.mjs` files plus `test/e115-join-precondition
 T-E443B-14 runs it): `node --test` on Node 22 at `8f30894` (tests and dist unchanged since
 `b4f2885`): 67 tests, 37 pass, **30 fail**, exit 1. The 30 failing top-level tests are exactly the 30 manifest entries
 (name-for-name), and every other test in those seven files is green.
+
+## T-E443B-14 qa close (2026-11-27)
+
+The three re-pins deferred above, done after T-E443B-13 landed the served text (in-place edits only, no new test file):
+
+| file | change | why |
+|---|---|---|
+| `test/fixtures/compose-golden/skill-coordinator-monolith.txt` | re-captured with `npm run build && node scripts/capture-constitution-golden.mjs` | coord-03 gains the usage-limit paragraph under `## Crash-Resume Protocol`; the diff is that one paragraph (+2 lines) and nothing else; the other 11 goldens came out byte-identical |
+| `test/context-budget.test.mjs` AC8/AC-P2-7 | teamwork bundle cap 19905 -> 20005 (title, assert, message), one E443b history comment | measured 20005 ~tok, +100 for the usage-limit sentence, within the human-approved re-baseline; no constitution change |
+| `test/e428-tracker-mirror.test.mjs` `BASE[IN_FILE].sha` | `81ea9cf3...` -> `908fa6a0938ed5bb4eb38ea4b74285b1a5306a996f6d1e450be05f199a5d917f`, with a re-pin comment naming the previous value | the four edited lines of `content/skill-integrator.md` are now part of the base (AC6, AC12) |
+
+`test/skill-manifest.test.mjs` is not edited: t-golden-byte-identity goes green from the re-capture alone.
+Targeted check: `context-budget`, `e428-tracker-mirror`, `skill-manifest`, `e90-golden-capture-completeness`,
+`compose-equivalence`: 113 tests, 113 pass. `qa_reports/expected-red_e443b-lane-launcher.txt` is marked fully resolved.

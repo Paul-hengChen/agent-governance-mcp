@@ -169,7 +169,9 @@ const BASE = {
   [SW_FILE]: { sha: "e8f7ee8c360cc9686e850a1b3c8f3debbe12512a87aee5e836c6d6174f8e08b9", revert: (t) => swapBack(removeInsert(t, C_SW2, "C-SW2"), C_SW1, OLD_SW_SENTENCE, "C-SW1") },
   // Re-pinned by E443a (specs/e443a-manifest-waves.md): the base now includes that ticket's two integrator
   // strings (Stage 1 step 6, Stage 2 exception); was bebdd0e874912302b06f2ae81812aa924b1089f21a3a1b0767e2b078f6f58d06.
-  [IN_FILE]: { sha: "81ea9cf3dbc3c706285b8e54105d0745aa81eae56f3a69ba2407eb0c205ff840", revert: (t) => removeInsert(t, C_IN1, "C-IN1") },
+  // Re-pinned by E443b (specs/e443b-lane-launcher.md): the base now includes that ticket's four edited integrator
+  // lines (Work overview, Lifecycle, Stage 3 Render, Stage 6 step 7); was 81ea9cf3dbc3c706285b8e54105d0745aa81eae56f3a69ba2407eb0c205ff840.
+  [IN_FILE]: { sha: "908fa6a0938ed5bb4eb38ea4b74285b1a5306a996f6d1e450be05f199a5d917f", revert: (t) => removeInsert(t, C_IN1, "C-IN1") },
   [CO_FILE]: { sha: "ad94413ccc8443ac135e29c19455df534139c94e31fc181cbe3d5ba65a745511", revert: (t) => removeInsert(t, C_CO1, "C-CO1") },
   [TF_FILE]: { sha: "2321639c08c98cd5023d6f16bb51396a74c5d1d28200e8f37be12121a3f04407", revert: (t) => removeInsert(t, C_TF1, "C-TF1") },
 };
