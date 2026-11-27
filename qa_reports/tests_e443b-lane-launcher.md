@@ -189,3 +189,11 @@ The fix is one allow-list entry plus a group comment citing the e443b architectu
 `test/lane-paths.test.mjs` is not in the lane's owned cell by name, and the manifest's catch-all ("other tests red
 only because of this lane, listed by the PM probe, confirmed by the integrator") needs integrator confirmation
 first. Every other test is green, including all forbidden-column invariants.
+
+### T-E443B-14 CALLERS2 re-pin (integrator ruling)
+
+Integrator ruling (mailbox to-lane#5, under the manifest's standing rule for unowned tests that are red only because
+of this lane, so no human row is needed): `test/lane-paths.test.mjs` is assigned to lane e443b. Applied in place:
+`SANCTIONED_LANE_PATHS_IMPORTERS` gains `"tools/lane-launch.ts"` with a one-line group comment (it imports
+`HISTORY_BUCKET_RE` / `resolveLaneName` read-only instead of restating them; cited as `(e443b)`). No regex is copied
+anywhere. `node --test test/lane-paths.test.mjs`: 60/60 pass. The expected-red manifest is marked resolved again.

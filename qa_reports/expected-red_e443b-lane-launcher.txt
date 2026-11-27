@@ -81,3 +81,7 @@ test/e428-tracker-mirror.test.mjs | AC12: every added or changed line in the fou
 # implementation defect. test/lane-paths.test.mjs is not in the lane's owned cell by name, so the re-pin waits
 # for the integrator to confirm ownership.
 test/lane-paths.test.mjs | CALLERS2 (allow-list): grep -rln "lane-paths" tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned F0 + L1-L3 importer set — a NEW unlisted importer still fails this
+# qa-engineer T-E443B-14 (2026-11-27) — RESOLVED again. By integrator ruling (mailbox to-lane#5, the manifest's standing
+# rule for unowned tests red only because of this lane), test/lane-paths.test.mjs is assigned to lane e443b. CALLERS2 now
+# names tools/lane-launch.ts with a group comment (read-only import of HISTORY_BUCKET_RE / resolveLaneName). No red is
+# left on purpose; entries are kept as history (append-only), not as open reds.

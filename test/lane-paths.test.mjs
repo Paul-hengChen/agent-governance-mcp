@@ -351,6 +351,8 @@ test("CALLERS2 (allow-list): grep -rln \"lane-paths\" tools/ gates/ guards/ prom
     // resolveCurrentLane/resolveLanePaths (CALLERS1/CALLERS3 unaffected).
     // (e177b AC5/AC5a/AC5c, review fix R1)
     "tools/lane-status.ts",
+    // tools/lane-launch.ts imports HISTORY_BUCKET_RE/resolveLaneName read-only instead of restating them. (e443b)
+    "tools/lane-launch.ts",
   ].sort();
   let output;
   try {
