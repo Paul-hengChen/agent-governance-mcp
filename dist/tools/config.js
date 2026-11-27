@@ -21,6 +21,8 @@ export const CUT_APPROVAL_AUTO_TIER_DEFAULTS = {
     allowDesignArmed: false,
     manifest: false,
 };
+export const DEFAULT_WAVE_DONE_AT = "merged";
+const isWaveDoneAt = (v) => v === "merged" || v === "pr-open";
 // Same character class as bin/agc-init.mjs GITIGNORE_UNSAFE_SEGMENT_RE: each
 // location becomes a `/<loc>/node_modules` exclude rule.
 const NODE_MODULES_LINK_UNSAFE_RE = /[*?[\]\\\x00-\x1f\x7f]/;
@@ -349,12 +351,22 @@ function loadConfigEntry(workspacePath) {
     if (typeof laneLaunchLimit === "number" && Number.isInteger(laneLaunchLimit) && laneLaunchLimit > 0) {
         result.laneLaunchLimit = laneLaunchLimit;
     }
+    const payload = migration.payload;
+    let waveDoneAtRejected;
+    if (Object.hasOwn(payload, "waveDoneAt")) {
+        if (isWaveDoneAt(payload.waveDoneAt))
+            result.waveDoneAt = payload.waveDoneAt;
+        else
+            waveDoneAtRejected = { value: payload.waveDoneAt };
+    }
     // Cache under the pre-read mtime. If the migration heal-on-read above
     // rewrote the file, the recorded mtime is already stale — the NEXT call's
     // stat will mismatch and trigger one redundant (but correct) re-read,
     // which is preferable to racing a post-write re-stat against concurrent
     // writers/deleters.
     const entry = { config: result, mtimeMs: currentMtime, error: null };
+    if (waveDoneAtRejected !== undefined)
+        entry.waveDoneAtRejected = waveDoneAtRejected;
     configCache.set(workspacePath, entry);
     return entry;
 }
@@ -394,6 +406,16 @@ export function resolveTaskPaths(workspacePath) {
 /** Absolute ticket-file directory: the configured `ticketDir` or the default. */
 export function resolveTicketDir(workspacePath) {
     return path.join(workspacePath, loadConfig(workspacePath).ticketDir ?? DEFAULT_TICKET_DIR);
+}
+/**
+ * Effective `waveDoneAt`: the configured value, or "merged" when the key is
+ * absent or unusable. `rejected` is present (the configured value verbatim)
+ * only when the key is present but unusable, so the caller can name it.
+ */
+export function resolveWaveDoneAt(workspacePath) {
+    const entry = loadConfigEntry(workspacePath);
+    const waveDoneAt = entry.config.waveDoneAt ?? DEFAULT_WAVE_DONE_AT;
+    return entry.waveDoneAtRejected === undefined ? { waveDoneAt } : { waveDoneAt, rejected: entry.waveDoneAtRejected.value };
 }
 /**
  * The current lane's ledger `.current/<lane>/tasks.md` when it exists, else

@@ -22,6 +22,7 @@ export interface WorkspaceConfig {
     sisterRepos?: SisterRepo[];
     ticketDir?: string;
     laneLaunchLimit?: number;
+    waveDoneAt?: WaveDoneAt;
 }
 export interface SisterRepo {
     name: string;
@@ -32,6 +33,8 @@ export interface SisterRepo {
 }
 export type WorkspaceArtifactsMode = "local" | "repo";
 export type WorkspaceKnowledgeMode = "local" | "repo";
+export type WaveDoneAt = "merged" | "pr-open";
+export declare const DEFAULT_WAVE_DONE_AT: WaveDoneAt;
 export interface NodeModulesLinksParse {
     links: string[];
     rejected: unknown[];
@@ -72,6 +75,15 @@ export declare function getConfigError(workspacePath: string): string | null;
 export declare function resolveTaskPaths(workspacePath: string): string[];
 /** Absolute ticket-file directory: the configured `ticketDir` or the default. */
 export declare function resolveTicketDir(workspacePath: string): string;
+/**
+ * Effective `waveDoneAt`: the configured value, or "merged" when the key is
+ * absent or unusable. `rejected` is present (the configured value verbatim)
+ * only when the key is present but unusable, so the caller can name it.
+ */
+export declare function resolveWaveDoneAt(workspacePath: string): {
+    waveDoneAt: WaveDoneAt;
+    rejected?: unknown;
+};
 /**
  * The current lane's ledger `.current/<lane>/tasks.md` when it exists, else
  * the legacy file (findLegacyTasksFile). Side-effect-free — no write, no
