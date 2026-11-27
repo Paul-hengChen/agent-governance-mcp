@@ -74,3 +74,18 @@ Green now (behaviour exists, kept as regression pins): E463-AC1 (2 tests), E463-
 Headless; no network, no real `gh`. No test reads repository history (`test/render-structure.test.mjs` forbids it), so the E464-AC6 clause
 "`scripts/verify-release.mjs` is byte-identical to the base" is a command proof for the judge (the X-AC1 `git diff` line);
 the test asserts only that `verify-release.mjs` does not import the helper.
+
+## Re-pin of test/e394-release-script.test.mjs (sr return 1/2, T-E463-02)
+
+Cause: spec Decision 2 has `scripts/release.mjs` import `./gh-compat.mjs`; three e394 tests collided with that import.
+No assertion was loosened.
+
+- Fixture template (`mkFixture`): also copies `scripts/gh-compat.mjs` beside `release.mjs`, so the two AC-S2 real-child tests
+  ("the stop record is the last stderr line through a real child with piped stderr (R2)", "every non-zero path through a real child prints the stop record last")
+  load the script.
+- AC-S9 "absorbed checks are delegated": the relative-import check now collects every top-level relative import and requires each to be exactly
+  `./gh-compat.mjs`; dynamic relative imports and `./check*` / `./verify*` imports stay refused.
+
+Runs: against HEAD without the sr build, e394 is 66/66 green (no pre-patch reds in e394; the re-pin needs no sr build).
+With the sr build patch applied temporarily (then reverted), e394 + e463 together: 89/89 pass.
+The e463 reds listed in `expected-red_e463-release-gh-checks.txt` are unchanged and unaffected by this re-pin.

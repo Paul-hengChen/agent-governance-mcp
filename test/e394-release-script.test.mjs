@@ -127,6 +127,8 @@ function buildTemplate({ baseVersion, version, spec, baseline }) {
   put(".current/lane1/handoff.md", "---\nlast_agent: qa-engineer\nstatus: PASS\n---\n# Handoff\n\n## Pending & Handoff Notes\n- QA PASS\n");
   put(".current/lane1/events.jsonl", "{\"n\":1}\n");
   put("scripts/release.mjs", fs.readFileSync(SCRIPT, "utf-8"));
+  // E463: release.mjs imports its one allowed sibling, the gh compatibility helper; a real-child run needs it beside the script.
+  put("scripts/gh-compat.mjs", fs.readFileSync(path.join(REPO, "scripts", "gh-compat.mjs"), "utf-8"));
   for (const s of ["scripts/check-version.mjs", "scripts/check-bookkeeping.mjs", "scripts/verify-release.mjs", "bin/agc-init.mjs"]) put(s, STUB);
   if (baseline) put("qa_reports/archive/old/review_T-OLD-01.md", "old\n");
   if (spec) put("specs/feat.md", "# feat\n");
@@ -809,7 +811,9 @@ test("AC-S8 the closing write must be on disk before anything is committed", () 
 
 test("AC-S9 absorbed checks are delegated", async () => {
   const src = fs.readFileSync(SCRIPT, "utf-8");
-  assert.ok(!/^import .*from "\.\.?\//m.test(src) && !/import\("\.\.?\//.test(src) && !/from "\.\/(check|verify)/.test(src), "release.mjs imports none of the three scripts");
+  // E463: the one relative import release.mjs may have is the gh compatibility helper; every other relative import (check-*, verify-*, anything else) stays refused.
+  const relImports = [...src.matchAll(/^import .*from "(\.\.?\/[^"]*)"/gm)].map((m) => m[1]);
+  assert.ok(relImports.every((i) => i === "./gh-compat.mjs") && !/import\("\.\.?\//.test(src) && !/from "\.\/(check|verify)/.test(src), "release.mjs imports none of the three scripts (only ./gh-compat.mjs is admitted)");
   const fx = mkFixture();
   await prepared(fx);
   await runMain(fx, ["publish", "--version", fx.version]);
